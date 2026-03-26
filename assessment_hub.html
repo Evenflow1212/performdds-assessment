@@ -758,7 +758,7 @@ function buildSteps(config) {
     const practiceInputHTML = isFirst ? `
       <div class="practice-input-box">
         <label>Practice Name</label>
-        <input type="text" id="practice-name-input" placeholder="e.g. Smile Family Dentistry" oninput="practiceName=this.value">
+        <input type="text" id="practice-name-input" placeholder="e.g. Smile Family Dentistry" oninput="practiceName=this.value" value="${practiceName}">
         <div class="hint">This will appear in the email to your Perform DDS consultant.</div>
       </div>` : '';
 
