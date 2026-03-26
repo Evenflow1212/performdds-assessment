@@ -1,0 +1,8 @@
+{
+  "name": "performdds-functions",
+  "version": "1.0.0",
+  "description": "Netlify functions for Perform DDS assessment workbook generation",
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  }
+}
