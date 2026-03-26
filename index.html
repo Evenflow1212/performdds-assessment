@@ -314,6 +314,7 @@ section { padding: 100px 48px; max-width: 1100px; margin: 0 auto; }
 .radio-opt:hover { border-color: rgba(0,174,239,0.4); }
 .radio-opt input[type=radio] { accent-color: var(--blue); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
 .radio-opt.selected { border-color: var(--blue); background: var(--blue-light); color: white; }
+.radio-opt.selected::after { content: ' ✓'; color: var(--blue); font-weight: 800; margin-left: 4px; }
 
 .form-submit-btn {
   width: 100%; background: var(--blue); color: var(--black); border: none;
@@ -348,7 +349,7 @@ section { padding: 100px 48px; max-width: 1100px; margin: 0 auto; }
   from { opacity: 0; transform: translateY(24px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal { opacity: 1; transform: translateY(0); transition: opacity 0.7s ease, transform 0.7s ease; }
 .reveal.visible { opacity: 1; transform: translateY(0); }
 
 /* ─── RESPONSIVE ─── */
@@ -740,9 +741,13 @@ Submitted via Perform DDS Practice Assessment Tool`;
     window.location.href = `assessment_hub.html`;
   }
 }
+
+// Expose functions globally
 window.handleSubmit = handleSubmit;
 window.selectRadio = selectRadio;
 window.togglePPOPct = togglePPOPct;
+
+// Wire up submit button via addEventListener as fallback
 document.addEventListener('DOMContentLoaded', function() {
   var btn = document.getElementById('submit-btn');
   if (btn) btn.addEventListener('click', handleSubmit);

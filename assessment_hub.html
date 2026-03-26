@@ -7,6 +7,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>emailjs.init('S3k44GF4XVmVpgfVJ');</script>
+<script>
+  const UPLOADCARE_KEY = '762aba345bfc73d44262';
+// API key is stored server-side as a Netlify environment variable (ANTHROPIC_KEY)
+// All AI calls are proxied through /.netlify/functions/analyze
+</script>
 <style>
 :root {
   --black: #0D0D0D;
@@ -139,6 +144,13 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 .upload-status.show { display: flex; justify-content: center; }
 .upload-change { font-size: 12px; color: var(--gray-500); margin-top: 6px; cursor: pointer; text-decoration: underline; }
 
+/* Uploadcare progress */
+.upload-progress-wrap { display: none; flex-direction: column; align-items: center; gap: 10px; padding: 8px 0; }
+.upload-progress-wrap.show { display: flex; }
+.upload-progress-bar-track { width: 100%; max-width: 320px; height: 4px; background: var(--black-border); border-radius: 2px; overflow: hidden; }
+.upload-progress-bar-fill { height: 100%; background: var(--blue); border-radius: 2px; transition: width 0.2s; width: 0%; }
+.upload-progress-label { font-size: 12px; color: var(--blue); font-family: var(--font-display); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+
 .nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--black-border); }
 .btn-back-step { background: transparent; color: var(--gray-500); border: 1px solid var(--black-border); border-radius: 4px; padding: 11px 24px; font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
 .btn-back-step:hover { border-color: var(--gray-500); color: white; }
@@ -208,7 +220,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
         <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Eaglesoft.</p>
         <div class="platform-reports">
           <div class="report-pill">Procedures by Provider</div>
-          <div class="report-pill">Collections Reconciliation</div>
+          <div class="report-pill">Payment Reconciliation</div>
           <div class="report-pill">P&L / Income Statement</div>
           <div class="report-pill">AR by Responsible Party</div>
           <div class="report-pill">Hygiene Schedule</div>
@@ -291,6 +303,42 @@ let uploads = {};
 let hygieneDone = false;
 let practiceName = '';
 
+// Close summary and scroll to a specific step
+function closeModal() {
+  document.getElementById('complete-card').style.display = 'none';
+  document.getElementById('steps-container').style.display = 'block';
+}
+function scrollToStep(stepIndex) {
+  goToStep(stepIndex);
+  const el = document.getElementById('steps-container');
+  if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+// Auto-launch from landing page URL params
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const platform = params.get('platform');
+  const practice = params.get('practice');
+  const doctor = params.get('doctor');
+  if (practice) { practiceName = practice; const inp = document.getElementById('practice-name-input'); if (inp) inp.value = practice; }
+  if (platform && platforms[platform]) {
+    openGuide(platform);
+  }
+});
+
+// Listen for hygiene form completion signal
+window.addEventListener('message', (e) => {
+  if (e.data === 'pdds_hygiene_done') {
+    hygieneDone = true;
+    // Find and update any visible hygiene status element
+    const statusEls = document.querySelectorAll('[id^="hygiene-status-"]');
+    statusEls.forEach(el => {
+      el.textContent = '✓ Completed';
+      el.style.color = 'var(--success)';
+    });
+  }
+});
+
 // ─── Platform configs ───
 const platforms = {
   eaglesoft: {
@@ -319,12 +367,12 @@ const platforms = {
         uploadLabel: 'Upload Procedures by Provider Report'
       },
       {
-        title: 'Collections Reconciliation Report',
-        subtitle: 'Total payments received broken down by type',
+        title: 'Payment Reconciliation Report',
+        subtitle: 'Collections broken down by payment type',
         why: '<strong>What we\'re looking for:</strong> Total collections by payment type — cash, check, credit card, insurance/EFT, and third-party finance. We calculate your collection rate and flag any gap between production and collections.',
         instructions: [
           'From the main menu, click <span class="path">Reports</span> → <span class="path">Financial</span>',
-          'Click <span class="path">Collections Reconciliation</span>',
+          'Click <span class="path">Payment Reconciliation</span>',
           'Set <strong>Date Range</strong> to the same 12 months as the production report',
           'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
           'Click <span class="path">Process</span>',
@@ -337,7 +385,7 @@ const platforms = {
         ],
         tip: 'The last page has the totals summary — that\'s the section we need most.',
         accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Collections Reconciliation Report'
+        uploadLabel: 'Upload Payment Reconciliation Report'
       },
       {
         title: 'P&L / Income Statement',
@@ -757,6 +805,10 @@ function buildSteps(config) {
           <p>Drag & drop or click to browse</p>
           <button class="upload-btn" onclick="event.stopPropagation()">Choose File</button>
         </div>
+        <div class="upload-progress-wrap" id="upload-progress-${i}">
+          <div class="upload-progress-label" id="upload-progress-label-${i}">Uploading…</div>
+          <div class="upload-progress-bar-track"><div class="upload-progress-bar-fill" id="upload-progress-fill-${i}"></div></div>
+        </div>
         <div class="upload-status" id="upload-status-${i}">✓ &nbsp; <span id="upload-name-${i}"></span></div>
         <div class="upload-change" id="upload-change-${i}" onclick="event.stopPropagation();triggerUpload(${i})" style="display:none">Change file</div>
       </div>` : '';
@@ -814,18 +866,18 @@ function goTo(step) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ─── File handling ───
+// ─── Uploadcare file handling ───
+// uploads[idx] = { name, size, url } once uploaded
+const uploadingPromises = {};
+
 function triggerUpload(idx) { document.getElementById(`file-${idx}`).click(); }
+
 function fileChosen(idx) {
   const file = document.getElementById(`file-${idx}`).files[0];
   if (!file) return;
-  uploads[idx] = file;
-  document.getElementById(`upload-prompt-${idx}`).style.display = 'none';
-  document.getElementById(`upload-status-${idx}`).classList.add('show');
-  document.getElementById(`upload-name-${idx}`).textContent = file.name;
-  document.getElementById(`upload-change-${idx}`).style.display = 'block';
-  document.getElementById(`upload-${idx}`).classList.add('uploaded');
+  startUploadcareUpload(idx, file);
 }
+
 function dragOver(e, idx) { e.preventDefault(); document.getElementById(`upload-${idx}`).classList.add('dragover'); }
 function dragLeave(idx) { document.getElementById(`upload-${idx}`).classList.remove('dragover'); }
 function drop(e, idx) {
@@ -834,7 +886,64 @@ function drop(e, idx) {
   if (!file) return;
   const dt = new DataTransfer(); dt.items.add(file);
   document.getElementById(`file-${idx}`).files = dt.files;
-  fileChosen(idx);
+  startUploadcareUpload(idx, file);
+}
+
+function startUploadcareUpload(idx, file) {
+  document.getElementById(`upload-prompt-${idx}`).style.display = 'none';
+  document.getElementById(`upload-status-${idx}`).classList.remove('show');
+  document.getElementById(`upload-change-${idx}`).style.display = 'none';
+  document.getElementById(`upload-${idx}`).classList.remove('uploaded');
+
+  const progressWrap = document.getElementById(`upload-progress-${idx}`);
+  const progressFill = document.getElementById(`upload-progress-fill-${idx}`);
+  const progressLabel = document.getElementById(`upload-progress-label-${idx}`);
+  progressWrap.classList.add('show');
+  progressFill.style.width = '0%';
+  progressLabel.textContent = 'Uploading…';
+
+  const formData = new FormData();
+  formData.append('UPLOADCARE_PUB_KEY', UPLOADCARE_KEY);
+  formData.append('UPLOADCARE_STORE', '1');
+  formData.append('file', file);
+
+  const xhr = new XMLHttpRequest();
+
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const pct = Math.round((e.loaded / e.total) * 100);
+      progressFill.style.width = pct + '%';
+      progressLabel.textContent = `Uploading… ${pct}%`;
+    }
+  };
+
+  uploadingPromises[idx] = new Promise((resolve, reject) => {
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const res = JSON.parse(xhr.responseText);
+        const url = `https://4fsegqpoj9.ucarecd.net/${res.file}/`;
+        uploads[idx] = { name: file.name, size: file.size, url };
+        progressWrap.classList.remove('show');
+        document.getElementById(`upload-status-${idx}`).classList.add('show');
+        document.getElementById(`upload-name-${idx}`).textContent = file.name;
+        document.getElementById(`upload-change-${idx}`).style.display = 'block';
+        document.getElementById(`upload-${idx}`).classList.add('uploaded');
+        resolve(url);
+      } else {
+        progressWrap.classList.remove('show');
+        document.getElementById(`upload-prompt-${idx}`).style.display = 'block';
+        reject(new Error('Upload failed: ' + xhr.status));
+      }
+    };
+    xhr.onerror = () => {
+      progressWrap.classList.remove('show');
+      document.getElementById(`upload-prompt-${idx}`).style.display = 'block';
+      reject(new Error('Network error'));
+    };
+  });
+
+  xhr.open('POST', 'https://upload.uploadcare.com/base/');
+  xhr.send(formData);
 }
 function markHygieneDone(stepIdx) {
   hygieneDone = true;
@@ -862,7 +971,8 @@ function buildSummary() {
       ? (hygieneDone ? 'Completed' : 'Not completed')
       : (uploads[i] ? uploads[i].name : 'Not uploaded');
     const cls = done ? 'uploaded' : 'skipped';
-    grid.innerHTML += `<div class="summary-item"><div class="s-label">${stepNames[i]}</div><div class="s-val ${cls}">${done ? '✓ ' : '— '}${val}</div></div>`;
+    const clickable = !done ? `onclick="closeModal();scrollToStep(${i})" style="cursor:pointer;border-color:#f59e0b;" title="Click to go back and complete this step"` : '';
+    grid.innerHTML += `<div class="summary-item" ${clickable}><div class="s-label">${stepNames[i]}${!done ? ' ↩' : ''}</div><div class="s-val ${cls}">${done ? '✓ ' : '— '}${val}</div></div>`;
   });
 }
 
@@ -871,21 +981,23 @@ function buildEmailBody(filesUploaded) {
   const config = platforms[currentPlatform];
   const now = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
   const pName = practiceName || document.getElementById('practice-name-input')?.value || 'Not provided';
+  const dName = new URLSearchParams(window.location.search).get('doctor') || '';
   const fileLines = filesUploaded.length
-    ? filesUploaded.map(f => `  • ${f.step}: ${f.filename} (${(f.size/1024).toFixed(0)} KB)`).join('\n')
+    ? filesUploaded.map(f => `  • ${f.step}: ${f.filename} (${(f.size/1024).toFixed(0)} KB)\n    Download: ${f.url}`).join('\n\n')
     : '  (no files uploaded)';
   return `New Practice Assessment Submission — Perform DDS
 Submitted: ${now}
 
+DOCTOR: ${dName || 'Not provided'}
 PRACTICE: ${pName}
 SOFTWARE: ${config.name}
 Hygiene Form: ${hygieneDone ? '✓ Completed' : 'Not completed'}
 
-FILES UPLOADED (client will send separately if needed):
+FILES UPLOADED — CLICK TO DOWNLOAD:
 ${fileLines}
 
 —
-Sent via Perform DDS Client Onboarding Guide`;
+Sent via Perform DDS Practice Assessment Tool`;
 }
 
 async function submitToConsultant() {
@@ -894,30 +1006,45 @@ async function submitToConsultant() {
   const config = platforms[currentPlatform];
   const stepNames = ['Production Report', 'Payment Report', 'P&L Statement', 'Hygiene Form', 'AR Aging Report', 'Patient Report'];
   const pName = practiceName || document.getElementById('practice-name-input')?.value || '';
+  const dName = new URLSearchParams(window.location.search).get('doctor') || '';
+
+  btn.disabled = true;
+  btn.textContent = 'Finalizing uploads…';
+
+  // Wait for any still-uploading files
+  const pending = Object.values(uploadingPromises);
+  if (pending.length) {
+    try { await Promise.allSettled(pending); } catch(e) {}
+  }
+
+  btn.textContent = 'Sending…';
 
   const filesUploaded = Object.keys(uploads).map(k => ({
     step: stepNames[parseInt(k)],
     filename: uploads[k].name,
-    size: uploads[k].size
+    size: uploads[k].size,
+    url: uploads[k].url || '(not uploaded)'
   }));
-
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
 
   const subject = pName
     ? `New Assessment: ${pName} (${config.name}) — Perform DDS`
     : `New ${config.name} Assessment Submission — Perform DDS`;
   const message = buildEmailBody(filesUploaded);
 
-  try {
-    await emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ');
-    sentMsg.innerHTML = `✓ &nbsp; Sent! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Please also email your uploaded files to <strong>david@performdds.com</strong> if not already attached.</span>`;
+  // Fire both in parallel — notification email + AI analysis
+  const [emailResult, analysisResult] = await Promise.allSettled([
+    emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
+    runAIAnalysis(filesUploaded, pName, dName, config.name)
+  ]);
+
+  if (emailResult.status === 'fulfilled') {
+    sentMsg.innerHTML = `✓ &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
     sentMsg.classList.add('show');
     btn.textContent = '✓ Sent';
     btn.style.background = 'var(--success)';
     btn.style.color = 'var(--black)';
-  } catch(err) {
-    console.error('EmailJS error:', err);
+  } else {
+    console.error('EmailJS error:', emailResult.reason);
     sentMsg.innerHTML = `⚠️ &nbsp; Couldn't send automatically — please email your summary and files to <strong>david@performdds.com</strong>.`;
     sentMsg.style.background = 'rgba(255,193,7,0.1)';
     sentMsg.style.borderColor = '#FFC107';
@@ -926,6 +1053,163 @@ async function submitToConsultant() {
     btn.disabled = false;
     btn.textContent = 'Retry →';
   }
+
+  if (analysisResult.status === 'rejected') {
+    console.error('AI analysis error:', analysisResult.reason);
+  }
+}
+
+// ─── AI Analysis Engine ───
+async function runAIAnalysis(filesUploaded, practiceName, doctorName, software) {
+  if (!filesUploaded.length) return;
+
+  // Load pdf.js for last-page extraction
+  if (!window.pdfjsLib) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  // Render a single PDF page to base64 JPEG
+  async function pageToBase64(pdfBytes, pageNum) {
+    const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+  }
+
+  // Build PDF content blocks for each uploaded file
+  const pdfBlocks = [];
+  for (const f of filesUploaded) {
+    if (!f.url || f.url === '(not uploaded)') continue;
+    try {
+      const resp = await fetch(f.url);
+      const arrayBuffer = await resp.arrayBuffer();
+      const isPaymentReport = f.step.toLowerCase().includes('payment');
+
+      if (isPaymentReport) {
+        // Extract only the last page as an image — that's where totals live
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const lastPageNum = pdf.numPages;
+        const lastPageImg = await pageToBase64(new Uint8Array(arrayBuffer), lastPageNum);
+        pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename}) — Last page (totals summary) ---` });
+        pdfBlocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: lastPageImg } });
+      } else {
+        // Full PDF for all other reports
+        const base64 = await new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result.split(',')[1]);
+          reader.onerror = rej;
+          reader.readAsDataURL(new Blob([arrayBuffer]));
+        });
+        pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename}) ---` });
+        pdfBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } });
+      }
+    } catch(e) {
+      console.warn(`Could not fetch ${f.step}:`, e);
+      pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename}) — could not load ---` });
+    }
+  }
+
+  const systemPrompt = `You are Dave Orr's AI assessment engine at Perform DDS — a dental practice management consulting firm with 20+ years of experience and 400+ client practices.
+
+Your job is to analyze uploaded dental practice reports and produce a concise, actionable pre-call assessment memo for Dave to review before speaking with the client.
+
+PERFORM DDS BENCHMARKS (flag anything outside these as a red flag):
+- Staff wages: 16–20% of collections (CRITICAL red flag if >25%)
+- Lab fees: target 4% of collections
+- Dental supplies: target 3% of collections  
+- Specialist supplies: target 2%
+- Marketing: target 2%
+- Misc overhead: target 10%
+- GP daily production target: $3,500/day
+- Hygiene daily target: $1,000–$1,250/day
+- Associate daily target: $3,000/day
+- Hygiene should be 30–35% of total production
+- AR 90+ day bucket: should be <12% of total AR (red flag if higher)
+- Collection rate: should be 98%+ of adjusted production
+
+OUTPUT FORMAT — use this exact structure:
+
+## PERFORM DDS — PRE-CALL ASSESSMENT
+Practice: [name] | Software: [software] | Submitted: [date]
+
+### PRACTICE SNAPSHOT
+- Monthly collections (avg):
+- Annual production:
+- # of providers:
+- Hygiene % of production:
+- Collection rate:
+
+### RED FLAGS 🚨
+List each red flag with: metric, actual value, benchmark, severity (HIGH/MEDIUM)
+
+### OPPORTUNITIES 💡
+Top 3–5 growth/optimization opportunities specific to this practice's numbers
+
+### HYGIENE DEPARTMENT
+Quick analysis of hygiene performance vs benchmarks
+
+### AR & COLLECTIONS
+Analysis of AR aging and collection rate
+
+### DAVE'S PREP NOTES
+3–5 specific questions or talking points Dave should raise on the call based on what stands out in the data
+
+Keep the analysis sharp and direct. Dave is an expert — no need to explain basic concepts. Flag the most important numbers first. If a report is missing or unreadable, note it and work with what you have.`;
+
+  const userMessage = [
+    {
+      type: 'text',
+      text: `Please analyze the following dental practice reports and produce the pre-call assessment memo.
+
+Practice: ${practiceName || 'Not provided'}
+Doctor: ${doctorName || 'Not provided'}
+Software: ${software}
+Submitted: ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}
+
+Uploaded reports:`
+    },
+    ...pdfBlocks
+  ];
+
+  const response = await fetch('/.netlify/functions/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Anthropic API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const analysisText = data.content.find(b => b.type === 'text')?.text || 'No analysis generated.';
+
+  // Email the analysis to Dave
+  const analysisSubject = practiceName
+    ? `AI Assessment Ready: ${practiceName} (${software}) — Perform DDS`
+    : `AI Assessment Ready: New ${software} Client — Perform DDS`;
+
+  await emailjs.send('service_5yz66e8', 'template_un21rcd', {
+    subject: analysisSubject,
+    message: analysisText,
+    name: 'Perform DDS AI Engine'
+  }, 'S3k44GF4XVmVpgfVJ');
 }
 </script>
 </body>

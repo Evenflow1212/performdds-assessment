@@ -75,11 +75,11 @@
 </header>
 <main>
   <div class="instructions">
-    <strong>Instructions:</strong> Fill in all fields below based on your current hygiene schedule.
+    <strong>Instructions:</strong> Fill in all fields below based on your current hygiene schedule. Use actual numbers from your practice management software. Leave days blank if hygiene is not scheduled that day.
     <ul>
-      <li>Use actual numbers from your practice management software.</li>
-      <li>Leave days blank if hygiene is not scheduled that day.</li>
-      <li><strong>Recent Past</strong> = last 2–4 weeks actual data &nbsp;|&nbsp; <strong>Next 7 Days</strong> = this week's scheduled vs confirmed &nbsp;|&nbsp; <strong>Near/Far Future</strong> = upcoming weeks booked.</li>
+      <li><strong>Recent Past (3 weeks back):</strong> How many appointment slots were available each day vs how many patients were actually seen.</li>
+      <li><strong>Next 7 Days:</strong> This week only — how many patients are currently scheduled vs how many have confirmed their appointment.</li>
+      <li><strong>Near Future (next 3 weeks):</strong> How many total appointment slots are available vs how many are currently booked on the schedule.</li>
     </ul>
   </div>
   <form id="hygieneForm">
@@ -119,9 +119,9 @@
 
     <!-- RECENT PAST -->
     <div class="card">
-      <div class="card-header"><h3>Recent Past</h3><span class="badge">Last 4 Weeks — Actual</span></div>
+      <div class="card-header"><h3>Recent Past</h3><span class="badge">Last 3 Weeks — Actual</span></div>
       <div class="card-body">
-        <p class="lbl">Appointment slots available vs patients actually seen</p>
+        <p class="lbl">Looking back 3 weeks — total slots available vs patients actually seen each day</p>
         <div id="rpGrid"></div>
         <div class="sum-bar">
           <div class="si"><div class="sl">Available Appts</div><div class="sv" id="rp_a">—</div></div>
@@ -141,7 +141,7 @@
     <div class="card">
       <div class="card-header"><h3>Next 7 Days</h3><span class="badge">Current Week</span></div>
       <div class="card-body">
-        <p class="lbl">Scheduled vs Confirmed for this week</p>
+        <p class="lbl">This week only — patients scheduled vs patients who have confirmed their appointment</p>
         <div id="n7Grid"></div>
         <div class="sum-bar">
           <div class="si"><div class="sl">Total Scheduled</div><div class="sv" id="n7_s">—</div></div>
@@ -155,9 +155,9 @@
 
     <!-- NEAR FUTURE -->
     <div class="card">
-      <div class="card-header"><h3>Near Future</h3><span class="badge">Upcoming Weeks</span></div>
+      <div class="card-header"><h3>Near Future</h3><span class="badge">Next 3 Weeks</span></div>
       <div class="card-body">
-        <p class="lbl">Available slots vs currently booked</p>
+        <p class="lbl">Next 3 weeks — total appointment slots available vs how many are currently booked</p>
         <div id="nfGrid"></div>
         <div class="sum-bar">
           <div class="si"><div class="sl">Available</div><div class="sv" id="nf_a">—</div></div>
@@ -168,20 +168,6 @@
         </div>
       </div>
     </div>
-
-    <!-- FAR FUTURE -->
-    <div class="card">
-      <div class="card-header"><h3>Far Future</h3><span class="badge">Further Out — Pre-booked %</span></div>
-      <div class="card-body">
-        <p class="lbl">Available slots vs booked for weeks further out</p>
-        <div id="ffGrid"></div>
-        <div class="sum-bar">
-          <div class="si"><div class="sl">Available</div><div class="sv" id="ff_a">—</div></div>
-          <div class="sd"></div>
-          <div class="si"><div class="sl">Booked</div><div class="sv" id="ff_b">—</div></div>
-          <div class="sd"></div>
-          <div class="si"><div class="sl">Pre-book Rate</div><div class="sv p" id="ff_p">—</div></div>
-        </div>
       </div>
     </div>
 
@@ -190,6 +176,9 @@
       <button type="button" class="btn" onclick="submitForm()">Submit Schedule Data</button>
     </div>
     <div class="ok" id="okMsg">✓ &nbsp; Schedule data submitted successfully.</div>
+  <div id="returnBtn" style="display:none;margin-top:16px;text-align:center;">
+    <button type="button" class="btn" style="background:var(--success);" onclick="returnToAssessment()">← Return to Assessment</button>
+  </div>
   </form>
 </main>
 <script>
@@ -206,7 +195,7 @@ function buildGrid(id,weeks,l1,l2,pfx){
   h+=`</div>`;
   for(let wi=0;wi<weeks;wi++){
     h+=`<div class="wg-row" style="grid-template-columns:${cols}">
-      <div class="wc lc"><input type="text" style="width:100%;padding:5px 6px;border:1.5px solid var(--ice);border-radius:4px;font-size:12px;text-align:left" id="${pfx}_d${wi}" placeholder="e.g. 3/31/25" oninput="calc('${pfx}',${weeks})"></div>`;
+      <div class="wc lc"><input type="text" style="width:100%;padding:5px 6px;border:1.5px solid var(--ice);border-radius:4px;font-size:12px;text-align:left" id="${pfx}_d${wi}" placeholder="Week of..." oninput="calc('${pfx}',${weeks})"></div>`;
     DAYS.forEach((_,di)=>{
       h+=`<div class="wc"><input type="number" min="0" id="${pfx}_w${wi}_${di}_1" placeholder="0" oninput="calc('${pfx}',${weeks})"></div>`;
       h+=`<div class="wc"><input type="number" min="0" id="${pfx}_w${wi}_${di}_2" placeholder="0" oninput="calc('${pfx}',${weeks})"></div>`;
@@ -263,13 +252,13 @@ function submitForm(){
     practice:document.getElementById('practiceName').value,
     doctor:document.getElementById('doctorName').value,
     date:document.getElementById('submitDate').value,
-    hours:{},rdh:{},recentPast:[],next7:{scheduled:[],confirmed:[]},nearFuture:[],farFuture:[]
+    hours:{},rdh:{},recentPast:[],next7:{scheduled:[],confirmed:[]},nearFuture:[]
   };
   ['mon','tue','wed','thu','fri','sat'].forEach(d=>{
     data.hours[d]=document.getElementById(`h_${d}`)?.value||'';
     data.rdh[d]=document.getElementById(`r_${d}`)?.value||0;
   });
-  for(let wi=0;wi<4;wi++){
+  for(let wi=0;wi<3;wi++){
     const wk={date:document.getElementById(`rp_d${wi}`)?.value,days:[]};
     for(let di=0;di<6;di++)wk.days.push({appt:v(`rp_w${wi}_${di}_1`),seen:v(`rp_w${wi}_${di}_2`)});
     data.recentPast.push(wk);
@@ -278,32 +267,83 @@ function submitForm(){
     data.next7.scheduled.push(v(`n7_0_${di}`));
     data.next7.confirmed.push(v(`n7_1_${di}`));
   }
-  for(let wi=0;wi<4;wi++){
+  for(let wi=0;wi<3;wi++){
     const wk={date:document.getElementById(`nf_d${wi}`)?.value,days:[]};
     for(let di=0;di<6;di++)wk.days.push({appt:v(`nf_w${wi}_${di}_1`),booked:v(`nf_w${wi}_${di}_2`)});
     data.nearFuture.push(wk);
   }
-  for(let wi=0;wi<2;wi++){
-    const wk={date:document.getElementById(`ff_d${wi}`)?.value,days:[]};
-    for(let di=0;di<6;di++)wk.days.push({appt:v(`ff_w${wi}_${di}_1`),booked:v(`ff_w${wi}_${di}_2`)});
-    data.farFuture.push(wk);
+  // Store data in sessionStorage for hub to retrieve
+  try { sessionStorage.setItem('pdds_hygiene_data', JSON.stringify(data)); } catch(e) {}
+  // Signal hub tab
+  try { localStorage.setItem('pdds_hygiene_done', Date.now()); } catch(e) {}
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage('pdds_hygiene_done', '*');
   }
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`hygiene_${(data.practice||'practice').replace(/\s+/g,'-').toLowerCase()}_${Date.now()}.json`;
-  a.click();
-  document.getElementById('okMsg').classList.add('show');
-  document.getElementById('okMsg').scrollIntoView({behavior:'smooth',block:'center'});
+  const okEl = document.getElementById('okMsg');
+  const retEl = document.getElementById('returnBtn');
+  okEl.classList.add('show');
+  retEl.style.display = 'block';
+  okEl.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function returnToAssessment() {
+  // Signal opener if available, then close or go back
+  try { localStorage.setItem('pdds_hygiene_done', Date.now()); } catch(e) {}
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage('pdds_hygiene_done', '*');
+    window.close();
+  } else {
+    window.history.back();
+  }
+}
+
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function fmtDate(d) {
+  return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
+}
+
+function autoPopulateDates() {
+  const today = new Date();
+  const thisMonday = getMonday(today);
+
+  // RECENT PAST — 3 weeks backwards
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() - (3 - i) * 7);
+    const el = document.getElementById(`rp_d${i}`);
+    if (el) el.value = fmtDate(d);
+  }
+
+  // NEAR FUTURE — 3 weeks forwards starting next week
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() + (i + 1) * 7);
+    const el = document.getElementById(`nf_d${i}`);
+    if (el) el.value = fmtDate(d);
+  }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
   const t=new Date();
   document.getElementById('submitDate').value=`${t.getMonth()+1}/${t.getDate()}/${t.getFullYear()}`;
-  buildGrid('rpGrid',4,'Appt','Seen','rp');
+  // Pre-fill from URL params or sessionStorage
+  const params = new URLSearchParams(window.location.search);
+  const practice = params.get('practice') || sessionStorage.getItem('pdds_practice') || '';
+  const doctor = params.get('doctor') || sessionStorage.getItem('pdds_doctor') || '';
+  if (practice) document.getElementById('practiceName').value = practice;
+  if (doctor) document.getElementById('doctorName').value = doctor;
+  buildGrid('rpGrid',3,'Appt','Seen','rp');
   buildN7();
-  buildGrid('nfGrid',4,'Appt','Booked','nf');
-  buildGrid('ffGrid',2,'Appt','Booked','ff');
+  buildGrid('nfGrid',3,'Appt','Booked','nf');
+  autoPopulateDates();
 });
 </script>
 </body>
