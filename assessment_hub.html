@@ -1043,19 +1043,17 @@ async function submitToConsultant() {
   // Fire both in parallel — notification email + AI analysis
   const [emailResult, analysisResult] = await Promise.allSettled([
     
-    // Capture uploaded CDN URLs for workbook generation
-    if (window.uploadedFiles) {
-      const files = Object.values(window.uploadedFiles);
-      window._uploadedUrls.production = files[0]?.cdnUrl || files[0]?.url || null;
-      window._uploadedUrls.pl = files[2]?.cdnUrl || files[2]?.url || null;
-    }
-  emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
+      // Capture Uploadcare CDN URLs for workbook generation
+      if (window._ucUrls) {
+        window._capturedUrls = window._ucUrls;
+      }
+      document.getElementById('workbookBtn').style.display = 'flex';
+      emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
     runAIAnalysis(filesUploaded, pName, dName, config.name)
   ]);
 
   if (emailResult.status === 'fulfilled') {
-    sentMsg.innerHTML = `✓ &nbsp;
-      document.getElementById('workbookBtn').style.display='flex'; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
+    sentMsg.innerHTML = `✓ &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
     sentMsg.classList.add('show');
     btn.textContent = '✓ Sent';
     btn.style.background = 'var(--success)';
@@ -1229,47 +1227,76 @@ Uploaded reports:`
   }, 'S3k44GF4XVmVpgfVJ');
 }
 
+  // Uploadcare URL tracker — populated when files are uploaded
+  window._ucUrls = { production: null, pl: null };
+  window._capturedUrls = window._ucUrls;
 
-  // Store Uploadcare CDN URLs as files get uploaded
-  window._uploadedUrls = { production: null, pl: null };
+  // Intercept Uploadcare upload responses to grab CDN URLs
+  const _origFetch = window.fetch;
+  window.fetch = async function(...args) {
+    const resp = await _origFetch.apply(this, args);
+    try {
+      const clone = resp.clone();
+      const text = await clone.text();
+      if (text.includes('"uuid"') && text.includes('cdn')) {
+        const parsed = JSON.parse(text);
+        if (parsed.uuid) {
+          const cdnUrl = 'https://ucarecdn.com/' + parsed.uuid + '/';
+          const name = (parsed.name || '').toLowerCase();
+          if (name.includes('procedure') || name.includes('provider') || name.includes('production')) {
+            window._ucUrls.production = cdnUrl;
+          } else if (name.includes('profit') || name.includes('loss') || name.includes('p&l') || name.includes('pl ') || name.includes('income')) {
+            window._ucUrls.pl = cdnUrl;
+          } else if (!window._ucUrls.production) {
+            window._ucUrls.production = cdnUrl;
+          } else if (!window._ucUrls.pl) {
+            window._ucUrls.pl = cdnUrl;
+          }
+          console.log('Uploadcare URL captured:', cdnUrl, parsed.name);
+        }
+      }
+    } catch(e) {}
+    return resp;
+  };
 
   async function generateWorkbook() {
     const btn = document.getElementById('workbookBtn');
     const status = document.getElementById('workbookStatus');
     btn.disabled = true;
-    btn.innerHTML = '⏳ Generating workbook…';
-    status.textContent = 'Calling AI extractor — takes 20–40 seconds…';
+    btn.innerHTML = '⏳ Generating workbook… (20-40 sec)';
+    status.textContent = 'Calling AI extractor…';
     try {
-      const prodUrl = window._uploadedUrls.production;
-      const plUrl   = window._uploadedUrls.pl;
-      if (!prodUrl) throw new Error('Production PDF URL missing — please re-submit.');
+      const prodUrl = window._capturedUrls && window._capturedUrls.production;
+      const plUrl   = window._capturedUrls && window._capturedUrls.pl;
+      if (!prodUrl) throw new Error('Production PDF URL not found. Re-submit to try again.');
       const resp = await fetch('/.netlify/functions/generate-workbook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productionUrl: prodUrl,
           plUrl: plUrl || null,
-          templateB64: null,
           months: 12,
-          practiceName: practiceName || document.getElementById('practice-name-input')?.value || ''
+          practiceName: typeof practiceName !== 'undefined' ? practiceName :
+            (document.getElementById('practice-name-input') || {}).value || ''
         })
       });
-      if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || resp.status); }
+      if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error || 'Server error ' + resp.status); }
       const data = await resp.json();
       if (!data.success) throw new Error(data.error || 'Unknown error');
-      const safeName = (practiceName || 'Assessment').replace(/[^a-z0-9]/gi,'_');
+      const safeName = ((typeof practiceName !== 'undefined' ? practiceName : '') || 'Assessment').replace(/[^a-z0-9]/gi,'_');
       const a = document.createElement('a');
       a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + data.xlsxB64;
       a.download = safeName + '_Assessment.xlsx';
       a.click();
       btn.innerHTML = '✅ Workbook Downloaded!';
-      status.textContent = 'Codes: ' + data.summary.codesFound + ' | Production: $' + parseFloat(data.summary.totalProduction).toLocaleString();
+      status.textContent = 'Codes found: ' + data.summary.codesFound + ' | Production: $' + parseFloat(data.summary.totalProduction).toLocaleString();
     } catch(err) {
       status.textContent = '❌ ' + err.message;
       btn.disabled = false;
       btn.innerHTML = '📊 Download Assessment Workbook';
     }
   }
+
 </script>
 </body>
 </html>
