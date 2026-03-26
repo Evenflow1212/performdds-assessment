@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Practice Assessment — Perform DDS</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>emailjs.init('S3k44GF4XVmVpgfVJ');</script>
+<style>
+:root {
+  --black: #0A0A0A;
+  --black-mid: #141414;
+  --black-card: #1A1A1A;
+  --black-border: #262626;
+  --blue: #00AEEF;
+  --blue-dark: #0089BF;
+  --blue-glow: rgba(0,174,239,0.15);
+  --blue-light: rgba(0,174,239,0.07);
+  --white: #FFFFFF;
+  --gray-400: #999999;
+  --gray-600: #BBBBBB;
+  --success: #22C55E;
+  --font-display: 'Montserrat', sans-serif;
+  --font-body: 'Open Sans', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--font-body); background: var(--black); color: var(--gray-600); overflow-x: hidden; }
+
+/* ─── HEADER ─── */
+.site-header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 18px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(to bottom, rgba(10,10,10,0.95) 0%, transparent 100%);
+  backdrop-filter: blur(4px);
+}
+.logo-wrap { display: flex; align-items: center; gap: 14px; }
+.logo-img { height: 42px; width: auto; }
+.logo-fallback { display:none; width:40px; height:40px; background:var(--blue); border-radius:6px; align-items:center; justify-content:center; font-family:var(--font-display); color:var(--black); font-size:18px; font-weight:900; }
+.logo-text h1 { color: white; font-family: var(--font-display); font-size: 17px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
+.logo-text p { color: var(--blue); font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-top: 1px; }
+.header-cta { background: var(--blue); color: var(--black); border: none; border-radius: 4px; padding: 10px 22px; font-family: var(--font-display); font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
+.header-cta:hover { background: var(--blue-dark); transform: translateY(-1px); }
+
+/* ─── HERO ─── */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 80px 24px 80px;
+  position: relative; overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,174,239,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 80% 80%, rgba(0,174,239,0.04) 0%, transparent 60%);
+}
+.hero-grid-overlay {
+  position: absolute; inset: 0; opacity: 0.03;
+  background-image: linear-gradient(var(--blue) 1px, transparent 1px), linear-gradient(90deg, var(--blue) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+.hero-content { position: relative; z-index: 1; max-width: 900px; }
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--blue-light); border: 1px solid rgba(0,174,239,0.35);
+  border-radius: 4px; padding: 10px 22px;
+  font-family: var(--font-display); font-size: 12px; font-weight: 800;
+  letter-spacing: 3px; text-transform: uppercase; color: var(--blue);
+  margin-bottom: 28px;
+  animation: fadeUp 0.8s ease both;
+}
+.eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 6.5vw, 76px);
+  font-weight: 900;
+  color: white;
+  letter-spacing: -1px;
+  text-transform: uppercase;
+  line-height: 0.95;
+  margin-bottom: 28px;
+  animation: fadeUp 0.8s 0.1s ease both;
+}
+.hero-title .line2 { color: var(--blue); display: block; }
+.hero-title .line3 { display: block; font-size: clamp(20px, 3vw, 38px); font-weight: 600; letter-spacing: 2px; color: var(--gray-400); margin-top: 12px; }
+
+.hero-sub {
+  font-size: clamp(15px, 1.8vw, 18px);
+  color: var(--gray-400);
+  max-width: 640px;
+  margin: 0 auto 48px;
+  line-height: 1.75;
+  animation: fadeUp 0.8s 0.2s ease both;
+}
+.hero-sub strong { color: white; }
+
+.hero-actions {
+  display: flex; align-items: center; gap: 16px; justify-content: center; flex-wrap: wrap;
+  animation: fadeUp 0.8s 0.3s ease both;
+}
+.btn-primary {
+  background: var(--blue); color: var(--black); border: none;
+  border-radius: 4px; padding: 16px 40px;
+  font-family: var(--font-display); font-size: 13px; font-weight: 800;
+  letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 0 40px rgba(0,174,239,0.25);
+}
+.btn-primary:hover { background: var(--blue-dark); transform: translateY(-2px); box-shadow: 0 0 60px rgba(0,174,239,0.35); }
+.btn-secondary {
+  background: transparent; color: var(--gray-400);
+  border: 1px solid var(--black-border);
+  border-radius: 4px; padding: 15px 32px;
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-secondary:hover { border-color: var(--gray-400); color: white; }
+
+.scroll-hint {
+  position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  font-family: var(--font-display); font-size: 9px; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--gray-400); opacity: 0.5;
+  animation: fadeUp 1s 0.8s ease both;
+}
+.scroll-arrow { width: 20px; height: 20px; border-right: 2px solid var(--gray-400); border-bottom: 2px solid var(--gray-400); transform: rotate(45deg); animation: bounce 2s infinite; }
+@keyframes bounce { 0%,100%{transform:rotate(45deg) translateY(0)} 50%{transform:rotate(45deg) translateY(4px)} }
+
+/* ─── STATS STRIP ─── */
+.stats-strip {
+  border-top: 1px solid var(--black-border);
+  border-bottom: 1px solid var(--black-border);
+  background: var(--black-mid);
+  padding: 32px 48px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; flex-wrap: wrap;
+}
+.stat-item {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 16px 48px;
+  border-right: 1px solid var(--black-border);
+  opacity: 0; transform: translateY(20px);
+  transition: all 0.6s ease;
+}
+.stat-item:last-child { border-right: none; }
+.stat-item.visible { opacity: 1; transform: translateY(0); }
+.stat-num { font-family: var(--font-display); font-size: 42px; font-weight: 900; color: white; letter-spacing: -1px; line-height: 1; }
+.stat-num span { color: var(--blue); }
+.stat-label { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--gray-400); font-family: var(--font-display); }
+
+/* ─── SECTIONS ─── */
+section { padding: 100px 48px; max-width: 1100px; margin: 0 auto; }
+
+.section-tag { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--blue); margin-bottom: 16px; display: block; }
+.section-title { font-family: var(--font-display); font-size: clamp(26px, 3.5vw, 44px); font-weight: 900; color: white; text-transform: uppercase; letter-spacing: -0.5px; line-height: 1.05; margin-bottom: 20px; }
+.section-body { font-size: 16px; color: var(--gray-400); line-height: 1.8; max-width: 640px; }
+.section-body strong { color: white; }
+
+/* AI section */
+.ai-section { border-top: 1px solid var(--black-border); }
+.ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+.ai-visual {
+  position: relative; height: 360px;
+  display: flex; align-items: center; justify-content: center;
+}
+.ai-circle-outer {
+  width: 280px; height: 280px; border-radius: 50%;
+  border: 1px solid rgba(0,174,239,0.15);
+  display: flex; align-items: center; justify-content: center;
+  animation: spinSlow 20s linear infinite;
+  position: relative;
+}
+.ai-circle-outer::before {
+  content: '';
+  position: absolute; top: -1px; left: 50%; width: 8px; height: 8px;
+  background: var(--blue); border-radius: 50%;
+  box-shadow: 0 0 12px var(--blue);
+  transform: translateX(-50%);
+}
+.ai-circle-inner {
+  width: 200px; height: 200px; border-radius: 50%;
+  border: 1px solid rgba(0,174,239,0.25);
+  display: flex; align-items: center; justify-content: center;
+  animation: spinSlow 12s linear infinite reverse;
+  position: relative;
+}
+.ai-circle-inner::before {
+  content: '';
+  position: absolute; top: -1px; left: 50%; width: 6px; height: 6px;
+  background: var(--blue); border-radius: 50%;
+  box-shadow: 0 0 8px var(--blue);
+  transform: translateX(-50%);
+}
+.ai-center {
+  width: 110px; height: 110px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,174,239,0.2) 0%, rgba(0,174,239,0.05) 60%, transparent 100%);
+  border: 1px solid rgba(0,174,239,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 11px; font-weight: 800;
+  letter-spacing: 2px; text-transform: uppercase; color: var(--blue);
+  text-align: center; line-height: 1.3;
+}
+@keyframes spinSlow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+.ai-tags { display: flex; flex-direction: column; gap: 14px; margin-top: 32px; }
+.ai-tag {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: var(--black-card); border: 1px solid var(--black-border);
+  border-radius: 8px; padding: 16px 20px;
+  transition: border-color 0.2s;
+}
+.ai-tag:hover { border-color: rgba(0,174,239,0.3); }
+.ai-tag-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.ai-tag-text h4 { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: white; letter-spacing: 0.5px; margin-bottom: 4px; }
+.ai-tag-text p { font-size: 13px; color: var(--gray-400); line-height: 1.5; }
+
+/* Assessment process */
+.process-section { border-top: 1px solid var(--black-border); }
+.process-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 56px; }
+.process-step {
+  background: var(--black-card);
+  padding: 32px 28px;
+  position: relative;
+  transition: background 0.2s;
+}
+.process-step:hover { background: #1f1f1f; }
+.process-num {
+  font-family: var(--font-display); font-size: 64px; font-weight: 900;
+  color: rgba(0,174,239,0.08); line-height: 1; margin-bottom: 16px;
+  letter-spacing: -2px;
+}
+.process-step h3 { font-family: var(--font-display); font-size: 14px; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.process-step p { font-size: 13px; color: var(--gray-400); line-height: 1.6; }
+.process-accent { width: 32px; height: 2px; background: var(--blue); margin-bottom: 16px; }
+
+/* Quote */
+.quote-section {
+  border-top: 1px solid var(--black-border);
+  text-align: center; padding: 80px 48px;
+}
+.quote-mark { font-family: var(--font-display); font-size: 80px; color: var(--blue); opacity: 0.3; line-height: 0.5; margin-bottom: 24px; display: block; }
+.quote-text { font-family: var(--font-display); font-size: clamp(18px, 2.5vw, 28px); font-weight: 700; color: white; max-width: 800px; margin: 0 auto 28px; line-height: 1.4; letter-spacing: -0.3px; }
+.quote-attr { font-size: 13px; color: var(--blue); font-family: var(--font-display); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+
+/* ─── FORM SECTION ─── */
+.form-section {
+  border-top: 1px solid var(--black-border);
+  background: var(--black-mid);
+  padding: 100px 24px;
+}
+.form-inner { max-width: 680px; margin: 0 auto; }
+.form-header { text-align: center; margin-bottom: 48px; }
+.form-header .section-title { font-size: clamp(24px, 3vw, 38px); }
+.form-header p { font-size: 15px; color: var(--gray-400); line-height: 1.7; margin-top: 12px; }
+
+.form-card {
+  background: var(--black-card);
+  border: 1px solid var(--black-border);
+  border-radius: 12px;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.form-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--blue), transparent);
+}
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.form-row.single { grid-template-columns: 1fr; }
+.form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field label { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--blue); }
+.field input, .field select {
+  background: var(--black);
+  border: 1px solid var(--black-border);
+  border-radius: 5px;
+  padding: 12px 14px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  -webkit-appearance: none;
+}
+.field input::placeholder { color: #444; }
+.field input:focus, .field select:focus { border-color: var(--blue); }
+.field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+.field select option { background: #1a1a1a; color: white; }
+
+.field-divider {
+  border: none; border-top: 1px solid var(--black-border);
+  margin: 24px 0;
+}
+
+.radio-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.radio-opt {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--black); border: 1px solid var(--black-border);
+  border-radius: 5px; padding: 12px 14px; cursor: pointer;
+  transition: all 0.2s; font-size: 14px; color: var(--gray-600);
+}
+.radio-opt:hover { border-color: rgba(0,174,239,0.4); }
+.radio-opt input[type=radio] { accent-color: var(--blue); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.radio-opt.selected { border-color: var(--blue); background: var(--blue-light); color: white; }
+
+.form-submit-btn {
+  width: 100%; background: var(--blue); color: var(--black); border: none;
+  border-radius: 5px; padding: 17px; margin-top: 28px;
+  font-family: var(--font-display); font-size: 13px; font-weight: 800;
+  letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 24px rgba(0,174,239,0.25);
+}
+.form-submit-btn:hover { background: var(--blue-dark); transform: translateY(-1px); box-shadow: 0 8px 32px rgba(0,174,239,0.35); }
+.form-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.form-disclaimer { text-align: center; font-size: 12px; color: #555; margin-top: 16px; line-height: 1.5; }
+.form-disclaimer a { color: var(--blue); text-decoration: none; }
+
+.form-error { color: #F87171; font-size: 12px; margin-top: 6px; display: none; }
+.form-error.show { display: block; }
+
+/* ─── FOOTER ─── */
+.site-footer {
+  border-top: 1px solid var(--black-border);
+  background: var(--black);
+  padding: 32px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: #444;
+}
+.site-footer a { color: #555; text-decoration: none; }
+.site-footer a:hover { color: var(--blue); }
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.reveal { opacity: 1; transform: translateY(0); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .site-header { padding: 14px 20px; }
+  section { padding: 60px 20px; }
+  .stats-strip { padding: 24px 20px; }
+  .stat-item { padding: 12px 24px; }
+  .ai-grid { grid-template-columns: 1fr; gap: 40px; }
+  .ai-visual { display: none; }
+  .process-grid { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .form-row.triple { grid-template-columns: 1fr; }
+  .form-card { padding: 28px 20px; }
+  .site-footer { flex-direction: column; gap: 12px; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="logo-wrap">
+    <img class="logo-img" src="https://images.squarespace-cdn.com/content/v1/65c2c27990d50d089d25d2e3/6022f6b9-e12f-4811-8964-286890635aea/PerformDDS_Left_Logo2_Sml.png?format=300w" alt="Perform DDS" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div class="logo-fallback">P</div>
+    <div class="logo-text">
+      <h1>Perform DDS</h1>
+      <p>Your Practice... Optimized</p>
+    </div>
+  </div>
+  <button class="header-cta" onclick="document.getElementById('get-started').scrollIntoView({behavior:'smooth'})">Start Your Assessment →</button>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid-overlay"></div>
+  <div class="hero-content">
+    <div class="eyebrow"><span class="eyebrow-dot"></span> Perform DDS Practice Assessment</div>
+    <h1 class="hero-title">
+      Every Great Practice
+      <span class="line2">Starts With the<br>Right Data</span>
+      <span class="line3">20 Years of Consulting. Now Powered by AI.</span>
+    </h1>
+    <p class="hero-sub">
+      We've worked with <strong>400+ dental practices</strong> across the country. Every single engagement starts the same way — a deep assessment of your numbers. Now, <strong>AI lets us do it faster, sharper, and more precisely</strong> than ever before — without losing the human insight that actually drives results.
+    </p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="document.getElementById('get-started').scrollIntoView({behavior:'smooth'})">Begin Your Free Assessment →</button>
+      <button class="btn-secondary" onclick="document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'})">See How It Works</button>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <div class="scroll-arrow"></div>
+    Scroll
+  </div>
+</section>
+
+<!-- STATS STRIP -->
+<div class="stats-strip">
+  <div class="stat-item">
+    <div class="stat-num">400<span>+</span></div>
+    <div class="stat-label">Practices Transformed</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">20<span>+</span></div>
+    <div class="stat-label">Years of Expertise</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">40<span>%</span></div>
+    <div class="stat-label">Avg. Production Increase</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">8</div>
+    <div class="stat-label">Month Transformation</div>
+  </div>
+</div>
+
+<!-- AI SECTION -->
+<div style="border-top: 1px solid var(--black-border);">
+<section class="ai-section reveal" id="how-it-works">
+  <div class="ai-grid">
+    <div>
+      <span class="section-tag">AI-Powered Assessment</span>
+      <h2 class="section-title">The Most Expensive<br>Mistake in Dentistry?<br><span style="color:var(--blue)">Guessing.</span></h2>
+      <p class="section-body">
+        There's a movement in this industry to sell consultants, coaches, and programs without ever actually looking at your numbers first. <strong>We've never done that — and we never will.</strong>
+        <br><br>
+        For over two decades, Dave and the Perform DDS team have started every single engagement the same way: a deep, honest look at what's really happening in your practice. Where production is leaking. Where hygiene is underperforming. Where your overhead is quietly killing your profitability.
+        <br><br>
+        <strong>Now AI has made that process faster, more precise, and more actionable than ever.</strong> We know exactly which numbers to look for — and which ones most consultants completely miss.
+      </p>
+    </div>
+    <div class="ai-visual">
+      <div class="ai-circle-outer">
+        <div class="ai-circle-inner">
+          <div class="ai-center">AI<br>Engine</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ai-tags reveal" style="margin-top:56px;">
+    <div class="ai-tag">
+      <div class="ai-tag-icon">🎯</div>
+      <div class="ai-tag-text">
+        <h4>We Know What to Look For</h4>
+        <p>20+ years of real-world consulting data trained into an AI that instantly benchmarks your practice against hundreds of others — and flags exactly what needs attention.</p>
+      </div>
+    </div>
+    <div class="ai-tag">
+      <div class="ai-tag-icon">⚡</div>
+      <div class="ai-tag-text">
+        <h4>Results in Hours, Not Weeks</h4>
+        <p>What used to take days of manual number-crunching now happens automatically. You upload your reports. We get to work. Your first strategy call is grounded in real data.</p>
+      </div>
+    </div>
+    <div class="ai-tag">
+      <div class="ai-tag-icon">🤝</div>
+      <div class="ai-tag-text">
+        <h4>Human Insight at Every Step</h4>
+        <p>AI handles the data. Dave handles the strategy. No algorithm replaces the conversation, the coaching, and the accountability that actually moves practices forward.</p>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- PROCESS SECTION -->
+<div style="border-top: 1px solid var(--black-border);">
+<section class="process-section reveal">
+  <span class="section-tag">The Process</span>
+  <h2 class="section-title">How Your Assessment Works</h2>
+  <div class="process-grid">
+    <div class="process-step">
+      <div class="process-num">01</div>
+      <div class="process-accent"></div>
+      <h3>You Pull 6 Reports</h3>
+      <p>We walk you through exactly which reports to pull from your practice management software — step by step, with screenshots. Takes 15–20 minutes.</p>
+    </div>
+    <div class="process-step">
+      <div class="process-num">02</div>
+      <div class="process-accent"></div>
+      <h3>AI Runs the Analysis</h3>
+      <p>Our AI engine — built on 20+ years of real dental practice data — benchmarks every number against what we know high-performing practices look like.</p>
+    </div>
+    <div class="process-step">
+      <div class="process-num">03</div>
+      <div class="process-accent"></div>
+      <h3>Dave Calls You</h3>
+      <p>Dave personally reviews your results and calls you with 3–5 specific, prioritized action items. Not generic advice — your practice, your numbers, your path forward.</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- QUOTE -->
+<div class="quote-section reveal">
+  <span class="quote-mark">"</span>
+  <p class="quote-text">After the first meeting, Perform DDS was essentially free to me — because the ROI I got from that initial conversation more than paid for their services.</p>
+  <div class="quote-attr">— Dr. Nick, DDS &nbsp;·&nbsp; Perform DDS Client</div>
+</div>
+
+<!-- FORM -->
+<div class="form-section" id="get-started">
+  <div class="form-inner">
+    <div class="form-header reveal">
+      <span class="section-tag" style="display:block;text-align:center;">Free Practice Assessment</span>
+      <h2 class="section-title" style="text-align:center;">Let's Look at Your Numbers</h2>
+      <p>Fill out the form below and we'll take you straight to your personalized data collection guide — built specifically for your practice management software.</p>
+    </div>
+
+    <div class="form-card reveal">
+      <div class="form-row">
+        <div class="field">
+          <label>Doctor Name *</label>
+          <input type="text" id="f-doctor" placeholder="Dr. Jane Smith">
+          <div class="form-error" id="err-doctor">Please enter the doctor's name.</div>
+        </div>
+        <div class="field">
+          <label>Practice Name *</label>
+          <input type="text" id="f-practice" placeholder="Smith Family Dentistry">
+          <div class="form-error" id="err-practice">Please enter your practice name.</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Email Address *</label>
+          <input type="email" id="f-email" placeholder="doctor@mypractice.com">
+          <div class="form-error" id="err-email">Please enter a valid email address.</div>
+        </div>
+        <div class="field">
+          <label>Phone Number *</label>
+          <input type="tel" id="f-phone" placeholder="(555) 555-5555">
+          <div class="form-error" id="err-phone">Please enter a phone number.</div>
+        </div>
+      </div>
+      <div class="form-row single">
+        <div class="field">
+          <label>Practice Location (City, State) *</label>
+          <input type="text" id="f-location" placeholder="e.g. Newport Beach, CA">
+          <div class="form-error" id="err-location">Please enter your location.</div>
+        </div>
+      </div>
+
+      <hr class="field-divider">
+
+      <div class="form-row single">
+        <div class="field">
+          <label>Practice Management Software *</label>
+          <select id="f-software">
+            <option value="" disabled selected>Select your software...</option>
+            <option value="eaglesoft">Eaglesoft (Patterson Dental)</option>
+            <option value="dentrix">Dentrix (Henry Schein One)</option>
+            <option value="opendental">Open Dental</option>
+            <option value="other">Other / Not Sure</option>
+          </select>
+          <div class="form-error" id="err-software">Please select your practice software.</div>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top:16px;">
+        <div class="field">
+          <label>Insurance Model</label>
+          <div class="radio-group">
+            <label class="radio-opt" id="opt-innetwork">
+              <input type="radio" name="network" value="In-Network" onchange="selectRadio('network','opt-innetwork')"> In-Network
+            </label>
+            <label class="radio-opt" id="opt-outnetwork">
+              <input type="radio" name="network" value="Out-of-Network" onchange="selectRadio('network','opt-outnetwork')"> Out-of-Network
+            </label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Plan Type</label>
+          <div class="radio-group">
+            <label class="radio-opt" id="opt-ppo">
+              <input type="radio" name="plantype" value="PPO" onchange="selectRadio('plantype','opt-ppo');togglePPOPct(true)"> PPO
+            </label>
+            <label class="radio-opt" id="opt-hmo">
+              <input type="radio" name="plantype" value="HMO" onchange="selectRadio('plantype','opt-hmo');togglePPOPct(false)"> HMO
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row single" id="ppo-pct-row" style="display:none;margin-top:16px;">
+        <div class="field">
+          <label>Approx. % of Practice That Is PPO</label>
+          <select id="f-ppopct">
+            <option value="" disabled selected>Select a range...</option>
+            <option value="Under 25%">Under 25%</option>
+            <option value="25–50%">25–50%</option>
+            <option value="50–75%">50–75%</option>
+            <option value="75–90%">75–90%</option>
+            <option value="90–100%">90–100% (Mostly PPO)</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="form-submit-btn" id="submit-btn" onclick="handleSubmit()">
+        Begin My Free Assessment →
+      </button>
+      <p class="form-disclaimer">By submitting you agree to be contacted by Perform DDS. We respect your privacy and will never share your information. Questions? Call <a href="tel:9492324788">(949) 232-4788</a>.</p>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div>© 2026 Perform DDS. All rights reserved.</div>
+  <div style="display:flex;gap:24px;">
+    <a href="tel:9492324788">(949) 232-4788</a>
+    <a href="/cdn-cgi/l/email-protection#80e9eee6efc0f0e5f2e6eff2ede4e4f3aee3efed"><span class="__cf_email__" data-cfemail="3a53545c557a4a5f485c5548575e5e4914595557">[email&#160;protected]</span></a>
+    <a href="https://www.performdds.com" target="_blank">performdds.com</a>
+  </div>
+</footer>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ─── Scroll animations ───
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      if (e.target.classList.contains('stat-item')) {
+        // stagger stats
+        const siblings = document.querySelectorAll('.stat-item');
+        siblings.forEach((s, i) => setTimeout(() => s.classList.add('visible'), i * 120));
+      }
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+document.querySelectorAll('.stat-item').forEach(el => observer.observe(el));
+
+// ─── Radio highlight ───
+function selectRadio(name, selectedId) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
+    r.closest('.radio-opt').classList.remove('selected');
+  });
+  document.getElementById(selectedId).classList.add('selected');
+}
+
+// ─── Toggle PPO % row ───
+function togglePPOPct(show) {
+  document.getElementById('ppo-pct-row').style.display = show ? 'grid' : 'none';
+  if (!show) document.getElementById('f-ppopct').value = '';
+}
+
+
+function validate() {
+  let ok = true;
+  const checks = [
+    { id: 'f-doctor', err: 'err-doctor', test: v => v.trim().length > 1 },
+    { id: 'f-practice', err: 'err-practice', test: v => v.trim().length > 1 },
+    { id: 'f-email', err: 'err-email', test: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
+    { id: 'f-phone', err: 'err-phone', test: v => v.trim().length > 6 },
+    { id: 'f-location', err: 'err-location', test: v => v.trim().length > 2 },
+    { id: 'f-software', err: 'err-software', test: v => v !== '' }
+  ];
+  checks.forEach(c => {
+    const val = document.getElementById(c.id).value;
+    const errEl = document.getElementById(c.err);
+    if (!c.test(val)) { errEl.classList.add('show'); ok = false; }
+    else { errEl.classList.remove('show'); }
+  });
+  return ok;
+}
+
+// ─── Submit ───
+async function handleSubmit() {
+  if (!validate()) return;
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  const doctor = document.getElementById('f-doctor').value.trim();
+  const practice = document.getElementById('f-practice').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const location = document.getElementById('f-location').value.trim();
+  const software = document.getElementById('f-software').value;
+  const network = document.querySelector('input[name="network"]:checked')?.value || 'Not specified';
+  const plantype = document.querySelector('input[name="plantype"]:checked')?.value || 'Not specified';
+  const ppopct = document.getElementById('f-ppopct').value || '';
+
+  const softwareNames = {
+    eaglesoft: 'Eaglesoft (Patterson Dental)',
+    dentrix: 'Dentrix (Henry Schein One)',
+    opendental: 'Open Dental',
+    other: 'Other / Not Sure'
+  };
+
+  const message = `New Practice Assessment Lead — Perform DDS
+Submitted: ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}
+
+DOCTOR: ${doctor}
+PRACTICE: ${practice}
+EMAIL: ${email}
+PHONE: ${phone}
+LOCATION: ${location}
+SOFTWARE: ${softwareNames[software]}
+INSURANCE MODEL: ${network}
+PLAN TYPE: ${plantype}${ppopct ? `\nPPO % OF PRACTICE: ${ppopct}` : ''}
+
+—
+Submitted via Perform DDS Practice Assessment Tool`;
+
+  try {
+    await emailjs.send('service_5yz66e8', 'template_un21rcd', {
+      subject: `New Assessment Lead: ${practice} — ${softwareNames[software]}`,
+      message,
+      name: doctor
+    }, 'S3k44GF4XVmVpgfVJ');
+  } catch(e) {
+    console.warn('EmailJS notification failed (proceeding anyway):', e);
+  }
+
+  // Store info for the hub
+  sessionStorage.setItem('pdds_doctor', doctor);
+  sessionStorage.setItem('pdds_practice', practice);
+  sessionStorage.setItem('pdds_software', software !== 'other' ? software : '');
+
+  // Redirect to hub
+  if (software && software !== 'other') {
+    window.location.href = `assessment_hub.html?platform=${software}&practice=${encodeURIComponent(practice)}&doctor=${encodeURIComponent(doctor)}`;
+  } else {
+    window.location.href = `assessment_hub.html`;
+  }
+}

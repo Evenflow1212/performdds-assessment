@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hygiene Schedule — Perform DDS</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:#1F3864;--navy2:#2E4B7A;--steel:#4A6FA5;--ice:#D9E1F2;--frost:#EEF3FA;
+    --white:#FFFFFF;--ink:#1A1A2E;--mist:#8A94A6;--gold:#C9A84C;--success:#2E7D52;
+    --radius:6px;--shadow:0 2px 12px rgba(31,56,100,0.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:#F0F3F9;color:var(--ink);min-height:100vh;padding:0 0 60px}
+  header{background:var(--navy);padding:24px 48px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100;box-shadow:0 4px 24px rgba(31,56,100,0.25)}
+  .logo{width:40px;height:40px;background:var(--gold);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;color:var(--navy);font-size:20px;font-weight:700;flex-shrink:0}
+  header h1{font-family:'DM Serif Display',serif;color:var(--white);font-size:20px;font-weight:400;letter-spacing:.02em}
+  header h1 span{color:var(--gold)}
+  .hsub{margin-left:auto;color:var(--ice);font-size:12px;font-weight:300;text-align:right;line-height:1.5}
+  main{max-width:980px;margin:36px auto;padding:0 20px}
+  .instructions{background:linear-gradient(135deg,var(--navy),var(--navy2));border-radius:var(--radius);padding:18px 24px;margin-bottom:24px;color:var(--ice);font-size:13px;line-height:1.7}
+  .instructions strong{color:var(--gold)}
+  .instructions ul{padding-left:18px;margin-top:6px}
+  .card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+  .card-header{background:var(--navy);padding:12px 22px;display:flex;align-items:center;gap:12px}
+  .card-header h3{font-family:'DM Serif Display',serif;color:var(--white);font-size:14px;font-weight:400;letter-spacing:.05em;text-transform:uppercase}
+  .badge{background:rgba(255,255,255,.15);color:var(--ice);font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;letter-spacing:.05em}
+  .card-body{padding:20px 22px}
+  .lbl{font-size:11px;font-weight:600;color:var(--mist);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+  .config-grid{display:grid;grid-template-columns:120px repeat(6,1fr);gap:8px;margin-bottom:16px;align-items:center}
+  .config-lbl{font-size:12px;font-weight:600;color:var(--navy2)}
+  .day-head{font-size:11px;font-weight:600;color:var(--navy2);text-transform:uppercase;letter-spacing:.06em;text-align:center;padding:5px 4px;background:var(--frost);border:1px solid var(--ice);border-radius:var(--radius) var(--radius) 0 0}
+  input[type=text],input[type=number]{width:100%;padding:8px 10px;border:1.5px solid var(--ice);border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);background:var(--white);transition:border-color .15s,-webkit-box-shadow .15s;-moz-appearance:textfield}
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+  input:focus{outline:none;border-color:var(--steel);box-shadow:0 0 0 3px rgba(74,111,165,.12)}
+  input.c{padding:6px 4px;text-align:center;font-size:13px}
+  .wgrid{border:1px solid var(--ice);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}
+  .wg-head{display:grid;background:var(--navy2)}
+  .wg-sub{display:grid;background:var(--frost);border-bottom:1px solid var(--ice)}
+  .wg-row{display:grid;border-top:1px solid var(--ice)}
+  .wg-row:nth-child(even){background:rgba(238,243,250,.4)}
+  .wh{color:var(--white);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:10px 6px;text-align:center;border-right:1px solid rgba(255,255,255,.15)}
+  .wh.lc{background:var(--navy);text-align:left;padding-left:14px}
+  .ws{font-size:10px;font-weight:600;color:var(--mist);text-transform:uppercase;letter-spacing:.04em;padding:5px 4px;text-align:center;border-right:1px solid var(--ice)}
+  .ws.lc{text-align:left;padding-left:14px}
+  .wc{padding:5px 4px;border-right:1px solid var(--ice)}
+  .wc.lc{padding:5px 14px;font-size:12px;font-weight:500;color:var(--navy);display:flex;align-items:center;background:var(--frost)}
+  .wc input{width:100%;padding:5px 3px;border:1.5px solid var(--ice);border-radius:4px;font-family:'DM Sans',sans-serif;font-size:13px;text-align:center;-moz-appearance:textfield}
+  .wc input::-webkit-inner-spin-button{-webkit-appearance:none}
+  .wc input:focus{outline:none;border-color:var(--steel);box-shadow:0 0 0 2px rgba(74,111,165,.12)}
+  .sum-bar{background:var(--frost);border:1px solid var(--ice);border-radius:var(--radius);padding:12px 18px;display:flex;gap:24px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .si .sl{font-size:10px;font-weight:600;color:var(--mist);text-transform:uppercase;letter-spacing:.06em}
+  .si .sv{font-size:19px;font-weight:600;color:var(--navy);font-variant-numeric:tabular-nums}
+  .si .sv.p{color:var(--steel)}
+  .sd{width:1px;height:32px;background:var(--ice)}
+  .submit-area{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 28px;display:flex;align-items:center;gap:20px;margin-top:24px}
+  .submit-note{font-size:13px;color:var(--mist);line-height:1.5;flex:1}
+  .submit-note strong{color:var(--navy)}
+  .btn{background:var(--navy);color:var(--white);border:none;padding:13px 32px;border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;letter-spacing:.04em;cursor:pointer;transition:background .15s,transform .1s;white-space:nowrap}
+  .btn:hover{background:var(--navy2);transform:translateY(-1px)}
+  .ok{display:none;background:#EBF7F0;border:1.5px solid var(--success);border-radius:var(--radius);padding:14px 18px;color:var(--success);font-weight:600;font-size:14px;margin-top:14px;align-items:center;gap:10px}
+  .ok.show{display:flex}
+  .pcard{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 28px;margin-bottom:20px;border-left:4px solid var(--gold);display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+  .pcard h2{grid-column:1/-1;font-family:'DM Serif Display',serif;font-size:15px;font-weight:400;color:var(--navy);letter-spacing:.06em;text-transform:uppercase;padding-bottom:12px;border-bottom:1px solid var(--ice)}
+  .fg{display:flex;flex-direction:column;gap:4px}
+  .fg label{font-size:11px;font-weight:600;color:var(--mist);text-transform:uppercase;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">P</div>
+  <h1>Perform <span>DDS</span> — Hygiene Schedule</h1>
+  <div class="hsub">Client Data Collection<br>Confidential</div>
+</header>
+<main>
+  <div class="instructions">
+    <strong>Instructions:</strong> Fill in all fields below based on your current hygiene schedule.
+    <ul>
+      <li>Use actual numbers from your practice management software.</li>
+      <li>Leave days blank if hygiene is not scheduled that day.</li>
+      <li><strong>Recent Past</strong> = last 2–4 weeks actual data &nbsp;|&nbsp; <strong>Next 7 Days</strong> = this week's scheduled vs confirmed &nbsp;|&nbsp; <strong>Near/Far Future</strong> = upcoming weeks booked.</li>
+    </ul>
+  </div>
+  <form id="hygieneForm">
+    <div class="pcard">
+      <h2>Practice Information</h2>
+      <div class="fg"><label>Practice Name</label><input type="text" id="practiceName" placeholder="e.g. Kringel Family Dentistry"></div>
+      <div class="fg"><label>Doctor / Owner</label><input type="text" id="doctorName" placeholder="e.g. Dr. Justin Kringel"></div>
+      <div class="fg"><label>Date Submitted</label><input type="text" id="submitDate"></div>
+    </div>
+
+    <!-- SCHEDULE CONFIG -->
+    <div class="card">
+      <div class="card-header"><h3>Schedule Configuration</h3><span class="badge">Hours &amp; Staffing</span></div>
+      <div class="card-body">
+        <p class="lbl">Office Hours per Day</p>
+        <div class="config-grid">
+          <div class="config-lbl">Hours</div>
+          <div class="fg"><div class="day-head">Mon</div><input type="text" class="c" id="h_mon" placeholder="8am–5pm"></div>
+          <div class="fg"><div class="day-head">Tue</div><input type="text" class="c" id="h_tue" placeholder="8am–5pm"></div>
+          <div class="fg"><div class="day-head">Wed</div><input type="text" class="c" id="h_wed" placeholder="8am–5pm"></div>
+          <div class="fg"><div class="day-head">Thu</div><input type="text" class="c" id="h_thu" placeholder="8am–5pm"></div>
+          <div class="fg"><div class="day-head">Fri</div><input type="text" class="c" id="h_fri" placeholder="8am–5pm"></div>
+          <div class="fg"><div class="day-head">Sat</div><input type="text" class="c" id="h_sat" placeholder="Closed"></div>
+        </div>
+        <p class="lbl" style="margin-top:8px">RDH Scheduled per Day</p>
+        <div class="config-grid">
+          <div class="config-lbl">RDH Count</div>
+          <input type="number" class="c" id="r_mon" placeholder="0" min="0">
+          <input type="number" class="c" id="r_tue" placeholder="0" min="0">
+          <input type="number" class="c" id="r_wed" placeholder="0" min="0">
+          <input type="number" class="c" id="r_thu" placeholder="0" min="0">
+          <input type="number" class="c" id="r_fri" placeholder="0" min="0">
+          <input type="number" class="c" id="r_sat" placeholder="0" min="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- RECENT PAST -->
+    <div class="card">
+      <div class="card-header"><h3>Recent Past</h3><span class="badge">Last 4 Weeks — Actual</span></div>
+      <div class="card-body">
+        <p class="lbl">Appointment slots available vs patients actually seen</p>
+        <div id="rpGrid"></div>
+        <div class="sum-bar">
+          <div class="si"><div class="sl">Available Appts</div><div class="sv" id="rp_a">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Patients Seen</div><div class="sv" id="rp_s">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Fill Rate</div><div class="sv p" id="rp_p">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Days Scheduled</div><div class="sv" id="rp_d">8</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Avg Patients/Day</div><div class="sv" id="rp_avg">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEXT 7 DAYS -->
+    <div class="card">
+      <div class="card-header"><h3>Next 7 Days</h3><span class="badge">Current Week</span></div>
+      <div class="card-body">
+        <p class="lbl">Scheduled vs Confirmed for this week</p>
+        <div id="n7Grid"></div>
+        <div class="sum-bar">
+          <div class="si"><div class="sl">Total Scheduled</div><div class="sv" id="n7_s">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Confirmed</div><div class="sv" id="n7_c">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Confirmation Rate</div><div class="sv p" id="n7_p">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEAR FUTURE -->
+    <div class="card">
+      <div class="card-header"><h3>Near Future</h3><span class="badge">Upcoming Weeks</span></div>
+      <div class="card-body">
+        <p class="lbl">Available slots vs currently booked</p>
+        <div id="nfGrid"></div>
+        <div class="sum-bar">
+          <div class="si"><div class="sl">Available</div><div class="sv" id="nf_a">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Booked</div><div class="sv" id="nf_b">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Pre-book Rate</div><div class="sv p" id="nf_p">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FAR FUTURE -->
+    <div class="card">
+      <div class="card-header"><h3>Far Future</h3><span class="badge">Further Out — Pre-booked %</span></div>
+      <div class="card-body">
+        <p class="lbl">Available slots vs booked for weeks further out</p>
+        <div id="ffGrid"></div>
+        <div class="sum-bar">
+          <div class="si"><div class="sl">Available</div><div class="sv" id="ff_a">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Booked</div><div class="sv" id="ff_b">—</div></div>
+          <div class="sd"></div>
+          <div class="si"><div class="sl">Pre-book Rate</div><div class="sv p" id="ff_p">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="submit-area">
+      <div class="submit-note"><strong>Ready to submit?</strong><br>Your data will be formatted for the Perform DDS assessment. Ensure all weeks are filled before submitting.</div>
+      <button type="button" class="btn" onclick="submitForm()">Submit Schedule Data</button>
+    </div>
+    <div class="ok" id="okMsg">✓ &nbsp; Schedule data submitted successfully.</div>
+  <div id="returnBtn" style="display:none;margin-top:16px;text-align:center;">
+    <button type="button" class="btn" style="background:var(--success);" onclick="returnToAssessment()">← Return to Assessment</button>
+  </div>
+  </form>
+</main>
+<script>
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function buildGrid(id,weeks,l1,l2,pfx){
+  const el=document.getElementById(id);
+  const cols=`150px repeat(${DAYS.length*2},1fr)`;
+  let h=`<div class="wgrid"><div class="wg-head" style="grid-template-columns:150px repeat(${DAYS.length},1fr)">
+    <div class="wh lc">Week of</div>`;
+  DAYS.forEach(d=>h+=`<div class="wh">${d}</div>`);
+  h+=`</div><div class="wg-sub" style="grid-template-columns:${cols}"><div class="ws lc"></div>`;
+  DAYS.forEach(()=>h+=`<div class="ws">${l1}</div><div class="ws">${l2}</div>`);
+  h+=`</div>`;
+  for(let wi=0;wi<weeks;wi++){
+    h+=`<div class="wg-row" style="grid-template-columns:${cols}">
+      <div class="wc lc"><input type="text" style="width:100%;padding:5px 6px;border:1.5px solid var(--ice);border-radius:4px;font-size:12px;text-align:left" id="${pfx}_d${wi}" placeholder="Week of..." oninput="calc('${pfx}',${weeks})"></div>`;
+    DAYS.forEach((_,di)=>{
+      h+=`<div class="wc"><input type="number" min="0" id="${pfx}_w${wi}_${di}_1" placeholder="0" oninput="calc('${pfx}',${weeks})"></div>`;
+      h+=`<div class="wc"><input type="number" min="0" id="${pfx}_w${wi}_${di}_2" placeholder="0" oninput="calc('${pfx}',${weeks})"></div>`;
+    });
+    h+=`</div>`;
+  }
+  h+=`</div>`;el.innerHTML=h;
+}
+
+function buildN7(){
+  const el=document.getElementById('n7Grid');
+  const cols=`160px repeat(${DAYS.length},1fr)`;
+  let h=`<div class="wgrid"><div class="wg-head" style="grid-template-columns:${cols}">
+    <div class="wh lc"></div>`;
+  DAYS.forEach(d=>h+=`<div class="wh">${d}</div>`);
+  h+=`</div>`;
+  ['Scheduled','Confirmed'].forEach((row,ri)=>{
+    h+=`<div class="wg-row" style="grid-template-columns:${cols}">
+      <div class="wc lc" style="font-weight:600">${row}</div>`;
+    DAYS.forEach((_,di)=>h+=`<div class="wc"><input type="number" min="0" id="n7_${ri}_${di}" placeholder="0" oninput="calcN7()"></div>`);
+    h+=`</div>`;
+  });
+  h+=`</div>`;el.innerHTML=h;
+}
+
+function v(id){return parseFloat(document.getElementById(id)?.value)||0;}
+
+function calc(pfx,weeks){
+  let t1=0,t2=0;
+  for(let wi=0;wi<weeks;wi++)
+    for(let di=0;di<6;di++){t1+=v(`${pfx}_w${wi}_${di}_1`);t2+=v(`${pfx}_w${wi}_${di}_2`);}
+  const pct=t1>0?(t2/t1*100).toFixed(1)+'%':'—';
+  if(pfx==='rp'){
+    set('rp_a',t1);set('rp_s',t2);set('rp_p',pct,true);
+    const d=parseFloat(document.getElementById('rp_d').textContent)||8;
+    set('rp_avg',t2>0?(t2/d).toFixed(1):'—',true);
+  }else if(pfx==='nf'){set('nf_a',t1);set('nf_b',t2);set('nf_p',pct,true);}
+  else if(pfx==='ff'){set('ff_a',t1);set('ff_b',t2);set('ff_p',pct,true);}
+}
+
+function calcN7(){
+  let s=0,c=0;
+  for(let di=0;di<6;di++){s+=v(`n7_0_${di}`);c+=v(`n7_1_${di}`);}
+  set('n7_s',s);set('n7_c',c);set('n7_p',s>0?(c/s*100).toFixed(1)+'%':'—',true);
+}
+
+function set(id,val,raw){
+  const el=document.getElementById(id);
+  if(el)el.textContent=(val===0&&!raw)?'—':val;
+}
+
+function submitForm(){
+  const data={
+    practice:document.getElementById('practiceName').value,
+    doctor:document.getElementById('doctorName').value,
+    date:document.getElementById('submitDate').value,
+    hours:{},rdh:{},recentPast:[],next7:{scheduled:[],confirmed:[]},nearFuture:[],farFuture:[]
+  };
+  ['mon','tue','wed','thu','fri','sat'].forEach(d=>{
+    data.hours[d]=document.getElementById(`h_${d}`)?.value||'';
+    data.rdh[d]=document.getElementById(`r_${d}`)?.value||0;
+  });
+  for(let wi=0;wi<4;wi++){
+    const wk={date:document.getElementById(`rp_d${wi}`)?.value,days:[]};
+    for(let di=0;di<6;di++)wk.days.push({appt:v(`rp_w${wi}_${di}_1`),seen:v(`rp_w${wi}_${di}_2`)});
+    data.recentPast.push(wk);
+  }
+  for(let di=0;di<6;di++){
+    data.next7.scheduled.push(v(`n7_0_${di}`));
+    data.next7.confirmed.push(v(`n7_1_${di}`));
+  }
+  for(let wi=0;wi<4;wi++){
+    const wk={date:document.getElementById(`nf_d${wi}`)?.value,days:[]};
+    for(let di=0;di<6;di++)wk.days.push({appt:v(`nf_w${wi}_${di}_1`),booked:v(`nf_w${wi}_${di}_2`)});
+    data.nearFuture.push(wk);
+  }
+  for(let wi=0;wi<2;wi++){
+    const wk={date:document.getElementById(`ff_d${wi}`)?.value,days:[]};
+    for(let di=0;di<6;di++)wk.days.push({appt:v(`ff_w${wi}_${di}_1`),booked:v(`ff_w${wi}_${di}_2`)});
+    data.farFuture.push(wk);
+  }
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`hygiene_${(data.practice||'practice').replace(/\s+/g,'-').toLowerCase()}_${Date.now()}.json`;
+  a.click();
+  document.getElementById('okMsg').classList.add('show');
+  document.getElementById('returnBtn').style.display = 'block';
+  document.getElementById('okMsg').scrollIntoView({behavior:'smooth',block:'center'});
+  // Signal the hub tab that hygiene form is complete
+  try { localStorage.setItem('pdds_hygiene_done', Date.now()); } catch(e) {}
+}
+
+function returnToAssessment() {
+  // Signal opener if available, then close or go back
+  try { localStorage.setItem('pdds_hygiene_done', Date.now()); } catch(e) {}
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage('pdds_hygiene_done', '*');
+    window.close();
+  } else {
+    window.history.back();
+  }
+}
+
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function fmtDate(d) {
+  return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
+}
+
+function autoPopulateDates() {
+  const today = new Date();
+  const thisMonday = getMonday(today);
+
+  // RECENT PAST — 4 weeks backwards
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() - (4 - i) * 7);
+    const el = document.getElementById(`rp_d${i}`);
+    if (el) el.value = fmtDate(d);
+  }
+
+  // NEAR FUTURE — 4 weeks forwards starting next week
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() + (i + 1) * 7);
+    const el = document.getElementById(`nf_d${i}`);
+    if (el) el.value = fmtDate(d);
+  }
+
+  // FAR FUTURE — 2 weeks further out (weeks 5 and 6 from now)
+  for (let i = 0; i < 2; i++) {
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() + (i + 5) * 7);
+    const el = document.getElementById(`ff_d${i}`);
+    if (el) el.value = fmtDate(d);
+  }
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const t=new Date();
+  document.getElementById('submitDate').value=`${t.getMonth()+1}/${t.getDate()}/${t.getFullYear()}`;
+  buildGrid('rpGrid',4,'Appt','Seen','rp');
+  buildN7();
+  buildGrid('nfGrid',4,'Appt','Booked','nf');
+  buildGrid('ffGrid',2,'Appt','Booked','ff');
+  autoPopulateDates();
+});
+</script>
+</body>
+</html>
