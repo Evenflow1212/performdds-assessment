@@ -188,7 +188,12 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
   .guide-container { padding: 20px 16px; }
   .summary-grid { grid-template-columns: 1fr 1fr; }
 }
-</style>
+
+    .workbook-btn{display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#1a7a3a,#22C55E);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-size:15px;font-weight:700;font-family:var(--font-display);cursor:pointer;letter-spacing:0.5px;margin-top:16px;width:100%;transition:all 0.2s;}
+    .workbook-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(34,197,94,0.35);}
+    .workbook-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+    .workbook-status{margin-top:10px;font-size:13px;color:var(--gray-500);text-align:center;min-height:20px;}
+  </style>
 </head>
 <body>
 
@@ -198,6 +203,10 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
     <div class="brand">
       <img class="logo-img" src="https://images.squarespace-cdn.com/content/v1/65c2c27990d50d089d25d2e3/6022f6b9-e12f-4811-8964-286890635aea/PerformDDS_Left_Logo2_Sml.png?format=300w" alt="Perform DDS" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="logo-fallback">P</div>
+      <button class="workbook-btn" id="workbookBtn" style="display:none" onclick="generateWorkbook()">
+        📊 Download Assessment Workbook
+      </button>
+      <div class="workbook-status" id="workbookStatus"></div>
       <div class="brand-text">
         <h1>Perform DDS</h1>
         <p>Your Practice... Optimized</p>
@@ -1033,12 +1042,20 @@ async function submitToConsultant() {
 
   // Fire both in parallel — notification email + AI analysis
   const [emailResult, analysisResult] = await Promise.allSettled([
-    emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
+    
+    // Capture uploaded CDN URLs for workbook generation
+    if (window.uploadedFiles) {
+      const files = Object.values(window.uploadedFiles);
+      window._uploadedUrls.production = files[0]?.cdnUrl || files[0]?.url || null;
+      window._uploadedUrls.pl = files[2]?.cdnUrl || files[2]?.url || null;
+    }
+  emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
     runAIAnalysis(filesUploaded, pName, dName, config.name)
   ]);
 
   if (emailResult.status === 'fulfilled') {
-    sentMsg.innerHTML = `✓ &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
+    sentMsg.innerHTML = `✓ &nbsp;
+      document.getElementById('workbookBtn').style.display='flex'; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
     sentMsg.classList.add('show');
     btn.textContent = '✓ Sent';
     btn.style.background = 'var(--success)';
@@ -1211,6 +1228,48 @@ Uploaded reports:`
     name: 'Perform DDS AI Engine'
   }, 'S3k44GF4XVmVpgfVJ');
 }
+
+
+  // Store Uploadcare CDN URLs as files get uploaded
+  window._uploadedUrls = { production: null, pl: null };
+
+  async function generateWorkbook() {
+    const btn = document.getElementById('workbookBtn');
+    const status = document.getElementById('workbookStatus');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Generating workbook…';
+    status.textContent = 'Calling AI extractor — takes 20–40 seconds…';
+    try {
+      const prodUrl = window._uploadedUrls.production;
+      const plUrl   = window._uploadedUrls.pl;
+      if (!prodUrl) throw new Error('Production PDF URL missing — please re-submit.');
+      const resp = await fetch('/.netlify/functions/generate-workbook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productionUrl: prodUrl,
+          plUrl: plUrl || null,
+          templateB64: null,
+          months: 12,
+          practiceName: practiceName || document.getElementById('practice-name-input')?.value || ''
+        })
+      });
+      if (!resp.ok) { const e = await resp.json(); throw new Error(e.error || resp.status); }
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Unknown error');
+      const safeName = (practiceName || 'Assessment').replace(/[^a-z0-9]/gi,'_');
+      const a = document.createElement('a');
+      a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + data.xlsxB64;
+      a.download = safeName + '_Assessment.xlsx';
+      a.click();
+      btn.innerHTML = '✅ Workbook Downloaded!';
+      status.textContent = 'Codes: ' + data.summary.codesFound + ' | Production: $' + parseFloat(data.summary.totalProduction).toLocaleString();
+    } catch(err) {
+      status.textContent = '❌ ' + err.message;
+      btn.disabled = false;
+      btn.innerHTML = '📊 Download Assessment Workbook';
+    }
+  }
 </script>
 </body>
 </html>
