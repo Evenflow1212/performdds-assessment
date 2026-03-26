@@ -1259,7 +1259,7 @@ Uploaded reports:`
     return resp;
   };
 
-  async function generateWorkbook() {
+  window.generateWorkbook = async function() {
     const btn = document.getElementById('workbookBtn');
     const status = document.getElementById('workbookStatus');
     btn.disabled = true;
