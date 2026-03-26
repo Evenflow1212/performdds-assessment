@@ -740,3 +740,13 @@ Submitted via Perform DDS Practice Assessment Tool`;
     window.location.href = `assessment_hub.html`;
   }
 }
+window.handleSubmit = handleSubmit;
+window.selectRadio = selectRadio;
+window.togglePPOPct = togglePPOPct;
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('submit-btn');
+  if (btn) btn.addEventListener('click', handleSubmit);
+});
+</script>
+</body>
+</html>
