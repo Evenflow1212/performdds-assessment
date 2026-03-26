@@ -1,38 +1,251 @@
-// Perform DDS — generate-workbook.js v1.0
-// Netlify Function: fetches PDFs from Uploadcare, extracts via Claude AI, returns XLSX
-// POST body: { productionUrl, plUrl, templateB64, months, practiceName }
-
+'use strict';
 const ExcelJS = require('exceljs');
 
 const CODE_MAP={D0120:'exam_periodic',D0140:'exam_focused',D0145:'exam_other',D0150:'exam_comprehensive',D0170:'exam_other',D0180:'exam_perio',D0210:'imaging_fmx',D0220:'imaging_other',D0230:'imaging_other',D0270:'imaging_other',D0272:'imaging_other',D0273:'imaging_other',D0274:'imaging_bw4',D0330:'imaging_pano',D0340:'imaging_other',D0350:'imaging_other',D0364:'imaging_other',D0365:'imaging_other',D0367:'imaging_other',D0380:'imaging_other',D1110:'hyg_adult_prophy',D1120:'hyg_child_prophy',D1206:'hyg_other',D1351:'hyg_other',D1353:'hyg_other',D1354:'hyg_other',D1556:'hyg_other',D4341:'hyg_srp',D4342:'hyg_srp',D4346:'hyg_irrigation',D4381:'hyg_arestin',D4910:'hyg_perio_maint',D4921:'hyg_irrigation',D2740:'cb_2740',D2750:'cb_2750',D2962:'oc_veneers',D2780:'oc_cast_metal',D2790:'oc_cast_metal',D2799:'oc_interim',D2719:'oc_crown_prep',D6057:'oc_custom_abutment',D6058:'oc_implant_crown',D6059:'oc_implant_crown',D6060:'oc_implant_crown',D6061:'oc_implant_crown',D6062:'oc_implant_crown',D6063:'oc_implant_crown',D6064:'oc_implant_crown',D6065:'oc_implant_crown',D6245:'bridge_pontic',D6740:'bridge_pontic',D2510:'cb_inlay_onlay',D2520:'cb_inlay_onlay',D2530:'cb_inlay_onlay',D2542:'cb_inlay_onlay',D2543:'cb_inlay_onlay',D2544:'cb_inlay_onlay',D2610:'cb_inlay_onlay',D2620:'cb_inlay_onlay',D2630:'cb_inlay_onlay',D2642:'cb_inlay_onlay',D2643:'cb_inlay_onlay',D2644:'cb_inlay_onlay',D2650:'cb_inlay_onlay',D2651:'cb_inlay_onlay',D2652:'cb_inlay_onlay',D8090:'ortho_comp_adult',D8040:'ortho_limited',D8681:'ortho_retention',D8695:'ortho_retention',D8699:'ortho_retention',D8701:'ortho_retention',D8702:'ortho_retention',D8703:'ortho_retention',D8704:'ortho_retention',D5110:'den_complete',D5120:'den_complete',D5130:'den_complete',D5140:'den_complete',D5213:'den_partial_cast',D5214:'den_partial_cast',D5211:'den_partial_resin',D5223:'den_partial_resin',D5225:'den_partial_flex',D5226:'den_partial_flex',D5820:'den_interim',D5821:'den_interim',D5410:'den_adj',D5411:'den_adj',D5421:'den_adj',D5422:'den_adj',D5511:'den_repair',D5512:'den_repair',D5520:'den_repair',D5612:'den_repair',D5640:'den_repair',D5650:'den_repair',D5730:'den_repair',D5741:'den_repair',D5750:'den_repair',D5751:'den_repair',D5851:'den_repair',D5862:'den_repair',D6111:'den_implant_supported',D6112:'den_implant_supported',D6113:'den_implant_supported',D3310:'endo_anterior',D3320:'endo_bicuspid',D3330:'endo_molar',D3332:'endo_retreat',D3346:'endo_retreat',D3347:'endo_retreat',D3348:'endo_retreat',D3110:'endo_other',D3120:'endo_other',D3240:'endo_other',D4249:'perio_crown_length',D4211:'perio_gingivectomy',D4212:'perio_gingivectomy',D7922:'os_membrane',D7953:'os_bone_graft_ridge',D6104:'os_bone_graft_implant',D7140:'os_ext_simple',D7210:'os_ext_surgical',D6010:'os_implant_surgical',D6011:'os_implant_misc',D6080:'os_implant_misc',D6089:'os_implant_misc',D6090:'os_implant_misc',D6091:'os_implant_misc',D6092:'os_implant_misc',D6100:'os_implant_misc',D6192:'os_implant_misc',D6197:'os_implant_misc',D6198:'os_implant_misc',D6199:'os_implant_misc',D7465:'os_abscess',D7510:'os_abscess',D7511:'os_abscess',D7971:'os_abscess'};
 
-const CAT_MAP=[[/^services?$|^service income$|^income$/i,'income_gross'],[/^\d{3} service income|^\d{3} refund|^refund/i,'income_adj'],[/associate.{0,10}(salary|wage)/i,'associates'],[/hygien.{0,15}(salary|wage|pay)/i,'hygienist'],[/specialist.{0,15}(salary|wage|pay)/i,'specialists'],[/employee.{0,10}bonus|staff bonus/i,'staff_bonus'],[/officer.{0,10}salary|owner.{0,10}(salary|draw)/i,'owner_salary'],[/payroll tax|employer tax|fica|futa|suta|^payroll taxes$/i,'staff_costs'],[/employee.{0,10}(relation|wage)|laundry|cleaning|uniform/i,'staff_costs'],[/lab fee|dental lab/i,'lab'],[/dental supply|dental supplie/i,'dental_supplies'],[/specialist supply/i,'specialist_supplies'],[/^rent$|parking|^lease$/i,'rent'],[/repair|maintenance/i,'rent'],[/advertis|^marketing$/i,'marketing'],[/office supply|postage/i,'office_supplies'],[/meal|entertainment|travel|continu.{0,10}ed|pension|retirement/i,'add_back'],[/depreciation|amortization/i,'excluded']];
+const CAT=[
+  [/^services?$|^service income$|^income$/i,'income_gross'],
+  [/^\d{3}\s(service|refund)|^refund/i,'income_adj'],
+  [/associate.{0,10}(salary|wage)/i,'associates'],
+  [/hygien.{0,15}(salary|wage|pay)/i,'hygienist'],
+  [/specialist.{0,15}(salary|wage|pay)/i,'specialists'],
+  [/employee.{0,10}bonus|staff.bonus/i,'staff_bonus'],
+  [/officer.{0,10}salary|owner.{0,10}(salary|draw)/i,'owner_salary'],
+  [/payroll.tax|employer.tax|^payroll.taxes$/i,'staff_costs'],
+  [/employee.{0,10}(relation|wage)|laundry|cleaning|uniform/i,'staff_costs'],
+  [/lab.fee|dental.lab/i,'lab'],
+  [/dental.suppl/i,'dental_supplies'],
+  [/specialist.suppl/i,'specialist_supplies'],
+  [/^rent$|parking|^lease$/i,'rent'],
+  [/repair|maintenance/i,'rent'],
+  [/advertis|^marketing$/i,'marketing'],
+  [/office.suppl|postage/i,'office_supplies'],
+  [/meal|entertainment|travel|continuing.ed|pension|retirement/i,'add_back'],
+  [/depreciation|amortization/i,'excluded'],
+];
 
-function norm(r){let s=String(r).trim().toUpperCase();if(!s.startsWith('D'))s='D'+s;const d=s.slice(1);if(d.length===5&&d.startsWith('0'))return'D'+d.slice(1);return s;}
-function cat(l){for(const[re,c]of CAT_MAP){if(re.test(l))return c;}return'other';}
-function grp(g,k,f='qty'){return(g[k]||{})[f]||0;}
-function agg(raw){const g={};for(const[c,d]of Object.entries(raw)){const gr=CODE_MAP[norm(c)];if(!gr)continue;if(!g[gr])g[gr]={qty:0,total:0};g[gr].qty+=d.qty;g[gr].total+=d.total;}for(const d of Object.values(g))d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;return g;}
-function parseProd(text){const raw={};for(const line of text.split('\n')){const p=line.trim().split('|');if(p.length<3)continue;const code=norm(p[0].trim());const qty=parseInt(p[1]);const total=parseFloat(p[2].replace(/[,$]/g,''));if(!code||isNaN(qty)||isNaN(total)||qty<=0)continue;if(!raw[code])raw[code]={qty:0,total:0};raw[code].qty+=qty;raw[code].total+=total;}for(const d of Object.values(raw)){d.total=Math.round(d.total*100)/100;d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;}return raw;}
-function parsePL(text){const items=[];const seen=new Set();for(const line of text.split('\n')){const idx=line.lastIndexOf('|');if(idx<0)continue;const label=line.slice(0,idx).trim();const amount=parseFloat(line.slice(idx+1).replace(/[,$]/g,''));if(!label||isNaN(amount))continue;const key=label.toLowerCase().slice(0,40);if(seen.has(key))continue;seen.add(key);items.push({label,amount,category:cat(label)});}const gross=items.filter(i=>i.category==='income_gross').reduce((s,i)=>s+i.amount,0);const adj=items.filter(i=>i.category==='income_adj').reduce((s,i)=>s+i.amount,0);return{items,netCollections:Math.round((gross+adj)*100)/100};}
+function norm(r){let s=String(r).trim().toUpperCase();if(!s.startsWith('D'))s='D'+s;const d=s.slice(1);if(d.length===5&&d[0]==='0')return'D'+d.slice(1);return s;}
+function catOf(l){for(const[re,c]of CAT){if(re.test(l))return c;}return'other';}
+function g(groups,k,f='qty'){return(groups[k]||{})[f]||0;}
 
-async function extractPdf(cdnUrl,apiKey,hint){
-    const buf=await(await fetch(cdnUrl)).arrayBuffer();
-    const b64=Buffer.from(buf).toString('base64');
-    const prompt=hint==='production'?'Eaglesoft Procedures by Provider. Return each ADA code as: CODE|QTY|TOTAL (e.g. 00120|3325|173352.46). Combine all providers. Data lines only.':'QuickBooks P&L. Return each line item as: LABEL|AMOUNT (e.g. Dental Supplies|171167.66). Negative for refunds. Data lines only.';
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]}]})});
-    return(await r.json()).content?.[0]?.text||'';
+function agg(raw){
+  const groups={};
+  for(const[code,d]of Object.entries(raw)){
+    const gr=CODE_MAP[norm(code)];
+    if(!gr)continue;
+    if(!groups[gr])groups[gr]={qty:0,total:0};
+    groups[gr].qty+=d.qty;
+    groups[gr].total+=d.total;
+  }
+  for(const d of Object.values(groups))d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;
+  return groups;
 }
 
-async function buildWb(tplB64,raw,groups,pl,months,name){
-    const wb=new ExcelJS.Workbook();
-    await wb.xlsx.load(Buffer.from(tplB64,'base64'));
-    const tot=Object.values(raw).reduce((s,v)=>s+v.total,0);
-    const ws=wb.getWorksheet('Production Worksheet');
-    const s=(c,v)=>{try{ws.getCell(c).value=v;}catch(e){}};
-    const f=(c,fo)=>{try{ws.getCell(c).value={formula:fo};}catch(e){}};
-    if(name)s('D4',name);s('D5',months);s('G5',Math.round(tot*100)/100);
-    s('D10',raw.D0120?.qty||0);f('E10','=D10/D5');s('F10',raw.D0120?.avg||0);
-    s('D11',raw.D0140?.qty||0);f('E11','=D11/D5');s('F11',raw.D0140?.avg||0);
-    s('D12',raw.D0150?.qty||0);f('E12','=D12/D5');s('F12',raw.D0150?.avg||0);
-    s('D13',raw.D0180?.qty||0);f('E13','=D13/D5');s('F13',raw.D0180?.avg||0);
-    s('D16',grp(groups,'imaging_fmx'));f('E16','=D16/D5');s('F16',raw.D0210?.avg|
+function parseProd(text){
+  const raw={};
+  for(const line of text.split('\n')){
+    const parts=line.trim().split('|');
+    if(parts.length<3)continue;
+    const code=norm(parts[0].trim());
+    const qty=parseInt(parts[1],10);
+    const total=parseFloat(parts[2].replace(/[,$]/g,''));
+    if(!code||isNaN(qty)||isNaN(total)||qty<=0)continue;
+    if(!raw[code])raw[code]={qty:0,total:0};
+    raw[code].qty+=qty;
+    raw[code].total+=total;
+  }
+  for(const d of Object.values(raw)){
+    d.total=Math.round(d.total*100)/100;
+    d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;
+  }
+  return raw;
+}
+
+function parsePL(text){
+  const items=[];
+  const seen=new Set();
+  for(const line of text.split('\n')){
+    const idx=line.lastIndexOf('|');
+    if(idx<0)continue;
+    const label=line.slice(0,idx).trim();
+    const amount=parseFloat(line.slice(idx+1).replace(/[,$]/g,''));
+    if(!label||isNaN(amount))continue;
+    const key=label.toLowerCase().slice(0,40);
+    if(seen.has(key))continue;
+    seen.add(key);
+    items.push({label,amount,category:catOf(label)});
+  }
+  const gross=items.filter(i=>i.category==='income_gross').reduce((s,i)=>s+i.amount,0);
+  const adj=items.filter(i=>i.category==='income_adj').reduce((s,i)=>s+i.amount,0);
+  return{items,netCollections:Math.round((gross+adj)*100)/100};
+}
+
+async function fetchPdf(url,key,hint){
+  const r=await fetch(url);
+  if(!r.ok)throw new Error('PDF fetch failed: '+url);
+  const b64=Buffer.from(await r.arrayBuffer()).toString('base64');
+  const prompt=hint==='prod'
+    ?'Eaglesoft Procedures by Provider report. Return each ADA code as CODE|QTY|TOTAL (e.g. 00120|340|420594.36). Combine all providers. Data lines only, no headers or explanations.'
+    :'QuickBooks P&L. Return each line item as LABEL|AMOUNT (e.g. Dental Supplies|171167.66). Negative for refunds/adjustments. Data lines only.';
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:4096,
+      messages:[{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+        {type:'text',text:prompt}
+      ]}]
+    })
+  });
+  const data=await resp.json();
+  if(data.error)throw new Error(data.error.message);
+  return data.content?.[0]?.text||'';
+}
+
+async function buildXlsx(raw,groups,pl,months,name){
+  const wb=new ExcelJS.Workbook();
+  const ws=wb.addWorksheet('Production Worksheet');
+  const wsA=wb.addWorksheet('All Codes - Production Report');
+  wb.addWorksheet('Hygiene Schedule');
+  wb.addWorksheet('Financial Overview');
+  wb.addWorksheet('Targets & Goal');
+  wb.addWorksheet('Employee Costs');
+  wb.addWorksheet('Budgetary P&L');
+  wb.addWorksheet('P&L Input');
+  wb.addWorksheet('P&L Raw Import');
+
+  const tot=Object.values(raw).reduce((s,v)=>s+v.total,0);
+  const s=(c,v)=>{try{ws.getCell(c).value=v;}catch(e){}};
+  const f=(c,fo)=>{try{ws.getCell(c).value={formula:fo};}catch(e){}};
+
+  s('B2','PRODUCTION OVERVIEW');
+  s('B4','practice'); if(name)s('D4',name);
+  s('B5','number of months reviewed'); s('D5',months);
+  s('E5','total production'); s('G5',Math.round(tot*100)/100);
+
+  s('B8','EXAMS'); s('E8','per month');
+  s('B10','periodic exam (0120)'); s('D10',raw.D0120?.qty||0); f('E10','=D10/D5'); s('F10',raw.D0120?.avg||0);
+  s('B11','focused exam (0140)');  s('D11',raw.D0140?.qty||0); f('E11','=D11/D5'); s('F11',raw.D0140?.avg||0);
+  s('B12','comprehensive exam (0150)'); s('D12',raw.D0150?.qty||0); f('E12','=D12/D5'); s('F12',raw.D0150?.avg||0);
+  s('B13','perio exam (0180)'); s('D13',raw.D0180?.qty||0); f('E13','=D13/D5'); s('F13',raw.D0180?.avg||0);
+
+  s('B15','IMAGING'); s('E15','per month');
+  s('B16','full mouth x-rays (0210)'); s('D16',g(groups,'imaging_fmx')); f('E16','=D16/D5'); s('F16',raw.D0210?.avg||0);
+  s('B17','4 bite wings (0274)');      s('D17',g(groups,'imaging_bw4')); f('E17','=D17/D5'); s('F17',raw.D0274?.avg||0);
+  s('B18','panorex (0330)');           s('D18',g(groups,'imaging_pano')); f('E18','=D18/D5'); s('F18',raw.D0330?.avg||0);
+
+  s('B20','HYGIENE'); s('E20','per month'); s('G20','total $$s');
+  s('B21','adult prophy (1110)'); s('D21',g(groups,'hyg_adult_prophy')); f('E21','=D21/D5'); s('F21',raw.D1110?.avg||0); f('G21','=D21*F21');
+  s('B22','child prophy (1120)'); s('D22',g(groups,'hyg_child_prophy')); f('E22','=D22/D5'); s('F22',raw.D1120?.avg||0); f('G22','=D22*F22');
+  s('B23','perio maintenance (4910)'); s('D23',g(groups,'hyg_perio_maint')); f('E23','=D23/D5'); s('F23',raw.D4910?.avg||0); f('G23','=D23*F23');
+  const sq=g(groups,'hyg_srp'),st=g(groups,'hyg_srp','total');
+  s('B24','SRP (4341/2)'); s('D24',sq); f('E24','=D24/D5'); s('F24',sq>0?Math.round(st/sq*100)/100:0); f('G24','=D24*F24');
+  s('B25','arestin or similar (4381)'); s('D25',g(groups,'hyg_arestin')); f('E25','=D25/D5'); s('F25',raw.D4381?.avg||0); f('G25','=D25*F25');
+  s('B26','irrigation'); s('D26',g(groups,'hyg_irrigation')); f('E26','=D26/D5'); s('F26',raw.D4346?.avg||0); f('G26','=D26*F26');
+
+  s('B30','CROWN & BRIDGE'); s('E30','per month'); s('G30','total $$s');
+  s('B31','porcelain/ceramic (2740)'); s('D31',g(groups,'cb_2740')); f('E31','=D31/D5'); s('F31',raw.D2740?.avg||0); f('G31','=D31*F31');
+  s('B32','porcelain/high noble (2750)'); s('D32',g(groups,'cb_2750')); f('E32','=D32/D5'); s('F32',raw.D2750?.avg||0); f('G32','=D32*F32');
+  const ioQ=g(groups,'cb_inlay_onlay'),ioT=g(groups,'cb_inlay_onlay','total');
+  s('B33','inlays & onlays; veneers & other'); s('D33',ioQ); f('E33','=D33/D5'); s('F33',ioQ>0?Math.round(ioT/ioQ*100)/100:0); f('G33','=D33*F33');
+  const brQ=g(groups,'bridge_pontic'),brT=g(groups,'bridge_pontic','total');
+  s('B34','bridge units'); s('D34',brQ); f('E34','=D34/D5'); s('F34',brQ>0?Math.round(brT/brQ*100)/100:0); f('G34','=D34*F34');
+  const icQ=g(groups,'oc_implant_crown'),icT=g(groups,'oc_implant_crown','total');
+  s('B35','implant crowns'); s('D35',icQ); f('E35','=D35/D5'); s('F35',icQ>0?Math.round(icT/icQ*100)/100:0); f('G35','=D35*F35');
+  f('E36','=(D31+D32+D33+D34+D35)/D5');
+
+  s('B38','SPECIALTY'); s('E38','% of production');
+  const peT=['perio_crown_length','perio_gingivectomy','perio_irrigation'];
+  const osT=Object.keys(groups).filter(k=>k.startsWith('os_'));
+  const orT=Object.keys(groups).filter(k=>k.startsWith('ortho_'));
+  const enT=Object.keys(groups).filter(k=>k.startsWith('endo_'));
+  const deT=Object.keys(groups).filter(k=>k.startsWith('den_'));
+  s('C39','perio'); s('D39',Math.round(peT.reduce((a,k)=>a+g(groups,k,'total'),0)*100)/100); f('E39','=IFERROR(D39/G5,0)');
+  s('C40','oral surgery'); s('D40',Math.round(osT.reduce((a,k)=>a+g(groups,k,'total'),0)*100)/100); f('E40','=IFERROR(D40/G5,0)');
+  s('C41','ortho'); s('D41',Math.round(orT.reduce((a,k)=>a+g(groups,k,'total'),0)*100)/100); f('E41','=IFERROR(D41/G5,0)');
+  s('C42','endo'); s('D42',Math.round(enT.reduce((a,k)=>a+g(groups,k,'total'),0)*100)/100); f('E42','=IFERROR(D42/G5,0)');
+  s('C43','dentures'); s('D43',Math.round(deT.reduce((a,k)=>a+g(groups,k,'total'),0)*100)/100); f('E43','=IFERROR(D43/G5,0)');
+  s('B44','SPECIALTY TOTAL'); f('D44','=SUM(D39:D43)'); f('E44','=IFERROR(D44/G5,0)');
+
+  // Right-side orange tables
+  s('J2','OTHER CROWNS'); s('K2','CODE'); s('L2','#'); s('M2','TOTAL $'); s('N2','AVG $');
+  const ocRows=[['Veneers','2962','oc_veneers'],['Cast Metal/Gold Crowns','2780-2790','oc_cast_metal'],['Interim/Temp Crown','2799','oc_interim'],['Custom Abutment','6057','oc_custom_abutment'],['Crown Prep','2719','oc_crown_prep'],['Implant Crowns (porc/ceramic)','6058-6065','oc_implant_crown']];
+  ocRows.forEach(([lbl,code,cat],i)=>{const r=3+i;s('J'+r,lbl);s('K'+r,code);s('L'+r,g(groups,cat));s('M'+r,g(groups,cat,'total'));f('N'+r,'=IFERROR(M'+r+'/L'+r+',0)');});
+  f('L9','=SUM(L3:L8)');f('M9','=SUM(M3:M8)');f('N9','=IFERROR(M9/L9,0)');
+
+  s('J11','BRIDGE UNITS'); s('K11','CODE'); s('L11','#'); s('M11','TOTAL $'); s('N11','AVG $');
+  s('J12','Pontic/Abutment Crown Porc/Cer'); s('K12','6245,6740'); s('L12',brQ); s('M12',brT); f('N12','=IFERROR(M12/L12,0)');
+  f('L18','=SUM(L12:L17)');f('M18','=SUM(M12:M17)');f('N18','=IFERROR(M18/L18,0)');
+
+  s('J20','ORTHO'); s('K20','CODE'); s('L20','#'); s('M20','TOTAL $'); s('N20','AVG $');
+  [['comp adult','8090','ortho_comp_adult'],['limited ortho','8040','ortho_limited'],['Retention/Adj/Repair','8681-8704','ortho_retention']].forEach(([lbl,code,cat],i)=>{const r=21+i;s('J'+r,lbl);s('K'+r,code);s('L'+r,g(groups,cat));s('M'+r,g(groups,cat,'total'));f('N'+r,'=IFERROR(M'+r+'/L'+r+',0)');});
+  f('L28','=SUM(L21:L27)');f('M28','=SUM(M21:M27)');f('N28','=IFERROR(M28/L28,0)');
+
+  s('J30','DENTURES'); s('K30','CODE'); s('L30','#'); s('M30','TOTAL $'); s('N30','AVG $');
+  [['Complete Dentures','5110-5140','den_complete'],['Partials - Cast Metal','5213-5214','den_partial_cast'],['Partials - Flexible','5225-5226','den_partial_flex'],['Partials - Resin/Immediate','5211,5223','den_partial_resin'],['Interim Partials','5820-5821','den_interim'],['Implant Supported Denture','6111-6113','den_implant_supported'],['Adjustments','5410-5422','den_adj'],['Repairs/Relines/Other','5511-5862','den_repair']].forEach(([lbl,code,cat],i)=>{const r=31+i;s('J'+r,lbl);s('K'+r,code);s('L'+r,g(groups,cat));s('M'+r,g(groups,cat,'total'));f('N'+r,'=IFERROR(M'+r+'/L'+r+',0)');});
+  f('L40','=SUM(L31:L39)');f('M40','=SUM(M31:M39)');f('N40','=IFERROR(M40/L40,0)');
+
+  s('J42','ENDO'); s('K42','CODE'); s('L42','#'); s('M42','TOTAL $'); s('N42','AVG $');
+  [['ROOT CANAL, ANTERIOR','3310','endo_anterior'],['ROOT CANAL, BICUSPID','3320','endo_bicuspid'],['ROOT CANAL, MOLAR','3330','endo_molar'],['RETREAT/INCOMPLETE','3332,3346-3348','endo_retreat']].forEach(([lbl,code,cat],i)=>{const r=43+i;s('J'+r,lbl);s('K'+r,code);s('L'+r,g(groups,cat));s('M'+r,g(groups,cat,'total'));f('N'+r,'=IFERROR(M'+r+'/L'+r+',0)');});
+  f('L47','=SUM(L43:L46)');f('M47','=SUM(M43:M46)');f('N47','=IFERROR(M47/L47,0)');
+
+  s('J50','PERIO'); s('K50','CODE'); s('L50','#'); s('M50','TOTAL $'); s('N50','AVG $');
+  s('J51','CROWN LENGTH, HARD TIS'); s('K51','4249'); s('L51',g(groups,'perio_crown_length')); s('M51',g(groups,'perio_crown_length','total')); f('N51','=IFERROR(M51/L51,0)');
+  s('J52','Gingivectomy/Gingivoplasty'); s('K52','4211-4212'); s('L52',g(groups,'perio_gingivectomy')); s('M52',g(groups,'perio_gingivectomy','total')); f('N52','=IFERROR(M52/L52,0)');
+  f('L55','=SUM(L51:L54)');f('M55','=SUM(M51:M54)');f('N55','=IFERROR(M55/L55,0)');
+
+  s('J57','ORAL SURGERY'); s('K57','CODE'); s('L57','#'); s('M57','TOTAL $'); s('N57','AVG $');
+  [['Membrane/Collagen Plug','7922','os_membrane'],['Bone repl graft ridge preserv','7953','os_bone_graft_ridge'],['Bone graft at implant placement','6104','os_bone_graft_implant'],['EXT-ERUPTED OR EXPOSED ROOT','7140','os_ext_simple'],['SURG EXTRACT ERUPTED','7210','os_ext_surgical'],['SURGICAL IMPLANT','6010','os_implant_surgical'],['Implant Maintenance/Misc','6011-6199','os_implant_misc'],['Abscess/Lesion/Operculectomy','7465-7971','os_abscess']].forEach(([lbl,code,cat],i)=>{const r=58+i;s('J'+r,lbl);s('K'+r,code);s('L'+r,g(groups,cat));s('M'+r,g(groups,cat,'total'));f('N'+r,'=IFERROR(M'+r+'/L'+r+',0)');});
+  f('L68','=SUM(L58:L67)');f('M68','=SUM(M58:M67)');f('N68','=IFERROR(M68/L68,0)');
+
+  // All Codes tab
+  wsA.getCell('A1').value='Code'; wsA.getCell('B1').value='Description'; wsA.getCell('C1').value='Quantity'; wsA.getCell('D1').value='Total $'; wsA.getCell('E1').value='Average $'; wsA.getCell('F1').value='% of Production';
+  let rr=2;
+  for(const[code,d]of Object.entries(raw).sort((a,b)=>a[0].localeCompare(b[0]))){
+    try{wsA.getCell('A'+rr).value=code; wsA.getCell('C'+rr).value=d.qty; wsA.getCell('D'+rr).value=d.total; wsA.getCell('E'+rr).value=d.avg; wsA.getCell('F'+rr).value=tot>0?d.total/tot:0; rr++;}catch(e){}
+  }
+
+  // P&L tabs if we have financial data
+  if(pl){
+    const wsPL=wb.getWorksheet('P&L Input');
+    const wsBud=wb.getWorksheet('Budgetary P&L');
+    const wsFO=wb.getWorksheet('Financial Overview');
+    const CM={associates:'B',hygienist:'C',specialists:'D',lab:'E',dental_supplies:'F',specialist_supplies:'G',staff_costs:'H',staff_bonus:'I',rent:'J',marketing:'K',office_supplies:'L',other:'M',owner_salary:'N',add_back:'O'};
+    try{wsPL.getCell('A2').value='months reviewed'; wsPL.getCell('B2').value=months; wsPL.getCell('E2').value='collections from P&L'; wsPL.getCell('H2').value=pl.netCollections; wsPL.getCell('L2').value='monthly ave.'; wsPL.getCell('N2').value={formula:'=H2/B2'};}catch(e){}
+    let pr=6; const gd={};
+    for(const item of pl.items){if(!CM[item.category])continue; if(!gd[item.category])gd[item.category]={label:item.label,total:0}; gd[item.category].total+=item.amount;}
+    for(const[cat,d]of Object.entries(gd)){const col=CM[cat]; try{wsPL.getCell('A'+pr).value=d.label; wsPL.getCell(col+pr).value=Math.round(d.total*100)/100; wsPL.getCell('P'+pr).value=Math.round(d.total*100)/100;}catch(e){} pr++;}
+    const avgC=pl.netCollections/months, avgP=tot/months;
+    const pct=(c)=>{const t=pl.items.filter(i=>i.category===c).reduce((s,i)=>s+i.amount,0); return pl.netCollections>0?t/pl.netCollections:0;};
+    const mav=(c)=>{const t=pl.items.filter(i=>i.category===c).reduce((s,i)=>s+i.amount,0); return months>0?Math.round(t/months*100)/100:0;};
+    try{wsFO.getCell('B4').value='practice'; wsFO.getCell('D4').value=name||''; wsFO.getCell('D25').value=avgC; wsFO.getCell('D26').value=avgC; wsFO.getCell('D27').value=avgP; wsFO.getCell('D28').value={formula:'=IFERROR(D26/D27,0)'};}catch(e){}
+    try{wsBud.getCell('B7').value='COLLECTION'; wsBud.getCell('C7').value=avgC; wsBud.getCell('C8').value=pct('associates'); wsBud.getCell('D8').value=mav('associates'); wsBud.getCell('C9').value=pct('hygienist'); wsBud.getCell('D9').value=mav('hygienist'); wsBud.getCell('C12').value=pct('lab'); wsBud.getCell('D12').value=mav('lab'); wsBud.getCell('C13').value=pct('dental_supplies'); wsBud.getCell('D13').value=mav('dental_supplies'); wsBud.getCell('C18').value=pct('staff_costs'); wsBud.getCell('D18').value=mav('staff_costs'); wsBud.getCell('D19').value=mav('staff_bonus'); wsBud.getCell('C20').value=pct('rent'); wsBud.getCell('D20').value=mav('rent'); wsBud.getCell('C22').value=pct('other'); wsBud.getCell('D22').value=mav('other'); wsBud.getCell('C24').value=pct('marketing'); wsBud.getCell('D24').value=mav('marketing');}catch(e){}
+  }
+
+  return Buffer.from(await wb.xlsx.writeBuffer()).toString('base64');
+}
+
+exports.handler = async function(event) {
+  if(event.httpMethod==='OPTIONS')return{statusCode:200,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST,OPTIONS'},body:''};
+  if(event.httpMethod!=='POST')return{statusCode:405,body:'Method Not Allowed'};
+  const KEY=process.env.ANTHROPIC_KEY;
+  if(!KEY)return{statusCode:500,body:JSON.stringify({error:'ANTHROPIC_KEY not set'})};
+  let body;
+  try{body=JSON.parse(event.body);}catch(e){return{statusCode:400,body:JSON.stringify({error:'Invalid JSON'})};}
+  const{productionUrl,plUrl,months=12,practiceName=''}=body;
+  if(!productionUrl)return{statusCode:400,body:JSON.stringify({error:'productionUrl required'})};
+  try{
+    const prodText=await fetchPdf(productionUrl,KEY,'prod');
+    const raw=parseProd(prodText);
+    const groups=agg(raw);
+    let pl=null;
+    if(plUrl){const plText=await fetchPdf(plUrl,KEY,'pl');pl=parsePL(plText);}
+    const xlsxB64=await buildXlsx(raw,groups,pl,months,practiceName);
+    const totalProd=Object.values(raw).reduce((s,v)=>s+v.total,0);
+    return{statusCode:200,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},body:JSON.stringify({success:true,xlsxB64,summary:{codesFound:Object.keys(raw).length,totalProduction:totalProd.toFixed(2),netCollections:pl?.netCollections||null}})};
+  }catch(err){
+    return{statusCode:500,headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:err.message,stack:err.stack?.slice(0,500)})};
+  }
+};
