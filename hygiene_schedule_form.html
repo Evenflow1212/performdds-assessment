@@ -190,9 +190,6 @@
       <button type="button" class="btn" onclick="submitForm()">Submit Schedule Data</button>
     </div>
     <div class="ok" id="okMsg">✓ &nbsp; Schedule data submitted successfully.</div>
-  <div id="returnBtn" style="display:none;margin-top:16px;text-align:center;">
-    <button type="button" class="btn" style="background:var(--success);" onclick="returnToAssessment()">← Return to Assessment</button>
-  </div>
   </form>
 </main>
 <script>
@@ -209,7 +206,7 @@ function buildGrid(id,weeks,l1,l2,pfx){
   h+=`</div>`;
   for(let wi=0;wi<weeks;wi++){
     h+=`<div class="wg-row" style="grid-template-columns:${cols}">
-      <div class="wc lc"><input type="text" style="width:100%;padding:5px 6px;border:1.5px solid var(--ice);border-radius:4px;font-size:12px;text-align:left" id="${pfx}_d${wi}" placeholder="Week of..." oninput="calc('${pfx}',${weeks})"></div>`;
+      <div class="wc lc"><input type="text" style="width:100%;padding:5px 6px;border:1.5px solid var(--ice);border-radius:4px;font-size:12px;text-align:left" id="${pfx}_d${wi}" placeholder="e.g. 3/31/25" oninput="calc('${pfx}',${weeks})"></div>`;
     DAYS.forEach((_,di)=>{
       h+=`<div class="wc"><input type="number" min="0" id="${pfx}_w${wi}_${di}_1" placeholder="0" oninput="calc('${pfx}',${weeks})"></div>`;
       h+=`<div class="wc"><input type="number" min="0" id="${pfx}_w${wi}_${di}_2" placeholder="0" oninput="calc('${pfx}',${weeks})"></div>`;
@@ -297,63 +294,7 @@ function submitForm(){
   a.download=`hygiene_${(data.practice||'practice').replace(/\s+/g,'-').toLowerCase()}_${Date.now()}.json`;
   a.click();
   document.getElementById('okMsg').classList.add('show');
-  document.getElementById('returnBtn').style.display = 'block';
   document.getElementById('okMsg').scrollIntoView({behavior:'smooth',block:'center'});
-  // Signal the hub tab that hygiene form is complete
-  try { localStorage.setItem('pdds_hygiene_done', Date.now()); } catch(e) {}
-}
-
-function returnToAssessment() {
-  // Signal opener if available, then close or go back
-  try { localStorage.setItem('pdds_hygiene_done', Date.now()); } catch(e) {}
-  if (window.opener && !window.opener.closed) {
-    window.opener.postMessage('pdds_hygiene_done', '*');
-    window.close();
-  } else {
-    window.history.back();
-  }
-}
-
-function getMonday(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0,0,0,0);
-  return d;
-}
-
-function fmtDate(d) {
-  return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
-}
-
-function autoPopulateDates() {
-  const today = new Date();
-  const thisMonday = getMonday(today);
-
-  // RECENT PAST — 4 weeks backwards
-  for (let i = 0; i < 4; i++) {
-    const d = new Date(thisMonday);
-    d.setDate(d.getDate() - (4 - i) * 7);
-    const el = document.getElementById(`rp_d${i}`);
-    if (el) el.value = fmtDate(d);
-  }
-
-  // NEAR FUTURE — 4 weeks forwards starting next week
-  for (let i = 0; i < 4; i++) {
-    const d = new Date(thisMonday);
-    d.setDate(d.getDate() + (i + 1) * 7);
-    const el = document.getElementById(`nf_d${i}`);
-    if (el) el.value = fmtDate(d);
-  }
-
-  // FAR FUTURE — 2 weeks further out (weeks 5 and 6 from now)
-  for (let i = 0; i < 2; i++) {
-    const d = new Date(thisMonday);
-    d.setDate(d.getDate() + (i + 5) * 7);
-    const el = document.getElementById(`ff_d${i}`);
-    if (el) el.value = fmtDate(d);
-  }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -363,7 +304,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   buildN7();
   buildGrid('nfGrid',4,'Appt','Booked','nf');
   buildGrid('ffGrid',2,'Appt','Booked','ff');
-  autoPopulateDates();
 });
 </script>
 </body>
