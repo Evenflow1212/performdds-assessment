@@ -1386,192 +1386,180 @@ Uploaded reports:`
 
 
 
-  // ── INLINE HYGIENE SCHEDULE JS ─────────────────────────────────────────
-  (function(){
-    var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat'];
+  // ── HYGIENE SCHEDULE FUNCTIONS ────────────────────────────────────────────
+  var HY_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+  var HY_KEYS = ['mon','tue','wed','thu','fri','sat'];
 
-    function buildWeekGrid(containerId,weeks,l1,l2,pfx){
-      var el=document.getElementById(containerId); if(!el) return;
-      var cols='110px repeat('+(DAYS.length*2)+',1fr)';
-      var h='<div style="border:1px solid #D9E1F2;border-radius:4px;overflow:hidden">'
-        +'<div style="display:grid;grid-template-columns:110px repeat('+DAYS.length+',1fr);background:#2E4B7A">'
-        +'<div style="color:#fff;font-size:10px;font-weight:700;padding:7px 10px">Week of</div>';
-      DAYS.forEach(function(d){h+='<div style="color:#fff;font-size:10px;font-weight:700;padding:7px 4px;text-align:center">'+d+'</div>';});
-      h+='</div><div style="display:grid;grid-template-columns:'+cols+';background:#EEF3FA;border-bottom:1px solid #D9E1F2">'
-        +'<div></div>';
-      DAYS.forEach(function(){
-        h+='<div style="font-size:9px;font-weight:700;color:#8A94A6;padding:3px 2px;text-align:center">'+l1+'</div>'
-          +'<div style="font-size:9px;font-weight:700;color:#8A94A6;padding:3px 2px;text-align:center">'+l2+'</div>';
-      });
-      h+='</div>';
-      for(var wi=0;wi<weeks;wi++){
-        h+='<div style="display:grid;grid-template-columns:'+cols+';border-top:1px solid #D9E1F2;'+(wi%2?'background:#F8FAFD':'')+'">'
-          +'<div style="padding:3px 6px"><input type="text" id="'+pfx+'_d'+wi+'" placeholder="Week of..." data-pfx="'+pfx+'" data-weeks="'+weeks+'" data-role="weekdate" style="width:100%;padding:3px 5px;border:1px solid #D9E1F2;border-radius:3px;font-size:11px"></div>';
-        DAYS.forEach(function(_,di){
-          h+='<div style="padding:2px"><input type="number" min="0" id="'+pfx+'_w'+wi+'_'+di+'_1" data-pfx="'+pfx+'" data-weeks="'+weeks+'" data-role="hygnum" placeholder="0" style="width:100%;padding:3px 2px;border:1px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center"></div>'
-            +'<div style="padding:2px"><input type="number" min="0" id="'+pfx+'_w'+wi+'_'+di+'_2" data-pfx="'+pfx+'" data-weeks="'+weeks+'" data-role="hygnum" placeholder="0" style="width:100%;padding:3px 2px;border:1px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center"></div>';
+  function hyV(id) { var el=document.getElementById(id); return el ? (parseFloat(el.value)||0) : 0; }
+  function hySet(id,val) { var el=document.getElementById(id); if(el) el.textContent = val||'--'; }
+
+  function hyCalc(pfx,weeks) {
+    var t1=0,t2=0;
+    for(var wi=0;wi<weeks;wi++) for(var di=0;di<6;di++){t1+=hyV(pfx+'_w'+wi+'_'+di+'_1');t2+=hyV(pfx+'_w'+wi+'_'+di+'_2');}
+    var pct = t1>0 ? (t2/t1*100).toFixed(1)+'%' : '--';
+    if(pfx==='hy_rp'){hySet('hy_rp_a',t1||'--');hySet('hy_rp_s',t2||'--');hySet('hy_rp_p',pct);hySet('hy_rp_avg',t2>0?(t2/8).toFixed(1):'--');}
+    else if(pfx==='hy_nf'){hySet('hy_nf_a',t1||'--');hySet('hy_nf_b',t2||'--');hySet('hy_nf_p',pct);}
+  }
+
+  function hyCalcN7() {
+    var s=0,c=0;
+    for(var di=0;di<6;di++){s+=hyV('hy_n7_0_'+di);c+=hyV('hy_n7_1_'+di);}
+    hySet('hy_n7_s',s||'--');hySet('hy_n7_c',c||'--');hySet('hy_n7_p',s>0?(c/s*100).toFixed(1)+'%':'--');
+  }
+
+  document.addEventListener('input', function(e) {
+    var role = e.target.dataset ? e.target.dataset.role : '';
+    if(role==='hygnum') hyCalc(e.target.dataset.pfx, parseInt(e.target.dataset.weeks));
+    else if(role==='hygn7') hyCalcN7();
+  });
+
+  function hyBuildWeekGrid(containerId, weeks, l1, l2, pfx) {
+    var el = document.getElementById(containerId); if(!el) return;
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'border:1px solid #D9E1F2;border-radius:4px;overflow:hidden';
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:grid;grid-template-columns:110px repeat(6,1fr);background:#2E4B7A';
+    var lbl = document.createElement('div');
+    lbl.style.cssText = 'color:#fff;font-size:10px;font-weight:700;padding:7px 10px';
+    lbl.textContent = 'Week of'; hdr.appendChild(lbl);
+    HY_DAYS.forEach(function(d){ var c=document.createElement('div'); c.style.cssText='color:#fff;font-size:10px;font-weight:700;padding:7px 4px;text-align:center'; c.textContent=d; hdr.appendChild(c); });
+    wrap.appendChild(hdr);
+    var sub = document.createElement('div');
+    sub.style.cssText = 'display:grid;grid-template-columns:110px repeat(12,1fr);background:#EEF3FA;border-bottom:1px solid #D9E1F2';
+    sub.appendChild(document.createElement('div'));
+    HY_DAYS.forEach(function(){ [l1,l2].forEach(function(t){ var c=document.createElement('div'); c.style.cssText='font-size:9px;font-weight:700;color:#8A94A6;padding:3px 2px;text-align:center'; c.textContent=t; sub.appendChild(c); }); });
+    wrap.appendChild(sub);
+    for(var wi=0;wi<weeks;wi++){
+      var row=document.createElement('div');
+      row.style.cssText='display:grid;grid-template-columns:110px repeat(12,1fr);border-top:1px solid #D9E1F2'+(wi%2?';background:#F8FAFD':'');
+      var dc=document.createElement('div'); dc.style.cssText='padding:3px 6px';
+      var di2=document.createElement('input'); di2.type='text'; di2.id=pfx+'_d'+wi; di2.placeholder='Week of...';
+      di2.style.cssText='width:100%;padding:3px 5px;border:1px solid #D9E1F2;border-radius:3px;font-size:11px';
+      di2.dataset.role='weekdate'; di2.dataset.pfx=pfx; di2.dataset.weeks=weeks;
+      dc.appendChild(di2); row.appendChild(dc);
+      HY_DAYS.forEach(function(_,di){
+        [1,2].forEach(function(side){
+          var cell=document.createElement('div'); cell.style.cssText='padding:2px';
+          var inp=document.createElement('input'); inp.type='number'; inp.min='0';
+          inp.id=pfx+'_w'+wi+'_'+di+'_'+side; inp.placeholder='0';
+          inp.style.cssText='width:100%;padding:3px 2px;border:1px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center';
+          inp.dataset.role='hygnum'; inp.dataset.pfx=pfx; inp.dataset.weeks=weeks;
+          cell.appendChild(inp); row.appendChild(cell);
         });
-        h+='</div>';
-      }
-      h+='</div>'; el.innerHTML=h;
-    }
-
-    function buildN7Grid(){
-      var el=document.getElementById('hy_n7_grid'); if(!el) return;
-      var cols='110px repeat('+DAYS.length+',1fr)';
-      var h='<div style="border:1px solid #D9E1F2;border-radius:4px;overflow:hidden">'
-        +'<div style="display:grid;grid-template-columns:'+cols+';background:#2E4B7A"><div></div>';
-      DAYS.forEach(function(d){h+='<div style="color:#fff;font-size:10px;font-weight:700;padding:7px 4px;text-align:center">'+d+'</div>';});
-      h+='</div>';
-      ['Scheduled','Confirmed'].forEach(function(row,ri){
-        h+='<div style="display:grid;grid-template-columns:'+cols+';border-top:1px solid #D9E1F2;'+(ri%2?'background:#F8FAFD':'')+'">'
-          +'<div style="padding:5px 10px;font-size:11px;font-weight:700;color:#1F3864;display:flex;align-items:center">'+row+'</div>';
-        DAYS.forEach(function(_,di){
-          h+='<div style="padding:2px"><input type="number" min="0" id="hy_n7_'+ri+'_'+di+'" data-role="hygn7" placeholder="0" style="width:100%;padding:3px 2px;border:1px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center"></div>';
-        });
-        h+='</div>';
       });
-      h+='</div>'; el.innerHTML=h;
+      wrap.appendChild(row);
     }
+    el.innerHTML=''; el.appendChild(wrap);
+  }
 
-    function hyV(id){return parseFloat(document.getElementById(id)?document.getElementById(id).value:0)||0;}
-    function hySet(id,val){var el=document.getElementById(id);if(el)el.textContent=val||'---';}
-
-    function hyCalc(pfx,weeks){
-      var t1=0,t2=0;
-      for(var wi=0;wi<weeks;wi++) for(var di=0;di<6;di++){t1+=hyV(pfx+'_w'+wi+'_'+di+'_1');t2+=hyV(pfx+'_w'+wi+'_'+di+'_2');}
-      var pct=t1>0?(t2/t1*100).toFixed(1)+'%':'---';
-      if(pfx==='hy_rp'){hySet('hy_rp_a',t1||'---');hySet('hy_rp_s',t2||'---');hySet('hy_rp_p',pct);hySet('hy_rp_avg',t1>0&&t2>0?(t2/8).toFixed(1):'---');}
-      else if(pfx==='hy_nf'){hySet('hy_nf_a',t1||'---');hySet('hy_nf_b',t2||'---');hySet('hy_nf_p',pct);}
-    }
-    window.hyCalc=hyCalc;
-
-    function hyCalcN7(){
-      var s=0,c=0;
-      for(var di=0;di<6;di++){s+=hyV('hy_n7_0_'+di);c+=hyV('hy_n7_1_'+di);}
-      hySet('hy_n7_s',s||'---');hySet('hy_n7_c',c||'---');hySet('hy_n7_p',s>0?(c/s*100).toFixed(1)+'%':'---');
-    }
-    window.hyCalcN7=hyCalcN7;
-
-    // Event delegation — no inline handlers needed
-    document.addEventListener('input',function(e){
-      var el=e.target;
-      var role=el.dataset?el.dataset.role:'';
-      if(role==='hygnum'){hyCalc(el.dataset.pfx,parseInt(el.dataset.weeks));}
-      else if(role==='hygn7'){hyCalcN7();}
-      else if(role==='weekdate'){hyCalc(el.dataset.pfx,parseInt(el.dataset.weeks));}
+  function hyBuildN7Grid() {
+    var el=document.getElementById('hy_n7_grid'); if(!el) return;
+    var wrap=document.createElement('div');
+    wrap.style.cssText='border:1px solid #D9E1F2;border-radius:4px;overflow:hidden';
+    var hdr=document.createElement('div');
+    hdr.style.cssText='display:grid;grid-template-columns:110px repeat(6,1fr);background:#2E4B7A';
+    hdr.appendChild(document.createElement('div'));
+    HY_DAYS.forEach(function(d){ var c=document.createElement('div'); c.style.cssText='color:#fff;font-size:10px;font-weight:700;padding:7px 4px;text-align:center'; c.textContent=d; hdr.appendChild(c); });
+    wrap.appendChild(hdr);
+    ['Scheduled','Confirmed'].forEach(function(lbl,ri){
+      var row=document.createElement('div');
+      row.style.cssText='display:grid;grid-template-columns:110px repeat(6,1fr);border-top:1px solid #D9E1F2'+(ri?';background:#F8FAFD':'');
+      var lc=document.createElement('div'); lc.style.cssText='padding:5px 10px;font-size:11px;font-weight:700;color:#1F3864;display:flex;align-items:center'; lc.textContent=lbl; row.appendChild(lc);
+      HY_DAYS.forEach(function(_,di){
+        var cell=document.createElement('div'); cell.style.cssText='padding:2px';
+        var inp=document.createElement('input'); inp.type='number'; inp.min='0'; inp.placeholder='0';
+        inp.id='hy_n7_'+ri+'_'+di;
+        inp.style.cssText='width:100%;padding:3px 2px;border:1px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center';
+        inp.dataset.role='hygn7';
+        cell.appendChild(inp); row.appendChild(cell);
+      });
+      wrap.appendChild(row);
     });
+    el.innerHTML=''; el.appendChild(wrap);
+  }
 
-    window.hyCollectData=function(){
-      var data={hours:{},rdh:{},recentPast:[],next7:{scheduled:[],confirmed:[]},nearFuture:[]};
-      ['mon','tue','wed','thu','fri','sat'].forEach(function(d){
-        var h=document.getElementById('hy_h_'+d); data.hours[d]=h?h.value:'';
-        var r=document.getElementById('hy_r_'+d); data.rdh[d]=r?r.value:0;
-      });
-      for(var wi=0;wi<3;wi++){
-        var wk={date:'',days:[]};
-        var dEl=document.getElementById('hy_rp_d'+wi); if(dEl)wk.date=dEl.value;
-        for(var di=0;di<6;di++) wk.days.push({appt:hyV('hy_rp_w'+wi+'_'+di+'_1'),seen:hyV('hy_rp_w'+wi+'_'+di+'_2')});
-        data.recentPast.push(wk);
-      }
-      for(var di=0;di<6;di++){data.next7.scheduled.push(hyV('hy_n7_0_'+di));data.next7.confirmed.push(hyV('hy_n7_1_'+di));}
-      for(var wi=0;wi<3;wi++){
-        var wk={date:'',days:[]};
-        var dEl=document.getElementById('hy_nf_d'+wi); if(dEl)wk.date=dEl.value;
-        for(var di=0;di<6;di++) wk.days.push({appt:hyV('hy_nf_w'+wi+'_'+di+'_1'),booked:hyV('hy_nf_w'+wi+'_'+di+'_2')});
-        data.nearFuture.push(wk);
-      }
-      return data;
-    };
+  function hyInitGrids() {
+    var rpEl=document.getElementById('hy_rp_grid');
+    if(!rpEl) return;
+    if(rpEl.hasChildNodes()) return;
+    hyBuildWeekGrid('hy_rp_grid',3,'Appt','Seen','hy_rp');
+    hyBuildN7Grid();
+    hyBuildWeekGrid('hy_nf_grid',3,'Appt','Booked','hy_nf');
+    var today=new Date(), day=today.getDay();
+    var mon=new Date(today); mon.setDate(today.getDate()-day+(day===0?-6:1));
+    function fmt(d){return (d.getMonth()+1)+'/'+d.getDate()+'/'+String(d.getFullYear()).slice(-2);}
+    for(var i=0;i<3;i++){var d=new Date(mon);d.setDate(d.getDate()-(3-i)*7);var el2=document.getElementById('hy_rp_d'+i);if(el2)el2.value=fmt(d);}
+    for(var i=0;i<3;i++){var d=new Date(mon);d.setDate(d.getDate()+(i+1)*7);var el2=document.getElementById('hy_nf_d'+i);if(el2)el2.value=fmt(d);}
+  }
 
-    window.hyFormatForEmail=function(data){
-      var D=['Mon','Tue','Wed','Thu','Fri','Sat'],K=['mon','tue','wed','thu','fri','sat'];
-      var out='--- HYGIENE SCHEDULE AUDIT ---\n\n';
-      out+='HOURS: '+D.map(function(d,i){return data.hours[K[i]]?d+': '+data.hours[K[i]]:'';}).filter(Boolean).join(' | ')+'\n';
-      out+='RDH/DAY: '+D.map(function(d,i){return data.rdh[K[i]]>0?d+': '+data.rdh[K[i]]:'';}).filter(Boolean).join(' | ')+'\n\n';
-      out+='RECENT PAST (Available/Seen):\n';
-      data.recentPast.forEach(function(wk){
-        if(!wk.days.some(function(d){return d.appt>0;})) return;
-        out+='  Week of '+(wk.date||'?')+': '+D.map(function(d,i){return wk.days[i]&&wk.days[i].appt>0?d+' '+wk.days[i].appt+'/'+wk.days[i].seen:'';}).filter(Boolean).join(' | ')+'\n';
+  function hyInjectForm() {
+    var el=document.getElementById('hygieneInline');
+    if(!el||el.hasChildNodes()) return;
+    var days=['Mon','Tue','Wed','Thu','Fri','Sat'],keys=['mon','tue','wed','thu','fri','sat'];
+    function mk(tag,css,txt){ var e=document.createElement(tag); if(css)e.style.cssText=css; if(txt!=null)e.textContent=txt; return e; }
+    function inp(type,id,ph,extraCss){ var e=document.createElement('input'); e.type=type; e.id=id; e.placeholder=ph; e.style.cssText=extraCss||''; return e; }
+    // Instructions
+    var inst=mk('div','background:#EEF3FA;border:1.5px solid #D9E1F2;border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#4A6FA5;line-height:1.7');
+    var strong=mk('strong','color:#1F3864','Instructions: '); inst.appendChild(strong);
+    inst.appendChild(document.createTextNode('Fill in using your practice management software.'));
+    var ul=mk('ul','padding-left:16px;margin-top:4px');
+    ['Recent Past (3 weeks): Slots available vs patients seen.','Next 7 Days: Scheduled vs confirmed this week.','Near Future (3 weeks): Slots available vs booked.'].forEach(function(t){var li=mk('li','');li.innerHTML=t;ul.appendChild(li);});
+    inst.appendChild(ul); el.appendChild(inst);
+    // Config card
+    var cfg=mk('div','background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden');
+    var cfgH=mk('div','background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px');
+    cfgH.appendChild(mk('span','color:#fff;font-size:11px;font-weight:700;text-transform:uppercase','Schedule Config'));
+    cfg.appendChild(cfgH);
+    var cfgB=mk('div','padding:14px');
+    // Hours row
+    cfgB.appendChild(mk('div','font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px','Office Hours'));
+    var hGrid=mk('div','display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center;margin-bottom:10px');
+    hGrid.appendChild(mk('div','font-size:11px;font-weight:600;color:#2E4B7A','Hours'));
+    days.forEach(function(d,i){
+      var wrap2=mk('div','');
+      var hd=mk('div','font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A',d);
+      var ip=inp('text','hy_h_'+keys[i],d==='Sat'?'Closed':'8-5','width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center');
+      wrap2.appendChild(hd); wrap2.appendChild(ip); hGrid.appendChild(wrap2);
+    });
+    cfgB.appendChild(hGrid);
+    // RDH row
+    cfgB.appendChild(mk('div','font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px','RDH per Day'));
+    var rGrid=mk('div','display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center');
+    rGrid.appendChild(mk('div','font-size:11px;font-weight:600;color:#2E4B7A','Count'));
+    keys.forEach(function(k){ var ip=inp('number','hy_r_'+k,'0','padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center'); ip.min='0'; rGrid.appendChild(ip); });
+    cfgB.appendChild(rGrid); cfg.appendChild(cfgB); el.appendChild(cfg);
+    // Helper to build a stat bar
+    function statBar(items){
+      var bar=mk('div','background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap');
+      items.forEach(function(item,i){
+        if(i>0){ bar.appendChild(mk('div','width:1px;background:#D9E1F2','')); }
+        var box=mk('div','');
+        box.appendChild(mk('div','font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase',item.label));
+        var sv=mk('div','font-size:15px;font-weight:700;color:'+(item.blue?'#4A6FA5':'#1F3864'),'--');
+        sv.id=item.id;
+        box.appendChild(sv);
+        bar.appendChild(box);
       });
-      var rpA=data.recentPast.reduce(function(s,w){return s+w.days.reduce(function(ss,d){return ss+d.appt;},0);},0);
-      var rpS=data.recentPast.reduce(function(s,w){return s+w.days.reduce(function(ss,d){return ss+d.seen;},0);},0);
-      out+='  TOTAL: '+rpA+' available, '+rpS+' seen, '+(rpA>0?(rpS/rpA*100).toFixed(0):'?')+'% fill rate\n\n';
-      out+='NEXT 7 DAYS (Scheduled/Confirmed):\n';
-      out+='  '+D.map(function(d,i){var s=data.next7.scheduled[i]||0;var c=data.next7.confirmed[i]||0;return s>0?d+' '+s+'/'+c:'';}).filter(Boolean).join(' | ')+'\n';
-      var n7s=data.next7.scheduled.reduce(function(a,b){return a+b;},0);
-      var n7c=data.next7.confirmed.reduce(function(a,b){return a+b;},0);
-      out+='  TOTAL: '+n7s+' scheduled, '+n7c+' confirmed, '+(n7s>0?(n7c/n7s*100).toFixed(0):'?')+'% confirmation\n\n';
-      out+='NEAR FUTURE (Available/Booked):\n';
-      data.nearFuture.forEach(function(wk){
-        if(!wk.days.some(function(d){return d.appt>0;})) return;
-        out+='  Week of '+(wk.date||'?')+': '+D.map(function(d,i){return wk.days[i]&&wk.days[i].appt>0?d+' '+wk.days[i].appt+'/'+wk.days[i].booked:'';}).filter(Boolean).join(' | ')+'\n';
-      });
-      var nfA=data.nearFuture.reduce(function(s,w){return s+w.days.reduce(function(ss,d){return ss+d.appt;},0);},0);
-      var nfB=data.nearFuture.reduce(function(s,w){return s+w.days.reduce(function(ss,d){return ss+d.booked;},0);},0);
-      out+='  TOTAL: '+nfA+' available, '+nfB+' booked, '+(nfA>0?(nfB/nfA*100).toFixed(0):'?')+'% pre-booked\n';
-      return out;
-    };
-
-    function initGrids(){
-      if(!document.getElementById('hy_rp_grid')) return;
-      if(document.getElementById('hy_rp_grid').hasChildNodes()) return;
-      buildWeekGrid('hy_rp_grid',3,'Appt','Seen','hy_rp');
-      buildN7Grid();
-      buildWeekGrid('hy_nf_grid',3,'Appt','Booked','hy_nf');
-      var today=new Date(),day=today.getDay();
-      var mon=new Date(today); mon.setDate(today.getDate()-day+(day===0?-6:1));
-      function fmt(d){return (d.getMonth()+1)+'/'+d.getDate()+'/'+String(d.getFullYear()).slice(-2);}
-      for(var i=0;i<3;i++){var d=new Date(mon);d.setDate(d.getDate()-(3-i)*7);var el=document.getElementById('hy_rp_d'+i);if(el)el.value=fmt(d);}
-      for(var i=0;i<3;i++){var d=new Date(mon);d.setDate(d.getDate()+(i+1)*7);var el=document.getElementById('hy_nf_d'+i);if(el)el.value=fmt(d);}
+      return bar;
     }
-    window.hyInitGrids=initGrids;
-    window.hyBuildGrids=initGrids;
-
-    document.addEventListener('DOMContentLoaded',function(){setTimeout(initGrids,400);});
-    new MutationObserver(function(){initGrids();}).observe(document.body,{childList:true,subtree:true});
-  
-    window.hyInjectForm = function(){
-      var el = document.getElementById('hygieneInline');
-      if(!el || el.hasChildNodes()) return;
-      el.innerHTML = '<div style="background:#EEF3FA;border:1.5px solid #D9E1F2;border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#4A6FA5;line-height:1.7"><strong style="color:#1F3864">Instructions:</strong> Fill in using your practice management software.<ul style="padding-left:16px;margin-top:4px"><li><strong>Recent Past (3 weeks):</strong> Slots available vs patients seen.</li><li><strong>Next 7 Days:</strong> Scheduled vs confirmed this week.</li><li><strong>Near Future (3 weeks):</strong> Slots available vs booked.</li></ul></div>'
-        +'<div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden"><div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px"><span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase">Schedule Config</span><span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Hours &amp; RDH per Day</span></div>'
-        +'<div style="padding:14px"><div style="font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Office Hours</div>'
-        +'<div style="display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center;margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#2E4B7A">Hours</div>'
-        +['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){return '<div><div style="font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A">'+d+'</div><input type="text" id="hy_h_'+d.toLowerCase()+'" placeholder="'+(d==='Sat'?'Closed':'8-5')+'" style="width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center"></div>';}).join('')
-        +'</div><div style="font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">RDH per Day</div>'
-        +'<div style="display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center"><div style="font-size:11px;font-weight:600;color:#2E4B7A">Count</div>'
-        +['mon','tue','wed','thu','fri','sat'].map(function(d){return '<input type="number" id="hy_r_'+d+'" min="0" placeholder="0" style="padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center">';}).join('')
-        +'</div></div></div>'
-        +'<div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden"><div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px"><span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase">Recent Past</span><span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Last 3 Weeks</span></div>'
-        +'<div style="padding:14px"><div id="hy_rp_grid"></div><div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Available</div><div id="hy_rp_a" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
-        +'<div style="width:1px;background:#D9E1F2"></div>'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Seen</div><div id="hy_rp_s" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
-        +'<div style="width:1px;background:#D9E1F2"></div>'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Fill Rate</div><div id="hy_rp_p" style="font-size:15px;font-weight:700;color:#4A6FA5">--</div></div>'
-        +'<div style="width:1px;background:#D9E1F2"></div>'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Avg/Day</div><div id="hy_rp_avg" style="font-size:15px;font-weight:700;color:#4A6FA5">--</div></div>'
-        +'</div></div></div>'
-        +'<div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden"><div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px"><span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase">Next 7 Days</span><span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Current Week</span></div>'
-        +'<div style="padding:14px"><div id="hy_n7_grid"></div><div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Scheduled</div><div id="hy_n7_s" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
-        +'<div style="width:1px;background:#D9E1F2"></div>'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Confirmed</div><div id="hy_n7_c" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
-        +'<div style="width:1px;background:#D9E1F2"></div>'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Confirm Rate</div><div id="hy_n7_p" style="font-size:15px;font-weight:700;color:#4A6FA5">--</div></div>'
-        +'</div></div></div>'
-        +'<div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;overflow:hidden"><div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px"><span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase">Near Future</span><span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Next 3 Weeks</span></div>'
-        +'<div style="padding:14px"><div id="hy_nf_grid"></div><div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Available</div><div id="hy_nf_a" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
-        +'<div style="width:1px;background:#D9E1F2"></div>'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Booked</div><div id="hy_nf_b" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
-        +'<div style="width:1px;background:#D9E1F2"></div>'
-        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Pre-book Rate</div><div id="hy_nf_p" style="font-size:15px;font-weight:700;color:#4A6FA5">--</div></div>'
-        +'</div></div></div>';
-      initGrids();
-    };
-})();
+    // Sections: Recent Past, Next 7, Near Future
+    [
+      {title:'Recent Past',badge:'Last 3 Weeks',grid:'hy_rp_grid',stats:[{label:'Available',id:'hy_rp_a'},{label:'Seen',id:'hy_rp_s'},{label:'Fill Rate',id:'hy_rp_p',blue:true},{label:'Avg/Day',id:'hy_rp_avg',blue:true}]},
+      {title:'Next 7 Days',badge:'Current Week',grid:'hy_n7_grid',stats:[{label:'Scheduled',id:'hy_n7_s'},{label:'Confirmed',id:'hy_n7_c'},{label:'Confirm Rate',id:'hy_n7_p',blue:true}]},
+      {title:'Near Future',badge:'Next 3 Weeks',grid:'hy_nf_grid',stats:[{label:'Available',id:'hy_nf_a'},{label:'Booked',id:'hy_nf_b'},{label:'Pre-book Rate',id:'hy_nf_p',blue:true}]}
+    ].forEach(function(sec,si){
+      var card=mk('div','background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden');
+      var cardH=mk('div','background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px');
+      cardH.appendChild(mk('span','color:#fff;font-size:11px;font-weight:700;text-transform:uppercase',sec.title));
+      cardH.appendChild(mk('span','background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px',sec.badge));
+      card.appendChild(cardH);
+      var cardB=mk('div','padding:14px');
+      cardB.appendChild(mk('div','',{id:sec.grid}));
+      var sb=statBar(sec.stats);
+      cardB.appendChild(sb); card.appendChild(cardB); el.appendChild(card);
+    });
+    hyInitGrids();
+  }
 </script>
 </body>
 </html>
