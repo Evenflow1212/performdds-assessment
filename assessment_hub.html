@@ -35,7 +35,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-body); background: var(--black); color: var(--gray-700); min-height: 100vh; }
 
-/* Ã¢ÂÂÃ¢ÂÂ LANDING Ã¢ÂÂÃ¢ÂÂ */
+/* -- LANDING -- */
 #landing { min-height: 100vh; display: flex; flex-direction: column; }
 
 .header { background: var(--black); border-bottom: 1px solid var(--black-border); padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
@@ -81,7 +81,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 .footer-note { margin-top: 48px; font-size: 12px; color: var(--gray-500); position: relative; z-index: 1; }
 .footer-note strong { color: var(--blue); }
 
-/* Ã¢ÂÂÃ¢ÂÂ GUIDE VIEW Ã¢ÂÂÃ¢ÂÂ */
+/* -- GUIDE VIEW -- */
 #guide-view { display: none; min-height: 100vh; flex-direction: column; }
 #guide-view.active { display: flex; }
 
@@ -130,7 +130,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 .setting-value { color: white; font-weight: 600; }
 
 .tip { background: var(--black-mid); border: 1px solid var(--black-border); border-radius: 6px; padding: 12px 16px; font-size: 13px; color: var(--gray-500); margin-top: 12px; display: flex; gap: 8px; }
-.tip::before { content: 'Ã°ÂÂÂ¡'; flex-shrink: 0; }
+.tip::before { content: ''; flex-shrink: 0; }
 
 .upload-zone { border: 2px dashed var(--black-border); border-radius: var(--radius); padding: 28px; text-align: center; cursor: pointer; transition: all 0.2s; margin-top: 20px; background: var(--black-mid); }
 .upload-zone:hover, .upload-zone.dragover { border-color: var(--blue); background: var(--blue-light); }
@@ -197,14 +197,14 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 </head>
 <body>
 
-<!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ LANDING PAGE Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+<!-- |||||||||||||| LANDING PAGE |||||||||||||| -->
 <div id="landing">
   <div class="header">
     <div class="brand">
       <img class="logo-img" src="https://images.squarespace-cdn.com/content/v1/65c2c27990d50d089d25d2e3/6022f6b9-e12f-4811-8964-286890635aea/PerformDDS_Left_Logo2_Sml.png?format=300w" alt="Perform DDS" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="logo-fallback">P</div>
       <button class="workbook-btn" id="workbookBtn" style="display:none" onclick="generateWorkbook()">
-        Ã°ÂÂÂ Download Assessment Workbook
+         Download Assessment Workbook
       </button>
       <div class="workbook-status" id="workbookStatus"></div>
       <div class="brand-text">
@@ -217,13 +217,13 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
   <div class="hero-section">
     <div class="hero-eyebrow">Practice Assessment Data Collection</div>
     <h1 class="hero-title">Select Your<br><span>Practice Software</span></h1>
-    <p class="hero-sub">We'll walk you through pulling the exact reports we need &mdash; step by step, specific to your software. Takes about 15Ã¢ÂÂ20 minutes.</p>
+    <p class="hero-sub">We'll walk you through pulling the exact reports we need &mdash; step by step, specific to your software. Takes about 15&ndash;20 minutes.</p>
 
     <div class="platform-grid">
 
       <!-- EAGLESOFT -->
       <div class="platform-card" onclick="openGuide('eaglesoft')">
-        <div class="platform-icon icon-eaglesoft">Ã°ÂÂ¦Â</div>
+        <div class="platform-icon icon-eaglesoft"></div>
         <div class="platform-label">Patterson Dental</div>
         <div class="platform-name">Eaglesoft</div>
         <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Eaglesoft.</p>
@@ -240,7 +240,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 
       <!-- DENTRIX -->
       <div class="platform-card" onclick="openGuide('dentrix')">
-        <div class="platform-icon icon-dentrix">Ã°ÂÂ¦Â·</div>
+        <div class="platform-icon icon-dentrix"></div>
         <div class="platform-label">Henry Schein One</div>
         <div class="platform-name">Dentrix</div>
         <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Dentrix.</p>
@@ -257,7 +257,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 
       <!-- OPEN DENTAL -->
       <div class="platform-card" onclick="openGuide('opendental')">
-        <div class="platform-icon icon-opendental">Ã°ÂÂÂ¥Ã¯Â¸Â</div>
+        <div class="platform-icon icon-opendental"></div>
         <div class="platform-label">Open Source</div>
         <div class="platform-name">Open Dental</div>
         <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Open Dental.</p>
@@ -278,7 +278,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
   </div>
 </div>
 
-<!-- Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ GUIDE VIEW Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ -->
+<!-- |||||||||||||| GUIDE VIEW |||||||||||||| -->
 <div id="guide-view">
   <div class="guide-header">
     <button class="back-btn" onclick="closePlatform()">&larr; Back to Platform Selection</button>
@@ -294,7 +294,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
   <div class="guide-container">
     <div id="steps-container"></div>
     <div class="complete-card" id="complete-card">
-      <div class="complete-icon">Ã°ÂÂÂ</div>
+      <div class="complete-icon"></div>
       <h2>You're All Done!</h2>
       <p>Here's a summary of what you've submitted. Click Send to deliver everything to your Perform DDS consultant.</p>
       <div class="summary-grid" id="summary-grid"></div>
@@ -305,7 +305,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 </div>
 
 <script>
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ State Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// --- State ---
 let currentPlatform = null;
 let currentStep = 0;
 window.uploads = window.uploads || {}; var uploads = window.uploads;
@@ -348,7 +348,7 @@ window.addEventListener('message', (e) => {
   }
 });
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Platform configs Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// --- Platform configs ---
 const platforms = {
   eaglesoft: {
     name: 'Eaglesoft',
@@ -361,7 +361,7 @@ const platforms = {
         instructions: [
           'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Provider</span>',
           'Click <span class="path">Procedures by Provider</span>',
-          'Set <strong>Date Range</strong> to last full 12 months <em>(e.g. Jan 1 Ã¢ÂÂ Dec 31)</em>',
+          'Set <strong>Date Range</strong> to last full 12 months <em>(e.g. Jan 1 &ndash; Dec 31)</em>',
           'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
           'Click <span class="path">Process</span> to generate',
           'Click <span class="path">Print</span> &rarr; save as PDF, or export to Excel'
@@ -428,7 +428,7 @@ const platforms = {
       {
         title: 'Accounts Receivable Report',
         subtitle: 'AR by Responsible Party &mdash; aged balances',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0Ã¢ÂÂ30, 31Ã¢ÂÂ60, 61Ã¢ÂÂ90, and 90+ days. We flag practices where 90+ day AR is over 12% of total AR &mdash; a major red flag for collection process issues.',
+        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ days. We flag practices where 90+ day AR is over 12% of total AR &mdash; a major red flag for collection process issues.',
         instructions: [
           'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Financial</span>',
           'Click <span class="path">Accounts Receivable by Responsible Party</span>',
@@ -452,12 +452,12 @@ const platforms = {
         instructions: [
           'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Patient</span>',
           'Click <span class="path">Patient Analysis</span>',
-          'Set <strong>Last Visit</strong> filter to <span class="path">Within 18Ã¢ÂÂ24 months</span>',
+          'Set <strong>Last Visit</strong> filter to <span class="path">Within 18&ndash;24 months</span>',
           'Click <span class="path">Process</span>',
           'Export or print &mdash; note the total active patient count'
         ],
         settings: [
-          { label: 'Last Visit', value: 'Within 18Ã¢ÂÂ24 months' },
+          { label: 'Last Visit', value: 'Within 18&ndash;24 months' },
           { label: 'Patient Type', value: 'Active only' },
           { label: 'Format', value: 'PDF or screenshot' }
         ],
@@ -548,7 +548,7 @@ const platforms = {
       {
         title: 'Aging Report',
         subtitle: 'Accounts receivable by age bracket',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0Ã¢ÂÂ30, 31Ã¢ÂÂ60, 61Ã¢ÂÂ90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total &mdash; a red flag for collection issues.',
+        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total &mdash; a red flag for collection issues.',
         instructions: [
           'Open the <span class="path">Office Manager</span>',
           'Click <span class="path">Reports</span> &rarr; <span class="path">Ledger</span> &rarr; <span class="path">Aging Report</span>',
@@ -573,13 +573,13 @@ const platforms = {
         instructions: [
           'Open the <span class="path">Office Manager</span>',
           'Click <span class="path">Reports</span> &rarr; <span class="path">Lists</span> &rarr; <span class="path">Patient Report (By Filters)</span>',
-          'Set <strong>Last Visit Date</strong> filter to within the last 18Ã¢ÂÂ24 months',
+          'Set <strong>Last Visit Date</strong> filter to within the last 18&ndash;24 months',
           'Set <strong>Patient Status</strong> to <span class="path">Active</span>',
           'Click <span class="path">OK</span> &mdash; note the total count at the bottom',
           'Export or screenshot the summary page'
         ],
         settings: [
-          { label: 'Last Visit', value: 'Within 18Ã¢ÂÂ24 months' },
+          { label: 'Last Visit', value: 'Within 18&ndash;24 months' },
           { label: 'Status', value: 'Active patients' },
           { label: 'Format', value: 'PDF or screenshot' }
         ],
@@ -601,7 +601,7 @@ const platforms = {
         instructions: [
           'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Standard Reports</span>',
           'Under the <strong>Production & Income</strong> section, click <span class="path">Procedures by Code</span>',
-          'Set the <strong>Date Range</strong> to the last full 12 months <em>(e.g. Jan 1 Ã¢ÂÂ Dec 31)</em>',
+          'Set the <strong>Date Range</strong> to the last full 12 months <em>(e.g. Jan 1 &ndash; Dec 31)</em>',
           'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
           'Leave all other filters at default',
           'Click <span class="path">Refresh</span> to generate',
@@ -669,7 +669,7 @@ const platforms = {
       {
         title: 'Aging of AR Report',
         subtitle: 'Accounts receivable by age bracket',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0Ã¢ÂÂ30, 31Ã¢ÂÂ60, 61Ã¢ÂÂ90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total.',
+        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total.',
         instructions: [
           'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Standard Reports</span>',
           'Under <strong>Monthly</strong>, click <span class="path">Aging of AR</span>',
@@ -693,12 +693,12 @@ const platforms = {
         instructions: [
           'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Standard</span>',
           'Under <strong>Lists</strong>, click <span class="path">Active Patients</span>',
-          'Set <strong>Last Visit</strong> to within the last 18Ã¢ÂÂ24 months',
+          'Set <strong>Last Visit</strong> to within the last 18&ndash;24 months',
           'Click <span class="path">OK</span>',
           'Note the total count, export or screenshot'
         ],
         settings: [
-          { label: 'Last Visit', value: 'Within 18Ã¢ÂÂ24 months' },
+          { label: 'Last Visit', value: 'Within 18&ndash;24 months' },
           { label: 'Status', value: 'Active' },
           { label: 'Format', value: 'PDF or screenshot' }
         ],
@@ -710,7 +710,7 @@ const platforms = {
   }
 };
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Navigation Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// --- Navigation ---
 function openGuide(platform) {
   currentPlatform = platform;
   currentStep = 0;
@@ -806,7 +806,7 @@ function buildSteps(config) {
       <div class="upload-zone" id="upload-${i}" onclick="triggerUpload(${i})" ondragover="dragOver(event,${i})" ondragleave="dragLeave(${i})" ondrop="drop(event,${i})">
         <input type="file" id="file-${i}" accept="${step.accept}" onchange="fileChosen(${i})">
         <div id="upload-prompt-${i}">
-          <div class="upload-icon">Ã°ÂÂÂ¤</div>
+          <div class="upload-icon"></div>
           <h3>${step.uploadLabel}</h3>
           <p>Drag & drop or click to browse</p>
           <button class="upload-btn" onclick="event.stopPropagation()">Choose File</button>
@@ -875,7 +875,7 @@ function goTo(step) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Uploadcare file handling Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// --- Uploadcare file handling ---
 // uploads[idx] = { name, size, url } once uploaded
 const uploadingPromises = {};
 
@@ -960,7 +960,7 @@ function markHygieneDone(stepIdx) {
   if (el) { el.textContent = '&#10003; Completed'; el.style.color = 'var(--success)'; }
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Summary Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// --- Summary ---
 function buildSummary() {
   const config = platforms[currentPlatform];
   const stepNames = ['Production Report', 'Payment Report', 'P&L Statement', 'Hygiene Form', 'AR Aging Report', 'Patient Report'];
@@ -981,11 +981,11 @@ function buildSummary() {
       : (uploads[i] ? uploads[i].name : 'Not uploaded');
     const cls = done ? 'uploaded' : 'skipped';
     const clickable = !done ? `onclick="closeModal();scrollToStep(${i})" style="cursor:pointer;border-color:#f59e0b;" title="Click to go back and complete this step"` : '';
-    grid.innerHTML += `<div class="summary-item" ${clickable}><div class="s-label">${stepNames[i]}${!done ? ' Ã¢ÂÂ©' : ''}</div><div class="s-val ${cls}">${done ? '&#10003; ' : '&mdash; '}${val}</div></div>`;
+    grid.innerHTML += `<div class="summary-item" ${clickable}><div class="s-label">${stepNames[i]}${!done ? ' ' : ''}</div><div class="s-val ${cls}">${done ? '&#10003; ' : '&mdash; '}${val}</div></div>`;
   });
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Email submit Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// --- Email submit ---
 function buildEmailBody(filesUploaded) {
   const config = platforms[currentPlatform];
   const now = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
@@ -1061,7 +1061,7 @@ async function submitToConsultant() {
     btn.style.color = 'var(--black)';
   } else {
     console.error('EmailJS error:', emailResult.reason);
-    sentMsg.innerHTML = `Ã¢ÂÂ Ã¯Â¸Â &nbsp; Couldn't send automatically &mdash; please email your summary and files to <strong>david@performdds.com</strong>.`;
+    sentMsg.innerHTML = ` &nbsp; Couldn't send automatically &mdash; please email your summary and files to <strong>david@performdds.com</strong>.`;
     sentMsg.style.background = 'rgba(255,193,7,0.1)';
     sentMsg.style.borderColor = '#FFC107';
     sentMsg.style.color = '#FFC107';
@@ -1075,7 +1075,7 @@ async function submitToConsultant() {
   }
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ AI Analysis Engine Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// --- AI Analysis Engine ---
 async function runAIAnalysis(filesUploaded, practiceName, doctorName, software) {
   if (!filesUploaded.length) return;
 
@@ -1141,16 +1141,16 @@ async function runAIAnalysis(filesUploaded, practiceName, doctorName, software) 
 Your job is to analyze uploaded dental practice reports and produce a concise, actionable pre-call assessment memo for Dave to review before speaking with the client.
 
 PERFORM DDS BENCHMARKS (flag anything outside these as a red flag):
-- Staff wages: 16Ã¢ÂÂ20% of collections (CRITICAL red flag if >25%)
+- Staff wages: 16&ndash;20% of collections (CRITICAL red flag if >25%)
 - Lab fees: target 4% of collections
 - Dental supplies: target 3% of collections  
 - Specialist supplies: target 2%
 - Marketing: target 2%
 - Misc overhead: target 10%
 - GP daily production target: $3,500/day
-- Hygiene daily target: $1,000Ã¢ÂÂ$1,250/day
+- Hygiene daily target: $1,000&ndash;$1,250/day
 - Associate daily target: $3,000/day
-- Hygiene should be 30Ã¢ÂÂ35% of total production
+- Hygiene should be 30&ndash;35% of total production
 - AR 90+ day bucket: should be <12% of total AR (red flag if higher)
 - Collection rate: should be 98%+ of adjusted production
 
@@ -1166,11 +1166,11 @@ Practice: [name] | Software: [software] | Submitted: [date]
 - Hygiene % of production:
 - Collection rate:
 
-### RED FLAGS Ã°ÂÂÂ¨
+### RED FLAGS 
 List each red flag with: metric, actual value, benchmark, severity (HIGH/MEDIUM)
 
-### OPPORTUNITIES Ã°ÂÂÂ¡
-Top 3Ã¢ÂÂ5 growth/optimization opportunities specific to this practice's numbers
+### OPPORTUNITIES 
+Top 3&ndash;5 growth/optimization opportunities specific to this practice's numbers
 
 ### HYGIENE DEPARTMENT
 Quick analysis of hygiene performance vs benchmarks
@@ -1179,7 +1179,7 @@ Quick analysis of hygiene performance vs benchmarks
 Analysis of AR aging and collection rate
 
 ### DAVE'S PREP NOTES
-3Ã¢ÂÂ5 specific questions or talking points Dave should raise on the call based on what stands out in the data
+3&ndash;5 specific questions or talking points Dave should raise on the call based on what stands out in the data
 
 Keep the analysis sharp and direct. Dave is an expert &mdash; no need to explain basic concepts. Flag the most important numbers first. If a report is missing or unreadable, note it and work with what you have.`;
 
@@ -1263,7 +1263,7 @@ Uploaded reports:`
   window.generateWorkbook = async function() {
     const btn = document.getElementById('workbookBtn');
     const status = document.getElementById('workbookStatus');
-    btn.disabled = true; btn.innerHTML = 'Ã¢ÂÂ³ Extracting data&hellip;';
+    btn.disabled = true; btn.innerHTML = ' Extracting data&hellip;';
     try {
       const prodUrl = window._uploadedUrls?.production;
       const plUrl   = window._uploadedUrls?.pl;
@@ -1378,11 +1378,11 @@ Uploaded reports:`
       XLSX.utils.book_append_sheet(wb,ws2,'All Codes');
       XLSX.writeFile(wb,(pName||'Practice').replace(/[^a-z0-9]/gi,'_')+'_Assessment.xlsx');
 
-      btn.innerHTML='Ã¢ÂÂ Workbook Downloaded!';btn.disabled=false;
-      status.textContent='Ã¢ÂÂ '+Object.keys(raw).length+' codes extracted | Production: '+$v(tot)+(netC?' | Collections: '+$v(netC):'');
+      btn.innerHTML='&#10003; Workbook Downloaded!';btn.disabled=false;
+      status.textContent='&#10003; '+Object.keys(raw).length+' codes extracted | Production: '+$v(tot)+(netC?' | Collections: '+$v(netC):'');
     } catch(err){
-      status.textContent='Ã¢ÂÂ '+err.message;
-      btn.disabled=false;btn.innerHTML='Ã°ÂÂÂ Download Assessment Workbook';
+      status.textContent=' '+err.message;
+      btn.disabled=false;btn.innerHTML=' Download Assessment Workbook';
     }
   }
 
