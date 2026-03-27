@@ -931,7 +931,8 @@ function buildSteps(config) {
 
     container.appendChild(div);
   });
-}
+
+  setTimeout(hyInitGrids, 200);}
 
 function goTo(step) {
   const config = platforms[currentPlatform];
@@ -1591,6 +1592,7 @@ Uploaded reports:`
       for(let i=0;i<3;i++){const d=new Date(mon);d.setDate(d.getDate()-(3-i)*7);const el=document.getElementById('hy_rp_d'+i);if(el)el.value=fmt(d);}
       for(let i=0;i<3;i++){const d=new Date(mon);d.setDate(d.getDate()+(i+1)*7);const el=document.getElementById('hy_nf_d'+i);if(el)el.value=fmt(d);}
     }
+    window.hyInitGrids = initGrids;
     document.addEventListener('DOMContentLoaded',()=>setTimeout(initGrids,300));
     new MutationObserver(()=>initGrids()).observe(document.body,{childList:true,subtree:true});
   })();
