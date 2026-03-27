@@ -81,20 +81,17 @@ function parsePL(text){
 }
 
 async function fetchPdf(url,key,hint){
-  const r=await fetch(url);
-  if(!r.ok)throw new Error('PDF fetch failed: '+url);
-  const b64=Buffer.from(await r.arrayBuffer()).toString('base64');
   const prompt=hint==='prod'
     ?'Eaglesoft Procedures by Provider report. Return each ADA code as CODE|QTY|TOTAL (e.g. 00120|340|420594.36). Combine all providers. Data lines only, no headers or explanations.'
     :'QuickBooks P&L. Return each line item as LABEL|AMOUNT (e.g. Dental Supplies|171167.66). Negative for refunds/adjustments. Data lines only.';
   const resp=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-beta':'url-pdf-input-2025-04-01'},
     body:JSON.stringify({
       model:'claude-sonnet-4-20250514',
       max_tokens:4096,
       messages:[{role:'user',content:[
-        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+        {type:'document',source:{type:'url',url:url}},
         {type:'text',text:prompt}
       ]}]
     })
