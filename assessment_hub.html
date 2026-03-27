@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Practice Assessment Hub â Perform DDS</title>
+<title>Practice Assessment Hub  Perform DDS</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>emailjs.init('S3k44GF4XVmVpgfVJ');</script>
@@ -35,7 +35,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-body); background: var(--black); color: var(--gray-700); min-height: 100vh; }
 
-/* ââ LANDING ââ */
+/*  LANDING  */
 #landing { min-height: 100vh; display: flex; flex-direction: column; }
 
 .header { background: var(--black); border-bottom: 1px solid var(--black-border); padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
@@ -81,7 +81,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 .footer-note { margin-top: 48px; font-size: 12px; color: var(--gray-500); position: relative; z-index: 1; }
 .footer-note strong { color: var(--blue); }
 
-/* ââ GUIDE VIEW ââ */
+/*  GUIDE VIEW  */
 #guide-view { display: none; min-height: 100vh; flex-direction: column; }
 #guide-view.active { display: flex; }
 
@@ -130,7 +130,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 .setting-value { color: white; font-weight: 600; }
 
 .tip { background: var(--black-mid); border: 1px solid var(--black-border); border-radius: 6px; padding: 12px 16px; font-size: 13px; color: var(--gray-500); margin-top: 12px; display: flex; gap: 8px; }
-.tip::before { content: 'ð¡'; flex-shrink: 0; }
+.tip::before { content: ''; flex-shrink: 0; }
 
 .upload-zone { border: 2px dashed var(--black-border); border-radius: var(--radius); padding: 28px; text-align: center; cursor: pointer; transition: all 0.2s; margin-top: 20px; background: var(--black-mid); }
 .upload-zone:hover, .upload-zone.dragover { border-color: var(--blue); background: var(--blue-light); }
@@ -197,14 +197,14 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
 </head>
 <body>
 
-<!-- ââââââââââââââ LANDING PAGE ââââââââââââââ -->
+<!--  LANDING PAGE  -->
 <div id="landing">
   <div class="header">
     <div class="brand">
       <img class="logo-img" src="https://images.squarespace-cdn.com/content/v1/65c2c27990d50d089d25d2e3/6022f6b9-e12f-4811-8964-286890635aea/PerformDDS_Left_Logo2_Sml.png?format=300w" alt="Perform DDS" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="logo-fallback">P</div>
       <button class="workbook-btn" id="workbookBtn" style="display:none" onclick="generateWorkbook()">
-        ð Download Assessment Workbook
+         Download Assessment Workbook
       </button>
       <div class="workbook-status" id="workbookStatus"></div>
       <div class="brand-text">
@@ -217,13 +217,13 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
   <div class="hero-section">
     <div class="hero-eyebrow">Practice Assessment Data Collection</div>
     <h1 class="hero-title">Select Your<br><span>Practice Software</span></h1>
-    <p class="hero-sub">We'll walk you through pulling the exact reports we need â step by step, specific to your software. Takes about 15â20 minutes.</p>
+    <p class="hero-sub">We'll walk you through pulling the exact reports we need  step by step, specific to your software. Takes about 1520 minutes.</p>
 
     <div class="platform-grid">
 
       <!-- EAGLESOFT -->
       <div class="platform-card" onclick="openGuide('eaglesoft')">
-        <div class="platform-icon icon-eaglesoft">ð¦</div>
+        <div class="platform-icon icon-eaglesoft"></div>
         <div class="platform-label">Patterson Dental</div>
         <div class="platform-name">Eaglesoft</div>
         <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Eaglesoft.</p>
@@ -235,12 +235,12 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
           <div class="report-pill">Hygiene Schedule</div>
           <div class="report-pill">Patient Analysis</div>
         </div>
-        <div class="platform-cta">Start Eaglesoft Guide <span class="arrow">â</span></div>
+        <div class="platform-cta">Start Eaglesoft Guide <span class="arrow">&rarr;</span></div>
       </div>
 
       <!-- DENTRIX -->
       <div class="platform-card" onclick="openGuide('dentrix')">
-        <div class="platform-icon icon-dentrix">ð¦·</div>
+        <div class="platform-icon icon-dentrix"></div>
         <div class="platform-label">Henry Schein One</div>
         <div class="platform-name">Dentrix</div>
         <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Dentrix.</p>
@@ -252,12 +252,12 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
           <div class="report-pill">Hygiene Schedule</div>
           <div class="report-pill">Active Patient List</div>
         </div>
-        <div class="platform-cta">Start Dentrix Guide <span class="arrow">â</span></div>
+        <div class="platform-cta">Start Dentrix Guide <span class="arrow">&rarr;</span></div>
       </div>
 
       <!-- OPEN DENTAL -->
       <div class="platform-card" onclick="openGuide('opendental')">
-        <div class="platform-icon icon-opendental">ð¥ï¸</div>
+        <div class="platform-icon icon-opendental"></div>
         <div class="platform-label">Open Source</div>
         <div class="platform-name">Open Dental</div>
         <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Open Dental.</p>
@@ -269,7 +269,7 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
           <div class="report-pill">Hygiene Schedule</div>
           <div class="report-pill">Active Patients</div>
         </div>
-        <div class="platform-cta">Start Open Dental Guide <span class="arrow">â</span></div>
+        <div class="platform-cta">Start Open Dental Guide <span class="arrow">&rarr;</span></div>
       </div>
 
     </div>
@@ -278,10 +278,10 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
   </div>
 </div>
 
-<!-- ââââââââââââââ GUIDE VIEW ââââââââââââââ -->
+<!--  GUIDE VIEW  -->
 <div id="guide-view">
   <div class="guide-header">
-    <button class="back-btn" onclick="closePlatform()">â Back to Platform Selection</button>
+    <button class="back-btn" onclick="closePlatform()">&larr; Back to Platform Selection</button>
     <div class="guide-platform-badge">
       <div class="platform-dot" id="guide-dot" style="background:var(--blue)"></div>
       <div class="guide-platform-name" id="guide-platform-name">Eaglesoft</div>
@@ -294,21 +294,21 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
   <div class="guide-container">
     <div id="steps-container"></div>
     <div class="complete-card" id="complete-card">
-      <div class="complete-icon">ð</div>
+      <div class="complete-icon"></div>
       <h2>You're All Done!</h2>
       <p>Here's a summary of what you've submitted. Click Send to deliver everything to your Perform DDS consultant.</p>
       <div class="summary-grid" id="summary-grid"></div>
-      <button class="btn-submit-final" onclick="submitToConsultant()">Send to Assessment Team â</button>
+      <button class="btn-submit-final" onclick="submitToConsultant()">Send to Assessment Team &rarr;</button>
       <div class="sent-msg" id="sent-msg"></div>
     </div>
   </div>
 </div>
 
 <script>
-// âââ State âââ
+//  State 
 let currentPlatform = null;
 let currentStep = 0;
-let uploads = {};
+window.uploads = window.uploads || {}; var uploads = window.uploads;
 let hygieneDone = false;
 let practiceName = '';
 
@@ -342,13 +342,13 @@ window.addEventListener('message', (e) => {
     // Find and update any visible hygiene status element
     const statusEls = document.querySelectorAll('[id^="hygiene-status-"]');
     statusEls.forEach(el => {
-      el.textContent = 'â Completed';
+      el.textContent = '&#10003; Completed';
       el.style.color = 'var(--success)';
     });
   }
 });
 
-// âââ Platform configs âââ
+//  Platform configs 
 const platforms = {
   eaglesoft: {
     name: 'Eaglesoft',
@@ -357,42 +357,42 @@ const platforms = {
       {
         title: 'Procedures by Provider Report',
         subtitle: 'Production broken down by ADA procedure code',
-        why: '<strong>What we\'re looking for:</strong> Every ADA code billed, the quantity, and total dollars. We map these to categories â crowns, hygiene, implants, endo, ortho, dentures â and calculate monthly averages, hygiene %, and your average crown fee.',
+        why: '<strong>What we\'re looking for:</strong> Every ADA code billed, the quantity, and total dollars. We map these to categories  crowns, hygiene, implants, endo, ortho, dentures  and calculate monthly averages, hygiene %, and your average crown fee.',
         instructions: [
-          'From the main menu, click <span class="path">Reports</span> â <span class="path">Provider</span>',
+          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Provider</span>',
           'Click <span class="path">Procedures by Provider</span>',
-          'Set <strong>Date Range</strong> to last full 12 months <em>(e.g. Jan 1 â Dec 31)</em>',
+          'Set <strong>Date Range</strong> to last full 12 months <em>(e.g. Jan 1  Dec 31)</em>',
           'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
           'Click <span class="path">Process</span> to generate',
-          'Click <span class="path">Print</span> â save as PDF, or export to Excel'
+          'Click <span class="path">Print</span> &rarr; save as PDF, or export to Excel'
         ],
         settings: [
           { label: 'Date Range', value: 'Last full 12 months' },
           { label: 'Provider', value: 'All Providers' },
           { label: 'Format', value: 'PDF or Excel' }
         ],
-        tip: 'This is the most important report â if you can only pull one, make it this one.',
+        tip: 'This is the most important report  if you can only pull one, make it this one.',
         accept: '.pdf,.xlsx,.xls,.csv',
         uploadLabel: 'Upload Procedures by Provider Report'
       },
       {
         title: 'Payment Reconciliation Report',
         subtitle: 'Collections broken down by payment type',
-        why: '<strong>What we\'re looking for:</strong> Total collections by payment type â cash, check, credit card, insurance/EFT, and third-party finance. We calculate your collection rate and flag any gap between production and collections.',
+        why: '<strong>What we\'re looking for:</strong> Total collections by payment type  cash, check, credit card, insurance/EFT, and third-party finance. We calculate your collection rate and flag any gap between production and collections.',
         instructions: [
-          'From the main menu, click <span class="path">Reports</span> â <span class="path">Financial</span>',
+          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Financial</span>',
           'Click <span class="path">Payment Reconciliation</span>',
           'Set <strong>Date Range</strong> to the same 12 months as the production report',
           'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
           'Click <span class="path">Process</span>',
-          'Export or print as PDF â focus on the totals on the last page'
+          'Export or print as PDF  focus on the totals on the last page'
         ],
         settings: [
           { label: 'Date Range', value: 'Same 12 months' },
           { label: 'Provider', value: 'All Providers' },
           { label: 'Format', value: 'PDF preferred' }
         ],
-        tip: 'The last page has the totals summary â that\'s the section we need most.',
+        tip: 'The last page has the totals summary  that\'s the section we need most.',
         accept: '.pdf,.xlsx,.xls,.csv',
         uploadLabel: 'Upload Payment Reconciliation Report'
       },
@@ -401,9 +401,9 @@ const platforms = {
         subtitle: 'Practice profit and loss for the year',
         why: '<strong>What we\'re looking for:</strong> Revenue, expenses by category (staff, supplies, lab, rent, marketing), and net income. This lets us benchmark your overhead against industry targets and find where money is leaking.',
         instructions: [
-          'Your P&L typically comes from your accountant or QuickBooks/accounting software â <em>not</em> Eaglesoft',
+          'Your P&L typically comes from your accountant or QuickBooks/accounting software  <em>not</em> Eaglesoft',
           'Ask your accountant for the most recent full-year P&L (Income Statement)',
-          'If you use QuickBooks: <span class="path">Reports</span> â <span class="path">Company & Financial</span> â <span class="path">Profit & Loss Standard</span>',
+          'If you use QuickBooks: <span class="path">Reports</span> &rarr; <span class="path">Company & Financial</span> &rarr; <span class="path">Profit & Loss Standard</span>',
           'Set date range to the same 12 months',
           'Export as PDF or Excel'
         ],
@@ -412,341 +412,14 @@ const platforms = {
           { label: 'Period', value: 'Same full 12 months' },
           { label: 'Format', value: 'PDF or Excel' }
         ],
-        tip: 'If you don\'t have this handy, just upload what you have â even a partial P&L is helpful.',
+        tip: 'If you don\'t have this handy, just upload what you have  even a partial P&L is helpful.',
         accept: '.pdf,.xlsx,.xls,.csv',
         uploadLabel: 'Upload P&L / Income Statement'
       },
       {
         title: 'Hygiene Schedule Form',
-        subtitle: 'Completed separately â takes about 5 minutes',
-        why: '<strong>What we\'re looking for:</strong> Your hygiene chair count, days per week, current schedule fill rate, and how your hygiene appointments are structured. This is key to optimizing your hygiene department.',
-        isHygiene: true,
-        hygieneLinkLabel: 'Open Hygiene Schedule Form',
-        tip: 'Fill this out in a new tab and come back here when done.',
-        uploadLabel: null
-      },
-      {
-        title: 'Accounts Receivable Report',
-        subtitle: 'AR by Responsible Party â aged balances',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0â30, 31â60, 61â90, and 90+ days. We flag practices where 90+ day AR is over 12% of total AR â a major red flag for collection process issues.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> â <span class="path">Financial</span>',
-          'Click <span class="path">Accounts Receivable by Responsible Party</span>',
-          'In the filter window, select <span class="path">Totals Only</span> for a summary view',
-          'Click <span class="path">Process</span>',
-          'Export or print as PDF'
-        ],
-        settings: [
-          { label: 'Report Type', value: 'AR by Responsible Party' },
-          { label: 'View', value: 'Totals Only' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'Run this report as of today â it reflects your current outstanding balances.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload AR Aging Report'
-      },
-      {
-        title: 'Patient Analysis Report',
-        subtitle: 'Active patient count and demographics',
-        why: '<strong>What we\'re looking for:</strong> Total active patient count. We use this alongside your production and hygiene data to calculate recare rates and identify unscheduled patients.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> â <span class="path">Patient</span>',
-          'Click <span class="path">Patient Analysis</span>',
-          'Set <strong>Last Visit</strong> filter to <span class="path">Within 18â24 months</span>',
-          'Click <span class="path">Process</span>',
-          'Export or print â note the total active patient count'
-        ],
-        settings: [
-          { label: 'Last Visit', value: 'Within 18â24 months' },
-          { label: 'Patient Type', value: 'Active only' },
-          { label: 'Format', value: 'PDF or screenshot' }
-        ],
-        tip: 'A screenshot of the summary page works perfectly if you can\'t export.',
-        accept: '.pdf,.xlsx,.xls,.csv,.png,.jpg',
-        uploadLabel: 'Upload Patient Count Report (optional)'
-      }
-    ]
-  },
-
-  dentrix: {
-    name: 'Dentrix',
-    color: '#65C35E',
-    steps: [
-      {
-        title: 'Practice Analysis Report',
-        subtitle: 'Production by ADA procedure code â all providers',
-        why: '<strong>What we\'re looking for:</strong> Every ADA code billed, quantity, and total dollars. In Dentrix this is the Practice Analysis Report run by procedure code. We map these to production categories and calculate monthly averages and hygiene %.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'From the top menu, click <span class="path">Analysis</span> â <span class="path">Practice</span>',
-          'Click <span class="path">Reports</span> in the Practice Analysis window',
-          'Set <strong>Date Range</strong> to the last full 12 months',
-          'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
-          'In the right panel: uncheck <em>By Category</em>, check <em>By Procedure Code (ADA Code)</em>',
-          'Check <strong>Production, Collections, Adjustments</strong>',
-          'Click <span class="path">OK</span> to generate, then print or export'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Last full 12 months' },
-          { label: 'Provider', value: 'All Providers' },
-          { label: 'Group by', value: 'ADA / Procedure Code' }
-        ],
-        tip: 'The "by ADA code" setting is critical â without it you\'ll get category totals instead of code-level detail.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Practice Analysis Report'
-      },
-      {
-        title: 'Payment Reconciliation Report',
-        subtitle: 'Collections by payment type',
-        why: '<strong>What we\'re looking for:</strong> Total collections broken down by payment type â patient cash/check/card, insurance EFT, and third-party finance. We use this to calculate your collection rate.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'From the top menu click <span class="path">Reports</span> â <span class="path">Management</span>',
-          'Click <span class="path">Practice Statistics</span>',
-          'Set <strong>Date Range</strong> to the same 12 months as your production report',
-          'Alternatively: <span class="path">Reports</span> â <span class="path">Ledger</span> â <span class="path">Payment Reconciliation</span>',
-          'Click <span class="path">OK</span> and export or print as PDF'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Same 12 months' },
-          { label: 'Provider', value: 'All Providers' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'Practice Statistics gives you a quick summary â Payment Reconciliation gives more detail on payment types.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Payment / Collections Report'
-      },
-      {
-        title: 'P&L / Income Statement',
-        subtitle: 'Practice profit and loss for the year',
-        why: '<strong>What we\'re looking for:</strong> Revenue, expenses by category, and net income. Dentrix does not generate a true P&L â this will come from your accountant or accounting software.',
-        instructions: [
-          'Ask your accountant for the most recent full-year P&L (Income Statement)',
-          'If you use QuickBooks: <span class="path">Reports</span> â <span class="path">Company & Financial</span> â <span class="path">Profit & Loss Standard</span>',
-          'Set date range to match your production report period',
-          'Export as PDF or Excel',
-          'If unavailable, a bank statement or monthly overhead summary is a helpful substitute'
-        ],
-        settings: [
-          { label: 'Source', value: 'Accountant or QuickBooks' },
-          { label: 'Period', value: 'Same full 12 months' },
-          { label: 'Format', value: 'PDF or Excel' }
-        ],
-        tip: 'Don\'t let this one hold you up â upload what you have and we\'ll work with it.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload P&L / Income Statement'
-      },
-      {
-        title: 'Hygiene Schedule Form',
-        subtitle: 'Completed separately â takes about 5 minutes',
-        why: '<strong>What we\'re looking for:</strong> Your hygiene chair count, days per week, current schedule fill rate, and how your hygiene appointments are structured.',
-        isHygiene: true,
-        hygieneLinkLabel: 'Open Hygiene Schedule Form',
-        tip: 'Fill this out in a new tab and come back here when done.',
-        uploadLabel: null
-      },
-      {
-        title: 'Aging Report',
-        subtitle: 'Accounts receivable by age bracket',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0â30, 31â60, 61â90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total â a red flag for collection issues.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'Click <span class="path">Reports</span> â <span class="path">Ledger</span> â <span class="path">Aging Report</span>',
-          'In the setup window, make sure <strong>Standard Aging</strong> is selected',
-          'Set minimum balance to <span class="path">$0.01</span> to include all balances',
-          'Click <span class="path">OK</span> â preview from Batch Processor',
-          'Print or export as PDF'
-        ],
-        settings: [
-          { label: 'Aging Type', value: 'Standard Aging' },
-          { label: 'Min Balance', value: '$0.01' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'Run as of today for the most current AR picture.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Aging Report'
-      },
-      {
-        title: 'Active Patient List',
-        subtitle: 'Total active patient count',
-        why: '<strong>What we\'re looking for:</strong> Total number of active patients, which we use alongside hygiene visit data to calculate your recare rate and identify unscheduled patients.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'Click <span class="path">Reports</span> â <span class="path">Lists</span> â <span class="path">Patient Report (By Filters)</span>',
-          'Set <strong>Last Visit Date</strong> filter to within the last 18â24 months',
-          'Set <strong>Patient Status</strong> to <span class="path">Active</span>',
-          'Click <span class="path">OK</span> â note the total count at the bottom',
-          'Export or screenshot the summary page'
-        ],
-        settings: [
-          { label: 'Last Visit', value: 'Within 18â24 months' },
-          { label: 'Status', value: 'Active patients' },
-          { label: 'Format', value: 'PDF or screenshot' }
-        ],
-        tip: 'A screenshot of just the count total works perfectly here.',
-        accept: '.pdf,.xlsx,.xls,.csv,.png,.jpg',
-        uploadLabel: 'Upload Active Patient Report (optional)'
-      }
-    ]
-  },
-
-  opendental: {
-    name: 'Open Dental',
-    color: '#F97316',
-    steps: [
-      {
-        title: 'Procedures by Code Report',
-        subtitle: 'Production broken down by ADA procedure code',
-        why: '<strong>What we\'re looking for:</strong> Every ADA code billed, the quantity, and total dollars. We map these to categories â crowns, hygiene, implants, endo, ortho, dentures â and calculate monthly averages, hygiene %, and your average crown fee.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> â <span class="path">Standard Reports</span>',
-          'Under the <strong>Production & Income</strong> section, click <span class="path">Procedures by Code</span>',
-          'Set the <strong>Date Range</strong> to the last full 12 months <em>(e.g. Jan 1 â Dec 31)</em>',
-          'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
-          'Leave all other filters at default',
-          'Click <span class="path">Refresh</span> to generate',
-          'Click <span class="path">Print</span> â <span class="path">Export to PDF</span> or use <span class="path">Save to File</span> as Excel/CSV'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Last full 12 months' },
-          { label: 'Provider', value: 'All Providers' },
-          { label: 'Format', value: 'PDF or Excel/CSV' },
-          { label: 'Group by', value: 'Procedure Code' }
-        ],
-        tip: 'If your practice has multiple providers, make sure All Providers is selected â we\'ll combine codes automatically.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Procedures by Code Report'
-      },
-      {
-        title: 'Payment Reconciliation Report',
-        subtitle: 'Collections broken down by payment type',
-        why: '<strong>What we\'re looking for:</strong> Total collections by payment type â cash, check, credit card, insurance/EFT, and third-party finance (CareCredit, Cherry). We calculate your collection rate and payment mix.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> â <span class="path">Standard Reports</span>',
-          'Under <strong>Collections</strong>, click <span class="path">Payment Reconciliation</span>',
-          'Set the <strong>Date Range</strong> to the last full 12 months (match the production report)',
-          'Set <strong>Providers</strong> to <span class="path">All Providers</span>',
-          'Click <span class="path">Refresh</span>',
-          'Export as <span class="path">PDF</span> â the section totals at the bottom are what we need'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Same 12 months' },
-          { label: 'Providers', value: 'All Providers' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'The totals section at the very end of the report is the key section.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Payment Reconciliation Report'
-      },
-      {
-        title: 'P&L / Income Statement',
-        subtitle: 'Practice profit and loss for the year',
-        why: '<strong>What we\'re looking for:</strong> Revenue, expenses by category (staff, supplies, lab, rent, marketing), and net income. Open Dental does not generate a full P&L â this comes from your accountant or accounting software.',
-        instructions: [
-          'Ask your accountant for the most recent full-year P&L (Income Statement)',
-          'If you use QuickBooks: <span class="path">Reports</span> â <span class="path">Company & Financial</span> â <span class="path">Profit & Loss Standard</span>',
-          'Set date range to match your production report period',
-          'Export as PDF or Excel'
-        ],
-        settings: [
-          { label: 'Source', value: 'Accountant or QuickBooks' },
-          { label: 'Period', value: 'Same full 12 months' },
-          { label: 'Format', value: 'PDF or Excel' }
-        ],
-        tip: 'Don\'t let this hold you up â upload what you have and we\'ll work with it.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload P&L / Income Statement'
-      },
-      {
-        title: 'Hygiene Schedule Form',
-        subtitle: 'Completed separately â takes about 5 minutes',
-        why: '<strong>What we\'re looking for:</strong> Your hygiene chair count, days per week, current schedule fill rate, and how your hygiene appointments are structured.',
-        isHygiene: true,
-        hygieneLinkLabel: 'Open Hygiene Schedule Form',
-        tip: 'Fill this out in a new tab and come back here when done.',
-        uploadLabel: null
-      },
-      {
-        title: 'Aging of AR Report',
-        subtitle: 'Accounts receivable by age bracket',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0â30, 31â60, 61â90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> â <span class="path">Standard Reports</span>',
-          'Under <strong>Monthly</strong>, click <span class="path">Aging of AR</span>',
-          'Select <span class="path">Totals Only</span> for a summary view',
-          'Click <span class="path">OK</span> to generate',
-          'Export or print as PDF'
-        ],
-        settings: [
-          { label: 'Report Type', value: 'Aging of AR' },
-          { label: 'View', value: 'Totals Only' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'Run as of today for the most current AR picture.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload AR Aging Report'
-      },
-      {
-        title: 'Active Patient Report',
-        subtitle: 'Total active patient count',
-        why: '<strong>What we\'re looking for:</strong> Total active patient count, used alongside hygiene visit data to calculate recare rates.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> â <span class="path">Standard</span>',
-          'Under <strong>Lists</strong>, click <span class="path">Active Patients</span>',
-          'Set <strong>Last Visit</strong> to within the last 18â24 months',
-          'Click <span class="path">OK</span>',
-          'Note the total count, export or screenshot'
-        ],
-        settings: [
-          { label: 'Last Visit', value: 'Within 18â24 months' },
-          { label: 'Status', value: 'Active' },
-          { label: 'Format', value: 'PDF or screenshot' }
-        ],
-        tip: 'A screenshot of the count total works perfectly.',
-        accept: '.pdf,.xlsx,.xls,.csv,.png,.jpg',
-        uploadLabel: 'Upload Active Patient Report (optional)'
-      }
-    ]
-  }
-};
-
-// âââ Navigation âââ
-function openGuide(platform) {
-  currentPlatform = platform;
-  currentStep = 0;
-  uploads = {};
-  hygieneDone = false;
-
-  const config = platforms[platform];
-  document.getElementById('guide-platform-name').textContent = config.name;
-  document.getElementById('guide-dot').style.background = config.color;
-
-  buildProgressBar(config);
-  buildSteps(config);
-
-  document.getElementById('landing').style.display = 'none';
-  const gv = document.getElementById('guide-view');
-  gv.style.display = 'flex';
-  gv.classList.add('active');
-
-  goTo(0);
-  window.scrollTo(0, 0);
-}
-
-function closePlatform() {
-  document.getElementById('landing').style.display = 'flex';
-  const gv = document.getElementById('guide-view');
-  gv.style.display = 'none';
-  gv.classList.remove('active');
-  window.scrollTo(0, 0);
-}
-
-function buildProgressBar(config) {
-  const bar = document.getElementById('progress-bar');
-  const stepNames = ['Production', 'Payments', 'P&L', 'Hygiene', 'AR Aging', 'Patients'];
-  bar.innerHTML = config.steps.map((s, i) =>
-    `<div class="prog-step" id="prog-${i}" onclick="goTo(${i})">
-      <div class="prog-num">${i+1}</div>${stepNames[i]}
+        subtitle: 'Completed separately  takes about 5 minutes',
+        why: '<strong>What we\'re looking for:${stepNames[i]}
     </div>`
   ).join('');
 }
@@ -800,30 +473,30 @@ function buildSteps(config) {
           <span class="setting-value" id="hygiene-status-${i}">Not yet completed</span>
         </div>
       </div>
-      <button class="upload-btn" onclick="markHygieneDone(${i})" style="margin-top:12px;background:var(--success);color:var(--black);">â &nbsp; I've completed the hygiene form</button>` : '';
+      <button class="upload-btn" onclick="markHygieneDone(${i})" style="margin-top:12px;background:var(--success);color:var(--black);">&#10003; &nbsp; I've completed the hygiene form</button>` : '';
 
     const uploadHTML = step.uploadLabel ? `
       <div class="upload-zone" id="upload-${i}" onclick="triggerUpload(${i})" ondragover="dragOver(event,${i})" ondragleave="dragLeave(${i})" ondrop="drop(event,${i})">
         <input type="file" id="file-${i}" accept="${step.accept}" onchange="fileChosen(${i})">
         <div id="upload-prompt-${i}">
-          <div class="upload-icon">ð¤</div>
+          <div class="upload-icon"></div>
           <h3>${step.uploadLabel}</h3>
           <p>Drag & drop or click to browse</p>
           <button class="upload-btn" onclick="event.stopPropagation()">Choose File</button>
         </div>
         <div class="upload-progress-wrap" id="upload-progress-${i}">
-          <div class="upload-progress-label" id="upload-progress-label-${i}">Uploadingâ¦</div>
+          <div class="upload-progress-label" id="upload-progress-label-${i}">Uploading</div>
           <div class="upload-progress-bar-track"><div class="upload-progress-bar-fill" id="upload-progress-fill-${i}"></div></div>
         </div>
-        <div class="upload-status" id="upload-status-${i}">â &nbsp; <span id="upload-name-${i}"></span></div>
+        <div class="upload-status" id="upload-status-${i}">&#10003; &nbsp; <span id="upload-name-${i}"></span></div>
         <div class="upload-change" id="upload-change-${i}" onclick="event.stopPropagation();triggerUpload(${i})" style="display:none">Change file</div>
       </div>` : '';
 
     const navHTML = `
       <div class="nav-row">
-        ${!isFirst ? `<button class="btn-back-step" onclick="goTo(${i-1})">â Back</button>` : '<div></div>'}
+        ${!isFirst ? `<button class="btn-back-step" onclick="goTo(${i-1})">&larr; Back</button>` : '<div></div>'}
         <div class="step-progress">Step ${i+1} of ${config.steps.length}</div>
-        <button class="btn-next-step" onclick="goTo(${i+1})">${isLast ? 'Review & Submit â' : 'Next â'}</button>
+        <button class="btn-next-step" onclick="goTo(${i+1})">${isLast ? 'Review & Submit &rarr;' : 'Next &rarr;'}</button>
       </div>`;
 
     div.innerHTML = `
@@ -869,11 +542,13 @@ function goTo(step) {
     document.getElementById(`step-${step}`).classList.add('visible');
     document.getElementById(`prog-${step}`).classList.add('active');
   }
+  
+  if(typeof hyCollectData === "function") { var hd = hyCollectData(); var hasData = hd.recentPast.some(function(w){return w.days.some(function(d){return d.appt>0;});}); if(hasData) hygieneDone = true; }
   currentStep = step;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// âââ Uploadcare file handling âââ
+//  Uploadcare file handling 
 // uploads[idx] = { name, size, url } once uploaded
 const uploadingPromises = {};
 
@@ -907,7 +582,7 @@ function startUploadcareUpload(idx, file) {
   const progressLabel = document.getElementById(`upload-progress-label-${idx}`);
   progressWrap.classList.add('show');
   progressFill.style.width = '0%';
-  progressLabel.textContent = 'Uploadingâ¦';
+  progressLabel.textContent = 'Uploading';
 
   const formData = new FormData();
   formData.append('UPLOADCARE_PUB_KEY', UPLOADCARE_KEY);
@@ -920,7 +595,7 @@ function startUploadcareUpload(idx, file) {
     if (e.lengthComputable) {
       const pct = Math.round((e.loaded / e.total) * 100);
       progressFill.style.width = pct + '%';
-      progressLabel.textContent = `Uploadingâ¦ ${pct}%`;
+      progressLabel.textContent = `Uploading ${pct}%`;
     }
   };
 
@@ -955,10 +630,10 @@ function startUploadcareUpload(idx, file) {
 function markHygieneDone(stepIdx) {
   hygieneDone = true;
   const el = document.getElementById(`hygiene-status-${stepIdx}`);
-  if (el) { el.textContent = 'â Completed'; el.style.color = 'var(--success)'; }
+  if (el) { el.textContent = '&#10003; Completed'; el.style.color = 'var(--success)'; }
 }
 
-// âââ Summary âââ
+//  Summary 
 function buildSummary() {
   const config = platforms[currentPlatform];
   const stepNames = ['Production Report', 'Payment Report', 'P&L Statement', 'Hygiene Form', 'AR Aging Report', 'Patient Report'];
@@ -967,9 +642,9 @@ function buildSummary() {
 
   const pName = practiceName || document.getElementById('practice-name-input')?.value || '';
   if (pName) {
-    grid.innerHTML += `<div class="summary-item"><div class="s-label">Practice</div><div class="s-val uploaded">â ${pName}</div></div>`;
+    grid.innerHTML += `<div class="summary-item"><div class="s-label">Practice</div><div class="s-val uploaded">&#10003; ${pName}</div></div>`;
   }
-  grid.innerHTML += `<div class="summary-item"><div class="s-label">Platform</div><div class="s-val uploaded">â ${config.name}</div></div>`;
+  grid.innerHTML += `<div class="summary-item"><div class="s-label">Platform</div><div class="s-val uploaded">&#10003; ${config.name}</div></div>`;
 
   config.steps.forEach((step, i) => {
     const isHygiene = step.isHygiene;
@@ -979,31 +654,31 @@ function buildSummary() {
       : (uploads[i] ? uploads[i].name : 'Not uploaded');
     const cls = done ? 'uploaded' : 'skipped';
     const clickable = !done ? `onclick="closeModal();scrollToStep(${i})" style="cursor:pointer;border-color:#f59e0b;" title="Click to go back and complete this step"` : '';
-    grid.innerHTML += `<div class="summary-item" ${clickable}><div class="s-label">${stepNames[i]}${!done ? ' â©' : ''}</div><div class="s-val ${cls}">${done ? 'â ' : 'â '}${val}</div></div>`;
+    grid.innerHTML += `<div class="summary-item" ${clickable}><div class="s-label">${stepNames[i]}${!done ? ' ' : ''}</div><div class="s-val ${cls}">${done ? '&#10003; ' : ' '}${val}</div></div>`;
   });
 }
 
-// âââ Email submit âââ
+//  Email submit 
 function buildEmailBody(filesUploaded) {
   const config = platforms[currentPlatform];
   const now = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
   const pName = practiceName || document.getElementById('practice-name-input')?.value || 'Not provided';
   const dName = new URLSearchParams(window.location.search).get('doctor') || '';
   const fileLines = filesUploaded.length
-    ? filesUploaded.map(f => `  â¢ ${f.step}: ${f.filename} (${(f.size/1024).toFixed(0)} KB)\n    Download: ${f.url}`).join('\n\n')
+    ? filesUploaded.map(f => `   ${f.step}: ${f.filename} (${(f.size/1024).toFixed(0)} KB)\n    Download: ${f.url}`).join('\n\n')
     : '  (no files uploaded)';
-  return `New Practice Assessment Submission â Perform DDS
+  return `New Practice Assessment Submission  Perform DDS
 Submitted: ${now}
 
 DOCTOR: ${dName || 'Not provided'}
 PRACTICE: ${pName}
 SOFTWARE: ${config.name}
-Hygiene Form: ${hygieneDone ? 'â Completed' : 'Not completed'}
+Hygiene Form: ${hygieneDone ? '&#10003; Completed' : 'Not completed'}
 
-FILES UPLOADED â CLICK TO DOWNLOAD:
+FILES UPLOADED  CLICK TO DOWNLOAD:
 ${fileLines}
 
-â
+
 Sent via Perform DDS Practice Assessment Tool
 
 ${(()=>{try{return hyFormatForEmail(hyCollectData());}catch(e){return '--- HYGIENE SCHEDULE: Not yet completed ---';}})()}`;
@@ -1018,7 +693,7 @@ async function submitToConsultant() {
   const dName = new URLSearchParams(window.location.search).get('doctor') || '';
 
   btn.disabled = true;
-  btn.textContent = 'Finalizing uploadsâ¦';
+  btn.textContent = 'Finalizing uploads';
 
   // Wait for any still-uploading files
   const pending = Object.values(uploadingPromises);
@@ -1026,7 +701,7 @@ async function submitToConsultant() {
     try { await Promise.allSettled(pending); } catch(e) {}
   }
 
-  btn.textContent = 'Sendingâ¦';
+  btn.textContent = 'Sending';
 
   const filesUploaded = Object.keys(uploads).map(k => ({
     step: stepNames[parseInt(k)],
@@ -1036,11 +711,11 @@ async function submitToConsultant() {
   }));
 
   const subject = pName
-    ? `New Assessment: ${pName} (${config.name}) â Perform DDS`
-    : `New ${config.name} Assessment Submission â Perform DDS`;
+    ? `New Assessment: ${pName} (${config.name})  Perform DDS`
+    : `New ${config.name} Assessment Submission  Perform DDS`;
   const message = buildEmailBody(filesUploaded);
 
-  // Fire both in parallel â notification email + AI analysis
+  // Fire both in parallel  notification email + AI analysis
   const [emailResult, analysisResult] = await Promise.allSettled([emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
     runAIAnalysis(filesUploaded, pName, dName, config.name)
   ]);
@@ -1052,20 +727,20 @@ async function submitToConsultant() {
       document.getElementById('workbookBtn').style.display='flex';
 
   if (emailResult.status === 'fulfilled') {
-    sentMsg.innerHTML = `â &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
+    sentMsg.innerHTML = `&#10003; &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
     sentMsg.classList.add('show');
-    btn.textContent = 'â Sent';
+    btn.textContent = '&#10003; Sent';
     btn.style.background = 'var(--success)';
     btn.style.color = 'var(--black)';
   } else {
     console.error('EmailJS error:', emailResult.reason);
-    sentMsg.innerHTML = `â ï¸ &nbsp; Couldn't send automatically â please email your summary and files to <strong>david@performdds.com</strong>.`;
+    sentMsg.innerHTML = ` &nbsp; Couldn't send automatically  please email your summary and files to <strong>david@performdds.com</strong>.`;
     sentMsg.style.background = 'rgba(255,193,7,0.1)';
     sentMsg.style.borderColor = '#FFC107';
     sentMsg.style.color = '#FFC107';
     sentMsg.classList.add('show');
     btn.disabled = false;
-    btn.textContent = 'Retry â';
+    btn.textContent = 'Retry &rarr;';
   }
 
   if (analysisResult.status === 'rejected') {
@@ -1073,7 +748,7 @@ async function submitToConsultant() {
   }
 }
 
-// âââ AI Analysis Engine âââ
+//  AI Analysis Engine 
 async function runAIAnalysis(filesUploaded, practiceName, doctorName, software) {
   if (!filesUploaded.length) return;
 
@@ -1111,11 +786,11 @@ async function runAIAnalysis(filesUploaded, practiceName, doctorName, software) 
       const isPaymentReport = f.step.toLowerCase().includes('payment');
 
       if (isPaymentReport) {
-        // Extract only the last page as an image â that's where totals live
+        // Extract only the last page as an image  that's where totals live
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const lastPageNum = pdf.numPages;
         const lastPageImg = await pageToBase64(new Uint8Array(arrayBuffer), lastPageNum);
-        pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename}) â Last page (totals summary) ---` });
+        pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename})  Last page (totals summary) ---` });
         pdfBlocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: lastPageImg } });
       } else {
         // Full PDF for all other reports
@@ -1130,31 +805,31 @@ async function runAIAnalysis(filesUploaded, practiceName, doctorName, software) 
       }
     } catch(e) {
       console.warn(`Could not fetch ${f.step}:`, e);
-      pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename}) â could not load ---` });
+      pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename})  could not load ---` });
     }
   }
 
-  const systemPrompt = `You are Dave Orr's AI assessment engine at Perform DDS â a dental practice management consulting firm with 20+ years of experience and 400+ client practices.
+  const systemPrompt = `You are Dave Orr's AI assessment engine at Perform DDS  a dental practice management consulting firm with 20+ years of experience and 400+ client practices.
 
 Your job is to analyze uploaded dental practice reports and produce a concise, actionable pre-call assessment memo for Dave to review before speaking with the client.
 
 PERFORM DDS BENCHMARKS (flag anything outside these as a red flag):
-- Staff wages: 16â20% of collections (CRITICAL red flag if >25%)
+- Staff wages: 1620% of collections (CRITICAL red flag if >25%)
 - Lab fees: target 4% of collections
 - Dental supplies: target 3% of collections  
 - Specialist supplies: target 2%
 - Marketing: target 2%
 - Misc overhead: target 10%
 - GP daily production target: $3,500/day
-- Hygiene daily target: $1,000â$1,250/day
+- Hygiene daily target: $1,000$1,250/day
 - Associate daily target: $3,000/day
-- Hygiene should be 30â35% of total production
+- Hygiene should be 3035% of total production
 - AR 90+ day bucket: should be <12% of total AR (red flag if higher)
 - Collection rate: should be 98%+ of adjusted production
 
-OUTPUT FORMAT â use this exact structure:
+OUTPUT FORMAT  use this exact structure:
 
-## PERFORM DDS â PRE-CALL ASSESSMENT
+## PERFORM DDS  PRE-CALL ASSESSMENT
 Practice: [name] | Software: [software] | Submitted: [date]
 
 ### PRACTICE SNAPSHOT
@@ -1164,11 +839,11 @@ Practice: [name] | Software: [software] | Submitted: [date]
 - Hygiene % of production:
 - Collection rate:
 
-### RED FLAGS ð¨
+### RED FLAGS 
 List each red flag with: metric, actual value, benchmark, severity (HIGH/MEDIUM)
 
-### OPPORTUNITIES ð¡
-Top 3â5 growth/optimization opportunities specific to this practice's numbers
+### OPPORTUNITIES 
+Top 35 growth/optimization opportunities specific to this practice's numbers
 
 ### HYGIENE DEPARTMENT
 Quick analysis of hygiene performance vs benchmarks
@@ -1177,9 +852,9 @@ Quick analysis of hygiene performance vs benchmarks
 Analysis of AR aging and collection rate
 
 ### DAVE'S PREP NOTES
-3â5 specific questions or talking points Dave should raise on the call based on what stands out in the data
+35 specific questions or talking points Dave should raise on the call based on what stands out in the data
 
-Keep the analysis sharp and direct. Dave is an expert â no need to explain basic concepts. Flag the most important numbers first. If a report is missing or unreadable, note it and work with what you have.`;
+Keep the analysis sharp and direct. Dave is an expert  no need to explain basic concepts. Flag the most important numbers first. If a report is missing or unreadable, note it and work with what you have.`;
 
   const userMessage = [
     {
@@ -1216,8 +891,8 @@ Uploaded reports:`
 
   // Email the analysis to Dave
   const analysisSubject = practiceName
-    ? `AI Assessment Ready: ${practiceName} (${software}) â Perform DDS`
-    : `AI Assessment Ready: New ${software} Client â Perform DDS`;
+    ? `AI Assessment Ready: ${practiceName} (${software})  Perform DDS`
+    : `AI Assessment Ready: New ${software} Client  Perform DDS`;
 
   await emailjs.send('service_5yz66e8', 'template_un21rcd', {
     subject: analysisSubject,
@@ -1226,7 +901,7 @@ Uploaded reports:`
   }, 'S3k44GF4XVmVpgfVJ');
 }
 
-  // Uploadcare URL tracker â populated when files are uploaded
+  // Uploadcare URL tracker  populated when files are uploaded
   window._ucUrls = { production: null, pl: null };
   window._capturedUrls = window._ucUrls;
 
@@ -1261,11 +936,11 @@ Uploaded reports:`
   window.generateWorkbook = async function() {
     const btn = document.getElementById('workbookBtn');
     const status = document.getElementById('workbookStatus');
-    btn.disabled = true; btn.innerHTML = 'â³ Extracting dataâ¦';
+    btn.disabled = true; btn.innerHTML = ' Extracting data';
     try {
       const prodUrl = window._uploadedUrls?.production;
       const plUrl   = window._uploadedUrls?.pl;
-      if (!prodUrl) throw new Error('Production PDF URL missing â please re-submit.');
+      if (!prodUrl) throw new Error('Production PDF URL missing  please re-submit.');
 
       async function extract(pdfUrl, prompt, label) {
         status.textContent = label;
@@ -1280,14 +955,14 @@ Uploaded reports:`
 
       const prodText = await extract(prodUrl,
         'Eaglesoft Procedures by Provider. Return each ADA code as CODE|QTY|TOTAL (e.g. 00120|340|420594.36). Combine all providers. Data lines only, no headers.',
-        'Step 1: Extracting ADA codes (up to 25s)â¦');
+        'Step 1: Extracting ADA codes (up to 25s)');
 
       let plText = '';
       if (plUrl) plText = await extract(plUrl,
         'QuickBooks P&L. Return each line item as LABEL|AMOUNT (e.g. Dental Supplies|171167.66). Negative numbers for expenses shown as negative. Data lines only.',
-        'Step 2: Extracting P&Lâ¦');
+        'Step 2: Extracting P&L');
 
-      status.textContent = 'Building Excel workbookâ¦';
+      status.textContent = 'Building Excel workbook';
 
       function nc(r){let s=String(r).trim().toUpperCase();if(!s.startsWith('D'))s='D'+s;const d=s.slice(1);if(d.length===5&&d[0]==='0')return'D'+d.slice(1);return s;}
       const raw={};
@@ -1322,7 +997,7 @@ Uploaded reports:`
       const rv=code=>raw[code]||{qty:0,total:0,avg:0};
 
       const rows=[
-        ['PERFORM DDS â PRACTICE ASSESSMENT'],
+        ['PERFORM DDS  PRACTICE ASSESSMENT'],
         ['Practice:',pName,'','Months:',M,'Production:',$v(tot)],
         [],
         ['EXAMS','Qty','Per Mo','Avg Fee'],
@@ -1376,11 +1051,11 @@ Uploaded reports:`
       XLSX.utils.book_append_sheet(wb,ws2,'All Codes');
       XLSX.writeFile(wb,(pName||'Practice').replace(/[^a-z0-9]/gi,'_')+'_Assessment.xlsx');
 
-      btn.innerHTML='â Workbook Downloaded!';btn.disabled=false;
-      status.textContent='â '+Object.keys(raw).length+' codes extracted | Production: '+$v(tot)+(netC?' | Collections: '+$v(netC):'');
+      btn.innerHTML=' Workbook Downloaded!';btn.disabled=false;
+      status.textContent=' '+Object.keys(raw).length+' codes extracted | Production: '+$v(tot)+(netC?' | Collections: '+$v(netC):'');
     } catch(err){
-      status.textContent='â '+err.message;
-      btn.disabled=false;btn.innerHTML='ð Download Assessment Workbook';
+      status.textContent=' '+err.message;
+      btn.disabled=false;btn.innerHTML=' Download Assessment Workbook';
     }
   }
 
