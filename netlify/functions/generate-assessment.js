@@ -10,11 +10,11 @@ exports.handler = async function(event) {
   const t=(c)=>(codes[c]||{}).total||0;
   const a=(c)=>(codes[c]||{}).avg||0;
   const pm=(n)=>months>0?Math.round(n/months*10)/10:0;
-  const pct=(n,d)=>d>0?Math.round(n/d*1000)/10:0;
+    const pct=(n,d)=>d>0?n/d:0;
   function fill(argb){return{type:'pattern',pattern:'solid',fgColor:{argb}};}
   function sc(ws,r,c,v,o={}){const cell=ws.getCell(r,c);if(v!==undefined&&v!==null)cell.value=v;if(o.bg)cell.fill=fill(o.bg);if(o.bold||o.color||o.size)cell.font={bold:!!o.bold,color:{argb:o.color||'FF000000'},size:o.size||11,name:'Calibri'};if(o.halign)cell.alignment={horizontal:o.halign,vertical:'middle'};if(o.numFmt)cell.numFmt=o.numFmt;return cell;}
   const NAVY='FF1F3864',NAVY2='FF2E4B7A',GRAY='FF7F7F7F',BL='FFD9E1F2',BM='FFEEF3FA',YEL='FFFFF3CD',WHT='FFFFFFFF',RED='FFFFE0E0';
-  const PCT='0.0"%"';
+    const PCT='0.0%';
   const sumcat=(cat)=>plItems.filter(i=>i.category===cat).reduce((s,i)=>s+Math.abs(i.amount),0);
   const associates=sumcat('Associates'),hygPay=sumcat('Hygienist'),specialists=sumcat('Specialists');
   const lab=sumcat('Lab'),dentalSup=sumcat('Dental Supplies'),specSup=sumcat('Specialist Supplies');
