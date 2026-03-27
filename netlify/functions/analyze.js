@@ -7,23 +7,17 @@ exports.handler = async function (event) {
   let body;
   try { body = JSON.parse(event.body); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
+  // Special mode: return key for client-side use (browser calls Anthropic directly)
+  if (body.getKey) {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: ANTHROPIC_KEY })
+    };
+  }
+
   try {
     let messages = body.messages;
-
-    // If pdfUrl provided, fetch PDF server-side and inject as base64 document
-    if (body.pdfUrl) {
-      const pdfResp = await fetch(body.pdfUrl);
-      if (!pdfResp.ok) throw new Error('PDF fetch failed: ' + pdfResp.status);
-      const buf = await pdfResp.arrayBuffer();
-      const b64 = Buffer.from(buf).toString('base64');
-      messages = [{
-        role: 'user',
-        content: [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
-          { type: 'text', text: body.prompt }
-        ]
-      }];
-    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
