@@ -1262,33 +1262,159 @@ Uploaded reports:`
     const btn = document.getElementById('workbookBtn');
     const status = document.getElementById('workbookStatus');
     btn.disabled = true;
-    btn.innerHTML = '⏳ Generating workbook… (20-40 sec)';
-    status.textContent = 'Calling AI extractor…';
+    btn.innerHTML = '⏳ Extracting data…';
+    status.textContent = 'Step 1 of 3: Reading production report…';
+
     try {
-            const prodUrl = window._uploadedUrls?.production || null;
-            const plUrl   = window._uploadedUrls?.pl || null;
-      if (!prodUrl) throw new Error('Production PDF URL not found. Re-submit to try again.');
-      const resp = await fetch('/.netlify/functions/generate-workbook', {
+      const prodUrl = window._uploadedUrls?.production;
+      const plUrl   = window._uploadedUrls?.pl;
+      if (!prodUrl) throw new Error('Production PDF URL missing — please re-submit.');
+
+      // Step 1: Extract production data via analyze.js proxy
+      const prodResp = await fetch('/.netlify/functions/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
-          productionUrl: prodUrl,
-          plUrl: plUrl || null,
-          months: 12,
-          practiceName: typeof practiceName !== 'undefined' ? practiceName :
-            (document.getElementById('practice-name-input') || {}).value || ''
+          max_tokens: 4096,
+          messages: [{role:'user', content:[
+            {type:'document', source:{type:'url', url: prodUrl}},
+            {type:'text', text:'Eaglesoft Procedures by Provider report. Return each ADA code as CODE|QTY|TOTAL (e.g. 00120|340|420594.36). Combine all providers. Data lines only, no headers.'}
+          ]}]
         })
       });
-      if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error || 'Server error ' + resp.status); }
-      const data = await resp.json();
-      if (!data.success) throw new Error(data.error || 'Unknown error');
-      const safeName = ((typeof practiceName !== 'undefined' ? practiceName : '') || 'Assessment').replace(/[^a-z0-9]/gi,'_');
-      const a = document.createElement('a');
-      a.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + data.xlsxB64;
-      a.download = safeName + '_Assessment.xlsx';
-      a.click();
+      const prodData = await prodResp.json();
+      const prodText = prodData.content?.[0]?.text || '';
+      status.textContent = 'Step 2 of 3: Reading P&L…';
+
+      // Step 2: Extract P&L if available
+      let plText = '';
+      if (plUrl) {
+        const plResp = await fetch('/.netlify/functions/analyze', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            max_tokens: 4096,
+            messages: [{role:'user', content:[
+              {type:'document', source:{type:'url', url: plUrl}},
+              {type:'text', text:'QuickBooks P&L. Return each line item as LABEL|AMOUNT (e.g. Dental Supplies|171167.66). Negative for refunds. Data lines only.'}
+            ]}]
+          })
+        });
+        const plData = await plResp.json();
+        plText = plData.content?.[0]?.text || '';
+      }
+
+      status.textContent = 'Step 3 of 3: Building Excel workbook…';
+
+      // Step 3: Parse extracted data
+      const CODE_MAP={D0120:'exam_periodic',D0140:'exam_focused',D0145:'exam_other',D0150:'exam_comprehensive',D0180:'exam_perio',D0210:'imaging_fmx',D0274:'imaging_bw4',D0330:'imaging_pano',D1110:'hyg_adult_prophy',D1120:'hyg_child_prophy',D4341:'hyg_srp',D4342:'hyg_srp',D4381:'hyg_arestin',D4910:'hyg_perio_maint',D2740:'cb_2740',D2750:'cb_2750',D3310:'endo_anterior',D3320:'endo_bicuspid',D3330:'endo_molar',D7140:'os_ext_simple',D7210:'os_ext_surgical',D6010:'os_implant_surgical'};
+      function normCode(r){let s=String(r).trim().toUpperCase();if(!s.startsWith('D'))s='D'+s;const d=s.slice(1);if(d.length===5&&d[0]==='0')return'D'+d.slice(1);return s;}
+      const raw={};
+      for(const line of prodText.split('\n')){
+        const p=line.trim().split('|');if(p.length<3)continue;
+        const code=normCode(p[0]);const qty=parseInt(p[1]);const total=parseFloat(p[2].replace(/[,$]/g,''));
+        if(!code||isNaN(qty)||isNaN(total)||qty<=0)continue;
+        if(!raw[code])raw[code]={qty:0,total:0};raw[code].qty+=qty;raw[code].total+=total;
+      }
+      for(const d of Object.values(raw)){d.total=Math.round(d.total*100)/100;d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;}
+      const totalProd=Object.values(raw).reduce((s,v)=>s+v.total,0);
+      const g=(code,f='qty')=>{const k=CODE_MAP[normCode(code)];return k?((raw[code]||{})[f]||0):0;};
+
+      // Parse P&L
+      let plItems=[], netCollections=null;
+      if(plText){
+        const seen=new Set();
+        for(const line of plText.split('\n')){
+          const idx=line.lastIndexOf('|');if(idx<0)continue;
+          const label=line.slice(0,idx).trim();const amt=parseFloat(line.slice(idx+1).replace(/[,$]/g,''));
+          if(!label||isNaN(amt))continue;
+          const key=label.toLowerCase().slice(0,30);if(seen.has(key))continue;seen.add(key);
+          plItems.push({label,amount:amt});
+        }
+        const gross=plItems.filter(i=>/(^services?$|^income$)/i.test(i.label)).reduce((s,i)=>s+i.amount,0);
+        const adj=plItems.filter(i=>/refund/i.test(i.label)).reduce((s,i)=>s+i.amount,0);
+        netCollections=gross+adj||plItems.reduce((s,i)=>i.amount>50000?i.amount:s,0)||null;
+      }
+
+      // Build CSV-style workbook data as tab-separated values (works in Excel)
+      const pName = practiceName || document.getElementById('practice-name-input')?.value || 'Practice';
+      const rows = [
+        ['PERFORM DDS — PRACTICE ASSESSMENT','','','','',''],
+        ['Practice:', pName,'','Months Reviewed:',12,''],
+        ['','','','Total Production:','$'+Math.round(totalProd).toLocaleString(),''],
+        ['','','','','',''],
+        ['EXAMS','Qty','Per Month','Avg Fee','',''],
+        ['Periodic Exam (D0120)', raw.D0120?.qty||0, Math.round((raw.D0120?.qty||0)/12*10)/10, '$'+(raw.D0120?.avg||0),'',''],
+        ['Focused Exam (D0140)', raw.D0140?.qty||0, Math.round((raw.D0140?.qty||0)/12*10)/10, '$'+(raw.D0140?.avg||0),'',''],
+        ['Comprehensive Exam (D0150)', raw.D0150?.qty||0, Math.round((raw.D0150?.qty||0)/12*10)/10, '$'+(raw.D0150?.avg||0),'',''],
+        ['','','','','',''],
+        ['IMAGING','Qty','Per Month','Avg Fee','',''],
+        ['FMX (D0210)', raw.D0210?.qty||0, Math.round((raw.D0210?.qty||0)/12*10)/10, '$'+(raw.D0210?.avg||0),'',''],
+        ['4 Bitewings (D0274)', raw.D0274?.qty||0, Math.round((raw.D0274?.qty||0)/12*10)/10, '$'+(raw.D0274?.avg||0),'',''],
+        ['Panorex (D0330)', raw.D0330?.qty||0, Math.round((raw.D0330?.qty||0)/12*10)/10, '$'+(raw.D0330?.avg||0),'',''],
+        ['','','','','',''],
+        ['HYGIENE','Qty','Per Month','Avg Fee','Total $',''],
+        ['Adult Prophy (D1110)', raw.D1110?.qty||0, Math.round((raw.D1110?.qty||0)/12*10)/10, '$'+(raw.D1110?.avg||0), '$'+Math.round((raw.D1110?.total||0)).toLocaleString(),''],
+        ['Child Prophy (D1120)', raw.D1120?.qty||0, Math.round((raw.D1120?.qty||0)/12*10)/10, '$'+(raw.D1120?.avg||0), '$'+Math.round((raw.D1120?.total||0)).toLocaleString(),''],
+        ['Perio Maintenance (D4910)', raw.D4910?.qty||0, Math.round((raw.D4910?.qty||0)/12*10)/10, '$'+(raw.D4910?.avg||0), '$'+Math.round((raw.D4910?.total||0)).toLocaleString(),''],
+        ['SRP (D4341/4342)', (raw.D4341?.qty||0)+(raw.D4342?.qty||0), Math.round(((raw.D4341?.qty||0)+(raw.D4342?.qty||0))/12*10)/10, '$'+Math.round(((raw.D4341?.total||0)+(raw.D4342?.total||0))/Math.max(1,(raw.D4341?.qty||0)+(raw.D4342?.qty||0))), '$'+Math.round((raw.D4341?.total||0)+(raw.D4342?.total||0)).toLocaleString(),''],
+        ['Arestin (D4381)', raw.D4381?.qty||0, Math.round((raw.D4381?.qty||0)/12*10)/10, '$'+(raw.D4381?.avg||0), '$'+Math.round((raw.D4381?.total||0)).toLocaleString(),''],
+        ['','','','','',''],
+        ['CROWN & BRIDGE','Qty','Per Month','Avg Fee','Total $',''],
+        ['Porcelain/Ceramic Crown (D2740)', raw.D2740?.qty||0, Math.round((raw.D2740?.qty||0)/12*10)/10, '$'+(raw.D2740?.avg||0), '$'+Math.round((raw.D2740?.total||0)).toLocaleString(),''],
+        ['PFM Crown (D2750)', raw.D2750?.qty||0, Math.round((raw.D2750?.qty||0)/12*10)/10, '$'+(raw.D2750?.avg||0), '$'+Math.round((raw.D2750?.total||0)).toLocaleString(),''],
+        ['','','','','',''],
+        ['ENDO','Qty','Per Month','Avg Fee','Total $',''],
+        ['Anterior RCT (D3310)', raw.D3310?.qty||0, Math.round((raw.D3310?.qty||0)/12*10)/10, '$'+(raw.D3310?.avg||0), '$'+Math.round((raw.D3310?.total||0)).toLocaleString(),''],
+        ['Bicuspid RCT (D3320)', raw.D3320?.qty||0, Math.round((raw.D3320?.qty||0)/12*10)/10, '$'+(raw.D3320?.avg||0), '$'+Math.round((raw.D3320?.total||0)).toLocaleString(),''],
+        ['Molar RCT (D3330)', raw.D3330?.qty||0, Math.round((raw.D3330?.qty||0)/12*10)/10, '$'+(raw.D3330?.avg||0), '$'+Math.round((raw.D3330?.total||0)).toLocaleString(),''],
+        ['','','','','',''],
+        ['ORAL SURGERY','Qty','Per Month','Avg Fee','Total $',''],
+        ['Simple Extraction (D7140)', raw.D7140?.qty||0, Math.round((raw.D7140?.qty||0)/12*10)/10, '$'+(raw.D7140?.avg||0), '$'+Math.round((raw.D7140?.total||0)).toLocaleString(),''],
+        ['Surgical Extraction (D7210)', raw.D7210?.qty||0, Math.round((raw.D7210?.qty||0)/12*10)/10, '$'+(raw.D7210?.avg||0), '$'+Math.round((raw.D7210?.total||0)).toLocaleString(),''],
+        ['Surgical Implant (D6010)', raw.D6010?.qty||0, Math.round((raw.D6010?.qty||0)/12*10)/10, '$'+(raw.D6010?.avg||0), '$'+Math.round((raw.D6010?.total||0)).toLocaleString(),''],
+      ];
+
+      if(netCollections){
+        rows.push(['','','','','','']);
+        rows.push(['P&L SUMMARY','','','','','']);
+        rows.push(['Net Collections','','','','$'+Math.round(netCollections).toLocaleString(),'']);
+        rows.push(['Monthly Average','','','','$'+Math.round(netCollections/12).toLocaleString(),'']);
+        for(const item of plItems.filter(i=>i.amount>10000)){
+          rows.push([item.label,'','','','$'+Math.round(item.amount).toLocaleString(),'']);
+        }
+      }
+
+      // ALL CODES tab rows
+      const allCodeRows = [['Code','Description','Qty','Total $','Avg Fee','% of Production']];
+      for(const [code,d] of Object.entries(raw).sort((a,b)=>a[0].localeCompare(b[0]))){
+        allCodeRows.push([code,'',d.qty,'$'+d.total.toLocaleString(),'$'+d.avg,totalProd>0?Math.round(d.total/totalProd*1000)/10+'%':'0%']);
+      }
+
+      // Build XLSX using SheetJS (loaded from CDN)
+      if(!window.XLSX){
+        await new Promise((res,rej)=>{
+          const s=document.createElement('script');
+          s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+          s.onload=res; s.onerror=rej; document.head.appendChild(s);
+        });
+      }
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{wch:35},{wch:8},{wch:10},{wch:12},{wch:14},{wch:6}];
+      XLSX.utils.book_append_sheet(wb, ws, 'Production Worksheet');
+
+      const ws2 = XLSX.utils.aoa_to_sheet(allCodeRows);
+      ws2['!cols'] = [{wch:10},{wch:25},{wch:8},{wch:12},{wch:10},{wch:12}];
+      XLSX.utils.book_append_sheet(wb, ws2, 'All Codes');
+
+      const safeName = pName.replace(/[^a-z0-9]/gi,'_');
+      XLSX.writeFile(wb, safeName + '_Assessment.xlsx');
+
       btn.innerHTML = '✅ Workbook Downloaded!';
-      status.textContent = 'Codes found: ' + data.summary.codesFound + ' | Production: $' + parseFloat(data.summary.totalProduction).toLocaleString();
+      status.textContent = '✅ ' + Object.keys(raw).length + ' codes extracted | Production: $' + Math.round(totalProd).toLocaleString() + (netCollections ? ' | Collections: $'+Math.round(netCollections).toLocaleString() : '');
+
     } catch(err) {
       status.textContent = '❌ ' + err.message;
       btn.disabled = false;
@@ -1299,5 +1425,6 @@ Uploaded reports:`
 </script>
 </body>
 </html>
+
 
 
