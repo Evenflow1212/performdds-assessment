@@ -3,6 +3,8 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[functions."generate-workbook"]
   timeout = 26
 
 [[plugins]]
