@@ -1264,122 +1264,130 @@ Uploaded reports:`
     btn.disabled = true;
     btn.innerHTML = '⏳ Extracting data…';
 
-    async function extractPdf(pdfUrl, prompt) {
-      const r = await fetch('/.netlify/functions/analyze', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ pdfUrl, prompt, max_tokens: 4096 })
-      });
-      if (!r.ok) throw new Error('analyze function returned ' + r.status);
-      const data = await r.json();
-      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-      return data.content?.[0]?.text || '';
-    }
-
     try {
       const prodUrl = window._uploadedUrls?.production;
       const plUrl   = window._uploadedUrls?.pl;
-      if (!prodUrl) throw new Error('Production PDF URL missing — please re-submit the form.');
+      if (!prodUrl) throw new Error('Production PDF URL missing — please re-submit.');
 
-      status.textContent = 'Step 1 of 3: Extracting ADA codes (20-30s)…';
-      const prodText = await extractPdf(prodUrl, 'Eaglesoft Procedures by Provider report. Return each ADA code as CODE|QTY|TOTAL (e.g. 00120|340|420594.36). Combine all providers. Data lines only, no headers or explanations.');
+      // Get API key from server (single fast call)
+      status.textContent = 'Connecting…';
+      const keyResp = await fetch('/.netlify/functions/analyze', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ getKey: true })
+      });
+      const { key } = await keyResp.json();
+      if (!key) throw new Error('Could not retrieve API key');
+
+      // Helper: fetch PDF as base64 in browser
+      async function pdfB64(url) {
+        const r = await fetch(url); if (!r.ok) throw new Error('PDF fetch failed');
+        const buf = await r.arrayBuffer();
+        const bytes = new Uint8Array(buf); let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+      }
+
+      // Helper: call Anthropic directly from browser (no Netlify timeout)
+      async function callClaude(b64, prompt) {
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'x-api-key': key, 'anthropic-version':'2023-06-01', 'anthropic-beta':'pdfs-2024-09-25' },
+          body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4096,
+            messages:[{role:'user',content:[
+              {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+              {type:'text',text:prompt}
+            ]}]
+          })
+        });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error.message);
+        return d.content?.[0]?.text || '';
+      }
+
+      status.textContent = 'Step 1 of 3: Downloading production PDF…';
+      const prodB64 = await pdfB64(prodUrl);
+
+      status.textContent = 'Step 2 of 3: Extracting ADA codes (30s)…';
+      const prodText = await callClaude(prodB64, 'Eaglesoft Procedures by Provider. Return each ADA code as CODE|QTY|TOTAL (e.g. 00120|340|420594.36). Combine all providers. Data lines only.');
 
       let plText = '';
       if (plUrl) {
-        status.textContent = 'Step 2 of 3: Extracting P&L data…';
-        plText = await extractPdf(plUrl, 'QuickBooks P&L report. Return each line item as LABEL|AMOUNT (e.g. Dental Supplies|171167.66). Negative amounts for refunds/adjustments. Data lines only.');
+        status.textContent = 'Step 2b: Extracting P&L…';
+        const plB64 = await pdfB64(plUrl);
+        plText = await callClaude(plB64, 'QuickBooks P&L. Return each line item as LABEL|AMOUNT (e.g. Dental Supplies|171167.66). Negative for refunds. Data lines only.');
       }
 
-      status.textContent = 'Step 3 of 3: Building Excel workbook…';
+      status.textContent = 'Step 3 of 3: Building Excel…';
 
-      function normCode(r){let s=String(r).trim().toUpperCase();if(!s.startsWith('D'))s='D'+s;const d=s.slice(1);if(d.length===5&&d[0]==='0')return'D'+d.slice(1);return s;}
+      function nc(r){let s=String(r).trim().toUpperCase();if(!s.startsWith('D'))s='D'+s;const d=s.slice(1);if(d.length===5&&d[0]==='0')return'D'+d.slice(1);return s;}
       const raw={};
       for(const line of prodText.split('\n')){
         const p=line.trim().split('|');if(p.length<3)continue;
-        const code=normCode(p[0]);const qty=parseInt(p[1]);const total=parseFloat(p[2].replace(/[,$]/g,''));
+        const code=nc(p[0]);const qty=parseInt(p[1]);const total=parseFloat(p[2].replace(/[,$]/g,''));
         if(!code||isNaN(qty)||isNaN(total)||qty<=0)continue;
         if(!raw[code])raw[code]={qty:0,total:0};raw[code].qty+=qty;raw[code].total+=total;
       }
       for(const d of Object.values(raw)){d.total=Math.round(d.total*100)/100;d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;}
-      const totalProd=Object.values(raw).reduce((s,v)=>s+v.total,0);
+      const tot=Object.values(raw).reduce((s,v)=>s+v.total,0);
 
-      let plItems=[], netCollections=null;
+      let plItems=[],netC=null;
       if(plText){
         const seen=new Set();
-        for(const line of plText.split('\n')){
-          const idx=line.lastIndexOf('|');if(idx<0)continue;
-          const label=line.slice(0,idx).trim();const amt=parseFloat(line.slice(idx+1).replace(/[,$]/g,''));
-          if(!label||isNaN(amt))continue;
-          const key=label.toLowerCase().slice(0,30);if(seen.has(key))continue;seen.add(key);
-          plItems.push({label,amount:amt});
-        }
-        const gross=plItems.filter(i=>/(service|income)/i.test(i.label)&&i.amount>50000).reduce((s,i)=>s+i.amount,0);
-        netCollections=gross||plItems.reduce((s,i)=>i.amount>100000?i.amount:s,0)||null;
+        for(const line of plText.split('\n')){const idx=line.lastIndexOf('|');if(idx<0)continue;const label=line.slice(0,idx).trim();const amt=parseFloat(line.slice(idx+1).replace(/[,$]/g,''));if(!label||isNaN(amt))continue;const key2=label.toLowerCase().slice(0,30);if(seen.has(key2))continue;seen.add(key2);plItems.push({label,amount:amt});}
+        netC=plItems.filter(i=>/(service|income)/i.test(i.label)&&i.amount>50000).reduce((s,i)=>s+i.amount,0)||plItems.reduce((s,i)=>i.amount>100000?i.amount:s,0)||null;
       }
 
-      if(!window.XLSX){
-        await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
-      }
+      if(!window.XLSX){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
 
       const pName=practiceName||document.getElementById('practice-name-input')?.value||'Practice';
-      const M=12;
-      const pm=(n)=>Math.round((n||0)/M*10)/10;
-      const dollar=(n)=>n?'$'+Math.round(n).toLocaleString():'';
+      const M=12,pm=(n)=>Math.round((n||0)/M*10)/10,$=(n)=>n?'$'+Math.round(n).toLocaleString():'';
+      const r=(code)=>raw[code]||{qty:0,total:0,avg:0};
 
       const rows=[
-        ['PERFORM DDS — PRACTICE ASSESSMENT WORKBOOK'],
-        ['Practice:',pName,'','Months Reviewed:',M,'Total Production:',dollar(totalProd)],
-        [],
-        ['EXAMS','Qty','Per Mo','Avg Fee'],
-        ['Periodic Exam (D0120)',raw.D0120?.qty||0,pm(raw.D0120?.qty),dollar(raw.D0120?.avg)],
-        ['Focused Exam (D0140)',raw.D0140?.qty||0,pm(raw.D0140?.qty),dollar(raw.D0140?.avg)],
-        ['Comprehensive (D0150)',raw.D0150?.qty||0,pm(raw.D0150?.qty),dollar(raw.D0150?.avg)],
-        ['Perio Exam (D0180)',raw.D0180?.qty||0,pm(raw.D0180?.qty),dollar(raw.D0180?.avg)],
-        [],
-        ['IMAGING','Qty','Per Mo','Avg Fee'],
-        ['FMX (D0210)',raw.D0210?.qty||0,pm(raw.D0210?.qty),dollar(raw.D0210?.avg)],
-        ['4 Bitewings (D0274)',raw.D0274?.qty||0,pm(raw.D0274?.qty),dollar(raw.D0274?.avg)],
-        ['Panorex (D0330)',raw.D0330?.qty||0,pm(raw.D0330?.qty),dollar(raw.D0330?.avg)],
-        [],
-        ['HYGIENE','Qty','Per Mo','Avg Fee','Total $'],
-        ['Adult Prophy (D1110)',raw.D1110?.qty||0,pm(raw.D1110?.qty),dollar(raw.D1110?.avg),dollar(raw.D1110?.total)],
-        ['Child Prophy (D1120)',raw.D1120?.qty||0,pm(raw.D1120?.qty),dollar(raw.D1120?.avg),dollar(raw.D1120?.total)],
-        ['Perio Maint (D4910)',raw.D4910?.qty||0,pm(raw.D4910?.qty),dollar(raw.D4910?.avg),dollar(raw.D4910?.total)],
-        ['SRP (D4341)',raw.D4341?.qty||0,pm(raw.D4341?.qty),dollar(raw.D4341?.avg),dollar(raw.D4341?.total)],
-        ['SRP (D4342)',raw.D4342?.qty||0,pm(raw.D4342?.qty),dollar(raw.D4342?.avg),dollar(raw.D4342?.total)],
-        ['Arestin (D4381)',raw.D4381?.qty||0,pm(raw.D4381?.qty),dollar(raw.D4381?.avg),dollar(raw.D4381?.total)],
-        [],
-        ['CROWN & BRIDGE','Qty','Per Mo','Avg Fee','Total $'],
-        ['Porc/Ceramic Crown (D2740)',raw.D2740?.qty||0,pm(raw.D2740?.qty),dollar(raw.D2740?.avg),dollar(raw.D2740?.total)],
-        ['PFM Crown (D2750)',raw.D2750?.qty||0,pm(raw.D2750?.qty),dollar(raw.D2750?.avg),dollar(raw.D2750?.total)],
-        [],
-        ['ENDO','Qty','Per Mo','Avg Fee','Total $'],
-        ['Anterior RCT (D3310)',raw.D3310?.qty||0,pm(raw.D3310?.qty),dollar(raw.D3310?.avg),dollar(raw.D3310?.total)],
-        ['Bicuspid RCT (D3320)',raw.D3320?.qty||0,pm(raw.D3320?.qty),dollar(raw.D3320?.avg),dollar(raw.D3320?.total)],
-        ['Molar RCT (D3330)',raw.D3330?.qty||0,pm(raw.D3330?.qty),dollar(raw.D3330?.avg),dollar(raw.D3330?.total)],
-        [],
-        ['ORAL SURGERY','Qty','Per Mo','Avg Fee','Total $'],
-        ['Simple Ext (D7140)',raw.D7140?.qty||0,pm(raw.D7140?.qty),dollar(raw.D7140?.avg),dollar(raw.D7140?.total)],
-        ['Surgical Ext (D7210)',raw.D7210?.qty||0,pm(raw.D7210?.qty),dollar(raw.D7210?.avg),dollar(raw.D7210?.total)],
-        ['Implant Surgical (D6010)',raw.D6010?.qty||0,pm(raw.D6010?.qty),dollar(raw.D6010?.avg),dollar(raw.D6010?.total)],
+        ['PERFORM DDS — PRACTICE ASSESSMENT'],
+        ['Practice:',pName,'','Months:',M,'Production:',$(tot)],
+        [],['EXAMS','Qty','Per Mo','Avg Fee'],
+        ['Periodic (D0120)',r('D0120').qty,pm(r('D0120').qty),$(r('D0120').avg)],
+        ['Focused (D0140)',r('D0140').qty,pm(r('D0140').qty),$(r('D0140').avg)],
+        ['Comprehensive (D0150)',r('D0150').qty,pm(r('D0150').qty),$(r('D0150').avg)],
+        ['Perio Exam (D0180)',r('D0180').qty,pm(r('D0180').qty),$(r('D0180').avg)],
+        [],['IMAGING','Qty','Per Mo','Avg Fee'],
+        ['FMX (D0210)',r('D0210').qty,pm(r('D0210').qty),$(r('D0210').avg)],
+        ['4 BW (D0274)',r('D0274').qty,pm(r('D0274').qty),$(r('D0274').avg)],
+        ['Panorex (D0330)',r('D0330').qty,pm(r('D0330').qty),$(r('D0330').avg)],
+        [],['HYGIENE','Qty','Per Mo','Avg Fee','Total'],
+        ['Adult Prophy (D1110)',r('D1110').qty,pm(r('D1110').qty),$(r('D1110').avg),$(r('D1110').total)],
+        ['Child Prophy (D1120)',r('D1120').qty,pm(r('D1120').qty),$(r('D1120').avg),$(r('D1120').total)],
+        ['Perio Maint (D4910)',r('D4910').qty,pm(r('D4910').qty),$(r('D4910').avg),$(r('D4910').total)],
+        ['SRP (D4341)',r('D4341').qty,pm(r('D4341').qty),$(r('D4341').avg),$(r('D4341').total)],
+        ['SRP (D4342)',r('D4342').qty,pm(r('D4342').qty),$(r('D4342').avg),$(r('D4342').total)],
+        ['Arestin (D4381)',r('D4381').qty,pm(r('D4381').qty),$(r('D4381').avg),$(r('D4381').total)],
+        [],['CROWN & BRIDGE','Qty','Per Mo','Avg Fee','Total'],
+        ['Porc Crown (D2740)',r('D2740').qty,pm(r('D2740').qty),$(r('D2740').avg),$(r('D2740').total)],
+        ['PFM Crown (D2750)',r('D2750').qty,pm(r('D2750').qty),$(r('D2750').avg),$(r('D2750').total)],
+        [],['ENDO','Qty','Per Mo','Avg Fee','Total'],
+        ['Anterior RCT (D3310)',r('D3310').qty,pm(r('D3310').qty),$(r('D3310').avg),$(r('D3310').total)],
+        ['Bicuspid RCT (D3320)',r('D3320').qty,pm(r('D3320').qty),$(r('D3320').avg),$(r('D3320').total)],
+        ['Molar RCT (D3330)',r('D3330').qty,pm(r('D3330').qty),$(r('D3330').avg),$(r('D3330').total)],
+        [],['ORAL SURGERY','Qty','Per Mo','Avg Fee','Total'],
+        ['Simple Ext (D7140)',r('D7140').qty,pm(r('D7140').qty),$(r('D7140').avg),$(r('D7140').total)],
+        ['Surgical Ext (D7210)',r('D7210').qty,pm(r('D7210').qty),$(r('D7210').avg),$(r('D7210').total)],
+        ['Implant (D6010)',r('D6010').qty,pm(r('D6010').qty),$(r('D6010').avg),$(r('D6010').total)],
       ];
-      if(netCollections){rows.push([]);rows.push(['P&L SUMMARY']);rows.push(['Net Collections','','','',dollar(netCollections)]);rows.push(['Monthly Average','','','',dollar(netCollections/M)]);for(const item of plItems.filter(i=>Math.abs(i.amount)>5000).slice(0,20))rows.push([item.label,'','','',dollar(item.amount)]);}
+      if(netC){rows.push([]);rows.push(['P&L SUMMARY']);rows.push(['Net Collections','','','',$(netC)]);rows.push(['Monthly Avg','','','',$(netC/M)]);for(const item of plItems.filter(i=>Math.abs(i.amount)>5000).slice(0,20))rows.push([item.label,'','','',$(item.amount)]);}
 
-      const allCodeRows=[['Code','Qty','Total $','Avg Fee','% of Production']];
-      for(const[code,d]of Object.entries(raw).sort((a,b)=>b[1].total-a[1].total))allCodeRows.push([code,d.qty,dollar(d.total),dollar(d.avg),totalProd>0?Math.round(d.total/totalProd*1000)/10+'%':'']);
+      const ac=[['Code','Qty','Total','Avg Fee','% of Prod']];
+      for(const[code,d]of Object.entries(raw).sort((a,b)=>b[1].total-a[1].total))ac.push([code,d.qty,$(d.total),$(d.avg),tot>0?Math.round(d.total/tot*1000)/10+'%':'']);
 
       const wb=XLSX.utils.book_new();
-      const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:30},{wch:8},{wch:8},{wch:12},{wch:14}];
+      const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:28},{wch:7},{wch:7},{wch:11},{wch:13}];
       XLSX.utils.book_append_sheet(wb,ws,'Production Worksheet');
-      const ws2=XLSX.utils.aoa_to_sheet(allCodeRows);ws2['!cols']=[{wch:10},{wch:8},{wch:14},{wch:12},{wch:16}];
+      const ws2=XLSX.utils.aoa_to_sheet(ac);ws2['!cols']=[{wch:9},{wch:7},{wch:13},{wch:11},{wch:13}];
       XLSX.utils.book_append_sheet(wb,ws2,'All Codes');
-
-      const safeName=(pName||'Practice').replace(/[^a-z0-9]/gi,'_');
-      XLSX.writeFile(wb,safeName+'_Assessment.xlsx');
+      XLSX.writeFile(wb,(pName||'Practice').replace(/[^a-z0-9]/gi,'_')+'_Assessment.xlsx');
 
       btn.innerHTML='✅ Workbook Downloaded!';btn.disabled=false;
-      status.textContent='✅ '+Object.keys(raw).length+' codes | Production: '+dollar(totalProd)+(netCollections?' | Collections: '+dollar(netCollections):'');
-
+      status.textContent='✅ '+Object.keys(raw).length+' codes | Production: '+$(tot)+(netC?' | Collections: '+$(netC):'');
     } catch(err) {
       status.textContent='❌ '+err.message;
       btn.disabled=false;btn.innerHTML='📊 Download Assessment Workbook';
@@ -1389,6 +1397,7 @@ Uploaded reports:`
 </script>
 </body>
 </html>
+
 
 
 
