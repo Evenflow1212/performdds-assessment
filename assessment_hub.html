@@ -1041,17 +1041,15 @@ async function submitToConsultant() {
   const message = buildEmailBody(filesUploaded);
 
   // Fire both in parallel — notification email + AI analysis
-  const [emailResult, analysisResult] = await Promise.allSettled([
-    
+  const [emailResult, analysisResult] = await Promise.allSettled([emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
+    runAIAnalysis(filesUploaded, pName, dName, config.name)
+  ]);
       // Capture uploaded CDN URLs for workbook generation
       window._uploadedUrls = {
         production: uploads[0]?.url || null,
         pl: uploads[2]?.url || null
       };
-      document.getElementById('workbookBtn').style.display = 'flex';
-      emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
-    runAIAnalysis(filesUploaded, pName, dName, config.name)
-  ]);
+      document.getElementById('workbookBtn').style.display='flex';
 
   if (emailResult.status === 'fulfilled') {
     sentMsg.innerHTML = `✓ &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
@@ -1301,4 +1299,5 @@ Uploaded reports:`
 </script>
 </body>
 </html>
+
 
