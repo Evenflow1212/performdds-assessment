@@ -86,7 +86,7 @@ async function fetchPdf(url,key,hint){
     :'QuickBooks P&L. Return each line item as LABEL|AMOUNT (e.g. Dental Supplies|171167.66). Negative for refunds/adjustments. Data lines only.';
   const resp=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-beta':'url-pdf-input-2025-04-01'},
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
     body:JSON.stringify({
       model:'claude-sonnet-4-20250514',
       max_tokens:4096,
