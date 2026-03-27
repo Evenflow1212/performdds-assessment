@@ -791,91 +791,7 @@ function buildSteps(config) {
 
     const hygieneHTML = step.isHygiene ? `
       <div style="margin:20px 0;text-align:center;">
-        <div id="hygieneInline">
-  <div style="background:#EEF3FA;border:1.5px solid #D9E1F2;border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#4A6FA5;line-height:1.7">
-    <strong style="color:#1F3864">Instructions:</strong> Fill in all fields using your practice management software.
-    <ul style="padding-left:16px;margin-top:4px">
-      <li><strong>Recent Past (3 weeks):</strong> Slots available vs patients actually seen.</li>
-      <li><strong>Next 7 Days:</strong> Patients scheduled vs confirmed this week.</li>
-      <li><strong>Near Future (3 weeks):</strong> Slots available vs currently booked.</li>
-    </ul>
-  </div>
-  <div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden">
-    <div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px">
-      <span style="color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Schedule Config</span>
-      <span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Hours &amp; RDH per Day</span>
-    </div>
-    <div style="padding:14px">
-      <div style="font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Office Hours</div>
-      <div style="display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:600;color:#2E4B7A">Hours</div>
-        <div><div style="font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A">Mon</div><input type="text" id="hy_h_mon" placeholder="8-5" style="width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center"></div>
-        <div><div style="font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A">Tue</div><input type="text" id="hy_h_tue" placeholder="8-5" style="width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center"></div>
-        <div><div style="font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A">Wed</div><input type="text" id="hy_h_wed" placeholder="8-5" style="width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center"></div>
-        <div><div style="font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A">Thu</div><input type="text" id="hy_h_thu" placeholder="8-5" style="width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center"></div>
-        <div><div style="font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A">Fri</div><input type="text" id="hy_h_fri" placeholder="8-5" style="width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center"></div>
-        <div><div style="font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A">Sat</div><input type="text" id="hy_h_sat" placeholder="Closed" style="width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center"></div>
-      </div>
-      <div style="font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">RDH per Day</div>
-      <div style="display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center">
-        <div style="font-size:11px;font-weight:600;color:#2E4B7A">Count</div>
-        <input type="number" id="hy_r_mon" min="0" placeholder="0" style="padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center">
-        <input type="number" id="hy_r_tue" min="0" placeholder="0" style="padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center">
-        <input type="number" id="hy_r_wed" min="0" placeholder="0" style="padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center">
-        <input type="number" id="hy_r_thu" min="0" placeholder="0" style="padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center">
-        <input type="number" id="hy_r_fri" min="0" placeholder="0" style="padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center">
-        <input type="number" id="hy_r_sat" min="0" placeholder="0" style="padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center">
-      </div>
-    </div>
-  </div>
-  <div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden">
-    <div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px">
-      <span style="color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Recent Past</span>
-      <span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Last 3 Weeks — Actual</span>
-    </div>
-    <div style="padding:14px"><div id="hy_rp_grid"></div>
-      <div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Available</div><div id="hy_rp_a" style="font-size:15px;font-weight:700;color:#1F3864">—</div></div>
-        <div style="width:1px;background:#D9E1F2"></div>
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Seen</div><div id="hy_rp_s" style="font-size:15px;font-weight:700;color:#1F3864">—</div></div>
-        <div style="width:1px;background:#D9E1F2"></div>
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Fill Rate</div><div id="hy_rp_p" style="font-size:15px;font-weight:700;color:#4A6FA5">—</div></div>
-        <div style="width:1px;background:#D9E1F2"></div>
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Avg/Day</div><div id="hy_rp_avg" style="font-size:15px;font-weight:700;color:#4A6FA5">—</div></div>
-      </div>
-    </div>
-  </div>
-  <div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden">
-    <div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px">
-      <span style="color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Next 7 Days</span>
-      <span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Current Week</span>
-    </div>
-    <div style="padding:14px"><div id="hy_n7_grid"></div>
-      <div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Scheduled</div><div id="hy_n7_s" style="font-size:15px;font-weight:700;color:#1F3864">—</div></div>
-        <div style="width:1px;background:#D9E1F2"></div>
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Confirmed</div><div id="hy_n7_c" style="font-size:15px;font-weight:700;color:#1F3864">—</div></div>
-        <div style="width:1px;background:#D9E1F2"></div>
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Confirm Rate</div><div id="hy_n7_p" style="font-size:15px;font-weight:700;color:#4A6FA5">—</div></div>
-      </div>
-    </div>
-  </div>
-  <div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden">
-    <div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px">
-      <span style="color:#fff;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Near Future</span>
-      <span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Next 3 Weeks</span>
-    </div>
-    <div style="padding:14px"><div id="hy_nf_grid"></div>
-      <div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Available</div><div id="hy_nf_a" style="font-size:15px;font-weight:700;color:#1F3864">—</div></div>
-        <div style="width:1px;background:#D9E1F2"></div>
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Booked</div><div id="hy_nf_b" style="font-size:15px;font-weight:700;color:#1F3864">—</div></div>
-        <div style="width:1px;background:#D9E1F2"></div>
-        <div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.06em">Pre-book Rate</div><div id="hy_nf_p" style="font-size:15px;font-weight:700;color:#4A6FA5">—</div></div>
-      </div>
-    </div>
-  </div>
-</div>
+        <div id="hygieneInline"></div>
       </div>
       <div class="settings-box">
         <h4>Status</h4>
@@ -932,7 +848,7 @@ function buildSteps(config) {
     container.appendChild(div);
   });
 
-  setTimeout(hyInitGrids, 200);}
+  setTimeout(hyInjectForm, 50);}
 
 function goTo(step) {
   const config = platforms[currentPlatform];
@@ -1614,7 +1530,48 @@ Uploaded reports:`
 
     document.addEventListener('DOMContentLoaded',function(){setTimeout(initGrids,400);});
     new MutationObserver(function(){initGrids();}).observe(document.body,{childList:true,subtree:true});
-  })();
+  
+    window.hyInjectForm = function(){
+      var el = document.getElementById('hygieneInline');
+      if(!el || el.hasChildNodes()) return;
+      el.innerHTML = '<div style="background:#EEF3FA;border:1.5px solid #D9E1F2;border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#4A6FA5;line-height:1.7"><strong style="color:#1F3864">Instructions:</strong> Fill in using your practice management software.<ul style="padding-left:16px;margin-top:4px"><li><strong>Recent Past (3 weeks):</strong> Slots available vs patients seen.</li><li><strong>Next 7 Days:</strong> Scheduled vs confirmed this week.</li><li><strong>Near Future (3 weeks):</strong> Slots available vs booked.</li></ul></div>'
+        +'<div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden"><div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px"><span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase">Schedule Config</span><span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Hours &amp; RDH per Day</span></div>'
+        +'<div style="padding:14px"><div style="font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Office Hours</div>'
+        +'<div style="display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center;margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:#2E4B7A">Hours</div>'
+        +['Mon','Tue','Wed','Thu','Fri','Sat'].map(function(d){return '<div><div style="font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A">'+d+'</div><input type="text" id="hy_h_'+d.toLowerCase()+'" placeholder="'+(d==='Sat'?'Closed':'8-5')+'" style="width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center"></div>';}).join('')
+        +'</div><div style="font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">RDH per Day</div>'
+        +'<div style="display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center"><div style="font-size:11px;font-weight:600;color:#2E4B7A">Count</div>'
+        +['mon','tue','wed','thu','fri','sat'].map(function(d){return '<input type="number" id="hy_r_'+d+'" min="0" placeholder="0" style="padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center">';}).join('')
+        +'</div></div></div>'
+        +'<div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden"><div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px"><span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase">Recent Past</span><span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Last 3 Weeks</span></div>'
+        +'<div style="padding:14px"><div id="hy_rp_grid"></div><div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Available</div><div id="hy_rp_a" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
+        +'<div style="width:1px;background:#D9E1F2"></div>'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Seen</div><div id="hy_rp_s" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
+        +'<div style="width:1px;background:#D9E1F2"></div>'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Fill Rate</div><div id="hy_rp_p" style="font-size:15px;font-weight:700;color:#4A6FA5">--</div></div>'
+        +'<div style="width:1px;background:#D9E1F2"></div>'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Avg/Day</div><div id="hy_rp_avg" style="font-size:15px;font-weight:700;color:#4A6FA5">--</div></div>'
+        +'</div></div></div>'
+        +'<div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden"><div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px"><span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase">Next 7 Days</span><span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Current Week</span></div>'
+        +'<div style="padding:14px"><div id="hy_n7_grid"></div><div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Scheduled</div><div id="hy_n7_s" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
+        +'<div style="width:1px;background:#D9E1F2"></div>'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Confirmed</div><div id="hy_n7_c" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
+        +'<div style="width:1px;background:#D9E1F2"></div>'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Confirm Rate</div><div id="hy_n7_p" style="font-size:15px;font-weight:700;color:#4A6FA5">--</div></div>'
+        +'</div></div></div>'
+        +'<div style="background:#fff;border:1px solid #D9E1F2;border-radius:6px;overflow:hidden"><div style="background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px"><span style="color:#fff;font-size:11px;font-weight:700;text-transform:uppercase">Near Future</span><span style="background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px">Next 3 Weeks</span></div>'
+        +'<div style="padding:14px"><div id="hy_nf_grid"></div><div style="background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Available</div><div id="hy_nf_a" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
+        +'<div style="width:1px;background:#D9E1F2"></div>'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Booked</div><div id="hy_nf_b" style="font-size:15px;font-weight:700;color:#1F3864">--</div></div>'
+        +'<div style="width:1px;background:#D9E1F2"></div>'
+        +'<div><div style="font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase">Pre-book Rate</div><div id="hy_nf_p" style="font-size:15px;font-weight:700;color:#4A6FA5">--</div></div>'
+        +'</div></div></div>';
+      initGrids();
+    };
+})();
 </script>
 </body>
 </html>
