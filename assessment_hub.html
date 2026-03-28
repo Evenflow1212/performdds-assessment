@@ -342,7 +342,7 @@ window.addEventListener('message', (e) => {
     // Find and update any visible hygiene status element
     const statusEls = document.querySelectorAll('[id^="hygiene-status-"]');
     statusEls.forEach(el => {
-      el.textContent = '&#10003; Completed';
+      el.textContent = '✓ Completed';
       el.style.color = 'var(--success)';
     });
   }
@@ -800,7 +800,7 @@ function buildSteps(config) {
           <span class="setting-value" id="hygiene-status-${i}">Not yet completed</span>
         </div>
       </div>
-      <button class="upload-btn" onclick="markHygieneDone(${i})" style="margin-top:12px;background:var(--success);color:var(--black);">&#10003; &nbsp; I've completed the hygiene form</button>` : '';
+      <button class="upload-btn" onclick="markHygieneDone(${i})" style="margin-top:12px;background:var(--success);color:var(--black);">✓ &nbsp; I've completed the hygiene form</button>` : '';
 
     const uploadHTML = step.uploadLabel ? `
       <div class="upload-zone" id="upload-${i}" onclick="triggerUpload(${i})" ondragover="dragOver(event,${i})" ondragleave="dragLeave(${i})" ondrop="drop(event,${i})">
@@ -815,7 +815,7 @@ function buildSteps(config) {
           <div class="upload-progress-label" id="upload-progress-label-${i}">Uploading&hellip;</div>
           <div class="upload-progress-bar-track"><div class="upload-progress-bar-fill" id="upload-progress-fill-${i}"></div></div>
         </div>
-        <div class="upload-status" id="upload-status-${i}">&#10003; &nbsp; <span id="upload-name-${i}"></span></div>
+        <div class="upload-status" id="upload-status-${i}">✓ &nbsp; <span id="upload-name-${i}"></span></div>
         <div class="upload-change" id="upload-change-${i}" onclick="event.stopPropagation();triggerUpload(${i})" style="display:none">Change file</div>
       </div>` : '';
 
@@ -957,7 +957,7 @@ function startUploadcareUpload(idx, file) {
 function markHygieneDone(stepIdx) {
   hygieneDone = true;
   const el = document.getElementById(`hygiene-status-${stepIdx}`);
-  if (el) { el.textContent = '&#10003; Completed'; el.style.color = 'var(--success)'; }
+  if (el) { el.textContent = '✓ Completed'; el.style.color = 'var(--success)'; }
 }
 
 // --- Summary ---
@@ -969,9 +969,9 @@ function buildSummary() {
 
   const pName = practiceName || document.getElementById('practice-name-input')?.value || '';
   if (pName) {
-    grid.innerHTML += `<div class="summary-item"><div class="s-label">Practice</div><div class="s-val uploaded">&#10003; ${pName}</div></div>`;
+    grid.innerHTML += `<div class="summary-item"><div class="s-label">Practice</div><div class="s-val uploaded">✓ ${pName}</div></div>`;
   }
-  grid.innerHTML += `<div class="summary-item"><div class="s-label">Platform</div><div class="s-val uploaded">&#10003; ${config.name}</div></div>`;
+  grid.innerHTML += `<div class="summary-item"><div class="s-label">Platform</div><div class="s-val uploaded">✓ ${config.name}</div></div>`;
 
   config.steps.forEach((step, i) => {
     const isHygiene = step.isHygiene;
@@ -981,7 +981,7 @@ function buildSummary() {
       : (uploads[i] ? uploads[i].name : 'Not uploaded');
     const cls = done ? 'uploaded' : 'skipped';
     const clickable = !done ? `onclick="closeModal();scrollToStep(${i})" style="cursor:pointer;border-color:#f59e0b;" title="Click to go back and complete this step"` : '';
-    grid.innerHTML += `<div class="summary-item" ${clickable}><div class="s-label">${stepNames[i]}${!done ? ' ' : ''}</div><div class="s-val ${cls}">${done ? '&#10003; ' : '&mdash; '}${val}</div></div>`;
+    grid.innerHTML += `<div class="summary-item" ${clickable}><div class="s-label">${stepNames[i]}${!done ? ' ' : ''}</div><div class="s-val ${cls}">${done ? '✓ ' : '&mdash; '}${val}</div></div>`;
   });
 }
 
@@ -1000,7 +1000,7 @@ Submitted: ${now}
 DOCTOR: ${dName || 'Not provided'}
 PRACTICE: ${pName}
 SOFTWARE: ${config.name}
-Hygiene Form: ${hygieneDone ? '&#10003; Completed' : 'Not completed'}
+Hygiene Form: ${hygieneDone ? '✓ Completed' : 'Not completed'}
 
 FILES UPLOADED &mdash; CLICK TO DOWNLOAD:
 ${fileLines}
@@ -1054,9 +1054,9 @@ async function submitToConsultant() {
       document.getElementById('workbookBtn').style.display='flex';
 
   if (emailResult.status === 'fulfilled') {
-    sentMsg.innerHTML = `&#10003; &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
+    sentMsg.innerHTML = `✓ &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
     sentMsg.classList.add('show');
-    btn.textContent = '&#10003; Sent';
+    btn.textContent = '✓ Sent';
     btn.style.background = 'var(--success)';
     btn.style.color = 'var(--black)';
   } else {
@@ -1347,8 +1347,8 @@ Uploaded reports:`
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      btn.innerHTML = '&#10003; Workbook Downloaded!'; btn.disabled = false;
-      status.textContent = '&#10003; ' + Object.keys(codes).length + ' codes | Production: $' + Math.round(totalProduction).toLocaleString() + (collections ? ' | Collections: $' + Math.round(collections).toLocaleString() : '');
+      btn.innerHTML = '✓ Workbook Downloaded!'; btn.disabled = false;
+      status.textContent = '✓ ' + Object.keys(codes).length + ' codes | Production: $' + Math.round(totalProduction).toLocaleString() + (collections ? ' | Collections: $' + Math.round(collections).toLocaleString() : '');
     } catch(err) {
       status.textContent = '&#10007; ' + err.message;
       btn.disabled = false; btn.innerHTML = '&#128202; Download Assessment Workbook';
