@@ -1263,92 +1263,32 @@ Uploaded reports:`
   window.generateWorkbook = async function() {
     const btn = document.getElementById('workbookBtn');
     const status = document.getElementById('workbookStatus');
-    btn.disabled = true; btn.innerHTML = '&#9203; Extracting data&hellip;';
+    btn.disabled = true; btn.innerHTML = '&#9203; Building workbook&hellip;';
     try {
-      const prodUrl = window._uploadedUrls?.production;
-      const plUrl   = window._uploadedUrls?.pl;
-      if (!prodUrl) throw new Error('Production PDF URL missing &mdash; please re-submit.');
-
-      async function extract(pdfUrl, prompt, label) {
-        status.textContent = label;
-        const r = await fetch('/.netlify/functions/extract-pdf', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ pdfUrl, prompt })
-        });
-        const d = await r.json();
-        if (d.error) throw new Error(d.error);
-        return d.text || '';
-      }
-
-      const prodText = await extract(prodUrl,
-        'Eaglesoft Procedures by Provider. Return each ADA code as CODE|QTY|TOTAL (e.g. 00120|340|420594.36). Combine all providers. Data lines only, no headers.',
-        'Step 1: Extracting ADA codes (up to 25s)&hellip;');
-
-      let plText = '';
-      if (plUrl) plText = await extract(plUrl,
-        'QuickBooks P&L. Return each line item as LABEL|AMOUNT|CATEGORY where CATEGORY is one of: Associates, Hygienist, Specialists, Lab, Dental Supplies, Specialist Supplies, Staff Costs, Staff Bonus, Rent & Parking, Marketing, Office Supplies, Other, Add-Back, Owner Draw, Income. Negative for refunds/income adjustments. Data lines only.',
-        'Step 2: Extracting P&L&hellip;');
-
-      status.textContent = 'Building 9-tab assessment workbook&hellip;';
-
-      // Parse production codes into structured objects
-      function nc(r){let s=String(r).trim().toUpperCase();if(!s.startsWith('D'))s='D'+s;const d=s.slice(1);if(d.length===5&&d[0]==='0')return'D'+d.slice(1);return s;}
-      const codes={};
-      for(const line of prodText.split('\n')){
-        const p=line.trim().split('|');if(p.length<3)continue;
-        const code=nc(p[0]),qty=parseInt(p[1]),total=parseFloat(p[2].replace(/[,$]/g,''));
-        if(!code||isNaN(qty)||isNaN(total)||qty<=0)continue;
-        if(!codes[code])codes[code]={qty:0,total:0};
-        codes[code].qty+=qty; codes[code].total+=total;
-      }
-      for(const d of Object.values(codes)){d.total=Math.round(d.total*100)/100;d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;}
-      const totalProduction=Object.values(codes).reduce((s,v)=>s+v.total,0);
-
-      // Parse P&L into structured items
-      const plItems=[];
-      const seen=new Set();
-      for(const line of plText.split('\n')){
-        const parts=line.split('|');if(parts.length<2)continue;
-        const label=parts[0].trim(),amount=parseFloat(parts[1].replace(/[,$]/g,'')),category=parts[2]?.trim()||'Other';
-        if(!label||isNaN(amount))continue;
-        const key=label.toLowerCase().slice(0,25);if(seen.has(key))continue;seen.add(key);
-        plItems.push({label,amount,category});
-      }
-      const collections=plItems.filter(i=>i.category==='Income').reduce((s,i)=>s+i.amount,0)||
-        plItems.filter(i=>i.amount>500000).reduce((s,i)=>s+i.amount,0)||0;
-
-      // Get hygiene data
-      let hygiene={};
-      try{ if(typeof hyCollectData==='function') hygiene=hyCollectData(); }catch(e){}
-
-      // Call generate-assessment function — returns full 9-tab workbook
-      const resp = await fetch('/.netlify/functions/generate-assessment', {
+      const prodUrl = window._uploadedUrls && window._uploadedUrls.production;
+      const plUrl   = window._uploadedUrls && window._uploadedUrls.pl;
+      if (!prodUrl) throw new Error('Production PDF not found — please re-upload and resubmit.');
+      status.textContent = 'Generating 9-tab assessment workbook (30-60s)&hellip;';
+      const pName = (typeof practiceName !== 'undefined' && practiceName) || document.getElementById('practice-name-input')?.value || 'Practice';
+      const resp = await fetch('/.netlify/functions/generate-workbook', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          practiceName: practiceName || document.getElementById('practice-name-input')?.value || 'Practice',
-          months: 12,
-          totalProduction,
-          collections,
-          codes,
-          plItems,
-          hygiene
-        })
+        body: JSON.stringify({ productionUrl: prodUrl, plUrl: plUrl || null, months: 12, practiceName: pName })
       });
-
-      if(!resp.ok) throw new Error('Workbook generation failed: ' + resp.status);
-
-      // Download the returned Excel file
-      const blob = await resp.blob();
+      if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error || 'Server error ' + resp.status); }
+      const d = await resp.json();
+      if (!d.success) throw new Error(d.error || 'Generation failed');
+      const binary = atob(d.xlsxB64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = (practiceName||'Practice').replace(/[^a-z0-9]/gi,'_') + '_Assessment.xlsx';
+      a.href = url; a.download = (pName + ' Assessment Workbook.xlsx').replace(/[^a-z0-9 .]/gi,'_');
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
-      btn.innerHTML = '✓ Workbook Downloaded!'; btn.disabled = false;
-      status.textContent = '✓ ' + Object.keys(codes).length + ' codes | Production: $' + Math.round(totalProduction).toLocaleString() + (collections ? ' | Collections: $' + Math.round(collections).toLocaleString() : '');
+      btn.disabled = false; btn.innerHTML = '&#10003; Download Again';
+      status.textContent = 'Done! Codes: ' + (d.summary && d.summary.codesFound || '') + (d.summary && d.summary.totalExpense ? ' | Expenses: $' + Number(d.summary.totalExpense).toLocaleString() : '');
     } catch(err) {
       status.textContent = '&#10007; ' + err.message;
       btn.disabled = false; btn.innerHTML = '&#128202; Download Assessment Workbook';
