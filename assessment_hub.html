@@ -1261,37 +1261,36 @@ Uploaded reports:`
   };
 
   window.generateWorkbook = async function() {
-    const btn = document.getElementById('workbookBtn');
-    const status = document.getElementById('workbookStatus');
-    btn.disabled = true; btn.innerHTML = '&#9203; Building workbook&hellip;';
+    const btn=document.getElementById('workbookBtn');
+    const status=document.getElementById('workbookStatus');
+    btn.disabled=true;btn.innerHTML='&#9203; Building workbook&hellip;';
     try {
-      const prodUrl = window._uploadedUrls && window._uploadedUrls.production;
-      const plUrl   = window._uploadedUrls && window._uploadedUrls.pl;
-      if (!prodUrl) throw new Error('Production PDF not found — please re-upload and resubmit.');
-      status.textContent = 'Generating 9-tab assessment workbook (30-60s)&hellip;';
-      const pName = (typeof practiceName !== 'undefined' && practiceName) || document.getElementById('practice-name-input')?.value || 'Practice';
-      const resp = await fetch('/.netlify/functions/generate-workbook', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ productionUrl: prodUrl, plUrl: plUrl || null, months: 12, practiceName: pName })
-      });
-      if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error || 'Server error ' + resp.status); }
-      const d = await resp.json();
-      if (!d.success) throw new Error(d.error || 'Generation failed');
-      const binary = atob(d.xlsxB64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = (pName + ' Assessment Workbook.xlsx').replace(/[^a-z0-9 .]/gi,'_');
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      btn.disabled = false; btn.innerHTML = '&#10003; Download Again';
-      status.textContent = 'Done! Codes: ' + (d.summary && d.summary.codesFound || '') + (d.summary && d.summary.totalExpense ? ' | Expenses: $' + Number(d.summary.totalExpense).toLocaleString() : '');
-    } catch(err) {
-      status.textContent = '&#10007; ' + err.message;
-      btn.disabled = false; btn.innerHTML = '&#128202; Download Assessment Workbook';
+      const prodFile=document.getElementById('file-0')?.files[0];
+      const plFile=document.getElementById('file-2')?.files[0];
+      if(!prodFile||prodFile.size===0) throw new Error('Production report not found — please re-upload on Step 1 and submit again.');
+      function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
+      status.textContent='Reading files…';
+      const productionBase64=await toBase64(prodFile);
+      const plBase64=plFile&&plFile.size>0?await toBase64(plFile):null;
+      const pName=(typeof practiceName!=='undefined'&&practiceName)||document.getElementById('practice-name-input')?.value||'Practice';
+      status.textContent='Generating 9-tab assessment workbook (30–60s)…';
+      const resp=await fetch('/.netlify/functions/generate-workbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productionBase64,plBase64,months:12,practiceName:pName})});
+      if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||'Server error '+resp.status);}
+      const data=await resp.json();
+      if(!data.success) throw new Error(data.error||'Generation failed');
+      const binary=atob(data.xlsxB64);
+      const bytes=new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=(pName+' Assessment Workbook.xlsx').replace(/[^a-z0-9 .]/gi,'_');
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      btn.disabled=false;btn.innerHTML='&#10003; Download Again';
+      status.textContent='Done! '+(data.summary?.codesFound||'')+' codes'+(data.summary?.totalExpense?' | Expenses: $'+Number(data.summary.totalExpense).toLocaleString():'')+( data.summary?.netCollections?' | Collections: $'+Number(data.summary.netCollections).toLocaleString():'');
+    } catch(err){
+      status.textContent='&#10007; '+err.message;
+      btn.disabled=false;btn.innerHTML='&#128202; Download Assessment Workbook';
     }
   }
 
