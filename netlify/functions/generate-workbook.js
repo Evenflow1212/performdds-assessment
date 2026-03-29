@@ -1,39 +1,62 @@
 'use strict';
 const ExcelJS = require('exceljs');
 
-const CODE_MAP={D0120:'exam_periodic',D0140:'exam_focused',D0150:'exam_comprehensive',D0170:'exam_other',D0180:'exam_perio',D0210:'imaging_fmx',D0220:'imaging_other',D0230:'imaging_other',D0270:'imaging_other',D0272:'imaging_other',D0273:'imaging_other',D0274:'imaging_bw4',D0330:'imaging_pano',D1110:'hyg_adult_prophy',D1120:'hyg_child_prophy',D4341:'hyg_srp',D4342:'hyg_srp',D4346:'hyg_irrigation',D4381:'hyg_arestin',D4910:'hyg_perio_maint',D2740:'cb_2740',D2750:'cb_2750',D6057:'oc_implant_crown',D6058:'oc_implant_crown',D6059:'oc_implant_crown',D6060:'oc_implant_crown',D6061:'oc_implant_crown',D6062:'oc_implant_crown',D6063:'oc_implant_crown',D6064:'oc_implant_crown',D6065:'oc_implant_crown',D6245:'bridge_pontic',D6740:'bridge_pontic',D2510:'cb_inlay_onlay',D2520:'cb_inlay_onlay',D2530:'cb_inlay_onlay',D2542:'cb_inlay_onlay',D2543:'cb_inlay_onlay',D2544:'cb_inlay_onlay',D8090:'ortho_comp_adult',D8040:'ortho_limited',D8681:'ortho_retention',D5110:'den_complete',D5120:'den_complete',D5213:'den_partial_cast',D5214:'den_partial_cast',D5820:'den_interim',D3310:'endo_anterior',D3320:'endo_bicuspid',D3330:'endo_molar',D3332:'endo_retreat',D3346:'endo_retreat',D3347:'endo_retreat',D3348:'endo_retreat',D4249:'perio_crown_length',D4211:'perio_gingivectomy',D7140:'os_ext_simple',D7210:'os_ext_surgical',D6010:'os_implant_surgical',D7953:'os_bone_graft'};
+const CODE_MAP={D0120:'exam_periodic',D0140:'exam_focused',D0150:'exam_comprehensive',D0170:'exam_other',D0180:'exam_perio',D0210:'imaging_fmx',D0220:'imaging_other',D0230:'imaging_other',D0270:'imaging_other',D0272:'imaging_other',D0273:'imaging_other',D0274:'imaging_bw4',D0330:'imaging_pano',D0340:'imaging_other',D1110:'hyg_adult_prophy',D1120:'hyg_child_prophy',D4341:'hyg_srp',D4342:'hyg_srp',D4346:'hyg_irrigation',D4381:'hyg_arestin',D4910:'hyg_perio_maint',D2740:'cb_2740',D2750:'cb_2750',D2962:'oc_veneers',D6057:'oc_implant_crown',D6058:'oc_implant_crown',D6059:'oc_implant_crown',D6060:'oc_implant_crown',D6061:'oc_implant_crown',D6062:'oc_implant_crown',D6063:'oc_implant_crown',D6064:'oc_implant_crown',D6065:'oc_implant_crown',D6245:'bridge_pontic',D6740:'bridge_pontic',D2510:'cb_inlay_onlay',D2520:'cb_inlay_onlay',D2530:'cb_inlay_onlay',D2542:'cb_inlay_onlay',D2543:'cb_inlay_onlay',D2544:'cb_inlay_onlay',D8090:'ortho_comp_adult',D8040:'ortho_limited',D8681:'ortho_retention',D5110:'den_complete',D5120:'den_complete',D5213:'den_partial_cast',D5214:'den_partial_cast',D5820:'den_interim',D5821:'den_interim',D3310:'endo_anterior',D3320:'endo_bicuspid',D3330:'endo_molar',D3332:'endo_retreat',D3346:'endo_retreat',D3347:'endo_retreat',D3348:'endo_retreat',D4249:'perio_crown_length',D4211:'perio_gingivectomy',D7140:'os_ext_simple',D7210:'os_ext_surgical',D6010:'os_implant_surgical',D7953:'os_bone_graft'};
 
 function norm(r){let s=String(r).trim().toUpperCase();if(!s.startsWith('D'))s='D'+s;const d=s.slice(1);if(d.length===5&&d[0]==='0')return'D'+d.slice(1);return s;}
-function g(groups,k,f='qty'){return(groups[k]||{})[f]||0;}
-function agg(raw){const groups={};for(const[code,d]of Object.entries(raw)){const gr=CODE_MAP[norm(code)];if(!gr)continue;if(!groups[gr])groups[gr]={qty:0,total:0};groups[gr].qty+=d.qty;groups[gr].total+=d.total;}for(const d of Object.values(groups))d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;return groups;}
+function g(gr,k,f='qty'){return(gr[k]||{})[f]||0;}
+function agg(raw){const gr={};for(const[code,d]of Object.entries(raw)){const g=CODE_MAP[norm(code)];if(!g)continue;if(!gr[g])gr[g]={qty:0,total:0};gr[g].qty+=d.qty;gr[g].total+=d.total;}for(const d of Object.values(gr))d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;return gr;}
 
-// Detect month count and date range from production PDF text
-function detectProdMeta(text){
-  // Match date range like "12/01/2021 - 12/20/2023" or "01/01/2023 - 12/31/2023"
+// Parse date range and month count from production report text
+function parseProdMeta(text){
+  // Match patterns like "12/01/2021 - 12/20/2023" or "01/01/2023 - 12/31/2023"
   const m=text.match(/(\d{1,2}\/\d{1,2}\/(\d{4}))\s*[-–]\s*(\d{1,2}\/\d{1,2}\/(\d{4}))/);
-  if(!m)return{months:12,years:[new Date().getFullYear()-1]};
-  const startYear=parseInt(m[2]),endYear=parseInt(m[4]);
-  // Parse full dates to get exact months
-  const startParts=m[1].split('/'),endParts=m[3].split('/');
-  const startDate=new Date(parseInt(startParts[2]),parseInt(startParts[0])-1,1);
-  const endDate=new Date(parseInt(endParts[2]),parseInt(endParts[0])-1,1);
-  const months=Math.round((endDate-startDate)/(1000*60*60*24*30.44))+1;
+  if(!m)return{months:12,years:[new Date().getFullYear()]};
+  const startDate=new Date(m[1]);
+  const endDate=new Date(m[3]);
+  const startYear=parseInt(m[2]);
+  const endYear=parseInt(m[4]);
+  // Calculate months rounded to nearest whole month
+  const diffMs=endDate-startDate;
+  const diffMonths=Math.round(diffMs/(1000*60*60*24*30.4375));
+  const months=Math.max(1,diffMonths);
   // Build year list
-  const years=[];for(let y=startYear;y<=endYear;y++)years.push(y);
-  return{months:Math.max(months,1),years,startYear,endYear};
+  const years=[];
+  for(let y=startYear;y<=endYear;y++)years.push(y);
+  return{months,years,startYear,endYear};
 }
 
 function parseProd(text){
   const raw={};
-  for(const line of text.split('\n')){
-    const parts=line.trim().split('|');
-    if(parts.length<3)continue;
-    const code=norm(parts[0].trim());
-    const qty=parseInt(parts[1],10);
-    const total=parseFloat(parts[2].replace(/[,$]/g,''));
-    if(!code||isNaN(qty)||isNaN(total)||qty<=0)continue;
-    if(!raw[code])raw[code]={qty:0,total:0};
-    raw[code].qty+=qty;raw[code].total+=total;
+  // Try CODE|QTY|TOTAL pipe format first (AI extraction)
+  const pipeLines=text.split('\n').filter(l=>l.includes('|'));
+  if(pipeLines.length>5){
+    for(const line of pipeLines){
+      const parts=line.trim().split('|');
+      if(parts.length<3)continue;
+      const code=norm(parts[0].trim());
+      const qty=parseInt(parts[1],10);
+      const total=parseFloat(parts[2].replace(/[,$]/g,''));
+      if(!code||isNaN(qty)||isNaN(total)||qty<=0)continue;
+      if(!raw[code])raw[code]={qty:0,total:0};
+      raw[code].qty+=qty;raw[code].total+=total;
+    }
+  }
+  // Also try native Dentrix/Eaglesoft format: "Quantity: N Total: N,NNN.NN"
+  const blocks=text.split(/\n(?=[A-Z])/);
+  for(const block of blocks){
+    const codeM=block.match(/^([A-Za-z]\d{4,6}[a-z]?)\s+-/);
+    const qtyM=block.match(/Quantity:\s*([\d,]+)/);
+    const totM=block.match(/Total:\s*([\d,]+\.\d{2})/);
+    if(codeM&&qtyM&&totM){
+      const code=norm(codeM[1]);
+      const qty=parseInt(qtyM[1].replace(/,/g,''),10);
+      const total=parseFloat(totM[1].replace(/,/g,''));
+      if(qty>0&&total>0){
+        if(!raw[code])raw[code]={qty:0,total:0};
+        raw[code].qty+=qty;raw[code].total+=total;
+      }
+    }
   }
   for(const d of Object.values(raw)){d.total=Math.round(d.total*100)/100;d.avg=d.qty>0?Math.round(d.total/d.qty*100)/100:0;}
   return raw;
@@ -47,7 +70,7 @@ function parsePL(text){
   if(!me)throw new Error('P&L: Total Expense not found');
   if(!mn)throw new Error('P&L: Net Income not found');
   const ti=amt(mi[1]),te=amt(me[1]),ni=amt(mn[1]);
-  if(Math.abs(Math.round((ti-te)*100)/100-ni)>0.03)throw new Error('P&L validation failed: '+ti+'-'+te+'='+Math.round((ti-te)*100)/100+' vs '+ni);
+  if(Math.abs(Math.round((ti-te)*100)/100-ni)>0.03)throw new Error('P&L validation failed');
   const lines=[];
   for(const line of text.split('\n')){const tr=line.trim();if(!tr)continue;const m=tr.match(/^(.+?)\s+([\d,]+\.\d{2})\s*$/);if(m&&parseFloat(m[2].replace(/,/g,''))>0&&m[1].trim().length>1)lines.push({label:m[1].trim(),amount:parseFloat(m[2].replace(/,/g,''))});}
   return{totalIncome:ti,totalExpense:te,netIncome:ni,netCollections:ti,lines};
@@ -64,27 +87,13 @@ function addPLRawImport(wb,pl,name){
   const fill=(c)=>({type:'pattern',pattern:'solid',fgColor:{argb:c}});
   ws.columns=[{key:'A',width:45},{key:'B',width:16},{key:'C',width:22}];
   const h1=ws.addRow(['P&L RAW IMPORT — '+name,'','']);h1.height=24;
-  ['A','B','C'].forEach(c=>{ws.getCell(c+'1').fill=fill(NAVY);ws.getCell(c+'1').font={bold:true,color:{argb:WHITE},size:12,name:'Arial'};});
+  ['A','B','C'].forEach(c=>{ws.getCell(c+'1').fill=fill(NAVY);ws.getCell(c+'1').font={bold:true,color:{argb:WHITE},size:c==='A'?12:10,name:'Arial'};});
   ws.getCell('A1').alignment={horizontal:'left',vertical:'middle'};
-  const h2=ws.addRow(['Line Item','Amount','→ P&L Input Cell']);h2.height=18;
+  const h2=ws.addRow(['Line Item','Amount','\u2192 P&L Input Cell']);h2.height=18;
   ['A','B','C'].forEach(c=>{ws.getCell(c+'2').fill=fill(NAVY);ws.getCell(c+'2').font={bold:true,color:{argb:WHITE},size:10,name:'Arial'};ws.getCell(c+'2').alignment={horizontal:c==='B'?'right':'left',vertical:'middle'};});
-  if(pl&&pl.lines&&pl.lines.length>0){
-    pl.lines.forEach((item,i)=>{
-      const bg=i%2===0?LGRAY:WHITE;const row=ws.addRow([item.label,item.amount,'']);row.height=16;
-      ['A','B','C'].forEach(c=>{const cell=ws.getCell(c+row.number);cell.fill=fill(bg);cell.font={size:10,name:'Arial'};cell.border={bottom:{style:'thin',color:{argb:'CCCCCC'}}};});
-      ws.getCell('A'+row.number).alignment={horizontal:'left',vertical:'middle'};
-      ws.getCell('B'+row.number).alignment={horizontal:'right',vertical:'middle'};
-      ws.getCell('B'+row.number).numFmt='$#,##0.00';
-    });
-  }
+  if(pl&&pl.lines&&pl.lines.length>0){pl.lines.forEach((item,i)=>{const bg=i%2===0?LGRAY:WHITE;const row=ws.addRow([item.label,item.amount,'']);row.height=16;['A','B','C'].forEach(c=>{const cell=ws.getCell(c+row.number);cell.fill=fill(bg);cell.font={size:10,name:'Arial'};cell.border={bottom:{style:'thin',color:{argb:'CCCCCC'}}};});ws.getCell('A'+row.number).alignment={horizontal:'left',vertical:'middle'};ws.getCell('B'+row.number).alignment={horizontal:'right',vertical:'middle'};ws.getCell('B'+row.number).numFmt='$#,##0.00';});}
   ws.addRow([]);
-  if(pl){
-    ['TOTAL EXPENSE','NET INCOME'].forEach((lbl,i)=>{
-      const val=i===0?pl.totalExpense:pl.netIncome;const row=ws.addRow([lbl,val,'']);row.height=18;
-      ['A','B','C'].forEach(c=>{ws.getCell(c+row.number).fill=fill('E8EEF7');ws.getCell(c+row.number).font={bold:true,size:10,name:'Arial',color:{argb:'1F3864'}};});
-      ws.getCell('B'+row.number).numFmt='$#,##0.00';ws.getCell('B'+row.number).alignment={horizontal:'right'};
-    });
-  }
+  if(pl){['TOTAL EXPENSE','NET INCOME'].forEach((lbl,i)=>{const val=i===0?pl.totalExpense:pl.netIncome;const row=ws.addRow([lbl,val,'']);row.height=18;['A','B','C'].forEach(c=>{ws.getCell(c+row.number).fill=fill('E8EEF7');ws.getCell(c+row.number).font={bold:true,size:10,name:'Arial',color:{argb:'1F3864'}};});ws.getCell('B'+row.number).numFmt='$#,##0.00';ws.getCell('B'+row.number).alignment={horizontal:'right'};});}
   ws.views=[{state:'frozen',ySplit:2}];
 }
 
@@ -97,16 +106,13 @@ async function buildXlsx(raw,groups,pl,prodMeta,name){
   wb.addWorksheet('Targets & Goal');wb.addWorksheet('Employee Costs');wb.addWorksheet('Budgetary P&L');
   const wsPL=wb.addWorksheet('P&L Input');
   if(pl)addPLRawImport(wb,pl,name);
-
   const tot=Object.values(raw).reduce((s,v)=>s+v.total,0);
   const sv=(ws,c,v)=>{try{ws.getCell(c).value=v;}catch(e){}};
   const fv=(ws,c,fo)=>{try{ws.getCell(c).value={formula:fo};}catch(e){}};
 
-  // ── PRODUCTION WORKSHEET ──
+  // PRODUCTION WORKSHEET
   sv(wsPW,'B2','PRODUCTION OVERVIEW');sv(wsPW,'B4','practice');sv(wsPW,'D4',name);
-  sv(wsPW,'B5','number of months reviewed');sv(wsPW,'D5',months);
-  sv(wsPW,'E5','total production');sv(wsPW,'G5',Math.round(tot*100)/100);
-  fv(wsPW,'G6','=G5/D5');
+  sv(wsPW,'B5','number of months reviewed');sv(wsPW,'D5',months);sv(wsPW,'E5','total production');sv(wsPW,'G5',Math.round(tot*100)/100);fv(wsPW,'G6','=G5/D5');
   sv(wsPW,'B8','EXAMS');sv(wsPW,'D8','qty');sv(wsPW,'E8','per month');sv(wsPW,'F8','ave. fee');
   sv(wsPW,'B9','periodic exam (0120)');sv(wsPW,'D9',raw.D0120?.qty||0);fv(wsPW,'E9','=D9/D5');sv(wsPW,'F9',raw.D0120?.avg||0);
   sv(wsPW,'B10','focused exam (0140)');sv(wsPW,'D10',raw.D0140?.qty||0);fv(wsPW,'E10','=D10/D5');sv(wsPW,'F10',raw.D0140?.avg||0);
@@ -120,20 +126,16 @@ async function buildXlsx(raw,groups,pl,prodMeta,name){
   sv(wsPW,'B20','adult prophy (1110)');sv(wsPW,'D20',g(groups,'hyg_adult_prophy'));fv(wsPW,'E20','=D20/D5');sv(wsPW,'F20',raw.D1110?.avg||0);fv(wsPW,'G20','=D20*F20');
   sv(wsPW,'B21','child prophy (1120)');sv(wsPW,'D21',g(groups,'hyg_child_prophy'));fv(wsPW,'E21','=D21/D5');sv(wsPW,'F21',raw.D1120?.avg||0);fv(wsPW,'G21','=D21*F21');
   sv(wsPW,'B22','perio maintenance (4910)');sv(wsPW,'D22',g(groups,'hyg_perio_maint'));fv(wsPW,'E22','=D22/D5');sv(wsPW,'F22',raw.D4910?.avg||0);fv(wsPW,'G22','=D22*F22');
-  const sqQ=g(groups,'hyg_srp'),sqT=g(groups,'hyg_srp','total');
-  sv(wsPW,'B23','SRP (4341/2)');sv(wsPW,'D23',sqQ);fv(wsPW,'E23','=D23/D5');sv(wsPW,'F23',sqQ>0?Math.round(sqT/sqQ*100)/100:0);fv(wsPW,'G23','=D23*F23');
+  const sqQ=g(groups,'hyg_srp'),sqT=g(groups,'hyg_srp','total');sv(wsPW,'B23','SRP (4341/2)');sv(wsPW,'D23',sqQ);fv(wsPW,'E23','=D23/D5');sv(wsPW,'F23',sqQ>0?Math.round(sqT/sqQ*100)/100:0);fv(wsPW,'G23','=D23*F23');
   sv(wsPW,'B24','arestin or similar (4381)');sv(wsPW,'D24',g(groups,'hyg_arestin'));fv(wsPW,'E24','=D24/D5');sv(wsPW,'F24',raw.D4381?.avg||0);fv(wsPW,'G24','=D24*F24');
   sv(wsPW,'B25','irrigation');sv(wsPW,'D25',g(groups,'hyg_irrigation'));fv(wsPW,'E25','=D25/D5');sv(wsPW,'F25',0);fv(wsPW,'G25','=D25*F25');
   fv(wsPW,'G27','=SUM(G20:G26)');fv(wsPW,'F27','=IFERROR(G27/G5,0)');
   sv(wsPW,'B29','CROWN & BRIDGE');sv(wsPW,'D29','qty');sv(wsPW,'E29','per month');sv(wsPW,'F29','ave. fee');sv(wsPW,'G29','total $$s');
   sv(wsPW,'B30','porcelain/ceramic (2740)');sv(wsPW,'D30',g(groups,'cb_2740'));fv(wsPW,'E30','=D30/D5');sv(wsPW,'F30',raw.D2740?.avg||0);fv(wsPW,'G30','=F30*D30');
   sv(wsPW,'B31','porcelain/high noble (2750)');sv(wsPW,'D31',g(groups,'cb_2750'));fv(wsPW,'E31','=D31/D5');sv(wsPW,'F31',raw.D2750?.avg||0);fv(wsPW,'G31','=F31*D31');
-  const ioQ=g(groups,'cb_inlay_onlay'),ioT=g(groups,'cb_inlay_onlay','total');
-  sv(wsPW,'B32','inlays & onlays; veneers & other');sv(wsPW,'D32',ioQ);fv(wsPW,'E32','=D32/D5');sv(wsPW,'G32',ioT);
-  const brQ=g(groups,'bridge_pontic'),brT=g(groups,'bridge_pontic','total');
-  sv(wsPW,'B33','bridge units');sv(wsPW,'D33',brQ);fv(wsPW,'E33','=D33/D5');sv(wsPW,'G33',brT);
-  const icQ=g(groups,'oc_implant_crown'),icT=g(groups,'oc_implant_crown','total');
-  sv(wsPW,'B34','implant crowns');sv(wsPW,'D34',icQ);fv(wsPW,'E34','=D34/D5');sv(wsPW,'G34',icT);
+  const ioQ=g(groups,'cb_inlay_onlay'),ioT=g(groups,'cb_inlay_onlay','total');sv(wsPW,'B32','inlays & onlays; veneers & other');sv(wsPW,'D32',ioQ);fv(wsPW,'E32','=D32/D5');sv(wsPW,'G32',ioT);
+  const brQ=g(groups,'bridge_pontic'),brT=g(groups,'bridge_pontic','total');sv(wsPW,'B33','bridge units');sv(wsPW,'D33',brQ);fv(wsPW,'E33','=D33/D5');sv(wsPW,'G33',brT);
+  const icQ=g(groups,'oc_implant_crown'),icT=g(groups,'oc_implant_crown','total');sv(wsPW,'B34','implant crowns');sv(wsPW,'D34',icQ);fv(wsPW,'E34','=D34/D5');sv(wsPW,'G34',icT);
   fv(wsPW,'E35','=IFERROR((D30+D31+D32+D33+D34)/D5,0)');
   sv(wsPW,'B37','SPECIALTY');sv(wsPW,'D37','$$s');sv(wsPW,'E37','% of production');sv(wsPW,'F37','Prod Per Month');
   const peT=Object.keys(groups).filter(k=>k.startsWith('perio_')).reduce((a,k)=>a+g(groups,k,'total'),0);
@@ -148,37 +150,56 @@ async function buildXlsx(raw,groups,pl,prodMeta,name){
   sv(wsPW,'C42','dentures');sv(wsPW,'D42',Math.round(deT*100)/100);fv(wsPW,'E42','=IFERROR(D42/G5,0)');fv(wsPW,'F42','=IFERROR(D42/D5,0)');
   sv(wsPW,'B43','SPECIALTY TOTAL');fv(wsPW,'D43','=SUM(D38:D42)');fv(wsPW,'E43','=IFERROR(D43/G5,0)');
 
-  // ── FINANCIAL OVERVIEW ──
+  // FINANCIAL OVERVIEW
   sv(wsFO,'B4','practice');sv(wsFO,'D4',name);
   sv(wsFO,'B5','HISTORICAL PRODUCTION & COLLECTION');
-  // Build year columns — one column pair per year detected in report
-  // We only have TOTALS, not monthly breakdowns, so we put total in TOTAL row only
-  const prodPerYear=Math.round(tot/years.length*100)/100;
-  const cols=['C','E','G','I','K']; // production columns
-  const colsC=['D','F','H','J','L']; // collection columns
-  years.forEach((yr,i)=>{
-    if(i>=cols.length)return;
-    const pc=cols[i],cc=colsC[i];
-    sv(wsFO,pc+'6',yr);
-    sv(wsFO,pc+'7','production');sv(wsFO,cc+'7',i===0&&pl?'collection':'');
-    // Total row only — no fake monthly breakdown
-    sv(wsFO,'B20','TOTAL');
-    sv(wsFO,pc+'20',prodPerYear);
-    if(i===0&&pl)sv(wsFO,cc+'20',Math.round(pl.netCollections*100)/100);
-    sv(wsFO,'B21','months');sv(wsFO,pc+'21',Math.round(months/years.length));
-    sv(wsFO,'B22','AVERAGE');
-    fv(wsFO,pc+'22','=IFERROR('+pc+'20/'+pc+'21,0)');
-    if(i===0&&pl)fv(wsFO,cc+'22','=IFERROR('+cc+'20/'+cc+'21,0)');
-  });
-  // Row 25-28 — P&L vs production comparison
-  sv(wsFO,'B25','ave. monthly collection');fv(wsFO,'D25',"='P&L Input'!N2");sv(wsFO,'F25','(From p&l)');
-  sv(wsFO,'B26','ave. monthly collection');fv(wsFO,'D26','=C22');sv(wsFO,'F26','(From practice reports)');
-  sv(wsFO,'B27','ave. monthly production');
-  // D27 = total production / total months detected
-  sv(wsFO,'D27',Math.round(tot/months*100)/100);sv(wsFO,'F27','(From production report — '+months+' months)');
-  sv(wsFO,'C28','collection %');fv(wsFO,'D28','=IFERROR(D25/D27,0)');
+  sv(wsFO,'C7','production');sv(wsFO,'D7','collection');
 
-  // ── P&L INPUT ──
+  // Year columns — parsed from report, NOT hardcoded
+  // Col C = first/only year, Col E = second year (if 2-year report)
+  const prodPerYear=Math.round(tot/years.length*100)/100;
+  const yearCols=['C','E','G']; // up to 3 years
+  years.forEach((yr,i)=>{
+    const col=yearCols[i];
+    if(!col)return;
+    sv(wsFO,col+'6',yr);
+    sv(wsFO,col+'7','production');
+    sv(wsFO,(String.fromCharCode(col.charCodeAt(0)+1))+'7','collection');
+    // Monthly rows 8-19: BLANK (no month-by-month data from production-by-code report)
+    // Only populate TOTAL row (row 20) and AVERAGE row (row 22)
+    sv(wsFO,'B20','TOTAL');
+    sv(wsFO,col+'20',prodPerYear);  // production total for this year
+    sv(wsFO,'B21','months');
+    sv(wsFO,col+'21',12);
+    sv(wsFO,'B22','AVERAGE');
+    fv(wsFO,col+'22','=IFERROR('+col+'20/'+col+'21,0)');
+    // Collection data (from P&L if available)
+    if(pl&&i===years.length-1){
+      // Put collection total in most recent year column
+      const collCol=String.fromCharCode(col.charCodeAt(0)+1);
+      sv(wsFO,collCol+'20',Math.round(pl.netCollections*100)/100);
+      sv(wsFO,collCol+'21',12);
+      fv(wsFO,collCol+'22','=IFERROR('+collCol+'20/'+collCol+'21,0)');
+    }
+  });
+
+  // P&L vs Practice comparison rows
+  sv(wsFO,'B25','ave. monthly collection');
+  if(pl)fv(wsFO,'D25',"='P&L Input'!N2");
+  sv(wsFO,'F25','(From p&l)');
+  sv(wsFO,'B26','ave. monthly collection');
+  // D26 = ave monthly collection from practice reports (most recent year collection col avg)
+  const mostRecentCollCol=String.fromCharCode(yearCols[years.length-1].charCodeAt(0)+1);
+  fv(wsFO,'D26','=IFERROR('+mostRecentCollCol+'22,0)');
+  sv(wsFO,'F26','(From practice reports)');
+  sv(wsFO,'B27','ave. monthly production');
+  // D27 = total production / total months (across all years)
+  sv(wsFO,'D27',Math.round(tot/months*100)/100);
+  sv(wsFO,'F27','(From production report — '+months+' months)');
+  sv(wsFO,'C28','collection %');
+  fv(wsFO,'D28','=IFERROR(D25/D27,0)');
+
+  // P&L INPUT
   sv(wsPL,'A2','months reviewed');sv(wsPL,'B2',12);sv(wsPL,'E2','collections from P&L');sv(wsPL,'L2','monthly ave.');fv(wsPL,'N2','=IFERROR(H2/B2,0)');
   sv(wsPL,'B4','Variable Costs');sv(wsPL,'H4','Fixed Costs');sv(wsPL,'N4','Owner');
   sv(wsPL,'A5','From P & L:');sv(wsPL,'B5','Associates');sv(wsPL,'C5','Hygienist');sv(wsPL,'D5','Specialists');sv(wsPL,'E5','Lab');sv(wsPL,'F5','Dental Supplies');sv(wsPL,'G5','Specialist Supplies');sv(wsPL,'H5','Staff Costs');sv(wsPL,'I5','Staff Bonus');sv(wsPL,'J5','Rent & Parking');sv(wsPL,'K5','Marketing');sv(wsPL,'L5','Office Supplies');sv(wsPL,'M5','Other');sv(wsPL,'N5','Salary');sv(wsPL,'O5','Other');
@@ -198,12 +219,14 @@ exports.handler=async function(event){
   const{productionBase64,plBase64,practiceName=''}=body;
   if(!productionBase64)return{statusCode:400,body:JSON.stringify({error:'productionBase64 required'})};
   try{
-    const PROD_PROMPT='Dental practice production report. First line: return the date range exactly as shown (e.g. "DATE_RANGE: 12/01/2021 - 12/20/2023"). Then return each ADA code as CODE|QTY|TOTAL (e.g. D0120|340|42059.36). Combine all providers. One line per code. ADA code lines only after the date range.';
+    const PROD_PROMPT='This is a dental practice production by procedure code report. Extract every ADA procedure code with its quantity and total production dollar amount. Return ONLY data lines in this exact format: CODE|QTY|TOTAL (e.g. D0120|2916|139832.00). One line per code. Include every code that has a quantity > 0. No headers, no explanations, no other text. Also include the date range line verbatim from the report header (e.g. "12/01/2021 - 12/20/2023").';
     const PL_PROMPT='QuickBooks Profit & Loss PDF. Extract raw text verbatim preserving all indentation and dollar amounts so Total Income, Total Expense, and Net Income summary lines are clearly identifiable.';
     const[prodText,plText='']=await Promise.all([callClaude(productionBase64,PROD_PROMPT,KEY),plBase64?callClaude(plBase64,PL_PROMPT,KEY):Promise.resolve('')]);
-    const prodMeta=detectProdMeta(prodText);
-    const raw=parseProd(prodText);const groups=agg(raw);
-    let pl=null;if(plBase64&&plText){try{pl=parsePL(plText);}catch(e){console.error('PL parse:',e.message);}}
+    const prodMeta=parseProdMeta(prodText);
+    const raw=parseProd(prodText);
+    const groups=agg(raw);
+    let pl=null;
+    if(plBase64&&plText){try{pl=parsePL(plText);}catch(e){console.error('PL parse:',e.message);}}
     const xlsxB64=await buildXlsx(raw,groups,pl,prodMeta,practiceName);
     const totalProd=Object.values(raw).reduce((s,v)=>s+v.total,0);
     return{statusCode:200,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},body:JSON.stringify({success:true,xlsxB64,summary:{codesFound:Object.keys(raw).length,totalProduction:totalProd.toFixed(2),months:prodMeta.months,years:prodMeta.years,netCollections:pl?.netCollections||null,totalExpense:pl?.totalExpense||null,netIncome:pl?.netIncome||null}})};
