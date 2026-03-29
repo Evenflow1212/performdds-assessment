@@ -9,21 +9,27 @@ function agg(raw){const gr={};for(const[code,d]of Object.entries(raw)){const g=C
 
 // Parse date range and month count from production report text
 function parseProdMeta(text){
-  // Match patterns like "12/01/2021 - 12/20/2023" or "01/01/2023 - 12/31/2023"
-  const m=text.match(/(\d{1,2}\/\d{1,2}\/(\d{4}))\s*[-–]\s*(\d{1,2}\/\d{1,2}\/(\d{4}))/);
-  if(!m)return{months:12,years:[new Date().getFullYear()]};
-  const startDate=new Date(m[1]);
-  const endDate=new Date(m[3]);
-  const startYear=parseInt(m[2]);
-  const endYear=parseInt(m[4]);
-  // Calculate months rounded to nearest whole month
-  const diffMs=endDate-startDate;
-  const diffMonths=Math.round(diffMs/(1000*60*60*24*30.4375));
-  const months=Math.max(1,diffMonths);
-  // Build year list
+  // Match date range like "12/01/2021 - 12/20/2023" anywhere in the text
+  const m=text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-](\d{4}))\s*[-–]\s*(\d{1,2}[\/\-]\d{1,2}[\/\-](\d{4}))/);
+  if(!m){console.log('No date range found, defaulting 12 months');return{months:12,years:[new Date().getFullYear()]};}
+  const parse=(s)=>{const p=s.split(/[\/\-]/);return new Date(parseInt(p[2]),parseInt(p[0])-1,parseInt(p[1]));};
+  const startDate=parse(m[1]);const endDate=parse(m[3]);
+  const startYear=parseInt(m[2]);const endYear=parseInt(m[4]);
+  // Months = difference in months rounded to nearest whole month
+  const months=Math.round((endDate.getFullYear()-startDate.getFullYear())*12+(endDate.getMonth()-startDate.getMonth())+(endDate.getDate()-startDate.getDate())/31);
+  const roundedMonths=Math.max(1,months);
+  // Only include years that have meaningful data (at least 3 months)
+  // If start month > 9 (Oct/Nov/Dec), don't count start year as a full year
   const years=[];
-  for(let y=startYear;y<=endYear;y++)years.push(y);
-  return{months,years,startYear,endYear};
+  for(let y=startYear;y<=endYear;y++){
+    const mStart=(y===startYear)?startDate.getMonth():0;
+    const mEnd=(y===endYear)?endDate.getMonth():11;
+    const monthsInYear=mEnd-mStart+1;
+    if(monthsInYear>=3)years.push(y);
+  }
+  if(years.length===0)years.push(endYear);
+  console.log('Date range: '+m[1]+' to '+m[3]+' = '+roundedMonths+' months, years:'+years.join(','));
+  return{months:roundedMonths,years};
 }
 
 function parseProd(text){
