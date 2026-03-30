@@ -398,7 +398,7 @@ const platforms = {
         instructions: [
           'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Provider</span>',
           'Click <span class="path">Procedures by Provider</span>',
-          'Set <strong>Date Range</strong> to last full 12 months <em>(e.g. Jan 1 &ndash; Dec 31)</em>',
+          'Set <strong>Date Range</strong> to last full <strong>24 months</strong> <em>(e.g. Jan 1, 2023 &ndash; Dec 31, 2024)</em> &mdash; <strong>24 months is preferred</strong> for the most accurate assessment',
           'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
           'Click <span class="path">Process</span> to generate',
           'Click <span class="path">Print</span> &rarr; save as PDF, or export to Excel'
@@ -422,7 +422,7 @@ const platforms = {
         instructions: [
           'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Financial</span>',
           'Click <span class="path">Payment Reconciliation</span>',
-          'Set <strong>Date Range</strong> to the same 12 months as the production report',
+          'Set <strong>Date Range</strong> to the <strong>same 24 months as the production report</strong> for best results &mdash; 12 months minimum',
           'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
           'Click <span class="path">Process</span>',
           'Export or print as PDF &mdash; focus on the totals on the last page'
@@ -447,12 +447,12 @@ const platforms = {
           'Your P&L typically comes from your accountant or QuickBooks/accounting software &mdash; <em>not</em> Eaglesoft',
           'Ask your accountant for the most recent full-year P&L (Income Statement)',
           'If you use QuickBooks: <span class="path">Reports</span> &rarr; <span class="path">Company & Financial</span> &rarr; <span class="path">Profit & Loss Standard</span>',
-          'Set date range to the same 12 months',
+          'Set date range to the <strong>most recent full 12 months</strong> &mdash; P&amp;L is always 12 months (1 full year)',
           'Export as PDF or Excel'
         ],
         settings: [
           { label: 'Source', value: 'Accountant or QuickBooks' },
-          { label: 'Period', value: 'Same full 12 months' },
+          { label: 'Period', value: '12 months — most recent full year' },
           { label: 'Format', value: 'PDF or Excel' }
         ],
         tip: 'If you don\'t have this handy, just upload what you have &mdash; even a partial P&L is helpful.',
@@ -525,7 +525,7 @@ const platforms = {
           'Open the <span class="path">Office Manager</span>',
           'From the top menu, click <span class="path">Analysis</span> &rarr; <span class="path">Practice</span>',
           'Click <span class="path">Reports</span> in the Practice Analysis window',
-          'Set <strong>Date Range</strong> to the last full 12 months',
+          'Set <strong>Date Range</strong> to the last full <strong>24 months</strong> &mdash; <strong>24 months is preferred</strong>, 12 months minimum',
           'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
           'In the right panel: uncheck <em>By Category</em>, check <em>By Procedure Code (ADA Code)</em>',
           'Check <strong>Production, Collections, Adjustments</strong>',
@@ -548,7 +548,7 @@ const platforms = {
           'Open the <span class="path">Office Manager</span>',
           'From the top menu click <span class="path">Reports</span> &rarr; <span class="path">Management</span>',
           'Click <span class="path">Practice Statistics</span>',
-          'Set <strong>Date Range</strong> to the same 12 months as your production report',
+          'Set <strong>Date Range</strong> to the <strong>same 24 months as your production report</strong> &mdash; match it exactly',
           'Alternatively: <span class="path">Reports</span> &rarr; <span class="path">Ledger</span> &rarr; <span class="path">Payment Reconciliation</span>',
           'Click <span class="path">OK</span> and export or print as PDF'
         ],
@@ -885,7 +885,7 @@ function buildSteps(config) {
           <label style="font-size:12px;font-weight:700;color:#1F3864;display:block;margin-bottom:6px">${step.monthsLabel}</label>
           <select id="months-select-${i}" style="width:100%;padding:8px 12px;border:2px solid #1F3864;border-radius:6px;font-size:14px;color:#1F3864;font-weight:600;background:white;cursor:pointer">
             <option value="12">12 months (1 year)</option>
-            <option value="24">24 months (2 years)</option>
+            <option value="24" selected>24 months (2 years) — recommended</option>
             <option value="36">36 months (3 years)</option>
             <option value="6">6 months (partial year)</option>
             <option value="3">3 months (quarterly)</option>
