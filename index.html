@@ -312,9 +312,11 @@ section { padding: 100px 48px; max-width: 1100px; margin: 0 auto; }
   transition: all 0.2s; font-size: 14px; color: var(--gray-600);
 }
 .radio-opt:hover { border-color: rgba(0,174,239,0.4); }
-.radio-opt input[type=radio] { accent-color: var(--blue); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.radio-opt input[type=radio] { display: none; }
+.radio-opt .radio-box { width: 20px; height: 20px; min-width: 20px; border: 2px solid rgba(255,255,255,0.3); border-radius: 4px; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 2px; transition: all 0.2s; }
 .radio-opt.selected { border-color: var(--blue); background: var(--blue-light); color: white; }
-.radio-opt.selected::after { content: ' ✓'; color: var(--blue); font-weight: 800; margin-left: 4px; }
+.radio-opt.selected .radio-box { background: var(--blue); border-color: var(--blue); }
+.radio-opt.selected .radio-box::after { content: '✓'; color: black; font-size: 13px; font-weight: 900; line-height: 1; }
 
 .form-submit-btn {
   width: 100%; background: var(--blue); color: var(--black); border: none;
@@ -575,10 +577,10 @@ section { padding: 100px 48px; max-width: 1100px; margin: 0 auto; }
           <label>Insurance Model</label>
           <div class="radio-group">
             <label class="radio-opt" id="opt-innetwork">
-              <input type="radio" name="network" value="In-Network" onchange="selectRadio('network','opt-innetwork')"> In-Network
+              <input type="radio" name="network" value="In-Network" onchange="selectRadio('network','opt-innetwork')"><div class="radio-box"></div> In-Network
             </label>
             <label class="radio-opt" id="opt-outnetwork">
-              <input type="radio" name="network" value="Out-of-Network" onchange="selectRadio('network','opt-outnetwork')"> Out-of-Network
+              <input type="radio" name="network" value="Out-of-Network" onchange="selectRadio('network','opt-outnetwork')"><div class="radio-box"></div> Out-of-Network
             </label>
           </div>
         </div>
@@ -586,10 +588,10 @@ section { padding: 100px 48px; max-width: 1100px; margin: 0 auto; }
           <label>Plan Type</label>
           <div class="radio-group">
             <label class="radio-opt" id="opt-ppo">
-              <input type="radio" name="plantype" value="PPO" onchange="selectRadio('plantype','opt-ppo');togglePPOPct(true)"> PPO
+              <input type="radio" name="plantype" value="PPO" onchange="selectRadio('plantype','opt-ppo');togglePPOPct(true)"><div class="radio-box"></div> PPO
             </label>
             <label class="radio-opt" id="opt-hmo">
-              <input type="radio" name="plantype" value="HMO" onchange="selectRadio('plantype','opt-hmo');togglePPOPct(false)"> HMO
+              <input type="radio" name="plantype" value="HMO" onchange="selectRadio('plantype','opt-hmo');togglePPOPct(false)"><div class="radio-box"></div> HMO
             </label>
           </div>
         </div>
