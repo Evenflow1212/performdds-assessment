@@ -898,6 +898,8 @@ const uploadingPromises = {};
 function triggerUpload(idx) { document.getElementById(`file-${idx}`).click(); }
 
 function fileChosen(idx) {
+  const mw = document.getElementById('months-wrap-'+idx);
+  if (mw) mw.style.display = 'block';
   const file = document.getElementById(`file-${idx}`).files[0];
   if (!file) return;
   startUploadcareUpload(idx, file);
