@@ -552,19 +552,48 @@ const platforms = {
         uploadLabel: null
       },
       {
-        title: 'Aging Report',
-        subtitle: 'Accounts receivable by age bracket',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total &mdash; a red flag for collection issues.',
+{
+        title: 'Patient AR Aging Report',
+        subtitle: 'Patient accounts receivable by age bracket',
+        why: '<strong>What we\'re looking for:</strong> Patient AR broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total &mdash; a red flag for collection issues.',
         instructions: [
           'Open the <span class="path">Office Manager</span>',
           'Click <span class="path">Reports</span> &rarr; <span class="path">Ledger</span> &rarr; <span class="path">Aging Report</span>',
-          'In the setup window, make sure <strong>Standard Aging</strong> is selected',
+          'In the setup window, make sure <strong>Standard Aging</strong> is selected and <strong>Patient</strong> is selected',
           'Set minimum balance to <span class="path">$0.01</span> to include all balances',
-          'Click <span class="path">OK</span> &mdash; preview from Batch Processor',
-          'Print or export as PDF'
+          'Click <span class="path">OK</span> &mdash; print or export as PDF'
         ],
         settings: [
-          { label: 'Aging Type', value: 'Standard Aging' },
+          { label: 'Report Type', value: 'Standard Aging' },
+          { label: 'Payor', value: 'Patient only' },
+          { label: 'Min Balance', value: '$0.01' },
+          { label: 'Format', value: 'PDF' }
+        ],
+        tip: 'This shows what patients owe directly. 90+ day patient AR over 12% is a red flag.',
+        accept: '.pdf,.xlsx,.xls,.csv',
+        uploadLabel: 'Upload Patient AR Aging Report'
+      },
+      {
+        title: 'Insurance AR Aging Report',
+        subtitle: 'Outstanding insurance claims by age bracket',
+        why: '<strong>What we\'re looking for:</strong> Insurance claims broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ days outstanding. Old unpaid claims signal billing issues and potential write-offs.',
+        instructions: [
+          'Open the <span class="path">Office Manager</span>',
+          'Click <span class="path">Reports</span> &rarr; <span class="path">Ledger</span> &rarr; <span class="path">Aging Report</span>',
+          'In the setup window, select <strong>Insurance</strong> as the payor type',
+          'Set minimum balance to <span class="path">$0.01</span>',
+          'Click <span class="path">OK</span> &mdash; print or export as PDF'
+        ],
+        settings: [
+          { label: 'Report Type', value: 'Standard Aging' },
+          { label: 'Payor', value: 'Insurance only' },
+          { label: 'Min Balance', value: '$0.01' },
+          { label: 'Format', value: 'PDF' }
+        ],
+        tip: 'Claims over 90 days outstanding should be followed up immediately — many insurers have filing deadlines.',
+        accept: '.pdf,.xlsx,.xls,.csv',
+        uploadLabel: 'Upload Insurance AR Aging Report'
+      },
           { label: 'Min Balance', value: '$0.01' },
           { label: 'Format', value: 'PDF preferred' }
         ],
@@ -1046,7 +1075,7 @@ async function submitToConsultant() {
     try { await Promise.allSettled(pending); } catch(e) {}
   }
 
-  btn.textContent = 'Sending&hellip;';
+  btn.textContent = 'Sending…';
 
   const filesUploaded = Object.keys(uploads).map(k => ({
     step: stepNames[parseInt(k)],
