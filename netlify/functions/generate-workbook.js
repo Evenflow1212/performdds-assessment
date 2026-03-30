@@ -106,11 +106,23 @@ function addPLRawImport(wb,pl,name){
 async function buildXlsx(raw,groups,pl,prodMeta,name){
   const{months,years}=prodMeta;
   const wb=new ExcelJS.Workbook();
-  const wsPW=wb.addWorksheet('Production Worksheet');
-  wb.addWorksheet('HYG Prod');wb.addWorksheet('Hygiene Schedule');wb.addWorksheet('dr prod');
-  const wsFO=wb.addWorksheet('Financial Overview');
-  wb.addWorksheet('Targets & Goal');wb.addWorksheet('Employee Costs');wb.addWorksheet('Budgetary P&L');
-  const wsPL=wb.addWorksheet('P&L Input');
+  // Load blank template from repo — preserves all Kringel formatting/structure with zero practice data
+  const templateUrl='https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/Blank_Assessment_Template.xlsx';
+  const templateResp=await fetch(templateUrl);
+  if(templateResp.ok){
+    const templateBuf=await templateResp.arrayBuffer();
+    await wb.xlsx.load(templateBuf);
+  } else {
+    // Fallback: create blank sheets if template unavailable
+    wb.addWorksheet('Production Worksheet');
+    wb.addWorksheet('HYG Prod');wb.addWorksheet('Hygiene Schedule');wb.addWorksheet('dr prod');
+    wb.addWorksheet('Financial Overview');
+    wb.addWorksheet('Targets & Goal');wb.addWorksheet('Employee Costs');wb.addWorksheet('Budgetary P&L');
+    wb.addWorksheet('P&L Input');
+  }
+  const wsPW=wb.getWorksheet('Production Worksheet');
+  const wsFO=wb.getWorksheet('Financial Overview');
+  const wsPL=wb.getWorksheet('P&L Input');
   if(pl)addPLRawImport(wb,pl,name);
   const tot=Object.values(raw).reduce((s,v)=>s+v.total,0);
   const sv=(ws,c,v)=>{try{ws.getCell(c).value=v;}catch(e){}};
