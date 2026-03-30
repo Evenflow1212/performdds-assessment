@@ -222,13 +222,15 @@ exports.handler=async function(event){
   const KEY=process.env.ANTHROPIC_KEY;
   if(!KEY)return{statusCode:500,body:JSON.stringify({error:'ANTHROPIC_KEY not set'})};
   let body;try{body=JSON.parse(event.body);}catch(e){return{statusCode:400,body:JSON.stringify({error:'Invalid JSON'})};}
-  const{productionBase64,plBase64,practiceName=''}=body;
+  const{productionBase64,plBase64,practiceName='',prodMonthsOverride=null,plMonths=12}=body;
   if(!productionBase64)return{statusCode:400,body:JSON.stringify({error:'productionBase64 required'})};
   try{
     const PROD_PROMPT='This is a dental practice production by procedure code report. Extract every ADA procedure code with its quantity and total production dollar amount. Return ONLY data lines in this exact format: CODE|QTY|TOTAL (e.g. D0120|2916|139832.00). One line per code. Include every code that has a quantity > 0. No headers, no explanations, no other text. Also include the date range line verbatim from the report header (e.g. "12/01/2021 - 12/20/2023").';
     const PL_PROMPT='QuickBooks Profit & Loss PDF. Extract raw text verbatim preserving all indentation and dollar amounts so Total Income, Total Expense, and Net Income summary lines are clearly identifiable.';
     const[prodText,plText='']=await Promise.all([callClaude(productionBase64,PROD_PROMPT,KEY),plBase64?callClaude(plBase64,PL_PROMPT,KEY):Promise.resolve('')]);
     const prodMeta=parseProdMeta(prodText);
+    // If user explicitly selected months in the hub, use that instead of auto-detected
+    if(prodMonthsOverride&&prodMonthsOverride>0){prodMeta.months=prodMonthsOverride;console.log('Using user-specified months:',prodMonthsOverride);}
     const raw=parseProd(prodText);
     const groups=agg(raw);
     let pl=null;
