@@ -373,7 +373,9 @@ const platforms = {
         ],
         tip: 'This is the most important report &mdash; if you can only pull one, make it this one.',
         accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Procedures by Provider Report'
+        uploadLabel: 'Upload Procedures by Provider Report',
+        needsMonths: true,
+        monthsLabel: 'How many months does this report cover?'
       },
       {
         title: 'Payment Reconciliation Report',
@@ -394,7 +396,9 @@ const platforms = {
         ],
         tip: 'The last page has the totals summary &mdash; that\'s the section we need most.',
         accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Payment Reconciliation Report'
+        uploadLabel: 'Upload Payment Reconciliation Report',
+        needsMonths: true,
+        monthsLabel: 'How many months does this report cover?'
       },
       {
         title: 'P&L / Income Statement',
@@ -414,7 +418,9 @@ const platforms = {
         ],
         tip: 'If you don\'t have this handy, just upload what you have &mdash; even a partial P&L is helpful.',
         accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload P&L / Income Statement'
+        uploadLabel: 'Upload P&L / Income Statement',
+        needsMonths: true,
+        monthsLabel: 'How many months does this P&L cover?'
       },
       {
         title: 'Hygiene Schedule Form',
@@ -805,6 +811,16 @@ function buildSteps(config) {
     const uploadHTML = step.uploadLabel ? `
       <div class="upload-zone" id="upload-${i}" onclick="triggerUpload(${i})" ondragover="dragOver(event,${i})" ondragleave="dragLeave(${i})" ondrop="drop(event,${i})">
         <input type="file" id="file-${i}" accept="${step.accept}" onchange="fileChosen(${i})">
+        ${step.needsMonths ? `<div id="months-wrap-${i}" style="display:none;margin-top:14px;padding:12px 16px;background:#f0f4ff;border-radius:8px;border:1px solid #c5d0e8;text-align:left">
+          <label style="font-size:12px;font-weight:700;color:#1F3864;display:block;margin-bottom:6px">${step.monthsLabel}</label>
+          <select id="months-select-${i}" style="width:100%;padding:8px 12px;border:2px solid #1F3864;border-radius:6px;font-size:14px;color:#1F3864;font-weight:600;background:white;cursor:pointer">
+            <option value="12">12 months (1 year)</option>
+            <option value="24">24 months (2 years)</option>
+            <option value="36">36 months (3 years)</option>
+            <option value="6">6 months (partial year)</option>
+            <option value="3">3 months (quarterly)</option>
+          </select>
+        </div>` : ''}
         <div id="upload-prompt-${i}">
           <div class="upload-icon"></div>
           <h3>${step.uploadLabel}</h3>
@@ -1274,7 +1290,7 @@ Uploaded reports:`
       const plBase64=plFile&&plFile.size>0?await toBase64(plFile):null;
       const pName=(typeof practiceName!=='undefined'&&practiceName)||document.getElementById('practice-name-input')?.value||'Practice';
       status.textContent='Generating 9-tab assessment workbook (30–60s)…';
-      const resp=await fetch('/.netlify/functions/generate-workbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productionBase64,plBase64,months:12,practiceName:pName})});
+      const resp=await fetch('/.netlify/functions/generate-workbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productionBase64,plBase64,practiceName:pName,prodMonthsOverride:parseInt(document.getElementById('months-select-0')?.value||'0')||null,plMonths:parseInt(document.getElementById('months-select-2')?.value||'12')||12})});
       if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||'Server error '+resp.status);}
       const data=await resp.json();
       if(!data.success) throw new Error(data.error||'Generation failed');
