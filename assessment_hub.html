@@ -193,7 +193,44 @@ body { font-family: var(--font-body); background: var(--black); color: var(--gra
     .workbook-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(34,197,94,0.35);}
     .workbook-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
     .workbook-status{margin-top:10px;font-size:13px;color:var(--gray-500);text-align:center;min-height:20px;}
-  </style>
+  
+/* ── SAMPLE REPORT MODAL ── */
+.sample-modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.85); z-index: 9999;
+  align-items: center; justify-content: center;
+}
+.sample-modal-overlay.open { display: flex; }
+.sample-modal {
+  background: #1a1a2e; border: 1px solid rgba(0,174,239,0.3);
+  border-radius: 12px; width: 90vw; max-width: 900px;
+  height: 85vh; display: flex; flex-direction: column;
+  overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.sample-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; background: #1F3864; flex-shrink: 0;
+}
+.sample-modal-title { font-size: 13px; font-weight: 700; color: white; letter-spacing: 1px; text-transform: uppercase; }
+.sample-modal-close {
+  background: none; border: none; color: rgba(255,255,255,0.7);
+  font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;
+}
+.sample-modal-close:hover { color: white; }
+.sample-modal-body { flex: 1; overflow: hidden; }
+.sample-modal-body iframe { width: 100%; height: 100%; border: none; }
+.sample-report-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(0,174,239,0.1); border: 1px solid rgba(0,174,239,0.4);
+  color: #00aeef; border-radius: 6px; padding: 8px 16px;
+  font-size: 12px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; cursor: pointer; margin-bottom: 12px;
+  transition: all 0.2s;
+}
+.sample-report-btn:hover { background: rgba(0,174,239,0.2); border-color: rgba(0,174,239,0.7); }
+.sample-report-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+</style>
 </head>
 <body>
 
@@ -374,6 +411,7 @@ const platforms = {
         tip: 'This is the most important report &mdash; if you can only pull one, make it this one.',
         accept: '.pdf,.xlsx,.xls,.csv',
         uploadLabel: 'Upload Procedures by Provider Report',
+        sampleReport: { dentrix: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Dentrix_Production_Summary.pdf', eaglesoft: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Eaglesoft_Procedures_By_Provider.pdf', opendental: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_OpenDental_Production_By_Procedure.pdf' },
         needsMonths: true,
         monthsLabel: 'How many months does this report cover?'
       },
@@ -397,6 +435,7 @@ const platforms = {
         tip: 'The last page has the totals summary &mdash; that\'s the section we need most.',
         accept: '.pdf,.xlsx,.xls,.csv',
         uploadLabel: 'Upload Payment Reconciliation Report',
+        sampleReport: { dentrix: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Dentrix_Day_Sheet.pdf', eaglesoft: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Eaglesoft_Provider_Productivity.pdf', opendental: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_OpenDental_Production_Income.pdf' },
         needsMonths: true,
         monthsLabel: 'How many months does this report cover?'
       },
@@ -571,7 +610,8 @@ const platforms = {
         ],
         tip: 'This shows what patients owe directly. 90+ day patient AR over 12% is a red flag.',
         accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Patient AR Aging Report'
+        uploadLabel: 'Upload Patient AR Aging Report',
+        sampleReport: { dentrix: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Dentrix_Aging_Report.pdf', eaglesoft: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Eaglesoft_AR_Report.pdf', opendental: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_OpenDental_Aging_AR.pdf' }
       },
       {
         title: 'Insurance AR Aging Report',
@@ -592,7 +632,8 @@ const platforms = {
         ],
         tip: 'Claims over 90 days outstanding should be followed up immediately — many insurers have filing deadlines.',
         accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Insurance AR Aging Report'
+        uploadLabel: 'Upload Insurance AR Aging Report',
+        sampleReport: { dentrix: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Dentrix_Aging_Report.pdf', eaglesoft: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Eaglesoft_AR_Report.pdf', opendental: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_OpenDental_Aging_AR.pdf' }
       },
           { label: 'Min Balance', value: '$0.01' },
           { label: 'Format', value: 'PDF preferred' }
@@ -886,6 +927,10 @@ function buildSteps(config) {
         ${settingsHTML}
         ${hygieneHTML}
         ${step.tip ? `<div class="tip">${step.tip}</div>` : ''}
+        ${step.sampleReport ? `<button class="sample-report-btn" onclick="openSampleModal('${step.sampleReport[currentPlatform] || Object.values(step.sampleReport)[0]}', '${step.title}')">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+          View Sample Report
+        </button>` : ''}
         ${uploadHTML}
         ${navHTML}
       </div>`;
@@ -1546,6 +1591,35 @@ Uploaded reports:`
     return out;
   }
 </script>
+
+<!-- SAMPLE REPORT MODAL -->
+<div class="sample-modal-overlay" id="sample-modal-overlay" onclick="closeSampleModal(event)">
+  <div class="sample-modal">
+    <div class="sample-modal-header">
+      <span class="sample-modal-title" id="sample-modal-title">Sample Report</span>
+      <button class="sample-modal-close" onclick="closeSampleModal()">&#x2715;</button>
+    </div>
+    <div class="sample-modal-body">
+      <iframe id="sample-modal-iframe" src="" title="Sample Report Preview"></iframe>
+    </div>
+  </div>
+</div>
+<script>
+function openSampleModal(url, title) {
+  document.getElementById('sample-modal-iframe').src = url;
+  document.getElementById('sample-modal-title').textContent = title + ' — Sample Report';
+  document.getElementById('sample-modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeSampleModal(e) {
+  if (e && e.target !== document.getElementById('sample-modal-overlay')) return;
+  document.getElementById('sample-modal-overlay').classList.remove('open');
+  document.getElementById('sample-modal-iframe').src = '';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSampleModal(); });
+</script>
+
 </body>
 </html>
 
