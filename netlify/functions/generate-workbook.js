@@ -276,7 +276,7 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); }
   catch(e) { return {statusCode:400,body:JSON.stringify({error:'Invalid JSON'})}; }
-  const {productionBase64, collectionsBase64, plBase64, practiceName='', software='dentrix', arPatient={}, arInsurance={}} = body;
+  const {productionBase64, collectionsBase64, plBase64, arPatBase64, arInsBase64, practiceName='', software='dentrix'} = body;
   if (!productionBase64) return {statusCode:400,body:JSON.stringify({error:'productionBase64 required'})};
   try {
     const PROD_PROMPT = 'Dental practice production by procedure code report. Extract every ADA code with quantity and total. Return ONLY lines: CODE|QTY|TOTAL (e.g. D0120|2916|139832.00). Also include date range line verbatim from header.';
@@ -285,7 +285,9 @@ exports.handler = async function(event) {
     const [prodText, collText='', plText=''] = await Promise.all([
       callClaude(productionBase64, PROD_PROMPT, KEY),
       collectionsBase64 ? callClaude(collectionsBase64, COLL_PROMPT, KEY) : Promise.resolve(''),
-      plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve('')
+      plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve(''),
+      arPatBase64 ? callClaude(arPatBase64, AR_PAT_PROMPT, KEY) : Promise.resolve(''),
+      arInsBase64 ? callClaude(arInsBase64, AR_INS_PROMPT, KEY) : Promise.resolve('')
     ]);
     console.log('prodText length:', prodText.length);
     if (collectionsBase64) console.log('collText:', collText.slice(0,200));
@@ -298,6 +300,19 @@ exports.handler = async function(event) {
       const pm = collText.match(/PAYMENTS\|([\d,.]+)/i);
       if (pm) { netCollFromReport = parseFloat(pm[1].replace(/,/g,'')); console.log('Collections payments='+netCollFromReport); }
     }
+
+    // Parse AR aging from PDFs
+    function parseAR(text) {
+      const get = (key) => {
+        const m = text.match(new RegExp(key+'\\|([\\d,]+\\.?\\d*)', 'i'));
+        return m ? parseFloat(m[1].replace(/,/g,'')) : 0;
+      };
+      return { total: get('TOTAL'), current: get('CURRENT'), d3160: get('D3160'), d6190: get('D6190'), d90plus: get('D90PLUS'), insr: get('INSR') };
+    }
+    const arPatient = arPatText ? parseAR(arPatText) : {};
+    const arInsurance = arInsText ? parseAR(arInsText) : {};
+    if (arPatText) console.log('AR Patient parsed: total='+arPatient.total);
+    if (arInsText) console.log('AR Insurance parsed: total='+arInsurance.total);
     let pl = null;
     if (plBase64 && plText) {
       try { pl = parsePL(plText); console.log('P&L OK: netCollections='+pl.netCollections); }
