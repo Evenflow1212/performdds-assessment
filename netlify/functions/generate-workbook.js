@@ -140,8 +140,9 @@ function addPLRawImport(wb,pl,name){
 }
 
 // FIXED: always load Blank_Assessment_Template.xlsx first
-async function buildXlsx(raw,groups,pl,prodMeta,name){
+async function buildXlsx(raw,groups,pl,prodMeta,name,extra={}){
   const {months,years} = prodMeta;
+  const {arPatient={}, arInsurance={}, netCollectionsFromReport=null} = extra;
   const wb = new ExcelJS.Workbook();
   const TEMPLATE_URL = 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/Blank_Assessment_Template.xlsx';
   try {
@@ -224,6 +225,34 @@ async function buildXlsx(raw,groups,pl,prodMeta,name){
   sv(wsFO,'D27',Math.round(tot/months*100)/100);
   fv(wsFO,'D28','=IFERROR(D25/D27,0)');
 
+
+  // AR AGING rows 32-33 in Financial Overview
+  if (arPatient && arPatient.total) {
+    sv(wsFO,'C32','Patient AR');
+    sv(wsFO,'D32',arPatient.total||0);
+    sv(wsFO,'E32',arPatient.current||0);
+    sv(wsFO,'F32',arPatient.d3160||0);
+    sv(wsFO,'G32',arPatient.d6190||0);
+    sv(wsFO,'H32',arPatient.d90plus||0);
+    sv(wsFO,'I32',arPatient.insr||0);
+  }
+  if (arInsurance && arInsurance.total) {
+    sv(wsFO,'C33','Insurance AR');
+    sv(wsFO,'D33',arInsurance.total||0);
+    sv(wsFO,'E33',arInsurance.current||0);
+    sv(wsFO,'F33',arInsurance.d3160||0);
+    sv(wsFO,'G33',arInsurance.d6190||0);
+    sv(wsFO,'H33',arInsurance.d90plus||0);
+  }
+  // Override collections col with Analysis Summary total if available
+  if (netCollectionsFromReport && years.length > 0) {
+    const lastCol = yearCols[years.length-1];
+    const collCol = String.fromCharCode(lastCol.charCodeAt(0)+1);
+    sv(wsFO,collCol+'20',Math.round(netCollectionsFromReport*100)/100);
+    fv(wsFO,collCol+'22','=IFERROR('+collCol+'20/'+collCol+'21,0)');
+    if (pl) { sv(wsFO,'D26',Math.round(netCollectionsFromReport/months*100)/100); }
+    console.log('Collections from report written: '+netCollectionsFromReport);
+  }
   // P&L INPUT — only touch specific data cells
   sv(wsPL,'B2',12); fv(wsPL,'N2','=IFERROR(H2/B2,0)');
   if (pl) {
@@ -243,31 +272,50 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); }
   catch(e) { return {statusCode:400,body:JSON.stringify({error:'Invalid JSON'})}; }
-  const {productionBase64, plBase64, practiceName=''} = body;
+  const {productionBase64, collectionsBase64, plBase64, practiceName='', software='dentrix', arPatient={}, arInsurance={}} = body;
   if (!productionBase64) return {statusCode:400,body:JSON.stringify({error:'productionBase64 required'})};
   try {
     const PROD_PROMPT = 'Dental practice production by procedure code report. Extract every ADA code with quantity and total. Return ONLY lines: CODE|QTY|TOTAL (e.g. D0120|2916|139832.00). Also include date range line verbatim from header.';
-    const PL_PROMPT = 'QuickBooks P&L report. Extract full text verbatim preserving all labels and dollar amounts. The Total Income, Total Expense, and Net Income summary lines must appear clearly with their exact amounts. Output raw text only.';
-    const [prodText, plText=''] = await Promise.all([
+    const COLL_PROMPT = 'This is a Dentrix Analysis Summary (Provider) report. Find the TOTAL row at the bottom. Extract Charges and Payments totals. Return ONLY two lines:\nCHARGES|[amount]\nPAYMENTS|[amount]';
+    const PL_PROMPT = 'QuickBooks P&L report. Extract full text verbatim preserving all labels and dollar amounts. Total Income, Total Expense, and Net Income must appear clearly. Output raw text only.';
+    const [prodText, collText, plText] = await Promise.all([
       callClaude(productionBase64, PROD_PROMPT, KEY),
+      collectionsBase64 ? callClaude(collectionsBase64, COLL_PROMPT, KEY) : Promise.resolve(''),
       plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve('')
     ]);
     console.log('prodText length:', prodText.length);
-    if (plBase64) console.log('plText length:', plText.length, '| preview:', plText.slice(0,200));
+    if (collectionsBase64) console.log('collText:', collText.slice(0,200));
+    if (plBase64) console.log('plText length:', plText.length);
     const prodMeta = parseProdMeta(prodText);
     const raw = parseProd(prodText);
     const groups = agg(raw);
+    let netCollectionsFromReport = null;
+    if (collText) {
+      const paymentsM = collText.match(/PAYMENTS\|([\d,]+\.?\d*)/i);
+      if (paymentsM) { netCollectionsFromReport = parseFloat(paymentsM[1].replace(/,/g,'')); console.log('Collections parsed: '+netCollectionsFromReport); }
+    }
     let pl = null;
     if (plBase64 && plText) {
       try { pl = parsePL(plText); console.log('P&L OK: netCollections='+pl.netCollections); }
-      catch(e) { console.error('PL parse failed:', e.message, '| dump:', plText.slice(0,500)); }
+      catch(e) { console.error('PL parse failed:', e.message); }
     }
-    const xlsxB64 = await buildXlsx(raw, groups, pl, prodMeta, practiceName);
+    const xlsxB64 = await buildXlsx(raw, groups, pl, prodMeta, practiceName, {arPatient, arInsurance, netCollectionsFromReport});
     const totalProd = Object.values(raw).reduce((s,v) => s+v.total, 0);
     return {
-      statusCode: 200,
-      headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
-      body: JSON.stringify({success:true,xlsxB64,summary:{codesFound:Object.keys(raw).length,totalProduction:totalProd.toFixed(2),months:prodMeta.months,years:prodMeta.years,netCollections:pl?.netCollections??null,totalExpense:pl?.totalExpense??null,netIncome:pl?.netIncome??null,plParsed:pl!==null}})
+      statusCode:200,
+      headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
+      body:JSON.stringify({success:true,xlsxB64,summary:{
+        codesFound:Object.keys(raw).length,
+        totalProduction:totalProd.toFixed(2),
+        months:prodMeta.months,
+        years:prodMeta.years,
+        netCollections:netCollectionsFromReport||pl?.netCollections||null,
+        totalExpense:pl?.totalExpense||null,
+        netIncome:pl?.netIncome||null,
+        plParsed:pl!==null,
+        arPatientTotal:arPatient?.total||null,
+        arInsuranceTotal:arInsurance?.total||null
+      }})
     };
   } catch(err) {
     return {statusCode:500,headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:err.message,stack:err.stack?.slice(0,500)})};
