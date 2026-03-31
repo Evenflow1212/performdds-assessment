@@ -834,29 +834,23 @@
           </div>
         </div>
       </div>
-      <div class="manual-entry">
-        <h4>Enter totals from TOTALS ALL CLAIMS row</h4>
+      <div class="upload-zone" id="upload5" onclick="document.getElementById('file5').click()">
+        <input type="file" id="file5" accept=".pdf" onchange="handleFile(5, this)">
+        <div class="upload-default">
+          <div class="upload-icon">📄</div>
+          <h4>Upload Insurance Claim Aging Report (PDF)</h4>
+          <p>Upload the full report — Claude will find the TOTALS ALL CLAIMS row automatically</p>
+        </div>
+        <div class="file-name" id="fname5">✅ <span id="fname5-text"></span></div>
+      </div>
+      <div class="manual-entry" id="ar-ins-manual" style="display:none;">
+        <h4>Extracted totals — review and correct if needed</h4>
         <div class="entry-grid">
-          <div class="entry-field total">
-            <label>Total Balance</label>
-            <input type="text" id="ar_ins_total" placeholder="$0.00" oninput="checkInsuranceEntry()">
-          </div>
-          <div class="entry-field">
-            <label>Current (0-30)</label>
-            <input type="text" id="ar_ins_current" placeholder="$0.00" oninput="checkInsuranceEntry()">
-          </div>
-          <div class="entry-field">
-            <label>31-60 Days</label>
-            <input type="text" id="ar_ins_3160" placeholder="$0.00" oninput="checkInsuranceEntry()">
-          </div>
-          <div class="entry-field">
-            <label>61-90 Days</label>
-            <input type="text" id="ar_ins_6190" placeholder="$0.00" oninput="checkInsuranceEntry()">
-          </div>
-          <div class="entry-field">
-            <label>Over 90 Days</label>
-            <input type="text" id="ar_ins_90plus" placeholder="$0.00" oninput="checkInsuranceEntry()">
-          </div>
+          <div class="entry-field total"><label>Total Balance</label><input type="text" id="ar_ins_total" placeholder="$0.00"></div>
+          <div class="entry-field"><label>Current (0-30)</label><input type="text" id="ar_ins_current" placeholder="$0.00"></div>
+          <div class="entry-field"><label>31-60 Days</label><input type="text" id="ar_ins_3160" placeholder="$0.00"></div>
+          <div class="entry-field"><label>61-90 Days</label><input type="text" id="ar_ins_6190" placeholder="$0.00"></div>
+          <div class="entry-field"><label>Over 90 Days</label><input type="text" id="ar_ins_90plus" placeholder="$0.00"></div>
         </div>
       </div>
       <div class="nav-row">
@@ -918,7 +912,7 @@
 <script>
 let currentStep = 1;
 let software = 'dentrix';
-let files = { 1: null, 2: null, 3: null };
+let files = { 1: null, 2: null, 3: null, 4: null, 5: null };
 let skipped = { 3: false, 4: false, 5: false };
 let generatedWorkbook = null;
 
@@ -988,8 +982,8 @@ document.querySelectorAll('.upload-zone').forEach(zone => {
   });
 });
 
-function checkManualEntry() { document.getElementById('next4').disabled = !document.getElementById('ar_pat_total').value.trim(); }
-function checkInsuranceEntry() { document.getElementById('next5').disabled = !document.getElementById('ar_ins_total').value.trim(); }
+function checkManualEntry() { document.getElementById('next4').disabled = !files[4]; }
+function checkInsuranceEntry() { document.getElementById('next5').disabled = !files[5]; }
 function parseAmount(str) { if (!str) return 0; return parseFloat(str.replace(/[$,]/g, '')) || 0; }
 
 function goToStep(n) {
@@ -1018,15 +1012,13 @@ function buildReview() {
     { num: 1, label: 'Production Report', file: files[1] },
     { num: 2, label: 'Collections Report', file: files[2] },
     { num: 3, label: 'P&L Statement', file: files[3], skippable: true },
-    { num: 4, label: 'Patient AR Aging', manual: true, skippable: true },
-    { num: 5, label: 'Insurance AR Aging', manual: true, skippable: true },
+    { num: 4, label: 'Patient AR Aging', file: files[4], skippable: true },
+    { num: 5, label: 'Insurance AR Aging', file: files[5], skippable: true },
   ];
   const html = steps.map(s => {
     let status, color;
-    if (s.manual) {
-      const hasData = s.num === 4 ? document.getElementById('ar_pat_total').value.trim() : document.getElementById('ar_ins_total').value.trim();
-      status = hasData ? '✅ Entered' : (skipped[s.num] ? '⏭ Skipped' : '⚠️ Not entered');
-      color = hasData ? 'var(--success)' : (skipped[s.num] ? 'var(--text-muted)' : 'var(--warning)');
+    if (false) {
+      // manual entry removed
     } else {
       status = s.file ? `✅ ${s.file.name}` : (skipped[s.num] ? '⏭ Skipped' : '⚠️ Not uploaded');
       color = s.file ? 'var(--success)' : (skipped[s.num] ? 'var(--text-muted)' : 'var(--warning)');
@@ -1058,22 +1050,10 @@ async function generate() {
     const collBase64 = await fileToBase64(files[2]);
     const plBase64 = files[3] ? await fileToBase64(files[3]) : null;
     const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
-    const arPatient = {
-      total: parseAmount(document.getElementById('ar_pat_total').value),
-      current: parseAmount(document.getElementById('ar_pat_current').value),
-      d3160: parseAmount(document.getElementById('ar_pat_3160').value),
-      d6190: parseAmount(document.getElementById('ar_pat_6190').value),
-      d90plus: parseAmount(document.getElementById('ar_pat_90plus').value),
-      insr: parseAmount(document.getElementById('ar_pat_insr').value),
-    };
-    const arInsurance = {
-      total: parseAmount(document.getElementById('ar_ins_total').value),
-      current: parseAmount(document.getElementById('ar_ins_current').value),
-      d3160: parseAmount(document.getElementById('ar_ins_3160').value),
-      d6190: parseAmount(document.getElementById('ar_ins_6190').value),
-      d90plus: parseAmount(document.getElementById('ar_ins_90plus').value),
-    };
-    const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, practiceName, software, arPatient, arInsurance };
+// AR data now extracted server-side from uploaded PDFs
+    const arPatBase64 = files[4] ? await fileToBase64(files[4]) : null;
+    const arInsBase64 = files[5] ? await fileToBase64(files[5]) : null;
+    const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, arPatBase64, arInsBase64, practiceName, software };
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1114,7 +1094,7 @@ function resetAll() {
   generatedWorkbook = null;
   document.getElementById('resultCard').classList.remove('visible');
   document.getElementById('practiceName').value = '';
-  [1,2,3].forEach(n => {
+  [1,2,3,4,5].forEach(n => {
     const zone = document.getElementById(`upload${n}`); if (zone) zone.classList.remove('has-file');
     const btn = document.getElementById(`next${n}`); if (btn && n !== 1) btn.disabled = true;
     const input = document.getElementById(`file${n}`); if (input) input.value = '';
