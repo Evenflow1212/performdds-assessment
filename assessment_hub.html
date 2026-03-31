@@ -3,1631 +3,1132 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Practice Assessment Hub &mdash; Perform DDS</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script>emailjs.init('S3k44GF4XVmVpgfVJ');</script>
-<script>
-  const UPLOADCARE_KEY = '762aba345bfc73d44262';
-// API key is stored server-side as a Netlify environment variable (ANTHROPIC_KEY)
-// All AI calls are proxied through /.netlify/functions/analyze
-</script>
+<title>Practice Assessment Hub — Perform DDS</title>
 <style>
-:root {
-  --black: #0D0D0D;
-  --black-mid: #161616;
-  --black-card: #1C1C1C;
-  --black-border: #2A2A2A;
-  --blue: #00AEEF;
-  --blue-dark: #0089BF;
-  --blue-glow: rgba(0,174,239,0.15);
-  --blue-light: rgba(0,174,239,0.08);
-  --white: #FFFFFF;
-  --gray-500: #888888;
-  --gray-700: #CCCCCC;
-  --success: #22C55E;
-  --success-light: rgba(34,197,94,0.12);
-  --font-display: 'Montserrat', sans-serif;
-  --font-body: 'Open Sans', sans-serif;
-  --radius: 8px;
-  --shadow: 0 4px 32px rgba(0,0,0,0.6);
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--font-body); background: var(--black); color: var(--gray-700); min-height: 100vh; }
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap');
 
-/* -- LANDING -- */
-#landing { min-height: 100vh; display: flex; flex-direction: column; }
+  :root {
+    --navy: #1a2b4a;
+    --navy-light: #243659;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --cream: #f8f6f1;
+    --white: #ffffff;
+    --text: #1a2b4a;
+    --text-muted: #6b7a94;
+    --border: #dde3ed;
+    --success: #2d7d4f;
+    --warning: #b85c00;
+    --step-active: #1a2b4a;
+    --step-done: #2d7d4f;
+    --step-pending: #c8d0de;
+    --shadow: 0 2px 16px rgba(26,43,74,0.10);
+    --radius: 12px;
+  }
 
-.header { background: var(--black); border-bottom: 1px solid var(--black-border); padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.brand { display: flex; align-items: center; gap: 16px; }
-.logo-img { height: 46px; width: auto; }
-.logo-fallback { display:none; width:44px; height:44px; background:var(--blue); border-radius:6px; align-items:center; justify-content:center; font-family:var(--font-display); color:var(--black); font-size:20px; font-weight:900; }
-.brand-text h1 { color: white; font-family: var(--font-display); font-size: 19px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-.brand-text p { color: var(--blue); font-size: 10px; font-weight: 600; margin-top: 2px; letter-spacing: 2.5px; text-transform: uppercase; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-.hero-section { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 24px 80px; text-align: center; position: relative; overflow: hidden; }
-.hero-section::before { content:''; position:absolute; top:0; left:0; right:0; bottom:0; background: radial-gradient(ellipse at 50% 0%, rgba(0,174,239,0.07) 0%, transparent 65%); pointer-events:none; }
-.hero-eyebrow { font-family: var(--font-display); font-size: 10px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--blue); margin-bottom: 20px; }
-.hero-title { font-family: var(--font-display); font-size: clamp(28px, 5vw, 52px); font-weight: 900; color: white; letter-spacing: -0.5px; text-transform: uppercase; line-height: 1.05; margin-bottom: 20px; }
-.hero-title span { color: var(--blue); }
-.hero-sub { font-size: 15px; color: var(--gray-500); max-width: 520px; line-height: 1.7; margin-bottom: 56px; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+  }
 
-/* Platform cards */
-.platform-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 920px; width: 100%; position: relative; z-index: 1; }
+  /* HEADER */
+  header {
+    background: var(--navy);
+    color: white;
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.3rem;
+    letter-spacing: 0.02em;
+    color: white;
+  }
+  .logo span { color: var(--gold); }
+  .header-sub {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
 
-.platform-card { background: var(--black-card); border: 1px solid var(--black-border); border-radius: 12px; padding: 36px 28px; cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden; text-align: left; }
-.platform-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--blue); transform:scaleX(0); transform-origin:left; transition:transform 0.3s ease; }
-.platform-card::after { content:''; position:absolute; inset:0; background: radial-gradient(ellipse at 50% 0%, rgba(0,174,239,0.06) 0%, transparent 70%); opacity:0; transition:opacity 0.3s ease; pointer-events:none; }
-.platform-card:hover { border-color: var(--blue); transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,174,239,0.12); }
-.platform-card:hover::before { transform: scaleX(1); }
-.platform-card:hover::after { opacity: 1; }
+  /* LAYOUT */
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
 
-.platform-icon { width: 52px; height: 52px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; font-size: 22px; }
-.icon-eaglesoft { background: rgba(0,174,239,0.1); border: 1px solid rgba(0,174,239,0.2); }
-.icon-dentrix { background: rgba(101,195,94,0.1); border: 1px solid rgba(101,195,94,0.2); }
-.icon-opendental { background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.2); }
+  /* SOFTWARE SELECTOR */
+  .software-bar {
+    background: white;
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .software-bar label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .software-btn {
+    padding: 8px 20px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .software-btn:hover { border-color: var(--navy); color: var(--navy); }
+  .software-btn.active {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: white;
+  }
 
-.platform-label { font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--gray-500); margin-bottom: 8px; font-family: var(--font-display); }
-.platform-name { font-family: var(--font-display); font-size: 22px; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
-.platform-desc { font-size: 13px; color: var(--gray-500); line-height: 1.6; margin-bottom: 24px; }
-.platform-reports { display: flex; flex-direction: column; gap: 6px; margin-bottom: 28px; }
-.report-pill { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--gray-700); }
-.report-pill::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--blue); flex-shrink:0; }
-.platform-cta { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--blue); transition: gap 0.2s; }
-.platform-card:hover .platform-cta { gap: 12px; }
-.platform-cta .arrow { transition: transform 0.2s; }
-.platform-card:hover .platform-cta .arrow { transform: translateX(4px); }
+  /* PRACTICE NAME */
+  .practice-row {
+    background: white;
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .practice-row label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .practice-row input {
+    flex: 1;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.18s;
+  }
+  .practice-row input:focus { border-color: var(--navy); }
 
-.footer-note { margin-top: 48px; font-size: 12px; color: var(--gray-500); position: relative; z-index: 1; }
-.footer-note strong { color: var(--blue); }
+  /* PROGRESS TRACKER */
+  .progress-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 32px;
+    gap: 0;
+  }
+  .prog-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    cursor: pointer;
+  }
+  .prog-step::before {
+    content: '';
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: var(--step-pending);
+    z-index: 0;
+  }
+  .prog-step:last-child::before { display: none; }
+  .prog-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--step-pending);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    position: relative;
+    z-index: 1;
+    transition: all 0.2s;
+    border: 3px solid var(--cream);
+  }
+  .prog-step.active .prog-dot { background: var(--navy); box-shadow: 0 0 0 4px rgba(26,43,74,0.15); }
+  .prog-step.done .prog-dot { background: var(--success); }
+  .prog-step.done .prog-dot::after { content: '✓'; }
+  .prog-label {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-top: 6px;
+    text-align: center;
+    letter-spacing: 0.03em;
+    max-width: 70px;
+    line-height: 1.3;
+  }
+  .prog-step.active .prog-label { color: var(--navy); font-weight: 700; }
 
-/* -- GUIDE VIEW -- */
-#guide-view { display: none; min-height: 100vh; flex-direction: column; }
-#guide-view.active { display: flex; }
+  /* STEP CARD */
+  .step-card {
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+    overflow: hidden;
+    display: none;
+  }
+  .step-card.visible { display: block; }
 
-.guide-header { background: var(--black); border-bottom: 1px solid var(--black-border); padding: 14px 40px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; position: sticky; top:0; z-index:200; }
-.back-btn { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gray-500); cursor: pointer; transition: color 0.2s; background: none; border: none; }
-.back-btn:hover { color: var(--blue); }
-.guide-platform-badge { display: flex; align-items: center; gap: 10px; }
-.platform-dot { width: 8px; height: 8px; border-radius: 50%; }
-.guide-platform-name { font-family: var(--font-display); font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: white; }
+  .step-header {
+    background: var(--navy);
+    color: white;
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+  .step-title { font-size: 1.05rem; font-weight: 600; }
+  .step-subtitle { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
 
-/* Guide progress bar */
-.progress-bar { background: var(--black-mid); border-bottom: 1px solid var(--black-border); padding: 0 40px; display: flex; align-items: center; overflow-x: auto; position: sticky; top: 57px; z-index: 100; box-shadow: 0 2px 16px rgba(0,0,0,0.4); flex-shrink:0; }
-.prog-step { display: flex; align-items: center; gap: 8px; padding: 13px 14px; cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; transition: all 0.2s; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--gray-500); font-family: var(--font-display); }
-.prog-step:hover { color: var(--white); }
-.prog-step.active { color: var(--blue); border-bottom-color: var(--blue); }
-.prog-step.done { color: var(--success); }
-.prog-num { width: 20px; height: 20px; border-radius: 50%; background: var(--black-border); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0; transition: all 0.2s; }
-.prog-step.active .prog-num { background: var(--blue); color: var(--black); }
-.prog-step.done .prog-num { background: var(--success); color: var(--black); }
+  .step-body { padding: 28px; }
 
-.guide-container { max-width: 860px; margin: 0 auto; padding: 36px 24px 80px; width: 100%; }
+  /* INSTRUCTIONS */
+  .instructions {
+    background: #f0f4fa;
+    border-left: 4px solid var(--navy);
+    border-radius: 0 8px 8px 0;
+    padding: 18px 20px;
+    margin-bottom: 24px;
+  }
+  .instructions h4 {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--navy);
+    margin-bottom: 12px;
+  }
+  .instructions ol, .instructions ul {
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .instructions li {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .instructions li strong { color: var(--navy); }
+  .instructions .path {
+    display: inline-block;
+    background: var(--navy);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin: 2px 0;
+  }
 
-/* Step cards */
-.step-card { background: var(--black-card); border: 1px solid var(--black-border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; display: none; }
-.step-card.visible { display: block; }
-.step-header { background: linear-gradient(90deg, #111827 0%, var(--black-mid) 100%); border-bottom: 1px solid var(--black-border); padding: 20px 26px; display: flex; align-items: center; gap: 14px; position: relative; }
-.step-header::after { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--blue); }
-.step-num { width: 38px; height: 38px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); color: var(--black); font-size: 17px; font-weight: 800; flex-shrink: 0; }
-.step-title h2 { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: white; }
-.step-title p { color: var(--gray-500); font-size: 13px; margin-top: 3px; }
-.step-body { padding: 28px; }
+  /* CALLOUT */
+  .callout {
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+  .callout.warn {
+    background: #fff8ed;
+    border: 1.5px solid #f0c060;
+    color: #7a4a00;
+  }
+  .callout.info {
+    background: #eef3fb;
+    border: 1.5px solid #b0c4e0;
+    color: #1a3060;
+  }
+  .callout.success {
+    background: #edfaf4;
+    border: 1.5px solid #7ecfaa;
+    color: #1a5c3a;
+  }
+  .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
 
-.why-box { background: var(--blue-light); border-left: 3px solid var(--blue); border-radius: 0 6px 6px 0; padding: 14px 18px; margin-bottom: 24px; font-size: 14px; line-height: 1.7; color: var(--gray-700); }
-.why-box strong { color: var(--blue); }
+  /* DATE BADGE */
+  .date-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--navy);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    margin: 4px 0;
+  }
+  .date-badge .label {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: rgba(255,255,255,0.65);
+    letter-spacing: 0.05em;
+  }
 
-.instructions h3 { font-size: 10px; font-weight: 700; color: var(--blue); margin-bottom: 14px; letter-spacing: 2px; text-transform: uppercase; font-family: var(--font-display); }
-.step-list { list-style: none; counter-reset: steps; margin-bottom: 20px; }
-.step-list li { counter-increment: steps; display: flex; gap: 14px; margin-bottom: 14px; font-size: 14px; line-height: 1.6; color: var(--gray-700); }
-.step-list li::before { content: counter(steps); background: var(--blue); color: var(--black); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; margin-top: 1px; font-family: var(--font-display); }
-.path { background: var(--black-border); border-radius: 4px; padding: 2px 8px; font-family: monospace; font-size: 13px; color: var(--blue); font-weight: 600; white-space: nowrap; }
+  /* SETTINGS TABLE */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #f5f7fb;
+    border-radius: 8px;
+    font-size: 0.88rem;
+  }
+  .setting-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .setting-check.on { background: var(--success); color: white; }
+  .setting-check.off { background: #dde3ed; color: #8a96a8; }
 
-.settings-box { background: var(--black-mid); border: 1px solid var(--black-border); border-radius: var(--radius); padding: 16px 20px; margin: 16px 0; }
-.settings-box h4 { font-size: 10px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; font-family: var(--font-display); }
-.setting-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 13px; }
-.setting-label { color: var(--gray-500); font-weight: 500; min-width: 130px; }
-.setting-value { color: white; font-weight: 600; }
+  /* SCREENSHOT GUIDE */
+  .screenshot-guide {
+    background: #f8f6f1;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .screenshot-guide h4 {
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .kbd {
+    display: inline-block;
+    background: var(--navy);
+    color: white;
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin: 2px;
+  }
 
-.tip { background: var(--black-mid); border: 1px solid var(--black-border); border-radius: 6px; padding: 12px 16px; font-size: 13px; color: var(--gray-500); margin-top: 12px; display: flex; gap: 8px; }
-.tip::before { content: ''; flex-shrink: 0; }
+  /* FILE UPLOAD */
+  .upload-zone {
+    border: 2.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #fafbfd;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--navy); background: #f0f4fa; }
+  .upload-zone.has-file { border-color: var(--success); background: #edfaf4; border-style: solid; }
+  .upload-icon { font-size: 2rem; margin-bottom: 10px; }
+  .upload-zone h4 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .upload-zone p { font-size: 0.82rem; color: var(--text-muted); }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .file-name {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--success);
+    margin-top: 8px;
+  }
+  .upload-zone.has-file .file-name { display: flex; justify-content: center; }
+  .upload-zone.has-file .upload-default { display: none; }
 
-.upload-zone { border: 2px dashed var(--black-border); border-radius: var(--radius); padding: 28px; text-align: center; cursor: pointer; transition: all 0.2s; margin-top: 20px; background: var(--black-mid); }
-.upload-zone:hover, .upload-zone.dragover { border-color: var(--blue); background: var(--blue-light); }
-.upload-zone.uploaded { border-color: var(--success); background: var(--success-light); border-style: solid; }
-.upload-icon { font-size: 30px; margin-bottom: 10px; }
-.upload-zone h3 { font-size: 13px; font-weight: 700; color: white; margin-bottom: 6px; font-family: var(--font-display); letter-spacing: 0.5px; text-transform: uppercase; }
-.upload-zone p { font-size: 13px; color: var(--gray-500); margin-bottom: 14px; }
-.upload-btn { background: var(--blue); color: var(--black); border: none; border-radius: 4px; padding: 10px 24px; font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
-.upload-zone input[type=file] { display: none; }
-.upload-status { display: none; align-items: center; gap: 10px; color: var(--success); font-weight: 700; font-size: 14px; }
-.upload-status.show { display: flex; justify-content: center; }
-.upload-change { font-size: 12px; color: var(--gray-500); margin-top: 6px; cursor: pointer; text-decoration: underline; }
+  /* MANUAL ENTRY */
+  .manual-entry {
+    background: #f5f7fb;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .manual-entry h4 {
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .entry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .entry-field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .entry-field input {
+    width: 100%;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.18s;
+    background: white;
+  }
+  .entry-field input:focus { border-color: var(--navy); }
+  .entry-field.total input { border-color: var(--gold); font-weight: 700; }
 
-/* Uploadcare progress */
-.upload-progress-wrap { display: none; flex-direction: column; align-items: center; gap: 10px; padding: 8px 0; }
-.upload-progress-wrap.show { display: flex; }
-.upload-progress-bar-track { width: 100%; max-width: 320px; height: 4px; background: var(--black-border); border-radius: 2px; overflow: hidden; }
-.upload-progress-bar-fill { height: 100%; background: var(--blue); border-radius: 2px; transition: width 0.2s; width: 0%; }
-.upload-progress-label { font-size: 12px; color: var(--blue); font-family: var(--font-display); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-
-.nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--black-border); }
-.btn-back-step { background: transparent; color: var(--gray-500); border: 1px solid var(--black-border); border-radius: 4px; padding: 11px 24px; font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
-.btn-back-step:hover { border-color: var(--gray-500); color: white; }
-.btn-next-step { background: var(--blue); color: var(--black); border: none; border-radius: 4px; padding: 12px 28px; font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
-.btn-next-step:hover { background: var(--blue-dark); transform: translateY(-1px); }
-.step-progress { font-size: 11px; color: var(--gray-500); font-family: var(--font-display); letter-spacing: 1px; }
-
-/* Practice name */
-.practice-input-box { background: var(--black-mid); border: 1px solid var(--black-border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 22px; }
-.practice-input-box label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--blue); margin-bottom: 10px; font-family: var(--font-display); }
-.practice-input-box input { width: 100%; border: 1px solid var(--black-border); border-radius: 4px; padding: 11px 14px; font-family: var(--font-body); font-size: 15px; font-weight: 600; color: white; background: var(--black); outline: none; }
-.practice-input-box .hint { font-size: 12px; color: var(--gray-500); margin-top: 6px; }
-
-/* Complete card */
-.complete-card { background: var(--black-card); border: 1px solid var(--black-border); border-radius: var(--radius); padding: 40px; text-align: center; display: none; }
-.complete-card.visible { display: block; }
-.complete-icon { font-size: 52px; margin-bottom: 16px; }
-.complete-card h2 { font-family: var(--font-display); color: white; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-.complete-card p { font-size: 15px; color: var(--gray-500); max-width: 480px; margin: 0 auto 28px; line-height: 1.6; }
-.summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 28px; }
-.summary-item { background: var(--black-mid); border: 1px solid var(--black-border); border-radius: 6px; padding: 14px; text-align: left; }
-.s-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--gray-500); margin-bottom: 6px; font-family: var(--font-display); }
-.s-val { font-size: 13px; font-weight: 600; color: white; }
-.s-val.uploaded { color: var(--success); }
-.s-val.skipped { color: var(--gray-500); }
-.btn-submit-final { background: var(--blue); color: var(--black); border: none; border-radius: 4px; padding: 15px 44px; font-family: var(--font-display); font-size: 13px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; box-shadow: 0 4px 20px rgba(0,174,239,0.3); }
-.btn-submit-final:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(0,174,239,0.45); background: var(--blue-dark); }
-.sent-msg { display: none; background: var(--success-light); border: 1px solid var(--success); border-radius: var(--radius); padding: 16px 24px; color: var(--success); font-weight: 600; font-size: 14px; margin-top: 20px; }
-.sent-msg.show { display: block; }
-
-@media (max-width: 700px) {
-  .platform-grid { grid-template-columns: 1fr; }
-  .header, .guide-header { padding: 14px 20px; }
-  .progress-bar { padding: 0 16px; }
-  .guide-container { padding: 20px 16px; }
-  .summary-grid { grid-template-columns: 1fr 1fr; }
-}
-
-    .workbook-btn{display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#1a7a3a,#22C55E);color:#fff;border:none;border-radius:10px;padding:14px 28px;font-size:15px;font-weight:700;font-family:var(--font-display);cursor:pointer;letter-spacing:0.5px;margin-top:16px;width:100%;transition:all 0.2s;}
-    .workbook-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(34,197,94,0.35);}
-    .workbook-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
-    .workbook-status{margin-top:10px;font-size:13px;color:var(--gray-500);text-align:center;min-height:20px;}
-  
-/* ── SAMPLE REPORT MODAL ── */
-.sample-modal-overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,0.85); z-index: 9999;
-  align-items: center; justify-content: center;
-}
-.sample-modal-overlay.open { display: flex; }
-.sample-modal {
-  background: #1a1a2e; border: 1px solid rgba(0,174,239,0.3);
-  border-radius: 12px; width: 90vw; max-width: 900px;
-  height: 85vh; display: flex; flex-direction: column;
-  overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-}
-.sample-modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px; background: #1F3864; flex-shrink: 0;
-}
-.sample-modal-title { font-size: 13px; font-weight: 700; color: white; letter-spacing: 1px; text-transform: uppercase; }
-.sample-modal-close {
-  background: none; border: none; color: rgba(255,255,255,0.7);
-  font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;
-}
-.sample-modal-close:hover { color: white; }
-.sample-modal-body { flex: 1; overflow: hidden; }
-.sample-modal-body iframe { width: 100%; height: 100%; border: none; }
-.sample-report-btn {
-  display: inline-flex; align-items: center; gap: 7px;
-  background: rgba(0,174,239,0.1); border: 1px solid rgba(0,174,239,0.4);
-  color: #00aeef; border-radius: 6px; padding: 8px 16px;
-  font-size: 12px; font-weight: 700; letter-spacing: 1px;
-  text-transform: uppercase; cursor: pointer; margin-bottom: 12px;
-  transition: all 0.2s;
-}
-.sample-report-btn:hover { background: rgba(0,174,239,0.2); border-color: rgba(0,174,239,0.7); }
-.sample-report-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-
+  /* NAVIGATION */
+  .nav-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1.5px solid var(--border);
+  }
+  .btn {
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.18s;
+    letter-spacing: 0.02em;
+  }
+  .btn-primary { background: var(--navy); color: white; }
+  .btn-primary:hover { background: var(--navy-light); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,43,74,0.25); }
+  .btn-secondary { background: white; color: var(--text); border: 2px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--navy); color: var(--navy); }
+  .btn-generate { background: var(--gold); color: var(--navy); padding: 14px 36px; font-size: 1rem; }
+  .btn-generate:hover { background: var(--gold-light); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(201,168,76,0.35); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+  .status-msg { font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
+  .generating { display: none; text-align: center; padding: 40px; }
+  .generating.visible { display: block; }
+  .spinner { width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--navy); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .generating h3 { font-size: 1.1rem; font-weight: 600; color: var(--navy); margin-bottom: 8px; }
+  .generating p { font-size: 0.88rem; color: var(--text-muted); }
+  .result-card { display: none; background: white; border-radius: var(--radius); box-shadow: var(--shadow); padding: 36px; text-align: center; }
+  .result-card.visible { display: block; }
+  .result-icon { font-size: 3rem; margin-bottom: 12px; }
+  .result-card h2 { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: var(--navy); margin-bottom: 8px; }
+  .result-card p { font-size: 0.92rem; color: var(--text-muted); margin-bottom: 24px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .summary-stat { background: #f5f7fb; border-radius: 10px; padding: 16px; text-align: left; }
+  .summary-stat .val { font-size: 1.25rem; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+  .summary-stat .lbl { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .skip-link { font-size: 0.8rem; color: var(--text-muted); text-decoration: underline; cursor: pointer; background: none; border: none; font-family: inherit; }
+  .skip-link:hover { color: var(--navy); }
+  @media (max-width: 600px) {
+    .settings-grid { grid-template-columns: 1fr; }
+    .entry-grid { grid-template-columns: 1fr 1fr; }
+    header { padding: 0 20px; }
+    .container { padding: 24px 16px 60px; }
+  }
 </style>
 </head>
 <body>
 
-<!-- |||||||||||||| LANDING PAGE |||||||||||||| -->
-<div id="landing">
-  <div class="header">
-    <div class="brand">
-      <img class="logo-img" src="https://images.squarespace-cdn.com/content/v1/65c2c27990d50d089d25d2e3/6022f6b9-e12f-4811-8964-286890635aea/PerformDDS_Left_Logo2_Sml.png?format=300w" alt="Perform DDS" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="logo-fallback">P</div>
-      <button class="workbook-btn" id="workbookBtn" style="display:none" onclick="generateWorkbook()">
-         Download Assessment Workbook
-      </button>
-      <div class="workbook-status" id="workbookStatus"></div>
-      <div class="brand-text">
-        <h1>Perform DDS</h1>
-        <p>Your Practice... Optimized</p>
-      </div>
+<header>
+  <div>
+    <div class="logo">Perform<span>DDS</span></div>
+  </div>
+  <div class="header-sub">Practice Assessment Hub</div>
+</header>
+
+<div class="container">
+
+  <!-- SOFTWARE SELECTOR -->
+  <div class="software-bar">
+    <label>Practice Software:</label>
+    <button class="software-btn active" onclick="setSoftware('dentrix')">Dentrix</button>
+    <button class="software-btn" onclick="setSoftware('eaglesoft')">Eaglesoft</button>
+    <button class="software-btn" onclick="setSoftware('opendental')">Open Dental</button>
+  </div>
+
+  <!-- PRACTICE NAME -->
+  <div class="practice-row">
+    <label>Practice Name:</label>
+    <input type="text" id="practiceName" placeholder="e.g. Smith Family Dentistry" />
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-bar" id="progressBar">
+    <div class="prog-step active" onclick="goToStep(1)">
+      <div class="prog-dot">1</div>
+      <div class="prog-label">Production</div>
+    </div>
+    <div class="prog-step" onclick="goToStep(2)">
+      <div class="prog-dot">2</div>
+      <div class="prog-label">Collections</div>
+    </div>
+    <div class="prog-step" onclick="goToStep(3)">
+      <div class="prog-dot">3</div>
+      <div class="prog-label">P&amp;L</div>
+    </div>
+    <div class="prog-step" onclick="goToStep(4)">
+      <div class="prog-dot">4</div>
+      <div class="prog-label">Patient AR</div>
+    </div>
+    <div class="prog-step" onclick="goToStep(5)">
+      <div class="prog-dot">5</div>
+      <div class="prog-label">Insurance AR</div>
+    </div>
+    <div class="prog-step" onclick="goToStep(6)">
+      <div class="prog-dot">6</div>
+      <div class="prog-label">Generate</div>
     </div>
   </div>
 
-  <div class="hero-section">
-    <div class="hero-eyebrow">Practice Assessment Data Collection</div>
-    <h1 class="hero-title">Select Your<br><span>Practice Software</span></h1>
-    <p class="hero-sub">We'll walk you through pulling the exact reports we need &mdash; step by step, specific to your software. Takes about 15&ndash;20 minutes.</p>
-
-    <div class="platform-grid">
-
-      <!-- EAGLESOFT -->
-      <div class="platform-card" onclick="openGuide('eaglesoft')">
-        <div class="platform-icon icon-eaglesoft"></div>
-        <div class="platform-label">Patterson Dental</div>
-        <div class="platform-name">Eaglesoft</div>
-        <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Eaglesoft.</p>
-        <div class="platform-reports">
-          <div class="report-pill">Procedures by Provider</div>
-          <div class="report-pill">Payment Reconciliation</div>
-          <div class="report-pill">P&L / Income Statement</div>
-          <div class="report-pill">AR by Responsible Party</div>
-          <div class="report-pill">Hygiene Schedule</div>
-          <div class="report-pill">Patient Analysis</div>
+  <!-- STEP 1: PRODUCTION -->
+  <div class="step-card visible" id="step1">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-title">Production by Procedure Code</div>
+        <div class="step-subtitle" id="step1-sub">Dentrix — Practice Analysis Reports</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="instructions">
+        <h4>How to run this report in Dentrix</h4>
+        <ol>
+          <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Management</span> → <span class="path">Practice Analysis Reports...</span></li>
+          <li>Set your date range to the last <strong>24 complete months</strong>:<br>
+            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+              <div class="date-badge"><span class="label">From</span> <span id="date24from">—</span></div>
+              <div class="date-badge"><span class="label">To</span> <span id="date24to">—</span></div>
+            </div>
+          </li>
+          <li>Switch date type to <strong>Procedure Date</strong> (not Entry Date — this is the default, you must change it)</li>
+          <li>Set all providers to <strong>All</strong></li>
+          <li>Under <em>Select Summary Reports</em>, match these settings exactly:</li>
+        </ol>
+        <div class="settings-grid" style="margin-top:12px;">
+          <div class="setting-row"><div class="setting-check on">✓</div> Production Summary</div>
+          <div class="setting-row"><div class="setting-check off">✗</div> ...by Category</div>
+          <div class="setting-row"><div class="setting-check on">✓</div> Include Cross Coding</div>
+          <div class="setting-row"><div class="setting-check off">✗</div> ...by Proc Code Range</div>
+          <div class="setting-row"><div class="setting-check off">✗</div> Payment Summary</div>
+          <div class="setting-row"><div class="setting-check off">✗</div> Adjustment Summary</div>
+          <div class="setting-row"><div class="setting-check off">✗</div> Patient Summary</div>
         </div>
-        <div class="platform-cta">Start Eaglesoft Guide <span class="arrow">&rarr;</span></div>
+        <ol start="6" style="margin-top:12px;">
+          <li>Click <strong>Batch</strong> (not Print — Print sends to a physical printer)</li>
+          <li>In the <strong>Batch Processor</strong>, double-click the new <em>Practice Analysis</em> entry to open it</li>
+          <li>Upload the PDF below</li>
+        </ol>
       </div>
-
-      <!-- DENTRIX -->
-      <div class="platform-card" onclick="openGuide('dentrix')">
-        <div class="platform-icon icon-dentrix"></div>
-        <div class="platform-label">Henry Schein One</div>
-        <div class="platform-name">Dentrix</div>
-        <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Dentrix.</p>
-        <div class="platform-reports">
-          <div class="report-pill">Practice Analysis Report</div>
-          <div class="report-pill">Payment Reconciliation</div>
-          <div class="report-pill">P&L / Income Statement</div>
-          <div class="report-pill">Aging Report</div>
-          <div class="report-pill">Hygiene Schedule</div>
-          <div class="report-pill">Active Patient List</div>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div><strong>Report too long?</strong> If your report is more than 5–6 pages, you may have accidentally included patient-level detail. Uncheck <em>Patient Summary</em> and re-run.</div>
+      </div>
+      <div class="callout info">
+        <div class="callout-icon">💡</div>
+        <div><strong>Using Splashtop or remote access?</strong> Use Batch (not Print). Take a screenshot with <strong class="kbd">⌘ Shift 4</strong> on Mac or <strong class="kbd">Win + Shift + S</strong> on PC. Files save to your Desktop automatically.</div>
+      </div>
+      <div class="upload-zone" id="upload1" onclick="document.getElementById('file1').click()">
+        <input type="file" id="file1" accept=".pdf" onchange="handleFile(1, this)">
+        <div class="upload-default">
+          <div class="upload-icon">📄</div>
+          <h4>Upload Production Report (PDF)</h4>
+          <p>Click to browse or drag and drop your PDF here</p>
         </div>
-        <div class="platform-cta">Start Dentrix Guide <span class="arrow">&rarr;</span></div>
+        <div class="file-name" id="fname1">✅ <span id="fname1-text"></span></div>
       </div>
+      <div class="nav-row">
+        <div class="status-msg" id="status1">Upload your production report to continue</div>
+        <button class="btn btn-primary" id="next1" onclick="nextStep(1)" disabled>Continue →</button>
+      </div>
+    </div>
+  </div>
 
-      <!-- OPEN DENTAL -->
-      <div class="platform-card" onclick="openGuide('opendental')">
-        <div class="platform-icon icon-opendental"></div>
-        <div class="platform-label">Open Source</div>
-        <div class="platform-name">Open Dental</div>
-        <p class="platform-desc">Step-by-step instructions for pulling all 6 assessment reports from Open Dental.</p>
-        <div class="platform-reports">
-          <div class="report-pill">Procedures by Code</div>
-          <div class="report-pill">Payment Reconciliation</div>
-          <div class="report-pill">P&L / Income Statement</div>
-          <div class="report-pill">Aging of AR Report</div>
-          <div class="report-pill">Hygiene Schedule</div>
-          <div class="report-pill">Active Patients</div>
+  <!-- STEP 2: COLLECTIONS -->
+  <div class="step-card" id="step2">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div>
+        <div class="step-title">Collections Summary</div>
+        <div class="step-subtitle" id="step2-sub">Dentrix — Analysis Summary (Provider)</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="instructions">
+        <h4>How to run this report in Dentrix</h4>
+        <ol>
+          <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Management</span> → <span class="path">Analysis Summary...</span></li>
+          <li>Set your date range to the same <strong>24 complete months</strong>:<br>
+            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+              <div class="date-badge"><span class="label">From</span> <span id="date24from2">—</span></div>
+              <div class="date-badge"><span class="label">To</span> <span id="date24to2">—</span></div>
+            </div>
+          </li>
+          <li>Switch date type to <strong>Procedure Date</strong></li>
+          <li>All Providers, All Billing Types</li>
+          <li>Under <em>Select Report Types</em>, check: Provider Summary, Inc MTD/YTD Totals, Include All Totals, Print Condensed Report</li>
+          <li>Click <strong>Batch</strong>, open from Batch Processor</li>
+          <li>The <strong>TOTAL row</strong> at the bottom right of the last page shows your Charges and Payments</li>
+          <li>Upload the PDF below</li>
+        </ol>
+      </div>
+      <div class="callout success">
+        <div class="callout-icon">📊</div>
+        <div>The <strong>TOTALS row</strong> at the bottom of this report shows total Charges and Payments for the full period. That's what populates the Financial Overview in your workbook.</div>
+      </div>
+      <div class="upload-zone" id="upload2" onclick="document.getElementById('file2').click()">
+        <input type="file" id="file2" accept=".pdf" onchange="handleFile(2, this)">
+        <div class="upload-default">
+          <div class="upload-icon">📄</div>
+          <h4>Upload Analysis Summary (PDF)</h4>
+          <p>Click to browse or drag and drop your PDF here</p>
         </div>
-        <div class="platform-cta">Start Open Dental Guide <span class="arrow">&rarr;</span></div>
+        <div class="file-name" id="fname2">✅ <span id="fname2-text"></span></div>
       </div>
-
-    </div>
-
-    <div class="footer-note">Not sure which software you use? Call us at <strong>(949) 232-4788</strong> and we'll help you get set up.</div>
-  </div>
-</div>
-
-<!-- |||||||||||||| GUIDE VIEW |||||||||||||| -->
-<div id="guide-view">
-  <div class="guide-header">
-    <button class="back-btn" onclick="closePlatform()">&larr; Back to Platform Selection</button>
-    <div class="guide-platform-badge">
-      <div class="platform-dot" id="guide-dot" style="background:var(--blue)"></div>
-      <div class="guide-platform-name" id="guide-platform-name">Eaglesoft</div>
-    </div>
-    <img class="logo-img" style="height:36px;" src="https://images.squarespace-cdn.com/content/v1/65c2c27990d50d089d25d2e3/6022f6b9-e12f-4811-8964-286890635aea/PerformDDS_Left_Logo2_Sml.png?format=300w" alt="Perform DDS" onerror="this.style.display='none'">
-  </div>
-
-  <div class="progress-bar" id="progress-bar"></div>
-
-  <div class="guide-container">
-    <div id="steps-container"></div>
-    <div class="complete-card" id="complete-card">
-      <div class="complete-icon"></div>
-      <h2>You're All Done!</h2>
-      <p>Here's a summary of what you've submitted. Click Send to deliver everything to your Perform DDS consultant.</p>
-      <div class="summary-grid" id="summary-grid"></div>
-      <button class="btn-submit-final" onclick="submitToConsultant()">Send to Assessment Team &rarr;</button>
-      <div class="sent-msg" id="sent-msg"></div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="prevStep(2)">← Back</button>
+        <button class="btn btn-primary" id="next2" onclick="nextStep(2)" disabled>Continue →</button>
+      </div>
     </div>
   </div>
+
+  <!-- STEP 3: P&L -->
+  <div class="step-card" id="step3">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-title">Profit &amp; Loss Statement</div>
+        <div class="step-subtitle">QuickBooks or from your accountant — 12 months</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="instructions">
+        <h4>How to get your P&amp;L</h4>
+        <ol>
+          <li>This comes from <strong>QuickBooks</strong> or your accountant — not from Dentrix</li>
+          <li>Request a <strong>Profit &amp; Loss report</strong> for the last complete 12 months:<br>
+            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+              <div class="date-badge"><span class="label">From</span> <span id="date12from">—</span></div>
+              <div class="date-badge"><span class="label">To</span> <span id="date12to">—</span></div>
+            </div>
+          </li>
+          <li>Export as PDF from QuickBooks: <span class="path">Reports</span> → <span class="path">Profit &amp; Loss</span> → <span class="path">Email / Export as PDF</span></li>
+          <li>Upload the PDF below</li>
+        </ol>
+      </div>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div><strong>Always use 12 months</strong> for the P&amp;L — one full calendar year. Use the dates shown above.</div>
+      </div>
+      <div class="upload-zone" id="upload3" onclick="document.getElementById('file3').click()">
+        <input type="file" id="file3" accept=".pdf" onchange="handleFile(3, this)">
+        <div class="upload-default">
+          <div class="upload-icon">📄</div>
+          <h4>Upload P&amp;L Statement (PDF)</h4>
+          <p>Click to browse or drag and drop your PDF here</p>
+        </div>
+        <div class="file-name" id="fname3">✅ <span id="fname3-text"></span></div>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="prevStep(3)">← Back</button>
+        <div>
+          <button class="skip-link" onclick="skipStep(3)" style="margin-right:16px;">Skip for now</button>
+          <button class="btn btn-primary" id="next3" onclick="nextStep(3)" disabled>Continue →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4: PATIENT AR -->
+  <div class="step-card" id="step4">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div>
+        <div class="step-title">Patient AR Aging</div>
+        <div class="step-subtitle" id="step4-sub">Dentrix — Aging Report (manual entry)</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="instructions">
+        <h4>How to run this report in Dentrix</h4>
+        <ol>
+          <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Ledger</span> → <span class="path">Aging Report...</span></li>
+          <li>Set: All Guarantors, All Providers, All Billing Types, Standard Aging only</li>
+          <li>Set <strong>Min Balance to Print</strong> to <strong>1.00</strong></li>
+          <li>Set <strong>Minimum Days Past Due</strong> to <strong>Over 0</strong></li>
+          <li>Click <strong>OK</strong>, then <strong>Batch</strong></li>
+          <li>Open from Batch Processor — scroll to the <strong>very last page</strong></li>
+          <li>Screenshot the TOTALS summary box at the bottom, then enter the numbers below</li>
+        </ol>
+      </div>
+      <div class="callout warn">
+        <div class="callout-icon">⚠️</div>
+        <div><strong>Important:</strong> Set "Min Balance to Print" to <strong>1.00</strong> — this excludes credit balances and zero-balance accounts so you only see patients who actually owe money.</div>
+      </div>
+      <div class="screenshot-guide">
+        <h4>📸 What to screenshot &amp; enter</h4>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:12px;">Scroll to the last page. The TOTALS box at the bottom looks like this:</p>
+        <div style="background:white;border:1.5px solid var(--border);border-radius:8px;padding:14px;font-size:0.82rem;font-family:monospace;">
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-weight:700;border-bottom:2px solid var(--navy);padding-bottom:6px;margin-bottom:6px;font-size:0.72rem;color:var(--navy);">
+            <span></span><span>Current</span><span>31-60</span><span>61-90</span><span>Over 90</span><span>Insr Est</span><span>Balance</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">
+            <span style="font-weight:700;">TOTALS:</span>
+            <span>110,595</span><span>1.00</span><span>183.00</span><span>9,765</span><span>21,320</span><span>120,545</span>
+          </div>
+        </div>
+      </div>
+      <div class="manual-entry">
+        <h4>Enter totals from the TOTALS row</h4>
+        <div class="entry-grid">
+          <div class="entry-field total">
+            <label>Total Balance</label>
+            <input type="text" id="ar_pat_total" placeholder="$0.00" oninput="checkManualEntry()">
+          </div>
+          <div class="entry-field">
+            <label>Current (0-30)</label>
+            <input type="text" id="ar_pat_current" placeholder="$0.00" oninput="checkManualEntry()">
+          </div>
+          <div class="entry-field">
+            <label>31-60 Days</label>
+            <input type="text" id="ar_pat_3160" placeholder="$0.00" oninput="checkManualEntry()">
+          </div>
+          <div class="entry-field">
+            <label>61-90 Days</label>
+            <input type="text" id="ar_pat_6190" placeholder="$0.00" oninput="checkManualEntry()">
+          </div>
+          <div class="entry-field">
+            <label>Over 90 Days</label>
+            <input type="text" id="ar_pat_90plus" placeholder="$0.00" oninput="checkManualEntry()">
+          </div>
+          <div class="entry-field">
+            <label>Insr Estimate</label>
+            <input type="text" id="ar_pat_insr" placeholder="$0.00" oninput="checkManualEntry()">
+          </div>
+        </div>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="prevStep(4)">← Back</button>
+        <div>
+          <button class="skip-link" onclick="skipStep(4)" style="margin-right:16px;">Skip for now</button>
+          <button class="btn btn-primary" id="next4" onclick="nextStep(4)" disabled>Continue →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5: INSURANCE AR -->
+  <div class="step-card" id="step5">
+    <div class="step-header">
+      <div class="step-num">5</div>
+      <div>
+        <div class="step-title">Insurance AR Aging</div>
+        <div class="step-subtitle" id="step5-sub">Dentrix — Insurance Claim Aging Report (manual entry)</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="instructions">
+        <h4>How to run this report in Dentrix</h4>
+        <ol>
+          <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Ledger</span> → <span class="path">Insurance Aging Report...</span></li>
+          <li>Select: <strong>Dental</strong> (not Medical), All Patients, All Providers, All Carriers, Over 0 Days</li>
+          <li>Leave "Exclude Partially Paid Claims" unchecked</li>
+          <li>Click <strong>OK</strong>, then <strong>Batch</strong></li>
+          <li>Open from Batch Processor — scroll to the <strong>very last page</strong></li>
+          <li>Enter the numbers from the <strong>TOTALS ALL CLAIMS</strong> row below</li>
+        </ol>
+      </div>
+      <div class="screenshot-guide">
+        <h4>📸 What to screenshot &amp; enter</h4>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin-bottom:12px;">The last page shows PRIMARY, SECONDARY, and TOTALS ALL CLAIMS rows. Use TOTALS ALL CLAIMS:</p>
+        <div style="background:white;border:1.5px solid var(--border);border-radius:8px;padding:14px;font-size:0.82rem;font-family:monospace;">
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;font-weight:700;border-bottom:2px solid var(--navy);padding-bottom:6px;margin-bottom:6px;font-size:0.72rem;color:var(--navy);">
+            <span></span><span>Estimate</span><span>Current</span><span>31-60</span><span>61-90</span><span>Over 90</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;color:var(--text-muted);">
+            <span>Primary:</span><span>20,451</span><span>52,001</span><span>34,678</span><span>4,565</span><span>0.00</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;color:var(--text-muted);">
+            <span>Secondary:</span><span>58.60</span><span>0.00</span><span>193</span><span>120</span><span>0.00</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;font-weight:700;margin-top:6px;border-top:1px solid var(--border);padding-top:6px;">
+            <span style="color:var(--navy);">TOTALS:</span><span>20,510</span><span>52,001</span><span>34,871</span><span>4,685</span><span>0.00</span>
+          </div>
+        </div>
+      </div>
+      <div class="manual-entry">
+        <h4>Enter totals from TOTALS ALL CLAIMS row</h4>
+        <div class="entry-grid">
+          <div class="entry-field total">
+            <label>Total Balance</label>
+            <input type="text" id="ar_ins_total" placeholder="$0.00" oninput="checkInsuranceEntry()">
+          </div>
+          <div class="entry-field">
+            <label>Current (0-30)</label>
+            <input type="text" id="ar_ins_current" placeholder="$0.00" oninput="checkInsuranceEntry()">
+          </div>
+          <div class="entry-field">
+            <label>31-60 Days</label>
+            <input type="text" id="ar_ins_3160" placeholder="$0.00" oninput="checkInsuranceEntry()">
+          </div>
+          <div class="entry-field">
+            <label>61-90 Days</label>
+            <input type="text" id="ar_ins_6190" placeholder="$0.00" oninput="checkInsuranceEntry()">
+          </div>
+          <div class="entry-field">
+            <label>Over 90 Days</label>
+            <input type="text" id="ar_ins_90plus" placeholder="$0.00" oninput="checkInsuranceEntry()">
+          </div>
+        </div>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="prevStep(5)">← Back</button>
+        <div>
+          <button class="skip-link" onclick="skipStep(5)" style="margin-right:16px;">Skip for now</button>
+          <button class="btn btn-primary" id="next5" onclick="nextStep(5)" disabled>Continue →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6: GENERATE -->
+  <div class="step-card" id="step6">
+    <div class="step-header">
+      <div class="step-num">6</div>
+      <div>
+        <div class="step-title">Generate Assessment Workbook</div>
+        <div class="step-subtitle">Review your uploads and generate your Excel workbook</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div id="review-list" style="margin-bottom:24px;"></div>
+      <div class="callout info">
+        <div class="callout-icon">⏱️</div>
+        <div>Generating your workbook takes approximately <strong>20–30 seconds</strong>. Claude AI reads your reports and populates all 10 tabs of the assessment template.</div>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
+        <button class="btn btn-generate" onclick="generate()" id="generateBtn">Generate Workbook ✦</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERATING STATE -->
+  <div class="generating" id="generatingState">
+    <div class="spinner"></div>
+    <h3>Building your assessment workbook…</h3>
+    <p>Claude AI is reading your reports and populating all 10 tabs.</p>
+    <p style="margin-top:8px;font-size:0.8rem;">This usually takes 20–30 seconds.</p>
+  </div>
+
+  <!-- RESULT -->
+  <div class="result-card" id="resultCard">
+    <div class="result-icon">✅</div>
+    <h2>Your Workbook is Ready</h2>
+    <p>The assessment workbook has been generated and is ready to download.</p>
+    <div class="summary-grid" id="summaryGrid"></div>
+    <button class="btn btn-generate" onclick="downloadWorkbook()" style="display:inline-flex;align-items:center;gap:8px;">
+      ⬇ Download Workbook
+    </button>
+    <div style="margin-top:16px;">
+      <button class="skip-link" onclick="resetAll()">Start a new assessment</button>
+    </div>
+  </div>
+
 </div>
 
 <script>
-// --- State ---
-let currentPlatform = null;
-let currentStep = 0;
-window.uploads = window.uploads || {}; var uploads = window.uploads;
-let hygieneDone = false;
-let practiceName = '';
+let currentStep = 1;
+let software = 'dentrix';
+let files = { 1: null, 2: null, 3: null };
+let skipped = { 3: false, 4: false, 5: false };
+let generatedWorkbook = null;
 
-// Close summary and scroll to a specific step
-function closeModal() {
-  document.getElementById('complete-card').style.display = 'none';
-  document.getElementById('steps-container').style.display = 'block';
-}
-function scrollToStep(stepIndex) {
-  goToStep(stepIndex);
-  const el = document.getElementById('steps-container');
-  if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
-}
-
-// Auto-launch from landing page URL params
-window.addEventListener('DOMContentLoaded', () => {
-  const params = new URLSearchParams(window.location.search);
-  const platform = params.get('platform');
-  const practice = params.get('practice');
-  const doctor = params.get('doctor');
-  if (practice) { practiceName = practice; const inp = document.getElementById('practice-name-input'); if (inp) inp.value = practice; }
-  if (platform && platforms[platform]) {
-    openGuide(platform);
-  }
-});
-
-// Listen for hygiene form completion signal
-window.addEventListener('message', (e) => {
-  if (e.data === 'pdds_hygiene_done') {
-    hygieneDone = true;
-    // Find and update any visible hygiene status element
-    const statusEls = document.querySelectorAll('[id^="hygiene-status-"]');
-    statusEls.forEach(el => {
-      el.textContent = '✓ Completed';
-      el.style.color = 'var(--success)';
-    });
-  }
-});
-
-// --- Platform configs ---
-const platforms = {
-  eaglesoft: {
-    name: 'Eaglesoft',
-    color: '#00AEEF',
-    steps: [
-      {
-        title: 'Procedures by Provider Report',
-        subtitle: 'Production broken down by ADA procedure code',
-        why: '<strong>What we\'re looking for:</strong> Every ADA code billed, the quantity, and total dollars. We map these to categories &mdash; crowns, hygiene, implants, endo, ortho, dentures &mdash; and calculate monthly averages, hygiene %, and your average crown fee.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Provider</span>',
-          'Click <span class="path">Procedures by Provider</span>',
-          'Set <strong>Date Range</strong> to last full <strong>24 months</strong> <em>(e.g. Jan 1, 2023 &ndash; Dec 31, 2024)</em> &mdash; <strong>24 months is preferred</strong> for the most accurate assessment',
-          'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
-          'Click <span class="path">Process</span> to generate',
-          'Click <span class="path">Print</span> &rarr; save as PDF, or export to Excel'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Last full 12 months' },
-          { label: 'Provider', value: 'All Providers' },
-          { label: 'Format', value: 'PDF or Excel' }
-        ],
-        tip: 'This is the most important report &mdash; if you can only pull one, make it this one.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Procedures by Provider Report',
-        sampleReport: { dentrix: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Dentrix_Production_Summary.pdf', eaglesoft: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Eaglesoft_Procedures_By_Provider.pdf', opendental: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_OpenDental_Production_By_Procedure.pdf' },
-        needsMonths: true,
-        monthsLabel: 'How many months does this report cover?'
-      },
-      {
-        title: 'Payment Reconciliation Report',
-        subtitle: 'Collections broken down by payment type',
-        why: '<strong>What we\'re looking for:</strong> Total collections by payment type &mdash; cash, check, credit card, insurance/EFT, and third-party finance. We calculate your collection rate and flag any gap between production and collections.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Financial</span>',
-          'Click <span class="path">Payment Reconciliation</span>',
-          'Set <strong>Date Range</strong> to the <strong>same 24 months as the production report</strong> for best results &mdash; 12 months minimum',
-          'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
-          'Click <span class="path">Process</span>',
-          'Export or print as PDF &mdash; focus on the totals on the last page'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Same 12 months' },
-          { label: 'Provider', value: 'All Providers' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'The last page has the totals summary &mdash; that\'s the section we need most.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Payment Reconciliation Report',
-        sampleReport: { dentrix: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Dentrix_Day_Sheet.pdf', eaglesoft: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Eaglesoft_Provider_Productivity.pdf', opendental: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_OpenDental_Production_Income.pdf' },
-        needsMonths: true,
-        monthsLabel: 'How many months does this report cover?'
-      },
-      {
-        title: 'P&L / Income Statement',
-        subtitle: 'Practice profit and loss for the year',
-        why: '<strong>What we\'re looking for:</strong> Revenue, expenses by category (staff, supplies, lab, rent, marketing), and net income. This lets us benchmark your overhead against industry targets and find where money is leaking.',
-        instructions: [
-          'Your P&L typically comes from your accountant or QuickBooks/accounting software &mdash; <em>not</em> Eaglesoft',
-          'Ask your accountant for the most recent full-year P&L (Income Statement)',
-          'If you use QuickBooks: <span class="path">Reports</span> &rarr; <span class="path">Company & Financial</span> &rarr; <span class="path">Profit & Loss Standard</span>',
-          'Set date range to the <strong>most recent full 12 months</strong> &mdash; P&amp;L is always 12 months (1 full year)',
-          'Export as PDF or Excel'
-        ],
-        settings: [
-          { label: 'Source', value: 'Accountant or QuickBooks' },
-          { label: 'Period', value: '12 months — most recent full year' },
-          { label: 'Format', value: 'PDF or Excel' }
-        ],
-        tip: 'If you don\'t have this handy, just upload what you have &mdash; even a partial P&L is helpful.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload P&L / Income Statement',
-        needsMonths: true,
-        monthsLabel: 'How many months does this P&L cover?'
-      },
-      {
-        title: 'Hygiene Schedule Form',
-        subtitle: 'Completed separately &mdash; takes about 5 minutes',
-        why: '<strong>What we\'re looking for:</strong> Your hygiene chair count, days per week, current schedule fill rate, and how your hygiene appointments are structured. This is key to optimizing your hygiene department.',
-        isHygiene: true,
-        hygieneLinkLabel: 'Open Hygiene Schedule Form',
-        tip: 'Fill this out in a new tab and come back here when done.',
-        uploadLabel: null
-      },
-      {
-        title: 'Accounts Receivable Report',
-        subtitle: 'AR by Responsible Party &mdash; aged balances',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ days. We flag practices where 90+ day AR is over 12% of total AR &mdash; a major red flag for collection process issues.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Financial</span>',
-          'Click <span class="path">Accounts Receivable by Responsible Party</span>',
-          'In the filter window, select <span class="path">Totals Only</span> for a summary view',
-          'Click <span class="path">Process</span>',
-          'Export or print as PDF'
-        ],
-        settings: [
-          { label: 'Report Type', value: 'AR by Responsible Party' },
-          { label: 'View', value: 'Totals Only' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'Run this report as of today &mdash; it reflects your current outstanding balances.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload AR Aging Report'
-      },
-      {
-        title: 'Patient Analysis Report',
-        subtitle: 'Active patient count and demographics',
-        why: '<strong>What we\'re looking for:</strong> Total active patient count. We use this alongside your production and hygiene data to calculate recare rates and identify unscheduled patients.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Patient</span>',
-          'Click <span class="path">Patient Analysis</span>',
-          'Set <strong>Last Visit</strong> filter to <span class="path">Within 18&ndash;24 months</span>',
-          'Click <span class="path">Process</span>',
-          'Export or print &mdash; note the total active patient count'
-        ],
-        settings: [
-          { label: 'Last Visit', value: 'Within 18&ndash;24 months' },
-          { label: 'Patient Type', value: 'Active only' },
-          { label: 'Format', value: 'PDF or screenshot' }
-        ],
-        tip: 'A screenshot of the summary page works perfectly if you can\'t export.',
-        accept: '.pdf,.xlsx,.xls,.csv,.png,.jpg',
-        uploadLabel: 'Upload Patient Count Report (optional)'
-      }
-    ]
-  },
-
-  dentrix: {
-    name: 'Dentrix',
-    color: '#65C35E',
-    steps: [
-      {
-        title: 'Practice Analysis Report',
-        subtitle: 'Production by ADA procedure code &mdash; all providers',
-        why: '<strong>What we\'re looking for:</strong> Every ADA code billed, quantity, and total dollars. In Dentrix this is the Practice Analysis Report run by procedure code. We map these to production categories and calculate monthly averages and hygiene %.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'From the top menu, click <span class="path">Analysis</span> &rarr; <span class="path">Practice</span>',
-          'Click <span class="path">Reports</span> in the Practice Analysis window',
-          'Set <strong>Date Range</strong> to the last full <strong>24 months</strong> &mdash; <strong>24 months is preferred</strong>, 12 months minimum',
-          'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
-          'In the right panel: uncheck <em>By Category</em>, check <em>By Procedure Code (ADA Code)</em>',
-          'Check <strong>Production, Collections, Adjustments</strong>',
-          'Click <span class="path">OK</span> to generate, then print or export'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Last full 12 months' },
-          { label: 'Provider', value: 'All Providers' },
-          { label: 'Group by', value: 'ADA / Procedure Code' }
-        ],
-        tip: 'The "by ADA code" setting is critical &mdash; without it you\'ll get category totals instead of code-level detail.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Practice Analysis Report'
-      },
-      {
-        title: 'Payment Reconciliation Report',
-        subtitle: 'Collections by payment type',
-        why: '<strong>What we\'re looking for:</strong> Total collections broken down by payment type &mdash; patient cash/check/card, insurance EFT, and third-party finance. We use this to calculate your collection rate.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'From the top menu click <span class="path">Reports</span> &rarr; <span class="path">Management</span>',
-          'Click <span class="path">Practice Statistics</span>',
-          'Set <strong>Date Range</strong> to the <strong>same 24 months as your production report</strong> &mdash; match it exactly',
-          'Alternatively: <span class="path">Reports</span> &rarr; <span class="path">Ledger</span> &rarr; <span class="path">Payment Reconciliation</span>',
-          'Click <span class="path">OK</span> and export or print as PDF'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Same 12 months' },
-          { label: 'Provider', value: 'All Providers' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'Practice Statistics gives you a quick summary &mdash; Payment Reconciliation gives more detail on payment types.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Payment / Collections Report'
-      },
-      {
-        title: 'P&L / Income Statement',
-        subtitle: 'Practice profit and loss for the year',
-        why: '<strong>What we\'re looking for:</strong> Revenue, expenses by category, and net income. Dentrix does not generate a true P&L &mdash; this will come from your accountant or accounting software.',
-        instructions: [
-          'Ask your accountant for the most recent full-year P&L (Income Statement)',
-          'If you use QuickBooks: <span class="path">Reports</span> &rarr; <span class="path">Company & Financial</span> &rarr; <span class="path">Profit & Loss Standard</span>',
-          'Set date range to match your production report period',
-          'Export as PDF or Excel',
-          'If unavailable, a bank statement or monthly overhead summary is a helpful substitute'
-        ],
-        settings: [
-          { label: 'Source', value: 'Accountant or QuickBooks' },
-          { label: 'Period', value: 'Same full 12 months' },
-          { label: 'Format', value: 'PDF or Excel' }
-        ],
-        tip: 'Don\'t let this one hold you up &mdash; upload what you have and we\'ll work with it.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload P&L / Income Statement'
-      },
-      {
-        title: 'Hygiene Schedule Form',
-        subtitle: 'Completed separately &mdash; takes about 5 minutes',
-        why: '<strong>What we\'re looking for:</strong> Your hygiene chair count, days per week, current schedule fill rate, and how your hygiene appointments are structured.',
-        isHygiene: true,
-        hygieneLinkLabel: 'Open Hygiene Schedule Form',
-        tip: 'Fill this out in a new tab and come back here when done.',
-        uploadLabel: null
-      },
-      {
-{
-        title: 'Patient AR Aging Report',
-        subtitle: 'Patient accounts receivable by age bracket',
-        why: '<strong>What we\'re looking for:</strong> Patient AR broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total &mdash; a red flag for collection issues.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'Click <span class="path">Reports</span> &rarr; <span class="path">Ledger</span> &rarr; <span class="path">Aging Report</span>',
-          'In the setup window, make sure <strong>Standard Aging</strong> is selected and <strong>Patient</strong> is selected',
-          'Set minimum balance to <span class="path">$0.01</span> to include all balances',
-          'Click <span class="path">OK</span> &mdash; print or export as PDF'
-        ],
-        settings: [
-          { label: 'Report Type', value: 'Standard Aging' },
-          { label: 'Payor', value: 'Patient only' },
-          { label: 'Min Balance', value: '$0.01' },
-          { label: 'Format', value: 'PDF' }
-        ],
-        tip: 'This shows what patients owe directly. 90+ day patient AR over 12% is a red flag.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Patient AR Aging Report',
-        sampleReport: { dentrix: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Dentrix_Aging_Report.pdf', eaglesoft: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Eaglesoft_AR_Report.pdf', opendental: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_OpenDental_Aging_AR.pdf' }
-      },
-      {
-        title: 'Insurance AR Aging Report',
-        subtitle: 'Outstanding insurance claims by age bracket',
-        why: '<strong>What we\'re looking for:</strong> Insurance claims broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ days outstanding. Old unpaid claims signal billing issues and potential write-offs.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'Click <span class="path">Reports</span> &rarr; <span class="path">Ledger</span> &rarr; <span class="path">Aging Report</span>',
-          'In the setup window, select <strong>Insurance</strong> as the payor type',
-          'Set minimum balance to <span class="path">$0.01</span>',
-          'Click <span class="path">OK</span> &mdash; print or export as PDF'
-        ],
-        settings: [
-          { label: 'Report Type', value: 'Standard Aging' },
-          { label: 'Payor', value: 'Insurance only' },
-          { label: 'Min Balance', value: '$0.01' },
-          { label: 'Format', value: 'PDF' }
-        ],
-        tip: 'Claims over 90 days outstanding should be followed up immediately — many insurers have filing deadlines.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Insurance AR Aging Report',
-        sampleReport: { dentrix: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Dentrix_Aging_Report.pdf', eaglesoft: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_Eaglesoft_AR_Report.pdf', opendental: 'https://raw.githubusercontent.com/Evenflow1212/performdds-assessment/main/sample-reports/Sample_OpenDental_Aging_AR.pdf' }
-      },
-          { label: 'Min Balance', value: '$0.01' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'Run as of today for the most current AR picture.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Aging Report'
-      },
-      {
-        title: 'Active Patient List',
-        subtitle: 'Total active patient count',
-        why: '<strong>What we\'re looking for:</strong> Total number of active patients, which we use alongside hygiene visit data to calculate your recare rate and identify unscheduled patients.',
-        instructions: [
-          'Open the <span class="path">Office Manager</span>',
-          'Click <span class="path">Reports</span> &rarr; <span class="path">Lists</span> &rarr; <span class="path">Patient Report (By Filters)</span>',
-          'Set <strong>Last Visit Date</strong> filter to within the last 18&ndash;24 months',
-          'Set <strong>Patient Status</strong> to <span class="path">Active</span>',
-          'Click <span class="path">OK</span> &mdash; note the total count at the bottom',
-          'Export or screenshot the summary page'
-        ],
-        settings: [
-          { label: 'Last Visit', value: 'Within 18&ndash;24 months' },
-          { label: 'Status', value: 'Active patients' },
-          { label: 'Format', value: 'PDF or screenshot' }
-        ],
-        tip: 'A screenshot of just the count total works perfectly here.',
-        accept: '.pdf,.xlsx,.xls,.csv,.png,.jpg',
-        uploadLabel: 'Upload Active Patient Report (optional)'
-      }
-    ]
-  },
-
-  opendental: {
-    name: 'Open Dental',
-    color: '#F97316',
-    steps: [
-      {
-        title: 'Procedures by Code Report',
-        subtitle: 'Production broken down by ADA procedure code',
-        why: '<strong>What we\'re looking for:</strong> Every ADA code billed, the quantity, and total dollars. We map these to categories &mdash; crowns, hygiene, implants, endo, ortho, dentures &mdash; and calculate monthly averages, hygiene %, and your average crown fee.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Standard Reports</span>',
-          'Under the <strong>Production & Income</strong> section, click <span class="path">Procedures by Code</span>',
-          'Set the <strong>Date Range</strong> to the last full 12 months <em>(e.g. Jan 1 &ndash; Dec 31)</em>',
-          'Set <strong>Provider</strong> to <span class="path">All Providers</span>',
-          'Leave all other filters at default',
-          'Click <span class="path">Refresh</span> to generate',
-          'Click <span class="path">Print</span> &rarr; <span class="path">Export to PDF</span> or use <span class="path">Save to File</span> as Excel/CSV'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Last full 12 months' },
-          { label: 'Provider', value: 'All Providers' },
-          { label: 'Format', value: 'PDF or Excel/CSV' },
-          { label: 'Group by', value: 'Procedure Code' }
-        ],
-        tip: 'If your practice has multiple providers, make sure All Providers is selected &mdash; we\'ll combine codes automatically.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Procedures by Code Report'
-      },
-      {
-        title: 'Payment Reconciliation Report',
-        subtitle: 'Collections broken down by payment type',
-        why: '<strong>What we\'re looking for:</strong> Total collections by payment type &mdash; cash, check, credit card, insurance/EFT, and third-party finance (CareCredit, Cherry). We calculate your collection rate and payment mix.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Standard Reports</span>',
-          'Under <strong>Collections</strong>, click <span class="path">Payment Reconciliation</span>',
-          'Set the <strong>Date Range</strong> to the last full 12 months (match the production report)',
-          'Set <strong>Providers</strong> to <span class="path">All Providers</span>',
-          'Click <span class="path">Refresh</span>',
-          'Export as <span class="path">PDF</span> &mdash; the section totals at the bottom are what we need'
-        ],
-        settings: [
-          { label: 'Date Range', value: 'Same 12 months' },
-          { label: 'Providers', value: 'All Providers' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'The totals section at the very end of the report is the key section.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload Payment Reconciliation Report'
-      },
-      {
-        title: 'P&L / Income Statement',
-        subtitle: 'Practice profit and loss for the year',
-        why: '<strong>What we\'re looking for:</strong> Revenue, expenses by category (staff, supplies, lab, rent, marketing), and net income. Open Dental does not generate a full P&L &mdash; this comes from your accountant or accounting software.',
-        instructions: [
-          'Ask your accountant for the most recent full-year P&L (Income Statement)',
-          'If you use QuickBooks: <span class="path">Reports</span> &rarr; <span class="path">Company & Financial</span> &rarr; <span class="path">Profit & Loss Standard</span>',
-          'Set date range to match your production report period',
-          'Export as PDF or Excel'
-        ],
-        settings: [
-          { label: 'Source', value: 'Accountant or QuickBooks' },
-          { label: 'Period', value: 'Same full 12 months' },
-          { label: 'Format', value: 'PDF or Excel' }
-        ],
-        tip: 'Don\'t let this hold you up &mdash; upload what you have and we\'ll work with it.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload P&L / Income Statement'
-      },
-      {
-        title: 'Hygiene Schedule Form',
-        subtitle: 'Completed separately &mdash; takes about 5 minutes',
-        why: '<strong>What we\'re looking for:</strong> Your hygiene chair count, days per week, current schedule fill rate, and how your hygiene appointments are structured.',
-        isHygiene: true,
-        hygieneLinkLabel: 'Open Hygiene Schedule Form',
-        tip: 'Fill this out in a new tab and come back here when done.',
-        uploadLabel: null
-      },
-      {
-        title: 'Aging of AR Report',
-        subtitle: 'Accounts receivable by age bracket',
-        why: '<strong>What we\'re looking for:</strong> Total AR broken down by 0&ndash;30, 31&ndash;60, 61&ndash;90, and 90+ day buckets. We flag practices where 90+ day AR exceeds 12% of total.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Standard Reports</span>',
-          'Under <strong>Monthly</strong>, click <span class="path">Aging of AR</span>',
-          'Select <span class="path">Totals Only</span> for a summary view',
-          'Click <span class="path">OK</span> to generate',
-          'Export or print as PDF'
-        ],
-        settings: [
-          { label: 'Report Type', value: 'Aging of AR' },
-          { label: 'View', value: 'Totals Only' },
-          { label: 'Format', value: 'PDF preferred' }
-        ],
-        tip: 'Run as of today for the most current AR picture.',
-        accept: '.pdf,.xlsx,.xls,.csv',
-        uploadLabel: 'Upload AR Aging Report'
-      },
-      {
-        title: 'Active Patient Report',
-        subtitle: 'Total active patient count',
-        why: '<strong>What we\'re looking for:</strong> Total active patient count, used alongside hygiene visit data to calculate recare rates.',
-        instructions: [
-          'From the main menu, click <span class="path">Reports</span> &rarr; <span class="path">Standard</span>',
-          'Under <strong>Lists</strong>, click <span class="path">Active Patients</span>',
-          'Set <strong>Last Visit</strong> to within the last 18&ndash;24 months',
-          'Click <span class="path">OK</span>',
-          'Note the total count, export or screenshot'
-        ],
-        settings: [
-          { label: 'Last Visit', value: 'Within 18&ndash;24 months' },
-          { label: 'Status', value: 'Active' },
-          { label: 'Format', value: 'PDF or screenshot' }
-        ],
-        tip: 'A screenshot of the count total works perfectly.',
-        accept: '.pdf,.xlsx,.xls,.csv,.png,.jpg',
-        uploadLabel: 'Upload Active Patient Report (optional)'
-      }
-    ]
-  }
-};
-
-// --- Navigation ---
-function openGuide(platform) {
-  currentPlatform = platform;
-  currentStep = 0;
-  uploads = {};
-  hygieneDone = false;
-
-  const config = platforms[platform];
-  document.getElementById('guide-platform-name').textContent = config.name;
-  document.getElementById('guide-dot').style.background = config.color;
-
-  buildProgressBar(config);
-  buildSteps(config);
-
-  document.getElementById('landing').style.display = 'none';
-  const gv = document.getElementById('guide-view');
-  gv.style.display = 'flex';
-  gv.classList.add('active');
-
-  goTo(0);
-  window.scrollTo(0, 0);
+function calcDates() {
+  const now = new Date();
+  const toDate = new Date(now.getFullYear(), now.getMonth(), 0);
+  const from24 = new Date(toDate.getFullYear() - 2, toDate.getMonth() + 1, 1);
+  const from12 = new Date(toDate.getFullYear() - 1, toDate.getMonth() + 1, 1);
+  const fmt = (d) => {
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${mm}/${dd}/${d.getFullYear()}`;
+  };
+  return { from24: fmt(from24), to: fmt(toDate), from12: fmt(from12) };
 }
 
-function closePlatform() {
-  document.getElementById('landing').style.display = 'flex';
-  const gv = document.getElementById('guide-view');
-  gv.style.display = 'none';
-  gv.classList.remove('active');
-  window.scrollTo(0, 0);
+function populateDates() {
+  const d = calcDates();
+  ['date24from','date24from2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d.from24; });
+  ['date24to','date24to2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d.to; });
+  const f12 = document.getElementById('date12from'); const t12 = document.getElementById('date12to');
+  if (f12) f12.textContent = d.from12;
+  if (t12) t12.textContent = d.to;
 }
 
-function buildProgressBar(config) {
-  const bar = document.getElementById('progress-bar');
-  const stepNames = ['Production', 'Payments', 'P&L', 'Hygiene', 'AR Aging', 'Patients'];
-  bar.innerHTML = config.steps.map((s, i) =>
-    `<div class="prog-step" id="prog-${i}" onclick="goTo(${i})">
-      <div class="prog-num">${i+1}</div>${stepNames[i]}
-    </div>`
-  ).join('');
+function setSoftware(sw) {
+  software = sw;
+  document.querySelectorAll('.software-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  updateSubtitles();
 }
 
-function buildSteps(config) {
-  const container = document.getElementById('steps-container');
-  container.innerHTML = '';
+function updateSubtitles() {
+  const labels = {
+    dentrix: { 1: 'Dentrix — Practice Analysis Reports', 2: 'Dentrix — Analysis Summary (Provider)', 4: 'Dentrix — Aging Report (manual entry)', 5: 'Dentrix — Insurance Claim Aging Report (manual entry)' },
+    eaglesoft: { 1: 'Eaglesoft — Procedures By Provider', 2: 'Eaglesoft — Provider Productivity', 4: 'Eaglesoft — AR by Responsible Party (manual entry)', 5: 'Eaglesoft — Outstanding Insurance Claims (manual entry)' },
+    opendental: { 1: 'Open Dental — Production by Procedure', 2: 'Open Dental — Production and Income Report', 4: 'Open Dental — Aging of A/R (manual entry)', 5: 'Open Dental — Aging of A/R Insurance (manual entry)' }
+  };
+  const sw = labels[software] || labels.dentrix;
+  Object.entries(sw).forEach(([step, label]) => { const el = document.getElementById(`step${step}-sub`); if (el) el.textContent = label; });
+}
 
-  config.steps.forEach((step, i) => {
-    const div = document.createElement('div');
-    div.className = 'step-card';
-    div.id = `step-${i}`;
+function handleFile(step, input) {
+  const file = input.files[0];
+  if (!file) return;
+  files[step] = file;
+  const zone = document.getElementById(`upload${step}`);
+  zone.classList.add('has-file');
+  document.getElementById(`fname${step}-text`).textContent = file.name;
+  const nextBtn = document.getElementById(`next${step}`);
+  if (nextBtn) nextBtn.disabled = false;
+  const statusEl = document.getElementById(`status${step}`);
+  if (statusEl) statusEl.textContent = '✅ File ready — click Continue';
+}
 
-    const isFirst = i === 0;
-    const isLast = i === config.steps.length - 1;
-
-    // Practice name on first step
-    const practiceInputHTML = isFirst ? `
-      <div class="practice-input-box">
-        <label>Practice Name</label>
-        <input type="text" id="practice-name-input" placeholder="e.g. Smile Family Dentistry" oninput="practiceName=this.value" value="${practiceName}">
-        <div class="hint">This will appear in the email to your Perform DDS consultant.</div>
-      </div>` : '';
-
-    const instructionsHTML = step.instructions ? `
-      <div class="instructions">
-        <h3>Step-by-step in ${config.name}</h3>
-        <ol class="step-list">
-          ${step.instructions.map(s => `<li>${s}</li>`).join('')}
-        </ol>
-      </div>` : '';
-
-    const settingsHTML = step.settings ? `
-      <div class="settings-box">
-        <h4>Required Settings</h4>
-        ${step.settings.map(s => `
-          <div class="setting-row">
-            <span class="setting-label">${s.label}</span>
-            <span class="setting-value">${s.value}</span>
-          </div>`).join('')}
-      </div>` : '';
-
-    const hygieneHTML = step.isHygiene ? `
-      <div style="margin:20px 0;text-align:center;">
-        <div id="hygieneInline"></div>
-      </div>
-      <div class="settings-box">
-        <h4>Status</h4>
-        <div class="setting-row">
-          <span class="setting-label">Hygiene Form</span>
-          <span class="setting-value" id="hygiene-status-${i}">Not yet completed</span>
-        </div>
-      </div>
-      <button class="upload-btn" onclick="markHygieneDone(${i})" style="margin-top:12px;background:var(--success);color:var(--black);">✓ &nbsp; I've completed the hygiene form</button>` : '';
-
-    const uploadHTML = step.uploadLabel ? `
-      <div class="upload-zone" id="upload-${i}" onclick="triggerUpload(${i})" ondragover="dragOver(event,${i})" ondragleave="dragLeave(${i})" ondrop="drop(event,${i})">
-        <input type="file" id="file-${i}" accept="${step.accept}" onchange="fileChosen(${i})">
-        ${step.needsMonths ? `<div id="months-wrap-${i}" style="display:none;margin-top:14px;padding:12px 16px;background:#f0f4ff;border-radius:8px;border:1px solid #c5d0e8;text-align:left">
-          <label style="font-size:12px;font-weight:700;color:#1F3864;display:block;margin-bottom:6px">${step.monthsLabel}</label>
-          <select id="months-select-${i}" style="width:100%;padding:8px 12px;border:2px solid #1F3864;border-radius:6px;font-size:14px;color:#1F3864;font-weight:600;background:white;cursor:pointer">
-            <option value="12">12 months (1 year)</option>
-            <option value="24" selected>24 months (2 years) — recommended</option>
-            <option value="36">36 months (3 years)</option>
-            <option value="6">6 months (partial year)</option>
-            <option value="3">3 months (quarterly)</option>
-          </select>
-        </div>` : ''}
-        <div id="upload-prompt-${i}">
-          <div class="upload-icon"></div>
-          <h3>${step.uploadLabel}</h3>
-          <p>Drag & drop or click to browse</p>
-          <button class="upload-btn" onclick="event.stopPropagation()">Choose File</button>
-        </div>
-        <div class="upload-progress-wrap" id="upload-progress-${i}">
-          <div class="upload-progress-label" id="upload-progress-label-${i}">Uploading&hellip;</div>
-          <div class="upload-progress-bar-track"><div class="upload-progress-bar-fill" id="upload-progress-fill-${i}"></div></div>
-        </div>
-        <div class="upload-status" id="upload-status-${i}">✓ &nbsp; <span id="upload-name-${i}"></span></div>
-        <div class="upload-change" id="upload-change-${i}" onclick="event.stopPropagation();triggerUpload(${i})" style="display:none">Change file</div>
-      </div>` : '';
-
-    const navHTML = `
-      <div class="nav-row">
-        ${!isFirst ? `<button class="btn-back-step" onclick="goTo(${i-1})">&larr; Back</button>` : '<div></div>'}
-        <div class="step-progress">Step ${i+1} of ${config.steps.length}</div>
-        <button class="btn-next-step" onclick="goTo(${i+1})">${isLast ? 'Review & Submit &rarr;' : 'Next &rarr;'}</button>
-      </div>`;
-
-    div.innerHTML = `
-      <div class="step-header">
-        <div class="step-num">${i+1}</div>
-        <div class="step-title">
-          <h2>${step.title}</h2>
-          <p>${step.subtitle}</p>
-        </div>
-      </div>
-      <div class="step-body">
-        ${practiceInputHTML}
-        <div class="why-box">${step.why}</div>
-        ${instructionsHTML}
-        ${settingsHTML}
-        ${hygieneHTML}
-        ${step.tip ? `<div class="tip">${step.tip}</div>` : ''}
-        ${step.sampleReport ? `<button class="sample-report-btn" onclick="openSampleModal('${step.sampleReport[currentPlatform] || Object.values(step.sampleReport)[0]}', '${step.title}')">
-          <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
-          View Sample Report
-        </button>` : ''}
-        ${uploadHTML}
-        ${navHTML}
-      </div>`;
-
-    container.appendChild(div);
+document.querySelectorAll('.upload-zone').forEach(zone => {
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag');
+    const stepNum = zone.id.replace('upload', '');
+    const input = document.getElementById(`file${stepNum}`);
+    if (e.dataTransfer.files[0] && input) {
+      const dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]); input.files = dt.files;
+      handleFile(parseInt(stepNum), input);
+    }
   });
+});
 
-  setTimeout(hyInjectForm, 50);}
+function checkManualEntry() { document.getElementById('next4').disabled = !document.getElementById('ar_pat_total').value.trim(); }
+function checkInsuranceEntry() { document.getElementById('next5').disabled = !document.getElementById('ar_ins_total').value.trim(); }
+function parseAmount(str) { if (!str) return 0; return parseFloat(str.replace(/[$,]/g, '')) || 0; }
 
-function goTo(step) {
-  const config = platforms[currentPlatform];
-  const total = config.steps.length;
-
-  for (let i = 0; i < total; i++) {
-    document.getElementById(`step-${i}`).classList.remove('visible');
-    const prog = document.getElementById(`prog-${i}`);
-    prog.classList.remove('active', 'done');
-    if (i < step) prog.classList.add('done');
-  }
-  document.getElementById('complete-card').classList.remove('visible');
-
-  if (step >= total) {
-    buildSummary();
-    document.getElementById('complete-card').classList.add('visible');
-  } else {
-    document.getElementById(`step-${step}`).classList.add('visible');
-    document.getElementById(`prog-${step}`).classList.add('active');
-  }
-  
-  if(typeof hyCollectData==="function"){try{var _hd=hyCollectData();if(_hd.recentPast.some(function(w){return w.days.some(function(d){return d.appt>0;});}))hygieneDone=true;}catch(e){}}
-  currentStep = step;
+function goToStep(n) {
+  document.querySelectorAll('.step-card').forEach(c => c.classList.remove('visible'));
+  const target = document.getElementById(`step${n}`); if (target) target.classList.add('visible');
+  document.querySelectorAll('.prog-step').forEach((s, i) => {
+    s.classList.remove('active', 'done');
+    if (i + 1 < n) s.classList.add('done'); else if (i + 1 === n) s.classList.add('active');
+  });
+  currentStep = n;
+  if (n === 6) buildReview();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// --- Uploadcare file handling ---
-// uploads[idx] = { name, size, url } once uploaded
-const uploadingPromises = {};
-
-function triggerUpload(idx) { document.getElementById(`file-${idx}`).click(); }
-
-function fileChosen(idx) {
-  const mw = document.getElementById('months-wrap-'+idx);
-  if (mw) mw.style.display = 'block';
-  const file = document.getElementById(`file-${idx}`).files[0];
-  if (!file) return;
-  startUploadcareUpload(idx, file);
+function nextStep(n) { goToStep(n + 1); }
+function prevStep(n) { goToStep(n - 1); }
+function skipStep(n) {
+  skipped[n] = true;
+  if (n === 3) { document.getElementById('next3').disabled = false; nextStep(3); }
+  if (n === 4) { document.getElementById('next4').disabled = false; nextStep(4); }
+  if (n === 5) { document.getElementById('next5').disabled = false; nextStep(5); }
 }
 
-function dragOver(e, idx) { e.preventDefault(); document.getElementById(`upload-${idx}`).classList.add('dragover'); }
-function dragLeave(idx) { document.getElementById(`upload-${idx}`).classList.remove('dragover'); }
-function drop(e, idx) {
-  e.preventDefault(); dragLeave(idx);
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  const dt = new DataTransfer(); dt.items.add(file);
-  document.getElementById(`file-${idx}`).files = dt.files;
-  startUploadcareUpload(idx, file);
-}
-
-function startUploadcareUpload(idx, file) {
-  document.getElementById(`upload-prompt-${idx}`).style.display = 'none';
-  document.getElementById(`upload-status-${idx}`).classList.remove('show');
-  document.getElementById(`upload-change-${idx}`).style.display = 'none';
-  document.getElementById(`upload-${idx}`).classList.remove('uploaded');
-
-  const progressWrap = document.getElementById(`upload-progress-${idx}`);
-  const progressFill = document.getElementById(`upload-progress-fill-${idx}`);
-  const progressLabel = document.getElementById(`upload-progress-label-${idx}`);
-  progressWrap.classList.add('show');
-  progressFill.style.width = '0%';
-  progressLabel.textContent = 'Uploading&hellip;';
-
-  const formData = new FormData();
-  formData.append('UPLOADCARE_PUB_KEY', UPLOADCARE_KEY);
-  formData.append('UPLOADCARE_STORE', '1');
-  formData.append('file', file);
-
-  const xhr = new XMLHttpRequest();
-
-  xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) {
-      const pct = Math.round((e.loaded / e.total) * 100);
-      progressFill.style.width = pct + '%';
-      progressLabel.textContent = `Uploading&hellip; ${pct}%`;
-    }
-  };
-
-  uploadingPromises[idx] = new Promise((resolve, reject) => {
-    xhr.onload = () => {
-      if (xhr.status === 200) {
-        const res = JSON.parse(xhr.responseText);
-        const url = `https://4fsegqpoj9.ucarecd.net/${res.file}/`;
-        uploads[idx] = { name: file.name, size: file.size, url };
-        progressWrap.classList.remove('show');
-        document.getElementById(`upload-status-${idx}`).classList.add('show');
-        document.getElementById(`upload-name-${idx}`).textContent = file.name;
-        document.getElementById(`upload-change-${idx}`).style.display = 'block';
-        document.getElementById(`upload-${idx}`).classList.add('uploaded');
-        resolve(url);
-      } else {
-        progressWrap.classList.remove('show');
-        document.getElementById(`upload-prompt-${idx}`).style.display = 'block';
-        reject(new Error('Upload failed: ' + xhr.status));
-      }
-    };
-    xhr.onerror = () => {
-      progressWrap.classList.remove('show');
-      document.getElementById(`upload-prompt-${idx}`).style.display = 'block';
-      reject(new Error('Network error'));
-    };
-  });
-
-  xhr.open('POST', 'https://upload.uploadcare.com/base/');
-  xhr.send(formData);
-}
-function markHygieneDone(stepIdx) {
-  hygieneDone = true;
-  const el = document.getElementById(`hygiene-status-${stepIdx}`);
-  if (el) { el.textContent = '✓ Completed'; el.style.color = 'var(--success)'; }
-}
-
-// --- Summary ---
-function buildSummary() {
-  const config = platforms[currentPlatform];
-  const stepNames = ['Production Report', 'Payment Report', 'P&L Statement', 'Hygiene Form', 'AR Aging Report', 'Patient Report'];
-  const grid = document.getElementById('summary-grid');
-  grid.innerHTML = '';
-
-  const pName = practiceName || document.getElementById('practice-name-input')?.value || '';
-  if (pName) {
-    grid.innerHTML += `<div class="summary-item"><div class="s-label">Practice</div><div class="s-val uploaded">✓ ${pName}</div></div>`;
-  }
-  grid.innerHTML += `<div class="summary-item"><div class="s-label">Platform</div><div class="s-val uploaded">✓ ${config.name}</div></div>`;
-
-  config.steps.forEach((step, i) => {
-    const isHygiene = step.isHygiene;
-    const done = isHygiene ? hygieneDone : !!uploads[i];
-    const val = isHygiene
-      ? (hygieneDone ? 'Completed' : 'Not completed')
-      : (uploads[i] ? uploads[i].name : 'Not uploaded');
-    const cls = done ? 'uploaded' : 'skipped';
-    const clickable = !done ? `onclick="closeModal();scrollToStep(${i})" style="cursor:pointer;border-color:#f59e0b;" title="Click to go back and complete this step"` : '';
-    grid.innerHTML += `<div class="summary-item" ${clickable}><div class="s-label">${stepNames[i]}${!done ? ' ' : ''}</div><div class="s-val ${cls}">${done ? '✓ ' : '&mdash; '}${val}</div></div>`;
-  });
-}
-
-// --- Email submit ---
-function buildEmailBody(filesUploaded) {
-  const config = platforms[currentPlatform];
-  const now = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
-  const pName = practiceName || document.getElementById('practice-name-input')?.value || 'Not provided';
-  const dName = new URLSearchParams(window.location.search).get('doctor') || '';
-  const fileLines = filesUploaded.length
-    ? filesUploaded.map(f => `  &bull; ${f.step}: ${f.filename} (${(f.size/1024).toFixed(0)} KB)\n    Download: ${f.url}`).join('\n\n')
-    : '  (no files uploaded)';
-  return `New Practice Assessment Submission &mdash; Perform DDS
-Submitted: ${now}
-
-DOCTOR: ${dName || 'Not provided'}
-PRACTICE: ${pName}
-SOFTWARE: ${config.name}
-Hygiene Form: ${hygieneDone ? '✓ Completed' : 'Not completed'}
-
-FILES UPLOADED &mdash; CLICK TO DOWNLOAD:
-${fileLines}
-
-&mdash;
-Sent via Perform DDS Practice Assessment Tool
-
-${(()=>{try{return hyFormatForEmail(hyCollectData());}catch(e){return '--- HYGIENE SCHEDULE: Not yet completed ---';}})()}`;
-}
-
-async function submitToConsultant() {
-  const btn = document.querySelector('.btn-submit-final');
-  const sentMsg = document.getElementById('sent-msg');
-  const config = platforms[currentPlatform];
-  const stepNames = ['Production Report', 'Payment Report', 'P&L Statement', 'Hygiene Form', 'AR Aging Report', 'Patient Report'];
-  const pName = practiceName || document.getElementById('practice-name-input')?.value || '';
-  const dName = new URLSearchParams(window.location.search).get('doctor') || '';
-
-  btn.disabled = true;
-  btn.textContent = 'Finalizing uploads&hellip;';
-
-  // Wait for any still-uploading files
-  const pending = Object.values(uploadingPromises);
-  if (pending.length) {
-    try { await Promise.allSettled(pending); } catch(e) {}
-  }
-
-  btn.textContent = 'Sending…';
-
-  const filesUploaded = Object.keys(uploads).map(k => ({
-    step: stepNames[parseInt(k)],
-    filename: uploads[k].name,
-    size: uploads[k].size,
-    url: uploads[k].url || '(not uploaded)'
-  }));
-
-  const subject = pName
-    ? `New Assessment: ${pName} (${config.name}) &mdash; Perform DDS`
-    : `New ${config.name} Assessment Submission &mdash; Perform DDS`;
-  const message = buildEmailBody(filesUploaded);
-
-  // Fire both in parallel &mdash; notification email + AI analysis
-  const [emailResult, analysisResult] = await Promise.allSettled([emailjs.send('service_5yz66e8', 'template_un21rcd', { subject, message, name: pName || 'New Client' }, 'S3k44GF4XVmVpgfVJ'),
-    runAIAnalysis(filesUploaded, pName, dName, config.name)
-  ]);
-      // Capture uploaded CDN URLs for workbook generation
-      window._uploadedUrls = {
-        production: uploads[0]?.url || null,
-        pl: uploads[2]?.url || null
-      };
-      document.getElementById('workbookBtn').style.display='flex';
-
-  if (emailResult.status === 'fulfilled') {
-    sentMsg.innerHTML = `✓ &nbsp; Submitted! Dave will be in touch within 1 business day.<br><span style="font-size:13px;font-weight:400;">Your files have been uploaded and are on their way.</span>`;
-    sentMsg.classList.add('show');
-    btn.textContent = '✓ Sent';
-    btn.style.background = 'var(--success)';
-    btn.style.color = 'var(--black)';
-  } else {
-    console.error('EmailJS error:', emailResult.reason);
-    sentMsg.innerHTML = ` &nbsp; Couldn't send automatically &mdash; please email your summary and files to <strong>david@performdds.com</strong>.`;
-    sentMsg.style.background = 'rgba(255,193,7,0.1)';
-    sentMsg.style.borderColor = '#FFC107';
-    sentMsg.style.color = '#FFC107';
-    sentMsg.classList.add('show');
-    btn.disabled = false;
-    btn.textContent = 'Retry &rarr;';
-  }
-
-  if (analysisResult.status === 'rejected') {
-    console.error('AI analysis error:', analysisResult.reason);
-  }
-}
-
-// --- AI Analysis Engine ---
-async function runAIAnalysis(filesUploaded, practiceName, doctorName, software) {
-  if (!filesUploaded.length) return;
-
-  // Load pdf.js for last-page extraction
-  if (!window.pdfjsLib) {
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-      s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  }
-
-  // Render a single PDF page to base64 JPEG
-  async function pageToBase64(pdfBytes, pageNum) {
-    const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.5 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-  }
-
-  // Build PDF content blocks for each uploaded file
-  const pdfBlocks = [];
-  for (const f of filesUploaded) {
-    if (!f.url || f.url === '(not uploaded)') continue;
-    try {
-      const resp = await fetch(f.url);
-      const arrayBuffer = await resp.arrayBuffer();
-      const isPaymentReport = f.step.toLowerCase().includes('payment');
-
-      if (isPaymentReport) {
-        // Extract only the last page as an image &mdash; that's where totals live
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        const lastPageNum = pdf.numPages;
-        const lastPageImg = await pageToBase64(new Uint8Array(arrayBuffer), lastPageNum);
-        pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename}) &mdash; Last page (totals summary) ---` });
-        pdfBlocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: lastPageImg } });
-      } else {
-        // Full PDF for all other reports
-        const base64 = await new Promise((res, rej) => {
-          const reader = new FileReader();
-          reader.onload = () => res(reader.result.split(',')[1]);
-          reader.onerror = rej;
-          reader.readAsDataURL(new Blob([arrayBuffer]));
-        });
-        pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename}) ---` });
-        pdfBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } });
-      }
-    } catch(e) {
-      console.warn(`Could not fetch ${f.step}:`, e);
-      pdfBlocks.push({ type: 'text', text: `--- FILE: ${f.step} (${f.filename}) &mdash; could not load ---` });
-    }
-  }
-
-  const systemPrompt = `You are Dave Orr's AI assessment engine at Perform DDS &mdash; a dental practice management consulting firm with 20+ years of experience and 400+ client practices.
-
-Your job is to analyze uploaded dental practice reports and produce a concise, actionable pre-call assessment memo for Dave to review before speaking with the client.
-
-PERFORM DDS BENCHMARKS (flag anything outside these as a red flag):
-- Staff wages: 16&ndash;20% of collections (CRITICAL red flag if >25%)
-- Lab fees: target 4% of collections
-- Dental supplies: target 3% of collections  
-- Specialist supplies: target 2%
-- Marketing: target 2%
-- Misc overhead: target 10%
-- GP daily production target: $3,500/day
-- Hygiene daily target: $1,000&ndash;$1,250/day
-- Associate daily target: $3,000/day
-- Hygiene should be 30&ndash;35% of total production
-- AR 90+ day bucket: should be <12% of total AR (red flag if higher)
-- Collection rate: should be 98%+ of adjusted production
-
-OUTPUT FORMAT &mdash; use this exact structure:
-
-## PERFORM DDS &mdash; PRE-CALL ASSESSMENT
-Practice: [name] | Software: [software] | Submitted: [date]
-
-### PRACTICE SNAPSHOT
-- Monthly collections (avg):
-- Annual production:
-- # of providers:
-- Hygiene % of production:
-- Collection rate:
-
-### RED FLAGS 
-List each red flag with: metric, actual value, benchmark, severity (HIGH/MEDIUM)
-
-### OPPORTUNITIES 
-Top 3&ndash;5 growth/optimization opportunities specific to this practice's numbers
-
-### HYGIENE DEPARTMENT
-Quick analysis of hygiene performance vs benchmarks
-
-### AR & COLLECTIONS
-Analysis of AR aging and collection rate
-
-### DAVE'S PREP NOTES
-3&ndash;5 specific questions or talking points Dave should raise on the call based on what stands out in the data
-
-Keep the analysis sharp and direct. Dave is an expert &mdash; no need to explain basic concepts. Flag the most important numbers first. If a report is missing or unreadable, note it and work with what you have.`;
-
-  const userMessage = [
-    {
-      type: 'text',
-      text: `Please analyze the following dental practice reports and produce the pre-call assessment memo.
-
-Practice: ${practiceName || 'Not provided'}
-Doctor: ${doctorName || 'Not provided'}
-Software: ${software}
-Submitted: ${new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' })}
-
-Uploaded reports:`
-    },
-    ...pdfBlocks
+function buildReview() {
+  const steps = [
+    { num: 1, label: 'Production Report', file: files[1] },
+    { num: 2, label: 'Collections Report', file: files[2] },
+    { num: 3, label: 'P&L Statement', file: files[3], skippable: true },
+    { num: 4, label: 'Patient AR Aging', manual: true, skippable: true },
+    { num: 5, label: 'Insurance AR Aging', manual: true, skippable: true },
   ];
+  const html = steps.map(s => {
+    let status, color;
+    if (s.manual) {
+      const hasData = s.num === 4 ? document.getElementById('ar_pat_total').value.trim() : document.getElementById('ar_ins_total').value.trim();
+      status = hasData ? '✅ Entered' : (skipped[s.num] ? '⏭ Skipped' : '⚠️ Not entered');
+      color = hasData ? 'var(--success)' : (skipped[s.num] ? 'var(--text-muted)' : 'var(--warning)');
+    } else {
+      status = s.file ? `✅ ${s.file.name}` : (skipped[s.num] ? '⏭ Skipped' : '⚠️ Not uploaded');
+      color = s.file ? 'var(--success)' : (skipped[s.num] ? 'var(--text-muted)' : 'var(--warning)');
+    }
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:8px;background:#f5f7fb;margin-bottom:8px;"><div style="font-weight:600;font-size:0.92rem;">${s.label}</div><div style="font-size:0.82rem;color:${color};font-weight:600;">${status}</div></div>`;
+  }).join('');
+  document.getElementById('review-list').innerHTML = html;
+  document.getElementById('generateBtn').disabled = !(files[1] && files[2]);
+}
 
-  const response = await fetch('/.netlify/functions/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }]
-    })
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
-
-  if (!response.ok) {
-    throw new Error(`Anthropic API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const analysisText = data.content.find(b => b.type === 'text')?.text || 'No analysis generated.';
-
-  // Email the analysis to Dave
-  const analysisSubject = practiceName
-    ? `AI Assessment Ready: ${practiceName} (${software}) &mdash; Perform DDS`
-    : `AI Assessment Ready: New ${software} Client &mdash; Perform DDS`;
-
-  await emailjs.send('service_5yz66e8', 'template_un21rcd', {
-    subject: analysisSubject,
-    message: analysisText,
-    name: 'Perform DDS AI Engine'
-  }, 'S3k44GF4XVmVpgfVJ');
 }
 
-  // Uploadcare URL tracker &mdash; populated when files are uploaded
-  window._ucUrls = { production: null, pl: null };
-  window._capturedUrls = window._ucUrls;
-
-  // Intercept Uploadcare upload responses to grab CDN URLs
-  const _origFetch = window.fetch;
-  window.fetch = async function(...args) {
-    const resp = await _origFetch.apply(this, args);
-    try {
-      const clone = resp.clone();
-      const text = await clone.text();
-      if (text.includes('"uuid"') && text.includes('cdn')) {
-        const parsed = JSON.parse(text);
-        if (parsed.uuid) {
-          const cdnUrl = 'https://ucarecdn.com/' + parsed.uuid + '/';
-          const name = (parsed.name || '').toLowerCase();
-          if (name.includes('procedure') || name.includes('provider') || name.includes('production')) {
-            window._ucUrls.production = cdnUrl;
-          } else if (name.includes('profit') || name.includes('loss') || name.includes('p&l') || name.includes('pl ') || name.includes('income')) {
-            window._ucUrls.pl = cdnUrl;
-          } else if (!window._ucUrls.production) {
-            window._ucUrls.production = cdnUrl;
-          } else if (!window._ucUrls.pl) {
-            window._ucUrls.pl = cdnUrl;
-          }
-          console.log('Uploadcare URL captured:', cdnUrl, parsed.name);
-        }
-      }
-    } catch(e) {}
-    return resp;
-  };
-
-  window.generateWorkbook = async function() {
-    const btn=document.getElementById('workbookBtn');
-    const status=document.getElementById('workbookStatus');
-    btn.disabled=true;btn.innerHTML='&#9203; Building workbook&hellip;';
-    try {
-      const prodFile=document.getElementById('file-0')?.files[0];
-      const plFile=document.getElementById('file-2')?.files[0];
-      if(!prodFile||prodFile.size===0) throw new Error('Production report not found — please re-upload on Step 1 and submit again.');
-      function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
-      status.textContent='Reading files…';
-      const productionBase64=await toBase64(prodFile);
-      const plBase64=plFile&&plFile.size>0?await toBase64(plFile):null;
-      const pName=(typeof practiceName!=='undefined'&&practiceName)||document.getElementById('practice-name-input')?.value||'Practice';
-      status.textContent='Generating 9-tab assessment workbook (30–60s)…';
-      const resp=await fetch('/.netlify/functions/generate-workbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productionBase64,plBase64,practiceName:pName,prodMonthsOverride:parseInt(document.getElementById('months-select-0')?.value||'0')||null,plMonths:parseInt(document.getElementById('months-select-2')?.value||'12')||12})});
-      if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error||'Server error '+resp.status);}
-      const data=await resp.json();
-      if(!data.success) throw new Error(data.error||'Generation failed');
-      const binary=atob(data.xlsxB64);
-      const bytes=new Uint8Array(binary.length);
-      for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-      const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download=(pName+' Assessment Workbook.xlsx').replace(/[^a-z0-9 .]/gi,'_');
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-      btn.disabled=false;btn.innerHTML='&#10003; Download Again';
-      status.textContent='Done! '+(data.summary?.codesFound||'')+' codes'+(data.summary?.totalExpense?' | Expenses: $'+Number(data.summary.totalExpense).toLocaleString():'')+( data.summary?.netCollections?' | Collections: $'+Number(data.summary.netCollections).toLocaleString():'');
-    } catch(err){
-      status.textContent='&#10007; '+err.message;
-      btn.disabled=false;btn.innerHTML='&#128202; Download Assessment Workbook';
-    }
+async function generate() {
+  if (!files[1] || !files[2]) {
+    alert('Please upload both the Production Report (Step 1) and the Collections Summary (Step 2) before generating.');
+    return;
   }
-
-
-
-  // ââ HYGIENE SCHEDULE FUNCTIONS ââââââââââââââââââââââââââââââââââââââââââ
-  var HY_DAYS=['Mon','Tue','Wed','Thu','Fri','Sat'];
-  var HY_KEYS=['mon','tue','wed','thu','fri','sat'];
-
-  function hyV(id){var e=document.getElementById(id);return e?(parseFloat(e.value)||0):0;}
-  function hySet(id,val){var e=document.getElementById(id);if(e)e.textContent=val||'--';}
-
-  function hyCalc(pfx,weeks){
-    var t1=0,t2=0;
-    for(var wi=0;wi<weeks;wi++)for(var di=0;di<6;di++){t1+=hyV(pfx+'_w'+wi+'_'+di+'_1');t2+=hyV(pfx+'_w'+wi+'_'+di+'_2');}
-    var pct=t1>0?(t2/t1*100).toFixed(1)+'%':'--';
-    if(pfx==='hy_rp'){hySet('hy_rp_a',t1||'--');hySet('hy_rp_s',t2||'--');hySet('hy_rp_p',pct);hySet('hy_rp_avg',t2>0?(t2/8).toFixed(1):'--');}
-    else if(pfx==='hy_nf'){hySet('hy_nf_a',t1||'--');hySet('hy_nf_b',t2||'--');hySet('hy_nf_p',pct);}
+  document.getElementById('step6').classList.remove('visible');
+  document.getElementById('generatingState').classList.add('visible');
+  try {
+    const prodBase64 = await fileToBase64(files[1]);
+    const collBase64 = await fileToBase64(files[2]);
+    const plBase64 = files[3] ? await fileToBase64(files[3]) : null;
+    const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
+    const arPatient = {
+      total: parseAmount(document.getElementById('ar_pat_total').value),
+      current: parseAmount(document.getElementById('ar_pat_current').value),
+      d3160: parseAmount(document.getElementById('ar_pat_3160').value),
+      d6190: parseAmount(document.getElementById('ar_pat_6190').value),
+      d90plus: parseAmount(document.getElementById('ar_pat_90plus').value),
+      insr: parseAmount(document.getElementById('ar_pat_insr').value),
+    };
+    const arInsurance = {
+      total: parseAmount(document.getElementById('ar_ins_total').value),
+      current: parseAmount(document.getElementById('ar_ins_current').value),
+      d3160: parseAmount(document.getElementById('ar_ins_3160').value),
+      d6190: parseAmount(document.getElementById('ar_ins_6190').value),
+      d90plus: parseAmount(document.getElementById('ar_ins_90plus').value),
+    };
+    const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, practiceName, software, arPatient, arInsurance };
+    const resp = await fetch('/.netlify/functions/generate-workbook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Generation failed');
+    generatedWorkbook = data.xlsxB64;
+    document.getElementById('generatingState').classList.remove('visible');
+    document.getElementById('resultCard').classList.add('visible');
+    const s = data.summary || {};
+    document.getElementById('summaryGrid').innerHTML = [
+      { val: s.codesFound || '—', lbl: 'Codes Found' },
+      { val: s.totalProduction ? '$' + Number(s.totalProduction).toLocaleString() : '—', lbl: 'Total Production' },
+      { val: s.months ? s.months + ' months' : '—', lbl: 'Period' },
+      { val: s.netCollections ? '$' + Number(s.netCollections).toLocaleString() : '—', lbl: 'Net Collections' },
+      { val: s.plParsed ? 'Yes ✅' : (plBase64 ? 'Partial' : 'Not uploaded'), lbl: 'P&L Parsed' },
+    ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
+  } catch (err) {
+    document.getElementById('generatingState').classList.remove('visible');
+    document.getElementById('step6').classList.add('visible');
+    alert('Error generating workbook: ' + err.message + '\n\nPlease check your files and try again.');
   }
+}
 
-  function hyCalcN7(){
-    var s=0,c=0;
-    for(var di=0;di<6;di++){s+=hyV('hy_n7_0_'+di);c+=hyV('hy_n7_1_'+di);}
-    hySet('hy_n7_s',s||'--');hySet('hy_n7_c',c||'--');hySet('hy_n7_p',s>0?(c/s*100).toFixed(1)+'%':'--');
-  }
+function downloadWorkbook() {
+  if (!generatedWorkbook) return;
+  const name = document.getElementById('practiceName').value.trim().replace(/\s+/g, '_') || 'Practice';
+  const link = document.createElement('a');
+  link.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + generatedWorkbook;
+  link.download = `${name}_Assessment_Workbook.xlsx`;
+  link.click();
+}
 
-  document.addEventListener('input',function(e){
-    var r=e.target.dataset?e.target.dataset.role:'';
-    if(r==='hygnum')hyCalc(e.target.dataset.pfx,parseInt(e.target.dataset.weeks));
-    else if(r==='hygn7')hyCalcN7();
+function resetAll() {
+  files = { 1: null, 2: null, 3: null };
+  skipped = { 3: false, 4: false, 5: false };
+  generatedWorkbook = null;
+  document.getElementById('resultCard').classList.remove('visible');
+  document.getElementById('practiceName').value = '';
+  [1,2,3].forEach(n => {
+    const zone = document.getElementById(`upload${n}`); if (zone) zone.classList.remove('has-file');
+    const btn = document.getElementById(`next${n}`); if (btn && n !== 1) btn.disabled = true;
+    const input = document.getElementById(`file${n}`); if (input) input.value = '';
   });
-
-  function hyBuildWeekGrid(cid,weeks,l1,l2,pfx){
-    var el=document.getElementById(cid);if(!el)return;
-    var wrap=document.createElement('div');wrap.style.cssText='border:1px solid #D9E1F2;border-radius:4px;overflow:hidden';
-    var hdr=document.createElement('div');hdr.style.cssText='display:grid;grid-template-columns:110px repeat(6,1fr);background:#2E4B7A';
-    var wl=document.createElement('div');wl.style.cssText='color:#fff;font-size:10px;font-weight:700;padding:7px 10px';wl.textContent='Week of';hdr.appendChild(wl);
-    HY_DAYS.forEach(function(d){var c=document.createElement('div');c.style.cssText='color:#fff;font-size:10px;font-weight:700;padding:7px 4px;text-align:center';c.textContent=d;hdr.appendChild(c);});
-    wrap.appendChild(hdr);
-    var sub=document.createElement('div');sub.style.cssText='display:grid;grid-template-columns:110px repeat(12,1fr);background:#EEF3FA;border-bottom:1px solid #D9E1F2';
-    sub.appendChild(document.createElement('div'));
-    HY_DAYS.forEach(function(){[l1,l2].forEach(function(t){var c=document.createElement('div');c.style.cssText='font-size:9px;font-weight:700;color:#8A94A6;padding:3px 2px;text-align:center';c.textContent=t;sub.appendChild(c);});});
-    wrap.appendChild(sub);
-    for(var wi=0;wi<weeks;wi++){
-      var row=document.createElement('div');row.style.cssText='display:grid;grid-template-columns:110px repeat(12,1fr);border-top:1px solid #D9E1F2'+(wi%2?';background:#F8FAFD':'');
-      var dc=document.createElement('div');dc.style.cssText='padding:3px 6px';
-      var di2=document.createElement('input');di2.type='text';di2.id=pfx+'_d'+wi;di2.placeholder='Week of...';
-      di2.style.cssText='width:100%;padding:3px 5px;border:1px solid #D9E1F2;border-radius:3px;font-size:11px';
-      dc.appendChild(di2);row.appendChild(dc);
-      HY_DAYS.forEach(function(_,di){
-        [1,2].forEach(function(side){
-          var cell=document.createElement('div');cell.style.cssText='padding:2px';
-          var inp=document.createElement('input');inp.type='number';inp.min='0';
-          inp.id=pfx+'_w'+wi+'_'+di+'_'+side;inp.placeholder='0';
-          inp.style.cssText='width:100%;padding:3px 2px;border:1px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center';
-          inp.dataset.role='hygnum';inp.dataset.pfx=pfx;inp.dataset.weeks=weeks;
-          cell.appendChild(inp);row.appendChild(cell);
-        });
-      });
-      wrap.appendChild(row);
-    }
-    el.innerHTML='';el.appendChild(wrap);
-  }
-
-  function hyBuildN7Grid(){
-    var el=document.getElementById('hy_n7_grid');if(!el)return;
-    var wrap=document.createElement('div');wrap.style.cssText='border:1px solid #D9E1F2;border-radius:4px;overflow:hidden';
-    var hdr=document.createElement('div');hdr.style.cssText='display:grid;grid-template-columns:110px repeat(6,1fr);background:#2E4B7A';
-    hdr.appendChild(document.createElement('div'));
-    HY_DAYS.forEach(function(d){var c=document.createElement('div');c.style.cssText='color:#fff;font-size:10px;font-weight:700;padding:7px 4px;text-align:center';c.textContent=d;hdr.appendChild(c);});
-    wrap.appendChild(hdr);
-    ['Scheduled','Confirmed'].forEach(function(lbl,ri){
-      var row=document.createElement('div');row.style.cssText='display:grid;grid-template-columns:110px repeat(6,1fr);border-top:1px solid #D9E1F2'+(ri?';background:#F8FAFD':'');
-      var lc=document.createElement('div');lc.style.cssText='padding:5px 10px;font-size:11px;font-weight:700;color:#1F3864;display:flex;align-items:center';lc.textContent=lbl;row.appendChild(lc);
-      HY_DAYS.forEach(function(_,di){
-        var cell=document.createElement('div');cell.style.cssText='padding:2px';
-        var inp=document.createElement('input');inp.type='number';inp.min='0';inp.placeholder='0';
-        inp.id='hy_n7_'+ri+'_'+di;inp.style.cssText='width:100%;padding:3px 2px;border:1px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center';
-        inp.dataset.role='hygn7';cell.appendChild(inp);row.appendChild(cell);
-      });
-      wrap.appendChild(row);
-    });
-    el.innerHTML='';el.appendChild(wrap);
-  }
-
-  function hyInitGrids(){
-    var rpEl=document.getElementById('hy_rp_grid');if(!rpEl||rpEl.hasChildNodes())return;
-    hyBuildWeekGrid('hy_rp_grid',3,'Appt','Seen','hy_rp');
-    hyBuildN7Grid();
-    hyBuildWeekGrid('hy_nf_grid',3,'Appt','Booked','hy_nf');
-    var today=new Date(),day=today.getDay();
-    var mon=new Date(today);mon.setDate(today.getDate()-day+(day===0?-6:1));
-    function fmt(d){return (d.getMonth()+1)+'/'+d.getDate()+'/'+String(d.getFullYear()).slice(-2);}
-    for(var i=0;i<3;i++){var d=new Date(mon);d.setDate(d.getDate()-(3-i)*7);var el=document.getElementById('hy_rp_d'+i);if(el)el.value=fmt(d);}
-    for(var i=0;i<3;i++){var d=new Date(mon);d.setDate(d.getDate()+(i+1)*7);var el=document.getElementById('hy_nf_d'+i);if(el)el.value=fmt(d);}
-  }
-
-  function hyInjectForm(){
-    var el=document.getElementById('hygieneInline');
-    if(!el||el.hasChildNodes())return;
-    function mk(tag,css,txt){var e=document.createElement(tag);if(css)e.style.cssText=css;if(txt!==undefined&&txt!==null)e.textContent=txt;return e;}
-    // Instructions
-    var inst=mk('div','background:#EEF3FA;border:1.5px solid #D9E1F2;border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#4A6FA5;line-height:1.7');
-    var strong=mk('strong','color:#1F3864','Instructions: ');inst.appendChild(strong);
-    inst.appendChild(document.createTextNode('Fill in using your practice management software.'));
-    var ul=mk('ul','padding-left:16px;margin-top:4px');
-    ['Recent Past (3 weeks): Slots available vs patients seen.','Next 7 Days: Scheduled vs confirmed this week.','Near Future (3 weeks): Slots available vs booked.'].forEach(function(t){var li=document.createElement('li');li.textContent=t;ul.appendChild(li);});
-    inst.appendChild(ul);el.appendChild(inst);
-    // Config
-    var cfg=mk('div','background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden');
-    var cfgH=mk('div','background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px');
-    cfgH.appendChild(mk('span','color:#fff;font-size:11px;font-weight:700;text-transform:uppercase','Schedule Config'));
-    cfgH.appendChild(mk('span','background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px','Hours & RDH per Day'));
-    cfg.appendChild(cfgH);
-    var cfgB=mk('div','padding:14px');
-    cfgB.appendChild(mk('div','font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px','Office Hours'));
-    var hGrid=mk('div','display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center;margin-bottom:10px');
-    hGrid.appendChild(mk('div','font-size:11px;font-weight:600;color:#2E4B7A','Hours'));
-    HY_DAYS.forEach(function(d,i){
-      var wrap=mk('div','');
-      var hd=mk('div','font-size:9px;font-weight:700;text-align:center;background:#EEF3FA;border:1px solid #D9E1F2;border-radius:3px 3px 0 0;padding:3px;color:#2E4B7A',d);
-      var ip=document.createElement('input');ip.type='text';ip.id='hy_h_'+HY_KEYS[i];ip.placeholder=d==='Sat'?'Closed':'8-5';
-      ip.style.cssText='width:100%;padding:4px 3px;border:1.5px solid #D9E1F2;border-radius:0 0 3px 3px;font-size:11px;text-align:center';
-      wrap.appendChild(hd);wrap.appendChild(ip);hGrid.appendChild(wrap);
-    });
-    cfgB.appendChild(hGrid);
-    cfgB.appendChild(mk('div','font-size:10px;font-weight:700;color:#8A94A6;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px','RDH per Day'));
-    var rGrid=mk('div','display:grid;grid-template-columns:90px repeat(6,1fr);gap:5px;align-items:center');
-    rGrid.appendChild(mk('div','font-size:11px;font-weight:600;color:#2E4B7A','Count'));
-    HY_KEYS.forEach(function(k){var ip=document.createElement('input');ip.type='number';ip.id='hy_r_'+k;ip.min='0';ip.placeholder='0';ip.style.cssText='padding:4px;border:1.5px solid #D9E1F2;border-radius:3px;font-size:12px;text-align:center';rGrid.appendChild(ip);});
-    cfgB.appendChild(rGrid);cfg.appendChild(cfgB);el.appendChild(cfg);
-    // Sections
-    function statBar(items){
-      var bar=mk('div','background:#EEF3FA;border:1px solid #D9E1F2;border-radius:4px;padding:8px 12px;display:flex;gap:16px;margin-top:8px;flex-wrap:wrap');
-      items.forEach(function(item,i){
-        if(i>0){var sep=mk('div','width:1px;background:#D9E1F2','');bar.appendChild(sep);}
-        var box=mk('div','');
-        box.appendChild(mk('div','font-size:9px;font-weight:700;color:#8A94A6;text-transform:uppercase',item.label));
-        var sv=mk('div','font-size:15px;font-weight:700;color:'+(item.blue?'#4A6FA5':'#1F3864'),'--');
-        sv.id=item.id;box.appendChild(sv);bar.appendChild(box);
-      });
-      return bar;
-    }
-    [{title:'Recent Past',badge:'Last 3 Weeks',grid:'hy_rp_grid',stats:[{label:'Available',id:'hy_rp_a'},{label:'Seen',id:'hy_rp_s'},{label:'Fill Rate',id:'hy_rp_p',blue:true},{label:'Avg/Day',id:'hy_rp_avg',blue:true}]},
-     {title:'Next 7 Days',badge:'Current Week',grid:'hy_n7_grid',stats:[{label:'Scheduled',id:'hy_n7_s'},{label:'Confirmed',id:'hy_n7_c'},{label:'Confirm Rate',id:'hy_n7_p',blue:true}]},
-     {title:'Near Future',badge:'Next 3 Weeks',grid:'hy_nf_grid',stats:[{label:'Available',id:'hy_nf_a'},{label:'Booked',id:'hy_nf_b'},{label:'Pre-book Rate',id:'hy_nf_p',blue:true}]}
-    ].forEach(function(sec){
-      var card=mk('div','background:#fff;border:1px solid #D9E1F2;border-radius:6px;margin-bottom:10px;overflow:hidden');
-      var cardH=mk('div','background:#1F3864;padding:9px 14px;display:flex;align-items:center;gap:10px');
-      cardH.appendChild(mk('span','color:#fff;font-size:11px;font-weight:700;text-transform:uppercase',sec.title));
-      cardH.appendChild(mk('span','background:rgba(255,255,255,.15);color:#D9E1F2;font-size:10px;padding:2px 8px;border-radius:20px',sec.badge));
-      card.appendChild(cardH);
-      var cardB=mk('div','padding:14px');
-      var gridDiv=mk('div','');gridDiv.id=sec.grid;  // <-- SET ID EXPLICITLY
-      cardB.appendChild(gridDiv);
-      cardB.appendChild(statBar(sec.stats));
-      card.appendChild(cardB);el.appendChild(card);
-    });
-    hyInitGrids();
-  }
-
-  function hyCollectData(){
-    var data={hours:{},rdh:{},recentPast:[],next7:{scheduled:[],confirmed:[]},nearFuture:[]};
-    HY_KEYS.forEach(function(k){
-      var h=document.getElementById('hy_h_'+k);data.hours[k]=h?h.value:'';
-      var r=document.getElementById('hy_r_'+k);data.rdh[k]=r?r.value:0;
-    });
-    for(var wi=0;wi<3;wi++){
-      var wk={date:'',days:[]};var de=document.getElementById('hy_rp_d'+wi);if(de)wk.date=de.value;
-      for(var di=0;di<6;di++)wk.days.push({appt:hyV('hy_rp_w'+wi+'_'+di+'_1'),seen:hyV('hy_rp_w'+wi+'_'+di+'_2')});
-      data.recentPast.push(wk);
-    }
-    for(var di=0;di<6;di++){data.next7.scheduled.push(hyV('hy_n7_0_'+di));data.next7.confirmed.push(hyV('hy_n7_1_'+di));}
-    for(var wi=0;wi<3;wi++){
-      var wk={date:'',days:[]};var de=document.getElementById('hy_nf_d'+wi);if(de)wk.date=de.value;
-      for(var di=0;di<6;di++)wk.days.push({appt:hyV('hy_nf_w'+wi+'_'+di+'_1'),booked:hyV('hy_nf_w'+wi+'_'+di+'_2')});
-      data.nearFuture.push(wk);
-    }
-    return data;
-  }
-
-  function hyFormatForEmail(data){
-    var out='--- HYGIENE SCHEDULE AUDIT ---\n\n';
-    out+='HOURS: '+HY_DAYS.map(function(d,i){return data.hours[HY_KEYS[i]]?d+': '+data.hours[HY_KEYS[i]]:'';}).filter(Boolean).join(' | ')+'\n';
-    out+='RDH/DAY: '+HY_DAYS.map(function(d,i){return data.rdh[HY_KEYS[i]]>0?d+': '+data.rdh[HY_KEYS[i]]:'';}).filter(Boolean).join(' | ')+'\n\n';
-    out+='RECENT PAST (Available/Seen):\n';
-    data.recentPast.forEach(function(wk){
-      if(!wk.days.some(function(d){return d.appt>0;}))return;
-      out+='  Week of '+(wk.date||'?')+': '+HY_DAYS.map(function(d,i){return wk.days[i]&&wk.days[i].appt>0?d+' '+wk.days[i].appt+'/'+wk.days[i].seen:'';}).filter(Boolean).join(' | ')+'\n';
-    });
-    var rpA=data.recentPast.reduce(function(s,w){return s+w.days.reduce(function(ss,d){return ss+d.appt;},0);},0);
-    var rpS=data.recentPast.reduce(function(s,w){return s+w.days.reduce(function(ss,d){return ss+d.seen;},0);},0);
-    out+='  TOTAL: '+rpA+' available, '+rpS+' seen, '+(rpA>0?(rpS/rpA*100).toFixed(0):'?')+'% fill rate\n\n';
-    out+='NEXT 7 DAYS (Scheduled/Confirmed):\n';
-    out+='  '+HY_DAYS.map(function(d,i){var s=data.next7.scheduled[i]||0,c=data.next7.confirmed[i]||0;return s>0?d+' '+s+'/'+c:'';}).filter(Boolean).join(' | ')+'\n';
-    var n7s=data.next7.scheduled.reduce(function(a,b){return a+b;},0),n7c=data.next7.confirmed.reduce(function(a,b){return a+b;},0);
-    out+='  TOTAL: '+n7s+' scheduled, '+n7c+' confirmed, '+(n7s>0?(n7c/n7s*100).toFixed(0):'?')+'% confirmation\n\n';
-    out+='NEAR FUTURE (Available/Booked):\n';
-    data.nearFuture.forEach(function(wk){
-      if(!wk.days.some(function(d){return d.appt>0;}))return;
-      out+='  Week of '+(wk.date||'?')+': '+HY_DAYS.map(function(d,i){return wk.days[i]&&wk.days[i].appt>0?d+' '+wk.days[i].appt+'/'+wk.days[i].booked:'';}).filter(Boolean).join(' | ')+'\n';
-    });
-    var nfA=data.nearFuture.reduce(function(s,w){return s+w.days.reduce(function(ss,d){return ss+d.appt;},0);},0);
-    var nfB=data.nearFuture.reduce(function(s,w){return s+w.days.reduce(function(ss,d){return ss+d.booked;},0);},0);
-    out+='  TOTAL: '+nfA+' available, '+nfB+' booked, '+(nfA>0?(nfB/nfA*100).toFixed(0):'?')+'% pre-booked\n';
-    return out;
-  }
-</script>
-
-<!-- SAMPLE REPORT MODAL -->
-<div class="sample-modal-overlay" id="sample-modal-overlay" onclick="closeSampleModal(event)">
-  <div class="sample-modal">
-    <div class="sample-modal-header">
-      <span class="sample-modal-title" id="sample-modal-title">Sample Report</span>
-      <button class="sample-modal-close" onclick="closeSampleModal()">&#x2715;</button>
-    </div>
-    <div class="sample-modal-body">
-      <iframe id="sample-modal-iframe" src="" title="Sample Report Preview"></iframe>
-    </div>
-  </div>
-</div>
-<script>
-function openSampleModal(url, title) {
-  document.getElementById('sample-modal-iframe').src = url;
-  document.getElementById('sample-modal-title').textContent = title + ' — Sample Report';
-  document.getElementById('sample-modal-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
+  ['ar_pat_total','ar_pat_current','ar_pat_3160','ar_pat_6190','ar_pat_90plus','ar_pat_insr',
+   'ar_ins_total','ar_ins_current','ar_ins_3160','ar_ins_6190','ar_ins_90plus'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('next1').disabled = true;
+  goToStep(1);
 }
-function closeSampleModal(e) {
-  if (e && e.target !== document.getElementById('sample-modal-overlay')) return;
-  document.getElementById('sample-modal-overlay').classList.remove('open');
-  document.getElementById('sample-modal-iframe').src = '';
-  document.body.style.overflow = '';
-}
-document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSampleModal(); });
-</script>
 
+populateDates();
+updateSubtitles();
+</script>
 </body>
 </html>
-
-
-
-
-
-
-
- 
- 
