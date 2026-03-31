@@ -255,11 +255,15 @@ async function buildXlsx(raw,groups,pl,prodMeta,name,extra={}){
   }
   // P&L INPUT — only touch specific data cells
   sv(wsPL,'B2',12); fv(wsPL,'N2','=IFERROR(H2/B2,0)');
+  if (netCollFromReport && !pl) { sv(wsPL,'H2',netCollFromReport); }
   if (pl) {
     sv(wsPL,'H2',pl.netCollections);
     sv(wsPL,'N54',pl.totalExpense);
     console.log('P&L written: netCollections='+pl.netCollections+' totalExpense='+pl.totalExpense);
   }
+  // AR DATA from manual entry
+  if(arData.patient&&arData.patient.total){sv(wsFO,'D32',arData.patient.total||0);sv(wsFO,'E32',arData.patient.current||0);sv(wsFO,'F32',arData.patient.d3160||0);sv(wsFO,'G32',arData.patient.d6190||0);sv(wsFO,'H32',arData.patient.d90plus||0);}
+  if(arData.insurance&&arData.insurance.total){sv(wsFO,'D33',arData.insurance.total||0);sv(wsFO,'E33',arData.insurance.current||0);sv(wsFO,'F33',arData.insurance.d3160||0);sv(wsFO,'G33',arData.insurance.d6190||0);sv(wsFO,'H33',arData.insurance.d90plus||0);}
   if (pl) addPLRawImport(wb, pl, name);
   return Buffer.from(await wb.xlsx.writeBuffer()).toString('base64');
 }
@@ -276,46 +280,36 @@ exports.handler = async function(event) {
   if (!productionBase64) return {statusCode:400,body:JSON.stringify({error:'productionBase64 required'})};
   try {
     const PROD_PROMPT = 'Dental practice production by procedure code report. Extract every ADA code with quantity and total. Return ONLY lines: CODE|QTY|TOTAL (e.g. D0120|2916|139832.00). Also include date range line verbatim from header.';
-    const COLL_PROMPT = 'This is a Dentrix Analysis Summary (Provider) report. Find the TOTAL row at the bottom. Extract Charges and Payments totals. Return ONLY two lines:\nCHARGES|[amount]\nPAYMENTS|[amount]';
-    const PL_PROMPT = 'QuickBooks P&L report. Extract full text verbatim preserving all labels and dollar amounts. Total Income, Total Expense, and Net Income must appear clearly. Output raw text only.';
-    const [prodText, collText, plText] = await Promise.all([
+    const COLL_PROMPT = 'This is a Dentrix Analysis Summary Provider report. Find the TOTAL row at the very bottom of the last page. Extract Charges and Payments totals. Return exactly two lines:\nCHARGES|[number]\nPAYMENTS|[number]\nNo other text.';
+    const PL_PROMPT = 'QuickBooks P&L report. Extract full text verbatim preserving all labels and dollar amounts. The Total Income, Total Expense, and Net Income summary lines must appear with their exact amounts. Output raw text only.';
+    const [prodText, collText='', plText=''] = await Promise.all([
       callClaude(productionBase64, PROD_PROMPT, KEY),
       collectionsBase64 ? callClaude(collectionsBase64, COLL_PROMPT, KEY) : Promise.resolve(''),
       plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve('')
     ]);
     console.log('prodText length:', prodText.length);
     if (collectionsBase64) console.log('collText:', collText.slice(0,200));
-    if (plBase64) console.log('plText length:', plText.length);
+    if (plBase64) console.log('plText length:', plText.length, '| preview:', plText.slice(0,200));
     const prodMeta = parseProdMeta(prodText);
     const raw = parseProd(prodText);
     const groups = agg(raw);
-    let netCollectionsFromReport = null;
+    let netCollFromReport = null;
     if (collText) {
-      const paymentsM = collText.match(/PAYMENTS\|([\d,]+\.?\d*)/i);
-      if (paymentsM) { netCollectionsFromReport = parseFloat(paymentsM[1].replace(/,/g,'')); console.log('Collections parsed: '+netCollectionsFromReport); }
+      const pm = collText.match(/PAYMENTS\|([\d,.]+)/i);
+      if (pm) { netCollFromReport = parseFloat(pm[1].replace(/,/g,'')); console.log('Collections payments='+netCollFromReport); }
     }
     let pl = null;
     if (plBase64 && plText) {
       try { pl = parsePL(plText); console.log('P&L OK: netCollections='+pl.netCollections); }
-      catch(e) { console.error('PL parse failed:', e.message); }
+      catch(e) { console.error('PL parse failed:', e.message, '| dump:', plText.slice(0,500)); }
     }
-    const xlsxB64 = await buildXlsx(raw, groups, pl, prodMeta, practiceName, {arPatient, arInsurance, netCollectionsFromReport});
+    const arData = { patient: arPatient, insurance: arInsurance };
+    const xlsxB64 = await buildXlsx(raw, groups, pl, prodMeta, practiceName, arData, netCollFromReport);
     const totalProd = Object.values(raw).reduce((s,v) => s+v.total, 0);
     return {
-      statusCode:200,
-      headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
-      body:JSON.stringify({success:true,xlsxB64,summary:{
-        codesFound:Object.keys(raw).length,
-        totalProduction:totalProd.toFixed(2),
-        months:prodMeta.months,
-        years:prodMeta.years,
-        netCollections:netCollectionsFromReport||pl?.netCollections||null,
-        totalExpense:pl?.totalExpense||null,
-        netIncome:pl?.netIncome||null,
-        plParsed:pl!==null,
-        arPatientTotal:arPatient?.total||null,
-        arInsuranceTotal:arInsurance?.total||null
-      }})
+      statusCode: 200,
+      headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
+      body: JSON.stringify({success:true,xlsxB64,summary:{codesFound:Object.keys(raw).length,totalProduction:totalProd.toFixed(2),months:prodMeta.months,years:prodMeta.years,netCollections:netCollFromReport||pl?.netCollections||null,totalExpense:pl?.totalExpense||null,netIncome:pl?.netIncome||null,plParsed:pl!==null}})
     };
   } catch(err) {
     return {statusCode:500,headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:err.message,stack:err.stack?.slice(0,500)})};
