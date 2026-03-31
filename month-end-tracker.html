@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Month End Tracker - Perform DDS</title>
+    <style>
+        :root {
+            --bg-page: #111a27;
+            --bg-card: #0f1c2e;
+            --bg-input: #1a2332;
+            --border: #2a3f5f;
+            --divider: rgba(42, 63, 95, 0.5);
+            --accent: #e8872a;
+            --label: #8899aa;
+            --text: #ffffff;
+
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --transition: 0.2s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            background-color: var(--bg-page);
+            color: var(--text);
+            font-family: var(--font-family);
+            line-height: 1.6;
+        }
+
+        body {
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            margin-bottom: 48px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid var(--divider);
+        }
+
+        .brand {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: var(--label);
+            margin-bottom: 32px;
+        }
+
+        .header-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 24px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--label);
+            margin-bottom: 8px;
+            text-transform: none;
+        }
+
+        .form-group input,
+        .form-group select {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 500;
+            font-family: var(--font-family);
+            transition: all var(--transition);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(232, 135, 42, 0.15);
+        }
+
+        /* Remove number spinner */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        /* Form Sections */
+        .section {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 24px;
+        }
+
+        /* Grid for 2-column form fields */
+        .fields-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            row-gap: 24px;
+        }
+
+        .field-wrapper {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .field-wrapper label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--label);
+            margin-bottom: 8px;
+        }
+
+        .field-wrapper input,
+        .field-wrapper .display-value {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .field-wrapper input {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            border-radius: 6px;
+            transition: all var(--transition);
+        }
+
+        .field-wrapper input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(232, 135, 42, 0.15);
+        }
+
+        /* Dollar input wrapper */
+        .dollar-input {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .dollar-input .prefix {
+            position: absolute;
+            left: 12px;
+            color: var(--label);
+            font-size: 15px;
+            font-weight: 500;
+            pointer-events: none;
+        }
+
+        .dollar-input input {
+            padding-left: 28px;
+            width: 100%;
+        }
+
+        /* Display value (auto-calculated) */
+        .display-value {
+            padding: 10px 12px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--accent);
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Doctor and Hygienist rows */
+        .repeatable-group {
+            margin-top: 24px;
+        }
+
+        .row-item {
+            display: grid;
+            grid-template-columns: 200px 80px 1fr;
+            gap: 16px;
+            align-items: flex-end;
+            padding: 16px;
+            background-color: rgba(42, 63, 95, 0.2);
+            border-radius: 6px;
+            margin-bottom: 12px;
+            border: 1px solid var(--divider);
+        }
+
+        .row-item .field-wrapper {
+            margin: 0;
+        }
+
+        .row-item .field-wrapper label {
+            margin-bottom: 6px;
+        }
+
+        .row-item .field-wrapper input {
+            padding: 8px 10px;
+            font-size: 14px;
+        }
+
+        .row-item .field-wrapper .dollar-input input {
+            padding-left: 28px;
+        }
+
+        .row-item .remove-btn {
+            padding: 8px 12px;
+            background-color: transparent;
+            color: var(--label);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all var(--transition);
+            font-size: 12px;
+        }
+
+        .row-item .remove-btn:hover {
+            color: #ff6b6b;
+            border-color: #ff6b6b;
+        }
+
+        .add-button {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 16px;
+            padding: 8px 16px;
+            background-color: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all var(--transition);
+            font-family: var(--font-family);
+        }
+
+        .add-button:hover {
+            background-color: rgba(232, 135, 42, 0.1);
+        }
+
+        .add-button::before {
+            content: '+';
+            margin-right: 6px;
+            font-size: 16px;
+        }
+
+        /* Hygiene section specific */
+        .hygiene-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 16px;
+            background-color: rgba(232, 135, 42, 0.1);
+            border: 1px solid rgba(232, 135, 42, 0.3);
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        .hygiene-total-label {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .hygiene-total-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        /* Submit area */
+        .submit-area {
+            margin-top: 48px;
+            text-align: center;
+        }
+
+        .submit-btn {
+            width: 100%;
+            max-width: 320px;
+            padding: 16px 32px;
+            height: 48px;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all var(--transition);
+            font-family: var(--font-family);
+            letter-spacing: 0.5px;
+        }
+
+        .submit-btn:hover {
+            background-color: #d67621;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(232, 135, 42, 0.3);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .clear-link {
+            display: inline-block;
+            margin-top: 16px;
+            color: var(--label);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color var(--transition);
+            cursor: pointer;
+        }
+
+        .clear-link:hover {
+            color: var(--accent);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 40px;
+            max-width: 420px;
+            text-align: center;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .checkmark {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 24px;
+            background-color: #4ade80;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .checkmark::after {
+            content: '';
+            width: 20px;
+            height: 10px;
+            border-left: 3px solid white;
+            border-bottom: 3px solid white;
+            transform: rotate(-45deg);
+            position: absolute;
+        }
+
+        .modal-heading {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+
+        .modal-summary {
+            font-size: 13px;
+            color: var(--label);
+            margin-bottom: 24px;
+            line-height: 1.8;
+        }
+
+        .modal-summary strong {
+            color: var(--text);
+            display: block;
+            margin: 8px 0;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+            font-family: var(--font-family);
+        }
+
+        .modal-btn-primary {
+            background-color: var(--accent);
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            background-color: #d67621;
+        }
+
+        .modal-btn-secondary {
+            background-color: var(--bg-input);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .modal-btn-secondary:hover {
+            background-color: rgba(232, 135, 42, 0.1);
+            border-color: var(--accent);
+        }
+
+        /* Single column field */
+        .single-field {
+            max-width: 280px;
+        }
+
+        .fields-grid.single-column {
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="brand">Perform DDS</div>
+            <h1 class="page-title">Month End Tracker</h1>
+            <p class="subtitle">Submit at end of month</p>
+
+            <div class="header-row">
+                <div class="form-group">
+                    <label>Practice Name</label>
+                    <input type="text" id="practiceName" value="Dr. Murray">
+                </div>
+                <div class="form-group">
+                    <label>Month</label>
+                    <select id="month">
+                        <option value="">Select Month</option>
+                        <option value="Jan">January</option>
+                        <option value="Feb" selected>February</option>
+                        <option value="Mar">March</option>
+                        <option value="Apr">April</option>
+                        <option value="May">May</option>
+                        <option value="Jun">June</option>
+                        <option value="Jul">July</option>
+                        <option value="Aug">August</option>
+                        <option value="Sep">September</option>
+                        <option value="Oct">October</option>
+                        <option value="Nov">November</option>
+                        <option value="Dec">December</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Year</label>
+                    <select id="year">
+                        <option value="">Select Year</option>
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026" selected>2026</option>
+                        <option value="2027">2027</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Days In -->
+        <div class="section">
+            <div class="section-title">Days In</div>
+            <div class="fields-grid single-column">
+                <div class="field-wrapper">
+                    <label>Days Worked (Dr. Days In)</label>
+                    <input type="number" id="daysIn" step="0.5" min="0" value="22.5">
+                </div>
+            </div>
+        </div>
+
+        <!-- Crowns -->
+        <div class="section">
+            <div class="section-title">Crowns</div>
+            <div class="fields-grid">
+                <div class="field-wrapper">
+                    <label>Crowns from Last Month</label>
+                    <input type="number" id="crownsLastMonth" step="1" min="0" value="35">
+                </div>
+                <div class="field-wrapper">
+                    <label>Crowns Prepped</label>
+                    <input type="number" id="crownsPrepped" step="1" min="0" value="56">
+                </div>
+                <div class="field-wrapper">
+                    <label>Crowns Future Booked (Next Month)</label>
+                    <input type="number" id="crownsFutureBooked" step="1" min="0" value="23">
+                </div>
+                <div class="field-wrapper">
+                    <label>Crowns Diagnosed - Non Cosmetic</label>
+                    <input type="number" id="crownsDiagnosed" step="1" min="0" value="35">
+                </div>
+            </div>
+        </div>
+
+        <!-- Doctor Production -->
+        <div class="section">
+            <div class="section-title">Doctor Production</div>
+            <div class="repeatable-group" id="doctorsContainer">
+                <!-- Rows added dynamically -->
+            </div>
+            <button class="add-button" id="addDoctorBtn">Add Doctor</button>
+        </div>
+
+        <!-- Specialty Production -->
+        <div class="section">
+            <div class="section-title">Specialty Production</div>
+            <div class="fields-grid">
+                <div class="field-wrapper">
+                    <label>Ortho Production</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" id="orthoProduction" step="0.01" min="0" value="4708">
+                    </div>
+                </div>
+                <div class="field-wrapper">
+                    <label>Oral Surgery</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" id="oralSurgery" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="field-wrapper">
+                    <label>Perio</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" id="perio" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="field-wrapper">
+                    <label>Cosmetic</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" id="cosmetic" step="0.01" min="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visits -->
+        <div class="section">
+            <div class="section-title">Visits</div>
+            <div class="fields-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 24px;">
+                <div class="field-wrapper">
+                    <label>New Patients Seen</label>
+                    <input type="number" id="newPatients" step="1" min="0" value="6">
+                </div>
+                <div class="field-wrapper">
+                    <label>1110/1120 Prophies</label>
+                    <input type="number" id="prophies" step="1" min="0" value="69">
+                </div>
+                <div class="field-wrapper">
+                    <label>4910 Perio Maintenance</label>
+                    <input type="number" id="perioMaint" step="1" min="0" value="19">
+                </div>
+                <div class="field-wrapper">
+                    <label>SRP - Patients (Not Quads)</label>
+                    <input type="number" id="srp" step="1" min="0" value="10">
+                </div>
+                <div class="field-wrapper">
+                    <label>Arrestin</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" id="arrestin" step="0.01" min="0" value="8">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hygiene -->
+        <div class="section">
+            <div class="section-title">Hygiene</div>
+            <div class="repeatable-group" id="hygienistsContainer">
+                <!-- Rows added dynamically -->
+            </div>
+            <button class="add-button" id="addHygienistBtn">Add Hygienist</button>
+
+            <div class="fields-grid single-column" style="margin-top: 24px;">
+                <div class="field-wrapper">
+                    <label>Empties (whole month)</label>
+                    <input type="number" id="empties" step="0.5" min="0" value="23.5">
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Exams -->
+        <div class="section">
+            <div class="section-title">Exams</div>
+            <div class="fields-grid">
+                <div class="field-wrapper">
+                    <label>0150 Comp Exam</label>
+                    <input type="number" id="compExam" step="1" min="0" value="6">
+                </div>
+                <div class="field-wrapper">
+                    <label>0120 Periodic Exam</label>
+                    <input type="number" id="periodicExam" step="1" min="0" value="89">
+                </div>
+                <div class="field-wrapper">
+                    <label>0140 Limited Exam</label>
+                    <input type="number" id="limitedExam" step="1" min="0" value="19">
+                </div>
+                <div class="field-wrapper">
+                    <label>Bite Wellness Completed</label>
+                    <input type="number" id="biteWellness" step="1" min="0" value="3">
+                </div>
+            </div>
+        </div>
+
+        <!-- Imaging -->
+        <div class="section">
+            <div class="section-title">Imaging</div>
+            <div class="fields-grid">
+                <div class="field-wrapper">
+                    <label>Panos</label>
+                    <input type="number" id="panos" step="1" min="0">
+                </div>
+                <div class="field-wrapper">
+                    <label>FMX</label>
+                    <input type="number" id="fmx" step="1" min="0" value="17">
+                </div>
+                <div class="field-wrapper">
+                    <label>CBCT</label>
+                    <input type="number" id="cbct" step="1" min="0">
+                </div>
+                <div class="field-wrapper">
+                    <label>Intra Oral Scan</label>
+                    <input type="number" id="intraOralScan" step="1" min="0">
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="section">
+            <div class="section-title">Results</div>
+            <div class="fields-grid">
+                <div class="field-wrapper">
+                    <label>Production</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" id="resultsProduction" step="0.01" min="0" value="172566.73">
+                    </div>
+                </div>
+                <div class="field-wrapper">
+                    <label>Collections</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" id="resultsCollections" step="0.01" min="0" value="159995">
+                    </div>
+                </div>
+                <div class="field-wrapper">
+                    <label>Future Scheduled (Next Month)</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" id="resultsFutureScheduled" step="0.01" min="0" value="97882">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit Area -->
+        <div class="submit-area">
+            <button class="submit-btn" id="submitBtn">Submit Month End Report</button>
+            <div class="clear-link" id="clearBtn">Clear Form</div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal" id="successModal">
+        <div class="modal-content">
+            <div class="checkmark"></div>
+            <h2 class="modal-heading">Report Submitted Successfully</h2>
+            <div class="modal-summary">
+                <strong id="modalPractice">Dr. Murray</strong>
+                <span id="modalMonth">February</span> <span id="modalYear">2026</span>
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--divider);">
+                    <div>Production: <strong id="modalProduction">$172,567</strong></div>
+                    <div>Collections: <strong id="modalCollections">$159,995</strong></div>
+                    <div>Days: <strong id="modalDays">22.5</strong></div>
+                    <div>Hygiene Total: <strong id="modalHygiene">$29,088</strong></div>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-primary" id="copyDataBtn">Copy Data</button>
+                <button class="modal-btn modal-btn-secondary" id="closeModalBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class MonthEndTracker {
+            constructor() {
+                this.doctors = [
+                    { name: 'Dr. Najem', days: '15', production: '90658' },
+                    { name: 'Dr. Murray', days: '7.5', production: '52890' }
+                ];
+                this.hygienists = [
+                    { name: 'Mia', days: '12', production: '16306' },
+                    { name: 'Brenda', days: '7.5', production: '9062' },
+                    { name: 'Phoung', days: '4', production: '4720' },
+                    { name: 'Temp', days: '', production: '' }
+                ];
+                this.lastSubmitData = null;
+
+                this.init();
+            }
+
+            init() {
+                this.renderDoctors();
+                this.renderHygienists();
+                this.attachEventListeners();
+                this.updateHygienistCalculations();
+            }
+
+            renderDoctors() {
+                const container = document.getElementById('doctorsContainer');
+                container.innerHTML = '';
+
+                this.doctors.forEach((doctor, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'row-item';
+                    row.innerHTML = `
+                        <div class="field-wrapper">
+                            <label>Doctor Name</label>
+                            <input type="text" class="doctor-name" value="${doctor.name}" data-index="${index}">
+                        </div>
+                        <div class="field-wrapper">
+                            <label>Days</label>
+                            <input type="number" class="doctor-days" step="0.5" min="0" value="${doctor.days}" data-index="${index}">
+                        </div>
+                        <div class="field-wrapper">
+                            <label>Production</label>
+                            <div class="dollar-input">
+                                <span class="prefix">$</span>
+                                <input type="number" class="doctor-production" step="0.01" min="0" value="${doctor.production}" data-index="${index}">
+                            </div>
+                        </div>
+                        ${this.doctors.length > 2 ? `<button class="row-item remove-btn" data-index="${index}">Remove</button>` : ''}
+                    `;
+                    container.appendChild(row);
+                });
+            }
+
+            renderHygienists() {
+                const container = document.getElementById('hygienistsContainer');
+                container.innerHTML = '';
+
+                this.hygienists.forEach((hygienist, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'row-item';
+                    row.innerHTML = `
+                        <div class="field-wrapper">
+                            <label>Name</label>
+                            <input type="text" class="hygienist-name" value="${hygienist.name}" data-index="${index}">
+                        </div>
+                        <div class="field-wrapper">
+                            <label>Days</label>
+                            <input type="number" class="hygienist-days" step="0.5" min="0" value="${hygienist.days}" data-index="${index}">
+                        </div>
+                        <div class="field-wrapper">
+                            <label>Production</label>
+                            <div class="dollar-input">
+                                <span class="prefix">$</span>
+                                <input type="number" class="hygienist-production" step="0.01" min="0" value="${hygienist.production}" data-index="${index}">
+                            </div>
+                        </div>
+                        ${this.hygienists.length > 4 ? `<button class="row-item remove-btn" data-index="${index}">Remove</button>` : ''}
+                    `;
+                    container.appendChild(row);
+                });
+
+                this.updateHygienistCalculations();
+            }
+
+            attachEventListeners() {
+                // Doctor changes
+                document.addEventListener('input', (e) => {
+                    if (e.target.classList.contains('doctor-name')) {
+                        const index = parseInt(e.target.dataset.index);
+                        this.doctors[index].name = e.target.value;
+                    }
+                    if (e.target.classList.contains('doctor-days') || e.target.classList.contains('doctor-production')) {
+                        const index = parseInt(e.target.dataset.index);
+                        if (e.target.classList.contains('doctor-days')) {
+                            this.doctors[index].days = e.target.value;
+                        } else {
+                            this.doctors[index].production = e.target.value;
+                        }
+                    }
+
+                    if (e.target.classList.contains('hygienist-name')) {
+                        const index = parseInt(e.target.dataset.index);
+                        this.hygienists[index].name = e.target.value;
+                    }
+                    if (e.target.classList.contains('hygienist-days') || e.target.classList.contains('hygienist-production')) {
+                        const index = parseInt(e.target.dataset.index);
+                        if (e.target.classList.contains('hygienist-days')) {
+                            this.hygienists[index].days = e.target.value;
+                        } else {
+                            this.hygienists[index].production = e.target.value;
+                        }
+                        this.updateHygienistCalculations();
+                    }
+                });
+
+                // Remove buttons
+                document.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('remove-btn')) {
+                        const index = parseInt(e.target.dataset.index);
+                        if (e.target.parentElement.querySelector('.doctor-name')) {
+                            this.doctors.splice(index, 1);
+                            this.renderDoctors();
+                        } else if (e.target.parentElement.querySelector('.hygienist-name')) {
+                            this.hygienists.splice(index, 1);
+                            this.renderHygienists();
+                        }
+                    }
+                });
+
+                document.getElementById('addDoctorBtn').addEventListener('click', () => {
+                    this.doctors.push({ name: '', days: '', production: '' });
+                    this.renderDoctors();
+                });
+
+                document.getElementById('addHygienistBtn').addEventListener('click', () => {
+                    this.hygienists.push({ name: '', days: '', production: '' });
+                    this.renderHygienists();
+                });
+
+                document.getElementById('submitBtn').addEventListener('click', () => this.handleSubmit());
+                document.getElementById('clearBtn').addEventListener('click', () => this.clearForm());
+                document.getElementById('closeModalBtn').addEventListener('click', () => {
+                    document.getElementById('successModal').classList.remove('show');
+                });
+                document.getElementById('copyDataBtn').addEventListener('click', () => this.copyToClipboard());
+            }
+
+            updateHygienistCalculations() {
+                let total = 0;
+
+                this.hygienists.forEach((hygienist, index) => {
+                    if (hygienist.production) {
+                        total += parseFloat(hygienist.production) || 0;
+                    }
+                });
+
+                const totalEl = document.getElementById('hygieneTotal');
+                totalEl.textContent = `$${total.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+            }
+
+            clearForm() {
+                document.querySelectorAll('input[type="text"], input[type="number"], select').forEach(el => {
+                    el.value = '';
+                });
+                this.doctors = [
+                    { name: 'Dr. Murray', days: '', production: '' },
+                    { name: 'Dr. Najem', days: '', production: '' }
+                ];
+                this.hygienists = [
+                    { name: 'Mia', days: '', production: '' },
+                    { name: 'Brenda', days: '', production: '' },
+                    { name: 'Phoung', days: '', production: '' },
+                    { name: 'Temp', days: '', production: '' }
+                ];
+                this.renderDoctors();
+                this.renderHygienists();
+                document.getElementById('hygieneTotal').textContent = '$0';
+            }
+
+            getFormData() {
+                const parseNum = (val) => val ? parseFloat(val) : null;
+                const getMonth = () => {
+                    const select = document.getElementById('month');
+                    return select.options[select.selectedIndex].text.substring(0, 3);
+                };
+
+                return {
+                    practice: document.getElementById('practiceName').value,
+                    month: getMonth(),
+                    year: parseInt(document.getElementById('year').value),
+                    daysIn: parseNum(document.getElementById('daysIn').value),
+                    crowns: {
+                        lastMonth: parseNum(document.getElementById('crownsLastMonth').value),
+                        prepped: parseNum(document.getElementById('crownsPrepped').value),
+                        booksRestOfMonth: parseNum(document.getElementById('crownsBooksRest').value),
+                        futureBooked: parseNum(document.getElementById('crownsFutureBooked').value),
+                        diagnosedNonCosmetic: parseNum(document.getElementById('crownsDiagnosed').value)
+                    },
+                    doctors: this.doctors
+                        .filter(d => d.name || d.days || d.production)
+                        .map(d => ({
+                            name: d.name,
+                            days: parseNum(d.days),
+                            production: parseNum(d.production)
+                        })),
+                    specialty: {
+                        ortho: parseNum(document.getElementById('orthoProduction').value),
+                        oralSurgery: parseNum(document.getElementById('oralSurgery').value),
+                        perio: parseNum(document.getElementById('perio').value),
+                        cosmetic: parseNum(document.getElementById('cosmetic').value)
+                    },
+                    visits: {
+                        newPatients: parseNum(document.getElementById('newPatients').value),
+                        prophies: parseNum(document.getElementById('prophies').value),
+                        perioMaint: parseNum(document.getElementById('perioMaint').value),
+                        srp: parseNum(document.getElementById('srp').value),
+                        arrestin: parseNum(document.getElementById('arrestin').value)
+                    },
+                    hygiene: {
+                        hygienists: this.hygienists
+                            .filter(h => h.name || h.days || h.production)
+                            .map(h => ({
+                                name: h.name,
+                                days: parseNum(h.days),
+                                production: parseNum(h.production)
+                            })),
+                        empties: parseNum(document.getElementById('empties').value),
+                        total: this.parseHygieneTotal()
+                    },
+                    exams: {
+                        comp: parseNum(document.getElementById('compExam').value),
+                        periodic: parseNum(document.getElementById('periodicExam').value),
+                        limited: parseNum(document.getElementById('limitedExam').value),
+                        biteWellness: parseNum(document.getElementById('biteWellness').value)
+                    },
+                    imaging: {
+                        panos: parseNum(document.getElementById('panos').value),
+                        fmx: parseNum(document.getElementById('fmx').value),
+                        cbct: parseNum(document.getElementById('cbct').value),
+                        intraOralScan: parseNum(document.getElementById('intraOralScan').value)
+                    },
+                    results: {
+                        production: parseNum(document.getElementById('resultsProduction').value),
+                        collections: parseNum(document.getElementById('resultsCollections').value),
+                        futureScheduled: parseNum(document.getElementById('resultsFutureScheduled').value)
+                    }
+                };
+            }
+
+            parseHygieneTotal() {
+                const text = document.getElementById('hygieneTotal').textContent;
+                return parseFloat(text.replace(/[$,]/g, '')) || 0;
+            }
+
+            handleSubmit() {
+                const practice = document.getElementById('practiceName').value.trim();
+                const month = document.getElementById('month').value;
+                const year = document.getElementById('year').value;
+
+                if (!practice || !month || !year) {
+                    alert('Please fill in Practice Name, Month, and Year');
+                    return;
+                }
+
+                this.lastSubmitData = this.getFormData();
+                this.showSuccessModal();
+            }
+
+            showSuccessModal() {
+                const data = this.lastSubmitData;
+                document.getElementById('modalPractice').textContent = data.practice;
+                document.getElementById('modalMonth').textContent = data.month;
+                document.getElementById('modalYear').textContent = data.year;
+                document.getElementById('modalDays').textContent = data.daysIn || '0';
+                document.getElementById('modalProduction').textContent = `$${(data.results.production || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                document.getElementById('modalCollections').textContent = `$${(data.results.collections || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                document.getElementById('modalHygiene').textContent = `$${(data.hygiene.total || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+                document.getElementById('successModal').classList.add('show');
+            }
+
+            copyToClipboard() {
+                const json = JSON.stringify(this.lastSubmitData, null, 2);
+                navigator.clipboard.writeText(json).then(() => {
+                    const btn = document.getElementById('copyDataBtn');
+                    const original = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        btn.textContent = original;
+                    }, 2000);
+                });
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            new MonthEndTracker();
+        });
+    </script>
+</body>
+</html>
