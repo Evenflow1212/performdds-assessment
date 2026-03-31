@@ -26,19 +26,20 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 /* DASHBOARD STYLES */
 .dashboard-wrap { display: none; }
 .dashboard-wrap.visible { display: block; }
-.header { background: #0d1926; padding: 16px 24px; display: flex; align-items: center; gap: 20px; border-bottom: 2px solid #2a3f5f; }
-.header h1 { font-size: 22px; font-weight: 600; color: #fff; }
-.header .subtitle { font-size: 13px; color: #8899aa; margin-top: 2px; }
-.header .user-area { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.header { background: #0d1926; padding: 6px 24px; display: flex; align-items: stretch; border-bottom: 2px solid #2a3f5f; position: relative; }
+.header .header-left { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.header h1 { font-size: 20px; font-weight: 600; color: #fff; white-space: nowrap; }
+.header .subtitle { display: none; }
+.header .user-area { margin-left: auto; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
 .header .user-area span { font-size: 13px; color: #8899aa; }
 .header .user-area a { font-size: 13px; color: #e8872a; text-decoration: none; cursor: pointer; }
-.tabs { display: flex; background: #0d1926; padding: 0 24px; border-bottom: 1px solid #2a3f5f; }
-.tab { padding: 12px 24px; cursor: pointer; color: #8899aa; font-size: 14px; font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.2s; }
+.tabs { display: flex; align-items: stretch; justify-content: center; flex: 1; padding: 0; }
+.tab { padding: 16px 24px; cursor: pointer; color: #8899aa; font-size: 14px; font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.2s; display: flex; align-items: center; }
 .tab:hover { color: #ccc; }
 .tab.active { color: #e8872a; border-bottom-color: #e8872a; }
 .content { padding: 20px 24px; display: none; }
 .content.active { display: block; }
-.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 20px; }
 .kpi-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 16px 20px; }
 .kpi-label { font-size: 11px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .kpi-value { font-size: 28px; font-weight: 700; color: #fff; }
@@ -73,12 +74,12 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .report-table .year-group-even td { color: rgba(255,255,255,0.92); }
 .report-table .sub-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
 .chart-grid-hyg { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-.spec-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 4px; }
+.spec-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 4px; }
 .spec-row:nth-child(even) { background: rgba(42, 63, 95, 0.15); }
 .spec-bar-wrap { flex: 1; margin: 0 12px; height: 6px; background: #1a2f4a; border-radius: 3px; }
 .spec-bar { height: 100%; background: #e8872a; border-radius: 3px; }
-.spec-label { font-size: 12px; color: #8899aa; min-width: 80px; }
-.spec-val { font-size: 12px; color: #fff; font-weight: 600; min-width: 60px; text-align: right; }
+.spec-label { font-size: 15px; color: #8899aa; min-width: 80px; }
+.spec-val { font-size: 15px; color: #fff; font-weight: 600; min-width: 60px; text-align: right; }
 .specialty-grid { display: grid; grid-template-columns: 1fr; gap: 4px; }
 
 /* FILTER BAR STYLES */
@@ -88,7 +89,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .filter-preset.active { background: #e8872a; color: #fff; }
 
 @media (max-width: 900px) {
-    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
     .chart-grid, .chart-grid-bottom, .chart-grid-hyg { grid-template-columns: 1fr; }
 }
 </style>
@@ -115,19 +116,19 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 <!-- DASHBOARD -->
 <div class="dashboard-wrap" id="dashboardWrap">
 <div class="header">
-    <div>
+    <div class="header-left">
         <h1>Dr. Vanek's Report</h1>
-        <div class="subtitle"><span id="headerDateRange">Dec 2023 &ndash; Dec 2025</span> &nbsp;|&nbsp; Perform DDS Dashboard</div>
+        <span id="headerDateRange" style="display:none;"></span>
+    </div>
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab(0)">Overview</div>
+        <div class="tab" onclick="switchTab(1)">Hygiene &amp; Exams</div>
+        <div class="tab" onclick="switchTab(2)">Reporting Hub</div>
     </div>
     <div class="user-area">
         <span>Welcome, <span id="welcomeName"></span></span>
         <a onclick="handleLogout()">Sign Out</a>
     </div>
-</div>
-<div class="tabs">
-    <div class="tab active" onclick="switchTab(0)">Overview</div>
-    <div class="tab" onclick="switchTab(1)">Hygiene &amp; Exams</div>
-    <div class="tab" onclick="switchTab(2)">Reporting Hub</div>
 </div>
 
 <div class="filter-bar">
@@ -166,6 +167,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label">Avg. Production (Last 12 Months)</div><div class="kpi-value" id="kpi-prod"></div></div>
         <div class="kpi-card"><div class="kpi-label">Avg. Collection (Last 12 Months)</div><div class="kpi-value" id="kpi-coll"></div></div>
         <div class="kpi-card"><div class="kpi-label">Avg. Days (Last 12 Months)</div><div class="kpi-value orange" id="kpi-days"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Avg. Crowns Prepped (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns-prepped"></div></div>
         <div class="kpi-card"><div class="kpi-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
     </div>
     <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
@@ -512,7 +514,8 @@ function initCharts(data = null) {
 
     const crownsByDate = groupByDate(activeData.crowns, 'dimension', 'value');
     const crownDates = Object.keys(crownsByDate).sort().slice(-12);
-    document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => s + (crownsByDate[d]['Crowns PREPPED'] || 0), 0) / crownDates.length);
+    document.getElementById('kpi-crowns-prepped').textContent = Math.round(crownDates.reduce((s,d) => s + (crownsByDate[d]['Crowns PREPPED'] || 0), 0) / crownDates.length);
+    document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length);
 
     const revDates = allResultDates;
     const revLabels = revDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); });
@@ -538,22 +541,23 @@ function initCharts(data = null) {
     Object.entries(specByType).sort((a,b) => b[1]-a[1]).forEach(([k, v]) => { donutLabels.push(k); donutData.push(v); });
     const donutLabelPlugin = {
         id: 'donutLabels',
-        afterDraw(chart) {
-            const { ctx, data } = chart;
+        afterDatasetsDraw(chart) {
+            const { ctx } = chart;
             const meta = chart.getDatasetMeta(0);
-            const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+            const dataset = chart.data.datasets[0];
+            const total = dataset.data.reduce((a, b) => a + b, 0);
             if (total === 0) return;
             meta.data.forEach((arc, i) => {
-                const pct = Math.round(data.datasets[0].data[i] / total * 100);
-                if (pct < 4) return;
-                const { x, y, startAngle, endAngle, innerRadius, outerRadius } = arc.getProps(['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius']);
+                const pct = Math.round(dataset.data[i] / total * 100);
+                if (pct < 3) return;
+                const { startAngle, endAngle, innerRadius, outerRadius } = arc.getProps(['startAngle', 'endAngle', 'innerRadius', 'outerRadius']);
                 const midAngle = (startAngle + endAngle) / 2;
                 const midRadius = (innerRadius + outerRadius) / 2;
-                const labelX = x + Math.cos(midAngle) * midRadius;
-                const labelY = y + Math.sin(midAngle) * midRadius;
+                const labelX = arc.x + Math.cos(midAngle) * midRadius;
+                const labelY = arc.y + Math.sin(midAngle) * midRadius;
                 ctx.save();
                 ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 13px sans-serif';
+                ctx.font = 'bold 14px Arial, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(pct + '%', labelX, labelY);
