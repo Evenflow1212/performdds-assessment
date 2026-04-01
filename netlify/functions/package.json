@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Netlify functions for Perform DDS assessment workbook generation",
   "dependencies": {
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "node-fetch": "^2.7.0"
   }
 }
