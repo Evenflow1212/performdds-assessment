@@ -41,13 +41,13 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .content.active { display: block; }
 .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 20px; }
 .kpi-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 16px 20px; }
-.kpi-label { font-size: 11px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-.kpi-value { font-size: 28px; font-weight: 700; color: #fff; }
+.kpi-label { font-size: 13px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.kpi-value { font-size: 32px; font-weight: 700; color: #fff; }
 .kpi-value.orange { color: #e8872a; }
 .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
 .chart-box { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 16px; }
-.chart-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: #fff; }
-.chart-box .chart-sub { font-size: 11px; color: #8899aa; margin-bottom: 12px; }
+.chart-box h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; color: #fff; }
+.chart-box .chart-sub { font-size: 13px; color: #8899aa; margin-bottom: 12px; }
 .chart-box canvas { width: 100% !important; }
 .chart-grid-bottom { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; margin-bottom: 20px; }
 .report-table-wrap { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 20px; overflow-x: auto; }
@@ -170,12 +170,14 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label">Avg. Crowns Prepped (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns-prepped"></div></div>
         <div class="kpi-card"><div class="kpi-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
     </div>
-    <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
+    <div style="margin-bottom: 20px;">
         <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="flex:1;min-height:380px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
+    </div>
+    <div class="chart-grid" style="grid-template-columns: 2fr 1fr; align-items: stretch;">
+        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><canvas id="chartCrowns"></canvas></div>
         <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="flex:1;display:flex;align-items:center;justify-content:center;"><canvas id="chartMaster"></canvas></div></div>
     </div>
-    <div class="chart-grid-bottom">
-        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><canvas id="chartCrowns"></canvas></div>
+    <div style="margin-bottom: 20px;">
         <div class="chart-box"><h3>Specialty Overview</h3><div class="chart-sub">Total Production by Specialty</div><div id="specialtyList" class="specialty-grid"></div></div>
     </div>
 </div>
@@ -475,7 +477,7 @@ function initCharts(data = null) {
     Chart.defaults.color = '#8899aa';
     Chart.defaults.borderColor = '#2a3f5f';
     Chart.defaults.font.family = 'Arial, sans-serif';
-    Chart.defaults.font.size = 11;
+    Chart.defaults.font.size = 13;
     Chart.defaults.plugins.legend.labels.boxWidth = 12;
 
     const yearDividerPlugin = {
