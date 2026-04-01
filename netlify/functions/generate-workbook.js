@@ -1,7 +1,6 @@
 'use strict';
 const ExcelJS = require('exceljs');
 const fetch = require('node-fetch');
-const pdfParse = require('pdf-parse');
 
 async function callClaude(pdfBase64, prompt, key) {
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -18,62 +17,6 @@ async function callClaude(pdfBase64, prompt, key) {
   const data = await resp.json();
   if (!resp.ok) throw new Error('Claude API error: ' + JSON.stringify(data).slice(0,300));
   return data.content?.[0]?.text || '';
-}
-
-// Extract text from PDF base64 without Claude
-async function extractPdfText(base64) {
-  try {
-    const buf = Buffer.from(base64, 'base64');
-    const result = await pdfParse(buf);
-    return result.text || '';
-  } catch(e) {
-    console.error('pdf-parse failed:', e.message);
-    return '';
-  }
-}
-
-// Parse Patient AR from raw PDF text
-function parsePatientAR(text) {
-  // Look for TOTALS line: "TOTALS: 110195.68 1.00 183.00 9765.39 21320.10 98824.97 120145.07"
-  const m = text.match(/TOTALS?:\s*([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)/i);
-  if (m) {
-    return {
-      current: parseFloat(m[1].replace(/,/g,'')),
-      d3160:   parseFloat(m[2].replace(/,/g,'')),
-      d6190:   parseFloat(m[3].replace(/,/g,'')),
-      d90plus: parseFloat(m[4].replace(/,/g,'')),
-      insr:    parseFloat(m[5].replace(/,/g,'')),
-      total:   parseFloat(m[7].replace(/,/g,''))
-    };
-  }
-  // Fallback: look for PERCENT line before it
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (/TOTALS?:/i.test(lines[i])) {
-      const nums = lines[i].match(/[\d,]+\.\d+/g);
-      if (nums && nums.length >= 5) {
-        const parsed = nums.map(n => parseFloat(n.replace(/,/g,'')));
-        return { current: parsed[0], d3160: parsed[1], d6190: parsed[2], d90plus: parsed[3], insr: parsed[4], total: parsed[parsed.length-1] };
-      }
-    }
-  }
-  return {};
-}
-
-// Parse Insurance AR from raw PDF text
-function parseInsuranceAR(text) {
-  // Look for TOTALS ALL CLAIMS line
-  const m = text.match(/TOTALS\s+ALL\s+CLAIMS:\s*([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)/i);
-  if (m) {
-    return {
-      total:   parseFloat(m[6].replace(/,/g,'')),
-      current: parseFloat(m[2].replace(/,/g,'')),
-      d3160:   parseFloat(m[3].replace(/,/g,'')),
-      d6190:   parseFloat(m[4].replace(/,/g,'')),
-      d90plus: parseFloat(m[5].replace(/,/g,''))
-    };
-  }
-  return {};
 }
 
 function parseProdMeta(text) {
@@ -128,7 +71,7 @@ function parsePL(text) {
     const m = cleaned.match(/-?\$?([\d,]+\.?\d*)/);
     if (!m) return null;
     const val = parseFloat(m[1].replace(/,/g,''));
-    return cleaned.includes('-') ? -val : val;
+    return cleaned.trim().startsWith('-') ? -val : val;
   }
   for (const line of text.split('\n')) {
     const l = line.toLowerCase(), amt = getAmt(line);
@@ -152,6 +95,7 @@ async function buildXlsx(raw, groups, pl, prodMeta, practiceName, arPatient, arI
     if (!tr.ok) throw new Error('Template ' + tr.status);
     wb = new ExcelJS.Workbook();
     await wb.xlsx.load(await tr.buffer());
+    console.log('Template loaded OK');
   } catch(e) {
     console.error('Template error:', e.message);
     wb = new ExcelJS.Workbook();
@@ -165,18 +109,18 @@ async function buildXlsx(raw, groups, pl, prodMeta, practiceName, arPatient, arI
   if (practiceName) sv(wsFO,'B2',practiceName);
   const yearCols = ['D','E','F'];
   years.slice(0,3).forEach((yr,i) => { if (yearCols[i]) sv(wsFO,yearCols[i]+'4',yr); });
-  const col = yearCols[Math.min(years.length-1, 2)] || 'E';
+  const col = yearCols[Math.min(years.length-1,2)] || 'E';
   const totalProd = Object.values(raw).reduce((s,v)=>s+v.total,0);
   sv(wsFO,col+'7',Math.round(totalProd*100)/100);
   const catRows = {diagnostic:8,preventive:9,restorative:10,endodontics:11,periodontics:12,prosthodontics:13,implants:14,oralSurgery:15,orthodontics:16,adjunctive:17,other:18};
   Object.entries(catRows).forEach(([cat,row]) => { if (groups[cat]) sv(wsFO,col+row,Math.round(groups[cat]*100)/100); });
   const collections = netCollectionsFromReport || pl?.netCollections || null;
-  if (collections) sv(wsFO,col+'20',Math.round(collections*100)/100);
-  if (collections && totalProd>0) sv(wsFO,col+'22',Math.round(collections/totalProd*10000)/10000);
+  if (collections) sv(wsFO,col+'20',Math.round(Math.abs(collections)*100)/100);
+  if (collections && totalProd>0) sv(wsFO,col+'22',Math.round(Math.abs(collections)/totalProd*10000)/10000);
   if (months>0) sv(wsFO,col+'26',Math.round(totalProd/months*100)/100);
   if (pl) {
-    if (pl.totalExpense) sv(wsFO,col+'35',Math.round(pl.totalExpense*100)/100);
-    if (pl.netIncome) sv(wsFO,col+'36',Math.round(pl.netIncome*100)/100);
+    if (pl.totalExpense) sv(wsFO,col+'35',Math.round(Math.abs(pl.totalExpense)*100)/100);
+    if (pl.netIncome != null) sv(wsFO,col+'36',Math.round(pl.netIncome*100)/100);
   }
   if (arPatient && arPatient.total) {
     sv(wsFO,'C32','Patient AR'); sv(wsFO,'D32',arPatient.total);
@@ -214,31 +158,23 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); }
   catch(e) { return {statusCode:400,body:JSON.stringify({error:'Invalid JSON'})}; }
-  const {productionBase64,collectionsBase64,plBase64,arPatBase64,arInsBase64,practiceName='',software='dentrix'} = body;
+
+  // arPatient and arInsurance come as pre-parsed objects from the hub
+  const {productionBase64,collectionsBase64,plBase64,practiceName='',arPatient={},arInsurance={}} = body;
   if (!productionBase64) return {statusCode:400,body:JSON.stringify({error:'productionBase64 required'})};
+
   try {
     const PROD_PROMPT = 'Dental practice production by procedure code report. Extract every procedure code with quantity and dollar total. Return ONLY one line per code: CODE|QTY|TOTAL (example: D0120|910|62016.00). Include the date range from the header on the first line verbatim.';
-    const COLL_PROMPT = 'Dentrix Analysis Summary Provider report. Find the TOTAL row at the very bottom of page 2. Return ONLY:\nCHARGES|[total charges]\nPAYMENTS|[total payments]';
+    const COLL_PROMPT = 'Dentrix Analysis Summary Provider report. Find the TOTAL row at the bottom of page 2. The payments number will appear as negative. Return ONLY:\nCHARGES|[total charges as positive number]\nPAYMENTS|[total payments as positive number, remove any minus sign]';
     const PL_PROMPT = 'QuickBooks Profit and Loss. Extract full text with all labels and dollar amounts. Include Total Income, Total Expenses, Net Income clearly.';
 
-    // Core calls: production + collections + PL via Claude
-    console.log('Starting core Claude calls...');
+    console.log('Starting Claude calls: prod + coll + pl...');
     const [prodText, collText, plText] = await Promise.all([
       callClaude(productionBase64, PROD_PROMPT, KEY),
       collectionsBase64 ? callClaude(collectionsBase64, COLL_PROMPT, KEY) : Promise.resolve(''),
       plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve('')
     ]);
-    console.log('Core done. prod:', prodText.length, 'coll:', collText.slice(0,80));
-
-    // AR: extract text directly from PDF - NO Claude API call needed
-    console.log('Extracting AR data from PDFs (no Claude)...');
-    const [arPatPdfText, arInsPdfText] = await Promise.all([
-      arPatBase64 ? extractPdfText(arPatBase64) : Promise.resolve(''),
-      arInsBase64 ? extractPdfText(arInsBase64) : Promise.resolve('')
-    ]);
-    const arPatient = arPatPdfText ? parsePatientAR(arPatPdfText) : {};
-    const arInsurance = arInsPdfText ? parseInsuranceAR(arInsPdfText) : {};
-    console.log('AR Patient total:', arPatient.total, '| AR Insurance total:', arInsurance.total);
+    console.log('Done. prod:', prodText.length, 'coll:', collText.slice(0,120));
 
     const prodMeta = parseProdMeta(prodText);
     const raw = parseProd(prodText);
@@ -247,7 +183,7 @@ exports.handler = async function(event) {
     let netCollectionsFromReport = null;
     if (collText) {
       const m = collText.match(/PAYMENTS\|([\d,]+\.?\d*)/i);
-      if (m) { netCollectionsFromReport = parseFloat(m[1].replace(/,/g,'')); console.log('Collections:', netCollectionsFromReport); }
+      if (m) { netCollectionsFromReport = Math.abs(parseFloat(m[1].replace(/,/g,''))); console.log('Collections:', netCollectionsFromReport); }
     }
 
     let pl = null;
@@ -256,8 +192,10 @@ exports.handler = async function(event) {
       catch(e) { console.error('P&L error:', e.message); }
     }
 
+    console.log('AR Patient:', JSON.stringify(arPatient), '| AR Insurance:', JSON.stringify(arInsurance));
     const xlsxB64 = await buildXlsx(raw, groups, pl, prodMeta, practiceName, arPatient, arInsurance, netCollectionsFromReport);
     const totalProd = Object.values(raw).reduce((s,v)=>s+v.total,0);
+
     return {
       statusCode:200,
       headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
