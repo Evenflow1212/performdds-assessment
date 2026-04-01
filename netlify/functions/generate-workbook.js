@@ -303,20 +303,19 @@ exports.handler = async function(event) {
     const AR_PAT_PROMPT = 'Dentrix Patient Aging Report. Find TOTALS row on last page only. Return ONLY:\nTOTAL|[balance]\nCURRENT|[0-30]\nD3160|[31-60]\nD6190|[61-90]\nD90PLUS|[over90]\nINSR|[insr_est]';
     const AR_INS_PROMPT = 'Dentrix Insurance Claim Aging Report. Find TOTALS ALL CLAIMS row on last page only. Return ONLY:\nTOTAL|[total]\nCURRENT|[current]\nD3160|[31-60]\nD6190|[61-90]\nD90PLUS|[over90]';
 
-    // Run core calls in parallel first
+    // Step 1: Run core calls in parallel (production + collections + PL)
     const [prodText, collText, plText] = await Promise.all([
       callClaude(productionBase64, PROD_PROMPT, KEY),
       collectionsBase64 ? callClaude(collectionsBase64, COLL_PROMPT, KEY) : Promise.resolve(''),
       plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve('')
     ]);
-    console.log('Core calls done. prod:', prodText.length, 'coll:', collText.slice(0,100));
+    console.log('Core done. prod:', prodText.length, 'coll:', collText.slice(0,80));
 
-    // Run AR calls separately with small token limit
-    const [arPatText, arInsText] = await Promise.all([
-      arPatBase64 ? callClaudeSmall(arPatBase64, AR_PAT_PROMPT, KEY) : Promise.resolve(''),
-      arInsBase64 ? callClaudeSmall(arInsBase64, AR_INS_PROMPT, KEY) : Promise.resolve('')
-    ]);
-    console.log('AR done. pat:', arPatText.slice(0,100), 'ins:', arInsText.slice(0,100));
+    // Step 2: Wait 5s to avoid rate limit, then run AR calls sequentially
+    await new Promise(res => setTimeout(res, 5000));
+    const arPatText = arPatBase64 ? await callClaudeSmall(arPatBase64, AR_PAT_PROMPT, KEY) : '';
+    const arInsText = arInsBase64 ? await callClaudeSmall(arInsBase64, AR_INS_PROMPT, KEY) : '';
+    console.log('AR done. pat:', arPatText.slice(0,80), 'ins:', arInsText.slice(0,80));
 
     const prodMeta = parseProdMeta(prodText);
     const raw = parseProd(prodText);
@@ -334,11 +333,11 @@ exports.handler = async function(event) {
     }
     const arPatient = arPatText ? parseAR(arPatText) : {};
     const arInsurance = arInsText ? parseAR(arInsText) : {};
-    console.log('AR Patient total:', arPatient.total, '| AR Insurance total:', arInsurance.total);
+    console.log('AR Patient:', arPatient.total, '| AR Insurance:', arInsurance.total);
 
     let pl = null;
     if (plBase64 && plText) {
-      try { pl = parsePL(plText); console.log('P&L OK'); }
+      try { pl = parsePL(plText); }
       catch(e) { console.error('PL parse failed:', e.message); }
     }
 
@@ -359,7 +358,7 @@ exports.handler = async function(event) {
       }})
     };
   } catch(err) {
-    console.error('Handler error:', err.message);
+    console.error('Error:', err.message);
     return {statusCode:500,headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:err.message,stack:err.stack?.slice(0,500)})};
   }
 };
