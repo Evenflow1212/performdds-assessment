@@ -1033,11 +1033,9 @@ async function generate() {
     const prodBase64 = await fileToBase64(files[1]);
     const collBase64 = await fileToBase64(files[2]);
     const plBase64 = files[3] ? await fileToBase64(files[3]) : null;
-    const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
-const arPatBase64 = files[4] ? await fileToBase64(files[4]) : null;
-    const arInsBase64 = files[5] ? await fileToBase64(files[5]) : null;
     const arPatBase64 = files[4] ? await fileToBase64(files[4]) : null;
     const arInsBase64 = files[5] ? await fileToBase64(files[5]) : null;
+    const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
     const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, arPatBase64, arInsBase64, practiceName, software };
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
