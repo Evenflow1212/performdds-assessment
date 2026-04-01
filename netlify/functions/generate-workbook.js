@@ -268,6 +268,24 @@ async function buildXlsx(raw,groups,pl,prodMeta,name,extra={}){
   return Buffer.from(await wb.xlsx.writeBuffer()).toString('base64');
 }
 
+async function callClaudeSmall(pdfBase64, prompt, key) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:pdfBase64}},
+        {type:'text',text:prompt}
+      ]}]
+    })
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error('Claude AR API error: ' + JSON.stringify(data));
+  return data.content?.[0]?.text || '';
+}
+
 exports.handler = async function(event) {
   if (event.httpMethod==='OPTIONS') return {statusCode:200,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST,OPTIONS'},body:''};
   if (event.httpMethod!=='POST') return {statusCode:405,body:'Method Not Allowed'};
@@ -282,40 +300,48 @@ exports.handler = async function(event) {
     const PROD_PROMPT = 'Dental practice production by procedure code report. Extract every ADA code with quantity and total. Return ONLY lines: CODE|QTY|TOTAL (e.g. D0120|2916|139832.00). Also include date range line verbatim from header.';
     const COLL_PROMPT = 'This is a Dentrix Analysis Summary (Provider) report. Find the TOTAL row at the bottom. Extract Charges and Payments totals. Return ONLY two lines:\nCHARGES|[amount]\nPAYMENTS|[amount]';
     const PL_PROMPT = 'QuickBooks P&L report. Extract full text verbatim preserving all labels and dollar amounts. Total Income, Total Expense, and Net Income must appear clearly. Output raw text only.';
-    const AR_PAT_PROMPT = 'This is a Dentrix Patient Aging Report. Find the TOTALS row at the very bottom of the last page. Return ONLY these lines:\nTOTAL|[balance]\nCURRENT|[0-30 amount]\nD3160|[31-60 amount]\nD6190|[61-90 amount]\nD90PLUS|[over90 amount]\nINSR|[insr_est amount]';
-    const AR_INS_PROMPT = 'This is a Dentrix Dental Insurance Claim Aging Report. Find the TOTALS ALL CLAIMS row at the very bottom of the last page. Return ONLY these lines:\nTOTAL|[total]\nCURRENT|[current]\nD3160|[31-60]\nD6190|[61-90]\nD90PLUS|[over90]';
-    const [prodText, collText, plText, arPatText, arInsText] = await Promise.all([
+    const AR_PAT_PROMPT = 'Dentrix Patient Aging Report. Find TOTALS row on last page only. Return ONLY:\nTOTAL|[balance]\nCURRENT|[0-30]\nD3160|[31-60]\nD6190|[61-90]\nD90PLUS|[over90]\nINSR|[insr_est]';
+    const AR_INS_PROMPT = 'Dentrix Insurance Claim Aging Report. Find TOTALS ALL CLAIMS row on last page only. Return ONLY:\nTOTAL|[total]\nCURRENT|[current]\nD3160|[31-60]\nD6190|[61-90]\nD90PLUS|[over90]';
+
+    // Run core calls in parallel first
+    const [prodText, collText, plText] = await Promise.all([
       callClaude(productionBase64, PROD_PROMPT, KEY),
       collectionsBase64 ? callClaude(collectionsBase64, COLL_PROMPT, KEY) : Promise.resolve(''),
-      plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve(''),
-      arPatBase64 ? callClaude(arPatBase64, AR_PAT_PROMPT, KEY) : Promise.resolve(''),
-      arInsBase64 ? callClaude(arInsBase64, AR_INS_PROMPT, KEY) : Promise.resolve('')
+      plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve('')
     ]);
-    console.log('prodText length:', prodText.length);
-    if (collectionsBase64) console.log('collText:', collText.slice(0,200));
-    if (arPatBase64) console.log('arPatText:', arPatText.slice(0,200));
-    if (arInsBase64) console.log('arInsText:', arInsText.slice(0,200));
+    console.log('Core calls done. prod:', prodText.length, 'coll:', collText.slice(0,100));
+
+    // Run AR calls separately with small token limit
+    const [arPatText, arInsText] = await Promise.all([
+      arPatBase64 ? callClaudeSmall(arPatBase64, AR_PAT_PROMPT, KEY) : Promise.resolve(''),
+      arInsBase64 ? callClaudeSmall(arInsBase64, AR_INS_PROMPT, KEY) : Promise.resolve('')
+    ]);
+    console.log('AR done. pat:', arPatText.slice(0,100), 'ins:', arInsText.slice(0,100));
+
     const prodMeta = parseProdMeta(prodText);
     const raw = parseProd(prodText);
     const groups = agg(raw);
+
     let netCollectionsFromReport = null;
     if (collText) {
-      const paymentsM = collText.match(/PAYMENTS\|([\d,]+\.?\d*)/i);
-      if (paymentsM) { netCollectionsFromReport = parseFloat(paymentsM[1].replace(/,/g,'')); console.log('Collections parsed: '+netCollectionsFromReport); }
+      const m = collText.match(/PAYMENTS\|([\d,]+\.?\d*)/i);
+      if (m) { netCollectionsFromReport = parseFloat(m[1].replace(/,/g,'')); console.log('Collections: '+netCollectionsFromReport); }
     }
+
     function parseAR(text) {
       const get = (key) => { const m = text.match(new RegExp(key+'\\|([\\d,]+\\.?\\d*)', 'i')); return m ? parseFloat(m[1].replace(/,/g,'')) : 0; };
       return { total: get('TOTAL'), current: get('CURRENT'), d3160: get('D3160'), d6190: get('D6190'), d90plus: get('D90PLUS'), insr: get('INSR') };
     }
     const arPatient = arPatText ? parseAR(arPatText) : {};
     const arInsurance = arInsText ? parseAR(arInsText) : {};
-    if (arPatText) console.log('AR Patient parsed: total='+arPatient.total);
-    if (arInsText) console.log('AR Insurance parsed: total='+arInsurance.total);
+    console.log('AR Patient total:', arPatient.total, '| AR Insurance total:', arInsurance.total);
+
     let pl = null;
     if (plBase64 && plText) {
-      try { pl = parsePL(plText); console.log('P&L OK: netCollections='+pl.netCollections); }
+      try { pl = parsePL(plText); console.log('P&L OK'); }
       catch(e) { console.error('PL parse failed:', e.message); }
     }
+
     const xlsxB64 = await buildXlsx(raw, groups, pl, prodMeta, practiceName, {arPatient, arInsurance, netCollectionsFromReport});
     const totalProd = Object.values(raw).reduce((s,v) => s+v.total, 0);
     return {
@@ -333,6 +359,7 @@ exports.handler = async function(event) {
       }})
     };
   } catch(err) {
+    console.error('Handler error:', err.message);
     return {statusCode:500,headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:err.message,stack:err.stack?.slice(0,500)})};
   }
 };
