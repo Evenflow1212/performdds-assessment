@@ -1022,6 +1022,43 @@ async function fileToBase64(file) {
   });
 }
 
+
+async function extractARFromPdf(file, type) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        // Use PDF.js if available, otherwise return empty
+        // For now parse the ArrayBuffer as text to find TOTALS row
+        const bytes = new Uint8Array(e.target.result);
+        let text = '';
+        for (let i = 0; i < bytes.length; i++) {
+          if (bytes[i] > 31 && bytes[i] < 127) text += String.fromCharCode(bytes[i]);
+          else text += ' ';
+        }
+        if (type === 'patient') {
+          // TOTALS: 110195.68 1.00 183.00 9765.39 21320.10 98824.97 120145.07
+          const m = text.match(/TOTALS[:\s]+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)/i);
+          if (m) {
+            resolve({ current: parseFloat(m[1].replace(/,/g,'')), d3160: parseFloat(m[2].replace(/,/g,'')), d6190: parseFloat(m[3].replace(/,/g,'')), d90plus: parseFloat(m[4].replace(/,/g,'')), insr: parseFloat(m[5].replace(/,/g,'')), total: parseFloat(m[7].replace(/,/g,'')) });
+            return;
+          }
+        } else {
+          // TOTALS ALL CLAIMS: 20510.15 52001.00 34871.00 4685.00 0.00 91557.00
+          const m = text.match(/TOTALS\s+ALL\s+CLAIMS[:\s]+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)/i);
+          if (m) {
+            resolve({ total: parseFloat(m[6].replace(/,/g,'')), current: parseFloat(m[2].replace(/,/g,'')), d3160: parseFloat(m[3].replace(/,/g,'')), d6190: parseFloat(m[4].replace(/,/g,'')), d90plus: parseFloat(m[5].replace(/,/g,'')) });
+            return;
+          }
+        }
+        resolve({});
+      } catch(e) { resolve({}); }
+    };
+    reader.onerror = () => resolve({});
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 async function generate() {
   if (!files[1] || !files[2]) {
     alert('Please upload both the Production Report (Step 1) and the Collections Summary (Step 2) before generating.');
@@ -1033,10 +1070,8 @@ async function generate() {
     const prodBase64 = await fileToBase64(files[1]);
     const collBase64 = await fileToBase64(files[2]);
     const plBase64 = files[3] ? await fileToBase64(files[3]) : null;
-    const arPatBase64 = files[4] ? await fileToBase64(files[4]) : null;
-    const arInsBase64 = files[5] ? await fileToBase64(files[5]) : null;
-    const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
-    const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, arPatBase64, arInsBase64, practiceName, software };
+            const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
+    const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, practiceName, software, arPatient, arInsurance };
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
