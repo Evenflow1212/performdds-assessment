@@ -280,9 +280,11 @@ exports.handler = async function(event) {
   if (!productionBase64) return {statusCode:400,body:JSON.stringify({error:'productionBase64 required'})};
   try {
     const PROD_PROMPT = 'Dental practice production by procedure code report. Extract every ADA code with quantity and total. Return ONLY lines: CODE|QTY|TOTAL (e.g. D0120|2916|139832.00). Also include date range line verbatim from header.';
-    const COLL_PROMPT = 'This is a Dentrix Analysis Summary Provider report. Find the TOTAL row at the very bottom of the last page. Extract Charges and Payments totals. Return exactly two lines:\nCHARGES|[number]\nPAYMENTS|[number]\nNo other text.';
-    const PL_PROMPT = 'QuickBooks P&L report. Extract full text verbatim preserving all labels and dollar amounts. The Total Income, Total Expense, and Net Income summary lines must appear with their exact amounts. Output raw text only.';
-    const [prodText, collText='', plText=''] = await Promise.all([
+    const COLL_PROMPT = 'This is a Dentrix Analysis Summary (Provider) report. Find the TOTAL row at the bottom. Extract Charges and Payments totals. Return ONLY two lines:\nCHARGES|[amount]\nPAYMENTS|[amount]';
+    const PL_PROMPT = 'QuickBooks P&L report. Extract full text verbatim preserving all labels and dollar amounts. Total Income, Total Expense, and Net Income must appear clearly. Output raw text only.';
+    const AR_PAT_PROMPT = 'This is a Dentrix Patient Aging Report. Find the TOTALS row at the very bottom of the last page. Return ONLY these lines:\nTOTAL|[balance]\nCURRENT|[0-30 amount]\nD3160|[31-60 amount]\nD6190|[61-90 amount]\nD90PLUS|[over90 amount]\nINSR|[insr_est amount]';
+    const AR_INS_PROMPT = 'This is a Dentrix Dental Insurance Claim Aging Report. Find the TOTALS ALL CLAIMS row at the very bottom of the last page. Return ONLY these lines:\nTOTAL|[total]\nCURRENT|[current]\nD3160|[31-60]\nD6190|[61-90]\nD90PLUS|[over90]';
+    const [prodText, collText, plText, arPatText, arInsText] = await Promise.all([
       callClaude(productionBase64, PROD_PROMPT, KEY),
       collectionsBase64 ? callClaude(collectionsBase64, COLL_PROMPT, KEY) : Promise.resolve(''),
       plBase64 ? callClaude(plBase64, PL_PROMPT, KEY) : Promise.resolve(''),
@@ -291,22 +293,18 @@ exports.handler = async function(event) {
     ]);
     console.log('prodText length:', prodText.length);
     if (collectionsBase64) console.log('collText:', collText.slice(0,200));
-    if (plBase64) console.log('plText length:', plText.length, '| preview:', plText.slice(0,200));
+    if (arPatBase64) console.log('arPatText:', arPatText.slice(0,200));
+    if (arInsBase64) console.log('arInsText:', arInsText.slice(0,200));
     const prodMeta = parseProdMeta(prodText);
     const raw = parseProd(prodText);
     const groups = agg(raw);
-    let netCollFromReport = null;
+    let netCollectionsFromReport = null;
     if (collText) {
-      const pm = collText.match(/PAYMENTS\|([\d,.]+)/i);
-      if (pm) { netCollFromReport = parseFloat(pm[1].replace(/,/g,'')); console.log('Collections payments='+netCollFromReport); }
+      const paymentsM = collText.match(/PAYMENTS\|([\d,]+\.?\d*)/i);
+      if (paymentsM) { netCollectionsFromReport = parseFloat(paymentsM[1].replace(/,/g,'')); console.log('Collections parsed: '+netCollectionsFromReport); }
     }
-
-    // Parse AR aging from PDFs
     function parseAR(text) {
-      const get = (key) => {
-        const m = text.match(new RegExp(key+'\\|([\\d,]+\\.?\\d*)', 'i'));
-        return m ? parseFloat(m[1].replace(/,/g,'')) : 0;
-      };
+      const get = (key) => { const m = text.match(new RegExp(key+'\\|([\\d,]+\\.?\\d*)', 'i')); return m ? parseFloat(m[1].replace(/,/g,'')) : 0; };
       return { total: get('TOTAL'), current: get('CURRENT'), d3160: get('D3160'), d6190: get('D6190'), d90plus: get('D90PLUS'), insr: get('INSR') };
     }
     const arPatient = arPatText ? parseAR(arPatText) : {};
@@ -316,15 +314,23 @@ exports.handler = async function(event) {
     let pl = null;
     if (plBase64 && plText) {
       try { pl = parsePL(plText); console.log('P&L OK: netCollections='+pl.netCollections); }
-      catch(e) { console.error('PL parse failed:', e.message, '| dump:', plText.slice(0,500)); }
+      catch(e) { console.error('PL parse failed:', e.message); }
     }
-    const arData = { patient: arPatient, insurance: arInsurance };
-    const xlsxB64 = await buildXlsx(raw, groups, pl, prodMeta, practiceName, arData, netCollFromReport);
+    const xlsxB64 = await buildXlsx(raw, groups, pl, prodMeta, practiceName, {arPatient, arInsurance, netCollectionsFromReport});
     const totalProd = Object.values(raw).reduce((s,v) => s+v.total, 0);
     return {
-      statusCode: 200,
-      headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
-      body: JSON.stringify({success:true,xlsxB64,summary:{codesFound:Object.keys(raw).length,totalProduction:totalProd.toFixed(2),months:prodMeta.months,years:prodMeta.years,netCollections:netCollFromReport||pl?.netCollections||null,totalExpense:pl?.totalExpense||null,netIncome:pl?.netIncome||null,plParsed:pl!==null}})
+      statusCode:200,
+      headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
+      body:JSON.stringify({success:true,xlsxB64,summary:{
+        codesFound:Object.keys(raw).length,
+        totalProduction:totalProd.toFixed(2),
+        months:prodMeta.months,
+        years:prodMeta.years,
+        netCollections:netCollectionsFromReport||pl?.netCollections||null,
+        plParsed:pl!==null,
+        arPatientTotal:arPatient?.total||null,
+        arInsuranceTotal:arInsurance?.total||null
+      }})
     };
   } catch(err) {
     return {statusCode:500,headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:err.message,stack:err.stack?.slice(0,500)})};
