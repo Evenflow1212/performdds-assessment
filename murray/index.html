@@ -37,17 +37,17 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .tab { padding: 16px 24px; cursor: pointer; color: #8899aa; font-size: 16px; font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.2s; display: flex; align-items: center; }
 .tab:hover { color: #ccc; }
 .tab.active { color: #e8872a; border-bottom-color: #e8872a; }
-.content { padding: 14px 24px; display: none; }
+.content { padding: 10px 20px; display: none; }
 .content.active { display: block; }
-.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
-.kpi-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px 16px; }
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
+.kpi-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 8px 12px; }
 .kpi-label { font-size: 15px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-.kpi-value { font-size: 38px; font-weight: 700; color: #fff; }
+.kpi-value { font-size: 28px; font-weight: 700; color: #fff; }
 .kpi-value.orange { color: #e8872a; }
-.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
-.chart-box { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 12px; }
-.chart-box h3 { font-size: 20px; font-weight: 600; margin-bottom: 4px; color: #fff; }
-.chart-box .chart-sub { font-size: 15px; color: #8899aa; margin-bottom: 12px; }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.chart-box { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 8px 12px; }
+.chart-box h3 { font-size: 16px; font-weight: 600; margin-bottom: 2px; color: #fff; }
+.chart-box .chart-sub { font-size: 12px; color: #8899aa; margin-bottom: 6px; }
 .chart-box canvas { width: 100% !important; }
 .chart-grid-bottom { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; margin-bottom: 20px; }
 .report-table-wrap { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 20px; overflow-x: auto; }
@@ -171,11 +171,11 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
     </div>
     <div style="margin-bottom: 20px;">
-        <div class="chart-box" style=""><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:280px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
+        <div class="chart-box" style=""><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:22vh;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
     </div>
     <div class="chart-grid" style="grid-template-columns: 2fr 1fr; align-items: stretch;">
-        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="height:240px;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
-        <div class="chart-box" style=""><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="height:240px;display:flex;align-items:center;justify-content:center;"><canvas id="chartMaster"></canvas></div></div>
+        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="height:17vh;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
+        <div class="chart-box" style=""><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="height:17vh;display:flex;align-items:center;justify-content:center;"><canvas id="chartMaster"></canvas></div></div>
     </div>
     <div style="margin-bottom: 20px;">
         <div class="chart-box"><h3>Specialty Overview</h3><div class="chart-sub">Total Production by Specialty</div><div id="specialtyList" class="specialty-grid"></div></div>
@@ -189,10 +189,10 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label">Avg. Hygiene Production</div><div class="kpi-value" id="kpi-hygprod"></div></div>
         <div class="kpi-card"><div class="kpi-label">Avg. Hygiene Prod/Day/Producer</div><div class="kpi-value orange" id="kpi-hygpd"></div></div>
     </div>
-    <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:220px;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
+    <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:18vh;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
     <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
-        <div class="chart-box" style=""><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="height:220px;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
-        <div class="chart-box" style=""><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="height:220px;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
+        <div class="chart-box" style=""><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="height:16vh;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
+        <div class="chart-box" style=""><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="height:16vh;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
     </div>
     <div class="chart-grid-hyg" style="margin-top:20px;">
         <div class="chart-box">
