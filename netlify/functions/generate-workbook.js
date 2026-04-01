@@ -255,7 +255,7 @@ async function buildXlsx(raw,groups,pl,prodMeta,name,extra={}){
   }
   // P&L INPUT — only touch specific data cells
   sv(wsPL,'B2',12); fv(wsPL,'N2','=IFERROR(H2/B2,0)');
-  if (netCollFromReport && !pl) { sv(wsPL,'H2',netCollFromReport); }
+  if (netCollectionsFromReport && !pl) { sv(wsPL,'H2',netCollectionsFromReport); }
   if (pl) {
     sv(wsPL,'H2',pl.netCollections);
     sv(wsPL,'N54',pl.totalExpense);
