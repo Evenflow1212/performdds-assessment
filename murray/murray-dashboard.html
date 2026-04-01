@@ -171,11 +171,11 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
     </div>
     <div style="margin-bottom: 20px;">
-        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="flex:1;min-height:260px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
+        <div class="chart-box" style=""><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:280px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
     </div>
     <div class="chart-grid" style="grid-template-columns: 2fr 1fr; align-items: stretch;">
-        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><canvas id="chartCrowns"></canvas></div>
-        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="flex:1;display:flex;align-items:center;justify-content:center;"><canvas id="chartMaster"></canvas></div></div>
+        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="height:240px;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
+        <div class="chart-box" style=""><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="height:240px;display:flex;align-items:center;justify-content:center;"><canvas id="chartMaster"></canvas></div></div>
     </div>
     <div style="margin-bottom: 20px;">
         <div class="chart-box"><h3>Specialty Overview</h3><div class="chart-sub">Total Production by Specialty</div><div id="specialtyList" class="specialty-grid"></div></div>
@@ -191,8 +191,8 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
     </div>
     <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:220px;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
     <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
-        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="flex:1;min-height:220px;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
-        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="flex:1;min-height:220px;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
+        <div class="chart-box" style=""><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="height:220px;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
+        <div class="chart-box" style=""><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="height:220px;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
     </div>
     <div class="chart-grid-hyg" style="margin-top:20px;">
         <div class="chart-box">
