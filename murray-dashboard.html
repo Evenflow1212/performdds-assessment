@@ -164,11 +164,11 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 
 <div class="content active" id="tab-0">
     <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Avg. Production (Last 12 Months)</div><div class="kpi-value" id="kpi-prod"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Avg. Collection (Last 12 Months)</div><div class="kpi-value" id="kpi-coll"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Avg. Days (Last 12 Months)</div><div class="kpi-value orange" id="kpi-days"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Avg. Crowns Prepped (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns-prepped"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-prod-label">Avg. Production (Last 12 Months)</div><div class="kpi-value" id="kpi-prod"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-coll-label">Avg. Collection (Last 12 Months)</div><div class="kpi-value" id="kpi-coll"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-days-label">Avg. Days (Last 12 Months)</div><div class="kpi-value orange" id="kpi-days"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-prepped-label">Avg. Crowns Prepped (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns-prepped"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
     </div>
     <div style="margin-bottom: 20px;">
         <div class="chart-box" style=""><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:22vh;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
@@ -184,10 +184,10 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 
 <div class="content" id="tab-1">
     <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Avg. New Patients / Month</div><div class="kpi-value" id="kpi-newpat"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Avg. Total Visits / Month</div><div class="kpi-value" id="kpi-visits"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Avg. Hygiene Production</div><div class="kpi-value" id="kpi-hygprod"></div></div>
-        <div class="kpi-card"><div class="kpi-label">Avg. Hygiene Prod/Day/Producer</div><div class="kpi-value orange" id="kpi-hygpd"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-newpat-label">Avg. New Patients / Month</div><div class="kpi-value" id="kpi-newpat"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-visits-label">Avg. Total Visits / Month</div><div class="kpi-value" id="kpi-visits"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-hygprod-label">Avg. Hygiene Production</div><div class="kpi-value" id="kpi-hygprod"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-hygpd-label">Avg. Hygiene Prod/Day/Producer</div><div class="kpi-value orange" id="kpi-hygpd"></div></div>
     </div>
     <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:18vh;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
     <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
@@ -506,29 +506,93 @@ function initCharts(data = null) {
 
     const resultsByDate = groupByDate(activeData.results, 'dimension', 'value');
     const allResultDates = Object.keys(resultsByDate).sort();
+    const isSingleMonth = allResultDates.length === 1;
+    let prevMonthData = null;
+    if (isSingleMonth) {
+        const cd = allResultDates[0];
+        const allRAWDates = [...new Set(RAW.results.map(r=>r.date))].sort();
+        const ci = allRAWDates.indexOf(cd);
+        if (ci > 0) prevMonthData = filterDataByDateRange(allRAWDates[ci-1], allRAWDates[ci-1]);
+    }
+    function fmtChange(cur, prev) {
+        if (!prev || prev === 0) return '';
+        const p = ((cur - prev) / prev * 100).toFixed(1);
+        const a = p >= 0 ? '\u25B2' : '\u25BC';
+        const c = p >= 0 ? '#6bc47f' : '#d94a7a';
+        return '<div style="font-size:12px;color:'+c+';margin-top:4px;">'+a+' '+Math.abs(p)+'% vs prior mo</div>';
+    }
+    const barLabelPlugin = {
+        id: 'barLabels',
+        afterDatasetsDraw(chart) {
+            const {ctx} = chart;
+            chart.data.datasets.forEach((ds, di) => {
+                chart.getDatasetMeta(di).data.forEach((bar, i) => {
+                    const v = ds.data[i]; if (v == null || v === 0) return;
+                    ctx.save(); ctx.fillStyle='#fff'; ctx.font='bold 12px Arial';
+                    const cur = chart.config.options._isCurrency;
+                    const hz = chart.config.options.indexAxis==='y';
+                    const lb = cur ? '$'+Math.round(v).toLocaleString() : Math.round(v).toLocaleString();
+                    if (hz) { ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(lb, bar.x+6, bar.y); }
+                    else { ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText(lb, bar.x, bar.y-4); }
+                    ctx.restore();
+                });
+            });
+        }
+    };
     const last12 = allResultDates.slice(-12);
-    document.getElementById('kpi-prod').textContent = fmt$(last12.reduce((s,d) => s + (resultsByDate[d]['Production'] || 0), 0) / last12.length);
-    document.getElementById('kpi-coll').textContent = fmt$(last12.reduce((s,d) => s + (resultsByDate[d]['Collections'] || 0), 0) / last12.length);
-
     const daysMap = {}; activeData.days.forEach(r => daysMap[r.date] = r.value);
     const daysDates = sortedDates(activeData.days).slice(-12);
-    document.getElementById('kpi-days').textContent = Math.round(daysDates.reduce((s,d) => s + (daysMap[d]||0), 0) / daysDates.length);
-
     const crownsByDate = groupByDate(activeData.crowns, 'dimension', 'value');
     const crownDates = Object.keys(crownsByDate).sort().slice(-12);
-    document.getElementById('kpi-crowns-prepped').textContent = Math.round(crownDates.reduce((s,d) => s + (crownsByDate[d]['Crowns PREPPED'] || 0), 0) / crownDates.length);
-    document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length);
+    if (isSingleMonth) {
+        const d = allResultDates[0];
+        const prod = resultsByDate[d]['Production']||0, coll = resultsByDate[d]['Collections']||0;
+        const days = daysMap[d]||0;
+        const cp = crownsByDate[d]?.['Crowns PREPPED']||0;
+        const cfb = crownsByDate[d]?.['Crowns FUTURE BOOKED']||0;
+        const cfl = crownsByDate[d]?.['Crowns from LAST MONTH']||0;
+        document.getElementById('kpi-prod-label').textContent = 'PRODUCTION';
+        document.getElementById('kpi-coll-label').textContent = 'COLLECTION';
+        document.getElementById('kpi-days-label').textContent = 'DAYS WORKED';
+        document.getElementById('kpi-crowns-prepped-label').textContent = 'CROWNS PREPPED';
+        document.getElementById('kpi-crowns-label').textContent = 'CROWNS ADDED';
+        let prevRes = prevMonthData ? groupByDate(prevMonthData.results,'dimension','value') : null;
+        let prevD = prevRes ? Object.keys(prevRes).sort()[0] : null;
+        document.getElementById('kpi-prod').innerHTML = fmt$(prod) + (prevD ? fmtChange(prod, prevRes[prevD]['Production']||0) : '');
+        document.getElementById('kpi-coll').innerHTML = fmt$(coll) + (prevD ? fmtChange(coll, prevRes[prevD]['Collections']||0) : '');
+        document.getElementById('kpi-days').innerHTML = days + (prevMonthData && prevMonthData.days[0] ? fmtChange(days, prevMonthData.days[0].value) : '');
+        document.getElementById('kpi-crowns-prepped').innerHTML = cp;
+        document.getElementById('kpi-crowns').innerHTML = (cp+cfb-cfl);
+    } else {
+        document.getElementById('kpi-prod-label').textContent = 'Avg. Production (Last 12 Months)';
+        document.getElementById('kpi-coll-label').textContent = 'Avg. Collection (Last 12 Months)';
+        document.getElementById('kpi-days-label').textContent = 'Avg. Days (Last 12 Months)';
+        document.getElementById('kpi-crowns-prepped-label').textContent = 'Avg. Crowns Prepped (Last 12 Months)';
+        document.getElementById('kpi-crowns-label').textContent = 'Avg. Crowns Added (Last 12 Months)';
+        document.getElementById('kpi-prod').textContent = fmt$(last12.reduce((s,d) => s + (resultsByDate[d]['Production'] || 0), 0) / last12.length);
+        document.getElementById('kpi-coll').textContent = fmt$(last12.reduce((s,d) => s + (resultsByDate[d]['Collections'] || 0), 0) / last12.length);
+        document.getElementById('kpi-days').textContent = Math.round(daysDates.reduce((s,d) => s + (daysMap[d]||0), 0) / daysDates.length);
+        document.getElementById('kpi-crowns-prepped').textContent = Math.round(crownDates.reduce((s,d) => s + (crownsByDate[d]['Crowns PREPPED'] || 0), 0) / crownDates.length);
+        document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length);
+    }
 
     const revDates = allResultDates;
-    const revPR = revDates.length <= 3 ? 5 : 0;
     const revLabels = revDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); });
-    chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
-        type: 'line', data: { labels: revLabels, datasets: [
-            { label: 'Production', data: revDates.map(d => resultsByDate[d]['Production']||null), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
-            { label: 'Collections', data: revDates.map(d => resultsByDate[d]['Collections']||null), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
-            { label: 'Future Scheduled', data: revDates.map(d => resultsByDate[d]['Future Scheduled']||null), borderColor: '#6bc47f', backgroundColor: 'rgba(107,196,127,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true }
-        ]}, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y != null ? Math.round(ctx.parsed.y).toLocaleString() : '-'); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k', font: { size: 12 } }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } } } }
-    });
+    if (isSingleMonth) {
+        const d = revDates[0];
+        chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
+            type: 'bar', data: { labels: ['Production', 'Collections', 'Future Scheduled'], datasets: [{ data: [resultsByDate[d]['Production']||0, resultsByDate[d]['Collections']||0, resultsByDate[d]['Future Scheduled']||0], backgroundColor: ['#e8872a', '#4a90d9', '#6bc47f'], borderRadius: 6, barPercentage: 0.5 }] }, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        const revPR = revDates.length <= 3 ? 5 : 0;
+        chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
+            type: 'line', data: { labels: revLabels, datasets: [
+                { label: 'Production', data: revDates.map(d => resultsByDate[d]['Production']||null), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                { label: 'Collections', data: revDates.map(d => resultsByDate[d]['Collections']||null), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                { label: 'Future Scheduled', data: revDates.map(d => resultsByDate[d]['Future Scheduled']||null), borderColor: '#6bc47f', backgroundColor: 'rgba(107,196,127,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true }
+            ]}, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y != null ? Math.round(ctx.parsed.y).toLocaleString() : '-'); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k', font: { size: 12 } }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } } } }
+        });
+    }
 
     const docByDate = {}; activeData.doctor.forEach(r => { if (!docByDate[r.date]) docByDate[r.date] = {}; docByDate[r.date][r.name] = r.production; });
     const docDates = Object.keys(docByDate).sort();
@@ -595,50 +659,97 @@ function initCharts(data = null) {
 
     const specTotals = {}; activeData.specialty.forEach(r => { specTotals[r.dimension] = (specTotals[r.dimension]||0) + (r.production||0); });
     const specSorted = Object.entries(specTotals).sort((a,b) => b[1]-a[1]);
-    const maxSpec = specSorted[0] ? specSorted[0][1] : 1;
+    const totalDocProd = activeData.doctor.reduce((s,r)=>s+(r.production||0),0); const totalHygProd = activeData.hygiene.reduce((s,r)=>s+(r.production||0),0); const totalSpecProd = Object.values(specTotals).reduce((s,v)=>s+v,0); const maxSpec = Math.max(totalDocProd + totalHygProd + totalSpecProd, 1);
     document.getElementById('specialtyList').innerHTML = specSorted.map(([name, val]) => '<div class="spec-row"><span class="spec-label">'+name+'</span><div class="spec-bar-wrap"><div class="spec-bar" style="width:'+Math.round(val/maxSpec*100)+'%"></div></div><span class="spec-val">'+fmt$(val)+'</span></div>').join('');
 
     const newPatByDate = {}; activeData.visits.forEach(r => { if (r.dimension === 'New Patients seen') newPatByDate[r.date] = r.count; });
     const npDates = Object.keys(newPatByDate).sort();
-    document.getElementById('kpi-newpat').textContent = Math.round(npDates.reduce((s,d) => s + (newPatByDate[d]||0), 0) / npDates.length);
-
     const totalVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)) totalVisitsByDate[r.date] = (totalVisitsByDate[r.date]||0) + (r.count||0); });
     const tvDates = Object.keys(totalVisitsByDate).sort();
-    document.getElementById('kpi-visits').textContent = Math.round(tvDates.reduce((s,d) => s + totalVisitsByDate[d], 0) / tvDates.length);
-
     const hygProdByDate = {}; activeData.hygiene.forEach(r => { hygProdByDate[r.date] = (hygProdByDate[r.date]||0) + (r.production||0); });
     const hpDates = Object.keys(hygProdByDate).sort();
     const last12hp = hpDates.slice(-12);
-    document.getElementById('kpi-hygprod').textContent = fmt$(last12hp.reduce((s,d) => s + hygProdByDate[d], 0) / last12hp.length);
-
     const hygPdByDate = {}; activeData.hygiene.forEach(r => { if (!hygPdByDate[r.date]) hygPdByDate[r.date] = []; if (r.days > 0 && r.production > 0) hygPdByDate[r.date].push(r.production / r.days); });
     const hdDates = Object.keys(hygPdByDate).sort().slice(-12);
-    document.getElementById('kpi-hygpd').textContent = fmt$(hdDates.reduce((s,d) => { const rates = hygPdByDate[d]; return s + (rates.length > 0 ? rates.reduce((a,b)=>a+b,0) / rates.length : 0); }, 0) / hdDates.length);
+
+    if (isSingleMonth) {
+        const d = npDates[0] || tvDates[0] || hpDates[0];
+        document.getElementById('kpi-newpat-label').textContent = 'NEW PATIENTS';
+        document.getElementById('kpi-visits-label').textContent = 'TOTAL VISITS';
+        document.getElementById('kpi-hygprod-label').textContent = 'HYGIENE PRODUCTION';
+        document.getElementById('kpi-hygpd-label').textContent = 'HYG PROD/DAY/PRODUCER';
+        const npVal = newPatByDate[d]||0;
+        const tvVal = totalVisitsByDate[d]||0;
+        const hpVal = hygProdByDate[d]||0;
+        const hdRates = hygPdByDate[d]||[];
+        const hpdVal = hdRates.length > 0 ? hdRates.reduce((a,b)=>a+b,0)/hdRates.length : 0;
+        document.getElementById('kpi-newpat').innerHTML = npVal + (prevMonthData ? fmtChange(npVal, Object.values(groupByDate(prevMonthData.visits,'dimension','count')).map(v=>v['New Patients seen']||0)[0]||0) : '');
+        document.getElementById('kpi-visits').innerHTML = tvVal;
+        document.getElementById('kpi-hygprod').innerHTML = fmt$(hpVal) + (prevMonthData ? fmtChange(hpVal, prevMonthData.hygiene.reduce((s,r)=>s+(r.production||0),0)) : '');
+        document.getElementById('kpi-hygpd').innerHTML = fmt$(hpdVal);
+    } else {
+        document.getElementById('kpi-newpat-label').textContent = 'Avg. New Patients / Month';
+        document.getElementById('kpi-visits-label').textContent = 'Avg. Total Visits / Month';
+        document.getElementById('kpi-hygprod-label').textContent = 'Avg. Hygiene Production';
+        document.getElementById('kpi-hygpd-label').textContent = 'Avg. Hygiene Prod/Day/Producer';
+        document.getElementById('kpi-newpat').textContent = Math.round(npDates.reduce((s,d) => s + (newPatByDate[d]||0), 0) / npDates.length);
+        document.getElementById('kpi-visits').textContent = Math.round(tvDates.reduce((s,d) => s + totalVisitsByDate[d], 0) / tvDates.length);
+        document.getElementById('kpi-hygprod').textContent = fmt$(last12hp.reduce((s,d) => s + hygProdByDate[d], 0) / last12hp.length);
+        document.getElementById('kpi-hygpd').textContent = fmt$(hdDates.reduce((s,d) => { const rates = hygPdByDate[d]; return s + (rates.length > 0 ? rates.reduce((a,b)=>a+b,0) / rates.length : 0); }, 0) / hdDates.length);
+    }
 
     const examsByDate = groupByDate(activeData.exams, 'dimension', 'count');
     const examDates = Object.keys(examsByDate).sort();
     const examPR = examDates.length <= 3 ? 5 : 0;
-    chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
-        type: 'line', data: { labels: examDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
-            datasets: [
-                { label: 'Periodic (0120)', data: examDates.map(d => examsByDate[d]['0120 Periodic Exam']||0), borderColor: '#6bc47f', backgroundColor: 'rgba(107,196,127,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
-                { label: 'Limited (0140)', data: examDates.map(d => examsByDate[d]['0140 Limited Exam']||0), borderColor: '#d94a7a', backgroundColor: 'rgba(217,74,122,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
-                { label: 'New Patients', data: examDates.map(d => newPatByDate[d]||0), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
-                { label: 'Comp (0150)', data: examDates.map(d => examsByDate[d]['0150 Comp Exam']||0), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true }
-            ]
-        }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } } } }
-    });
+
+    if (isSingleMonth) {
+        // Single month: show bar chart with exam types
+        const examTypes = ['0150 Comp Exam', '0120 Periodic Exam', '0140 Limited Exam'];
+        chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
+            type: 'bar', data: { labels: examTypes, datasets: [
+                { label: 'Count', data: examTypes.map(t => examsByDate[examDates[0]]?.[t] || 0), backgroundColor: ['#4a90d9', '#6bc47f', '#d94a7a'], borderRadius: 4 }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.y + ' exams'; } } } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        // Multi-month: show line chart
+        chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
+            type: 'line', data: { labels: examDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: [
+                    { label: 'Periodic (0120)', data: examDates.map(d => examsByDate[d]['0120 Periodic Exam']||0), borderColor: '#6bc47f', backgroundColor: 'rgba(107,196,127,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                    { label: 'Limited (0140)', data: examDates.map(d => examsByDate[d]['0140 Limited Exam']||0), borderColor: '#d94a7a', backgroundColor: 'rgba(217,74,122,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                    { label: 'New Patients', data: examDates.map(d => newPatByDate[d]||0), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                    { label: 'Comp (0150)', data: examDates.map(d => examsByDate[d]['0150 Comp Exam']||0), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true }
+                ]
+            }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } } } }
+        });
+    }
 
     const hygStatDates = Object.keys(hygProdByDate).sort();
     const hygPdPerName = {}; activeData.hygiene.forEach(r => { if (!hygPdPerName[r.date]) hygPdPerName[r.date] = {}; if (r.days > 0 && r.production > 0) hygPdPerName[r.date][r.name] = Math.round(r.production / r.days); });
     const hygStatNames = [...new Set(activeData.hygiene.map(r => r.name))];
     const hygStatColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a', '#9b59b6'];
     const hygStatPR = hygStatDates.length <= 3 ? 5 : 0;
-    chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
-        type: 'line', data: { labels: hygStatDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
-            datasets: hygStatNames.map((name, i) => ({ label: name, data: hygStatDates.map(d => (hygPdPerName[d] && hygPdPerName[d][name]) || null), borderColor: hygStatColors[i % hygStatColors.length], backgroundColor: hygStatColors[i % hygStatColors.length] + '15', borderWidth: 2.5, pointRadius: hygStatPR, pointHoverRadius: 6, tension: 0.35, fill: false, spanGaps: true }))
-        }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  $' + Math.round(total).toLocaleString(); }, label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y ? Math.round(ctx.parsed.y).toLocaleString() : '-') + '/day'; } } } }, scales: { y: { beginAtZero: false, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } } } }
-    });
+
+    if (isSingleMonth) {
+        // Single month: show horizontal bar chart with one bar per hygienist
+        const currentDate = allResultDates[0];
+        const hygDataForMonth = {}; activeData.hygiene.forEach(r => { if (r.date === currentDate && r.days > 0 && r.production > 0) hygDataForMonth[r.name] = Math.round(r.production / r.days); });
+        const hygNamesForMonth = Object.keys(hygDataForMonth).sort();
+        const hygValuesForMonth = hygNamesForMonth.map(n => hygDataForMonth[n]);
+
+        chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
+            type: 'bar', data: { labels: hygNamesForMonth, datasets: [
+                { label: '$/Day', data: hygValuesForMonth, backgroundColor: hygStatColors.slice(0, hygNamesForMonth.length), borderRadius: 4 }
+            ]}, plugins: [barLabelPlugin], options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + Math.round(ctx.parsed.x).toLocaleString() + '/day'; } } } }, scales: { x: { beginAtZero: false, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, y: { grid: { display: false } } } }
+        });
+    } else {
+        // Multi-month: show line chart
+        chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
+            type: 'line', data: { labels: hygStatDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: hygStatNames.map((name, i) => ({ label: name, data: hygStatDates.map(d => (hygPdPerName[d] && hygPdPerName[d][name]) || null), borderColor: hygStatColors[i % hygStatColors.length], backgroundColor: hygStatColors[i % hygStatColors.length] + '15', borderWidth: 2.5, pointRadius: hygStatPR, pointHoverRadius: 6, tension: 0.35, fill: false, spanGaps: true }))
+            }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  $' + Math.round(total).toLocaleString(); }, label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y ? Math.round(ctx.parsed.y).toLocaleString() : '-') + '/day'; } } } }, scales: { y: { beginAtZero: false, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } } } }
+        });
+    }
 
     const hygNames = [...new Set(activeData.hygiene.map(r => r.name))];
     const hygByDate = {}; activeData.hygiene.forEach(r => { if (!hygByDate[r.date]) hygByDate[r.date] = {}; hygByDate[r.date][r.name] = r.production; });
@@ -652,11 +763,27 @@ function initCharts(data = null) {
         { border: '#9b59b6', bg: 'rgba(155,89,182,0.35)' }
     ];
     const hygProdPR = hygAllDates.length <= 3 ? 5 : 0;
-    chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
-        type: 'line', data: { labels: hygAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
-            datasets: hygNames.map((name, i) => ({ label: name, data: hygAllDates.map(d => hygByDate[d][name] || 0), borderColor: hygAreaColors[i % hygAreaColors.length].border, backgroundColor: hygAreaColors[i % hygAreaColors.length].bg, borderWidth: 2, pointRadius: hygProdPR, pointHoverRadius: 5, tension: 0.35, fill: true }))
-        }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  Total: $' + Math.round(total).toLocaleString(); }, label: function(ctx) { return ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString(); } } } } }
-    });
+
+    if (isSingleMonth) {
+        // Single month: show bar chart with one bar per hygienist
+        const currentDate = allResultDates[0];
+        const hygProdForMonth = {}; activeData.hygiene.forEach(r => { if (r.date === currentDate) hygProdForMonth[r.name] = (hygProdForMonth[r.name] || 0) + (r.production || 0); });
+        const hygNamesForMonth = Object.keys(hygProdForMonth).sort();
+        const hygProdValuesForMonth = hygNamesForMonth.map(n => hygProdForMonth[n]);
+
+        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
+            type: 'bar', data: { labels: hygNamesForMonth, datasets: [
+                { label: 'Production', data: hygProdValuesForMonth, backgroundColor: hygProdColors.slice(0, hygNamesForMonth.length), borderRadius: 4 }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + Math.round(ctx.parsed.y).toLocaleString(); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        // Multi-month: show stacked area line chart
+        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
+            type: 'line', data: { labels: hygAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: hygNames.map((name, i) => ({ label: name, data: hygAllDates.map(d => hygByDate[d][name] || 0), borderColor: hygAreaColors[i % hygAreaColors.length].border, backgroundColor: hygAreaColors[i % hygAreaColors.length].bg, borderWidth: 2, pointRadius: hygProdPR, pointHoverRadius: 5, tension: 0.35, fill: true }))
+            }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  Total: $' + Math.round(total).toLocaleString(); }, label: function(ctx) { return ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString(); } } } } }
+        });
+    }
 
     const imagingByDate = groupByDate(activeData.imaging, 'dimension', 'count');
     const imagingDates = Object.keys(imagingByDate).sort();
