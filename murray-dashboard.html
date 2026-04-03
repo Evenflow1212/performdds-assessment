@@ -359,8 +359,10 @@ function updateRangeVisual() {
 function formatDateRange(start, end) {
     const [sy, sm] = start.split('-');
     const [ey, em] = end.split('-');
+    const fullMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const startMonth = months[parseInt(sm) - 1];
     const endMonth = months[parseInt(em) - 1];
+    if (start === end) return fullMonths[parseInt(sm) - 1] + ' ' + sy;
     return startMonth + ' ' + sy + ' - ' + endMonth + ' ' + ey;
 }
 
