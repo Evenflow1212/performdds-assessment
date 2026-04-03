@@ -654,7 +654,7 @@ function initCharts(data = null) {
         return prepped + futureBooked - fromLast;
     });
     const crownDatasets = crownDims.map((dim, i) => ({ label: dim.replace('Crown diagnosed - NON Cosmetic','Diagnosed Non-Cosmetic').replace('Crowns from LAST MONTH','From Last Month').replace('Crowns FUTURE BOOKED','Future Booked').replace('Crowns PREPPED','Prepped'), data: crownAllDates.map(d => crownsByDate[d][dim] || 0), backgroundColor: crownColors[i], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }));
-    crownDatasets.push({ label: 'Crowns Added', data: crownAddedData, backgroundColor: crownColors[4], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 });
+    crownDatasets.push({ label: 'Crowns Added', data: crownAddedData, backgroundColor: crownColors[3], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 });
     chartInstances['chartCrowns'] = new Chart(document.getElementById('chartCrowns'), {
         type: 'bar', data: { labels: crownAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
             datasets: crownDatasets
