@@ -575,9 +575,9 @@ function initCharts(data = null) {
         options: { responsive: true, maintainAspectRatio: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } }
     });
 
-    const crownDims = ['Crowns PREPPED', 'Crowns from LAST MONTH', 'Crowns FUTURE BOOKED', 'Crown diagnosed - NON Cosmetic'];
+    const crownDims = ['Crowns from LAST MONTH', 'Crowns PREPPED', 'Crowns FUTURE BOOKED'];
     const crownAllDates = Object.keys(crownsByDate).sort();
-    const crownColors = ['#e8872a','#4a90d9','#6bc47f','#d94a7a','#9b59b6'];
+    const crownColors = ['#4a90d9','#e8872a','#6bc47f','#9b59b6'];
     const crownAddedData = crownAllDates.map(d => {
         const prepped = crownsByDate[d]['Crowns PREPPED'] || 0;
         const futureBooked = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0;
