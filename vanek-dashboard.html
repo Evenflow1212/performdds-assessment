@@ -49,6 +49,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .chart-box h3 { font-size: 16px; font-weight: 600; margin-bottom: 2px; color: #fff; }
 .chart-box .chart-sub { font-size: 12px; color: #8899aa; margin-bottom: 6px; }
 .chart-box canvas { width: 100% !important; }
+#chartMaster { width: auto !important; max-width: 100%; }
 .chart-grid-bottom { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; margin-bottom: 20px; }
 .report-table-wrap { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 20px; overflow-x: auto; }
 .report-table-wrap h3 { font-size: 16px; margin-bottom: 16px; }
@@ -174,7 +175,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="chart-box" style=""><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:22vh;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
     </div>
     <div class="chart-grid" style="grid-template-columns: 2fr 1fr; align-items: stretch;">
-        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="height:25vh;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
+        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="height:300px;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
         <div class="chart-box" style=""><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="height:25vh;display:flex;align-items:center;justify-content:center;"><canvas id="chartMaster"></canvas></div></div>
     </div>
     <div style="margin-bottom: 20px;">
@@ -571,7 +572,7 @@ function initCharts(data = null) {
     chartInstances['chartMaster'] = new Chart(document.getElementById('chartMaster'), {
         type: 'doughnut', data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors.slice(0, donutLabels.length), borderColor: '#0f1c2e', borderWidth: 3, hoverOffset: 8 }] },
         plugins: [donutLabelPlugin],
-        options: { responsive: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } }
+        options: { responsive: true, maintainAspectRatio: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } }
     });
 
     const crownDims = ['Crowns PREPPED', 'Crowns from LAST MONTH', 'Crowns FUTURE BOOKED', 'Crown diagnosed - NON Cosmetic'];
@@ -589,7 +590,7 @@ function initCharts(data = null) {
         type: 'bar', data: { labels: crownAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
             datasets: crownDatasets
         }, plugins: [yearDividerPlugin],
-        options: { responsive: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45 } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 } }}, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
     });
 
     const specTotals = {}; activeData.specialty.forEach(r => { specTotals[r.dimension] = (specTotals[r.dimension]||0) + (r.production||0); });
