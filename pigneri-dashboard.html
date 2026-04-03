@@ -499,7 +499,7 @@ function initCharts(data = null) {
     function fmtChange(current, previous) {
         if (!previous || previous === 0) return '';
         const pctChange = ((current - previous) / previous * 100).toFixed(1);
-        const arrow = pctChange >= 0 ? '▲' : '▼';
+        const arrow = pctChange >= 0 ? 'â²' : 'â¼';
         const color = pctChange >= 0 ? '#6bc47f' : '#d94a7a';
         return `<span style="font-size:12px;color:${color};">${arrow} ${Math.abs(pctChange)}% vs prior month</span>`;
     }
@@ -641,11 +641,14 @@ function initCharts(data = null) {
     const donutLabels = [];
     const donutData = [];
     const donutColors = [];
-    docNames.forEach(n => { const v = activeData.doctor.filter(r => r.name === n).reduce((s, r) => s + (r.production || 0), 0); if (v > 0) { donutLabels.push(n); donutData.push(v); } });
+    const perioDocs = ['akers', 'trun', 'turin'];
+    let perioDocTotal = 0;
+    const otherDocProd = {};
+    docNames.forEach(n => { const v = activeData.doctor.filter(r => r.name === n).reduce((s, r) => s + (r.production || 0), 0); if (v > 0) { if (perioDocs.some(p => n.toLowerCase().replace(/[\\.\s]/g, '').includes(p))) { perioDocTotal += v; } else { otherDocProd[n] = v; } } });
     const hygTotal = activeData.hygiene.reduce((s, r) => s + (r.production || 0), 0);
     const specByType = {}; activeData.specialty.forEach(r => { if (r.production > 0) specByType[r.dimension] = (specByType[r.dimension] || 0) + r.production; });
     perioDocTotal += (specByType['Perio'] || 0); delete specByType['Perio'];
-    const allCats = {}; Object.entries(otherDocProd).forEach(([k,v]) => { allCats[k] = v; }); if (perioDocTotal > 0) allCats['Perio'] = perioDocTotal; if (hygTotal > 0) allCats['Hygiene'] = hygTotal; Object.entries(specByType).forEach(([k,v]) => { if (v > 0) allCats[k] = v; });
+    const allCats = {}; Object.entries(otherDocProd).forEach(function(e) { allCats[e[0]] = e[1]; }); if (perioDocTotal > 0) allCats['Perio'] = perioDocTotal; if (hygTotal > 0) allCats['Hygiene'] = hygTotal; Object.entries(specByType).forEach(function(e) { if (e[1] > 0) allCats[e[0]] = e[1]; });
     const orderMap = [['Dr. Pigneri','pigneri'],['Dr. Su','drsu'],['Perio','perio'],['Hygiene','hygiene'],['Ortho','orthoprod'],['TMJ','tmj']];
     const colorMap = {'Dr. Pigneri':'#4a90d9','Dr. Su':'#e74c3c','Perio':'#e8872a','Hygiene':'#d94a7a','Ortho':'#9b59b6','TMJ':'#1abc9c'};
     const extraColors = ['#f39c12','#6bc47f','#3498db','#2ecc71','#e67e22'];
@@ -695,7 +698,7 @@ function initCharts(data = null) {
         return prepped + futureBooked - fromLast;
     });
     const crownDatasets = crownDims.map((dim, i) => ({ label: dim.replace('Crown diagnosed - NON Cosmetic','Diagnosed Non-Cosmetic').replace('Crowns from LAST MONTH','From Last Month').replace('Crowns FUTURE BOOKED','Future Booked').replace('Crowns PREPPED','Prepped'), data: crownAllDates.map(d => crownsByDateAll[d][dim] || 0), backgroundColor: crownColors[i], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }));
-    crownDatasets.push({ label: 'Crowns Added', data: crownAddedData, backgroundColor: crownColors[4], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 });
+    crownDatasets.push({ label: 'Crowns Added', data: crownAddedData, backgroundColor: crownColors[3], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 });
     chartInstances['chartCrowns'] = new Chart(document.getElementById('chartCrowns'), {
         type: 'bar', data: { labels: crownAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
             datasets: crownDatasets
