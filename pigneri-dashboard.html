@@ -533,6 +533,7 @@ function initCharts(data = null) {
         afterDatasetsDraw(chart) {
             const { ctx } = chart;
             chart.data.datasets.forEach((dataset, di) => {
+                if (dataset.type === 'line' || dataset.borderDash) return;
                 const meta = chart.getDatasetMeta(di);
                 meta.data.forEach((bar, i) => {
                     const value = dataset.data[i];
@@ -860,14 +861,14 @@ function initCharts(data = null) {
         Object.entries(dims).forEach(([k, v]) => { if (!s[k]) s[k] = []; s[k].push(v); });
         return s;
     }, {});
-    const visitsAvg = Object.entries(visitsBreakdown).map(([k, vals]) => [k, Math.round(vals.reduce((a,b) => a+b, 0) / vals.length)]);
+    const visitsAvg = Object.entries(visitsBreakdown).map(([k, vals]) => [k, vals.length > 0 ? Math.round(vals.reduce((a,b) => a+(Number(b)||0), 0) / vals.length) : 0]);
     document.getElementById('visitsBreakdown').innerHTML = visitsAvg.map(([name, val]) => '<div class="spec-row"><span class="spec-label">'+name+'</span><span class="spec-val">'+val+'</span></div>').join('');
 
     const imagingBreakdown = Object.entries(imagingByDate).reduce((s, [d, dims]) => {
         Object.entries(dims).forEach(([k, v]) => { if (!s[k]) s[k] = []; s[k].push(v); });
         return s;
     }, {});
-    const imagingAvg = Object.entries(imagingBreakdown).map(([k, vals]) => [k, Math.round(vals.reduce((a,b) => a+b, 0) / vals.length)]);
+    const imagingAvg = Object.entries(imagingBreakdown).map(([k, vals]) => [k, vals.length > 0 ? Math.round(vals.reduce((a,b) => a+(Number(b)||0), 0) / vals.length) : 0]);
     document.getElementById('imagingBreakdown').innerHTML = imagingAvg.map(([name, val]) => '<div class="spec-row"><span class="spec-label">'+name+'</span><span class="spec-val">'+val+'</span></div>').join('');
 
     renderReportTable(activeData);
