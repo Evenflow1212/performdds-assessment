@@ -171,11 +171,11 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
     </div>
     <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
-        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:280px;max-height:280px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
+        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:200px;max-height:200px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
         <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="height:350px;position:relative;"><canvas id="chartMaster"></canvas></div></div>
     </div>
     <div class="chart-grid-bottom">
-        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="flex:1;min-height:0;height:200px;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
+        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="flex:1;min-height:0;height:160px;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
         <div class="chart-box"><h3>Specialty Overview</h3><div class="chart-sub">Total Production by Specialty</div><div id="specialtyList" class="specialty-grid"></div></div>
     </div>
 </div>
@@ -606,6 +606,11 @@ function initCharts(data = null) {
     const revPR = revDates.length <= 3 ? 5 : 0;
 
     if (isSingleMonth) {
+        // Calculate 12-month averages
+        const allRawDatesAvg = [...new Set(RAW.results.map(r=>r.date))].sort().slice(-12);
+        const rawByDateAvg = {}; RAW.results.forEach(r => { if (!rawByDateAvg[r.date]) rawByDateAvg[r.date] = {}; rawByDateAvg[r.date][r.dimension] = r.value; });
+        const avg12Prod = Math.round(allRawDatesAvg.reduce((s,d2) => s + (rawByDateAvg[d2]?.['Production'] || 0), 0) / allRawDatesAvg.length);
+        const avg12Coll = Math.round(allRawDatesAvg.reduce((s,d2) => s + (rawByDateAvg[d2]?.['Collections'] || 0), 0) / allRawDatesAvg.length);
         // Single month: show bar chart with 3 bars
         chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
             type: 'bar', data: { labels: ['Production', 'Collections', 'Future Scheduled'], datasets: [
@@ -613,7 +618,9 @@ function initCharts(data = null) {
                     resultsByDate[revDates[0]]['Production'] || 0,
                     resultsByDate[revDates[0]]['Collections'] || 0,
                     resultsByDate[revDates[0]]['Future Scheduled'] || 0
-                ], backgroundColor: ['#e8872a', '#4a90d9', '#6bc47f'], borderRadius: 4 }
+                ], backgroundColor: ['#e8872a', '#4a90d9', '#6bc47f'], borderRadius: 4 },
+                { type: 'line', label: '12-mo Avg Production', data: [avg12Prod, avg12Prod, avg12Prod], borderColor: '#e8872a', borderDash: [8, 4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 },
+                { type: 'line', label: '12-mo Avg Collections', data: [avg12Coll, avg12Coll, avg12Coll], borderColor: '#4a90d9', borderDash: [8, 4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 }
             ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, indexAxis: undefined, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + (ctx.parsed.y != null ? Math.round(ctx.parsed.y).toLocaleString() : '-'); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k', font: { size: 12 } }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
@@ -633,12 +640,18 @@ function initCharts(data = null) {
     const docColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a'];
     const donutLabels = [];
     const donutData = [];
-    const donutColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a', '#9b59b6', '#f39c12', '#1abc9c', '#e74c3c', '#3498db', '#2ecc71'];
+    const donutColors = [];
     docNames.forEach(n => { const v = activeData.doctor.filter(r => r.name === n).reduce((s, r) => s + (r.production || 0), 0); if (v > 0) { donutLabels.push(n); donutData.push(v); } });
     const hygTotal = activeData.hygiene.reduce((s, r) => s + (r.production || 0), 0);
-    if (hygTotal > 0) { donutLabels.push('Hygiene'); donutData.push(hygTotal); }
     const specByType = {}; activeData.specialty.forEach(r => { if (r.production > 0) specByType[r.dimension] = (specByType[r.dimension] || 0) + r.production; });
-    Object.entries(specByType).sort((a,b) => b[1]-a[1]).forEach(([k, v]) => { if (v > 0) { donutLabels.push(k); donutData.push(v); } });
+    perioDocTotal += (specByType['Perio'] || 0); delete specByType['Perio'];
+    const allCats = {}; Object.entries(otherDocProd).forEach(([k,v]) => { allCats[k] = v; }); if (perioDocTotal > 0) allCats['Perio'] = perioDocTotal; if (hygTotal > 0) allCats['Hygiene'] = hygTotal; Object.entries(specByType).forEach(([k,v]) => { if (v > 0) allCats[k] = v; });
+    const orderMap = [['Dr. Pigneri','pigneri'],['Dr. Su','drsu'],['Perio','perio'],['Hygiene','hygiene'],['Ortho','orthoprod'],['TMJ','tmj']];
+    const colorMap = {'Dr. Pigneri':'#4a90d9','Dr. Su':'#e74c3c','Perio':'#e8872a','Hygiene':'#d94a7a','Ortho':'#9b59b6','TMJ':'#1abc9c'};
+    const extraColors = ['#f39c12','#6bc47f','#3498db','#2ecc71','#e67e22'];
+    const used = new Set(); let ei = 0;
+    orderMap.forEach(([display, match]) => { const key = Object.keys(allCats).find(k => k.toLowerCase().replace(/[.\s]/g,'').includes(match)); if (key && allCats[key] > 0) { donutLabels.push(display); donutData.push(allCats[key]); donutColors.push(colorMap[display] || extraColors[ei++]); used.add(key); } });
+    Object.entries(allCats).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => { if (!used.has(k) && v > 0) { donutLabels.push(k); donutData.push(v); donutColors.push(extraColors[ei++ % extraColors.length]); } });
     const donutLabelPlugin = {
         id: 'donutLabels',
         afterDatasetsDraw(chart) {
@@ -666,15 +679,15 @@ function initCharts(data = null) {
         }
     };
     chartInstances['chartMaster'] = new Chart(document.getElementById('chartMaster'), {
-        type: 'doughnut', data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors.slice(0, donutLabels.length), borderColor: '#0f1c2e', borderWidth: 3, hoverOffset: 8 }] },
+        type: 'doughnut', data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderColor: '#0f1c2e', borderWidth: 3, hoverOffset: 8 }] },
         plugins: [donutLabelPlugin],
         options: { responsive: true, maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } }
     });
 
     const crownsByDateAll = groupByDate(activeData.crowns, 'dimension', 'value');
-    const crownDims = ['Crowns PREPPED', 'Crowns from LAST MONTH', 'Crowns FUTURE BOOKED', 'Crown diagnosed - NON Cosmetic'];
+    const crownDims = ['Crowns from LAST MONTH', 'Crowns PREPPED', 'Crowns FUTURE BOOKED'];
     const crownAllDates = Object.keys(crownsByDateAll).sort();
-    const crownColors = ['#e8872a','#4a90d9','#6bc47f','#d94a7a','#9b59b6'];
+    const crownColors = ['#4a90d9','#e8872a','#6bc47f','#9b59b6'];
     const crownAddedData = crownAllDates.map(d => {
         const prepped = crownsByDateAll[d]['Crowns PREPPED'] || 0;
         const futureBooked = crownsByDateAll[d]['Crowns FUTURE BOOKED'] || 0;
