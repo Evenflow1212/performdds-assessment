@@ -782,7 +782,9 @@ function initDashboard() {
                 }
             }
         }
-        overlay.classList.remove('active');
+        var btn = expanded ? expanded.querySelector('.chart-expand-btn') : null;
+            if (btn) { btn.innerHTML = '&#x26F6;'; btn.title = 'Expand'; }
+            overlay.classList.remove('active');
     }
 
     overlay.addEventListener('click', function(e) {
