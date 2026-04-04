@@ -39,7 +39,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .tab.active { color: #e8872a; border-bottom-color: #e8872a; }
 .content { padding: 10px 20px; display: none; }
 .content.active { display: block; }
-.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
+.kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 10px; }
 .kpi-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 8px 12px; }
 .kpi-label { font-size: 15px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .kpi-value { font-size: 28px; font-weight: 700; color: #fff; }
@@ -184,6 +184,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label">Avg. Days (Last 12 Months)</div><div class="kpi-value orange" id="kpi-days"></div></div>
         <div class="kpi-card"><div class="kpi-label">Avg. Crowns Prepped (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns-prepped"></div></div>
         <div class="kpi-card"><div class="kpi-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-batavg-label">Avg. Batting Average (Last 12 Months)</div><div class="kpi-value orange" id="kpi-batavg"></div></div>
     </div>
     <div style="margin-bottom: 20px;">
         <div class="chart-box" style=""><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:22vh;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
@@ -535,6 +536,16 @@ function initCharts(data = null) {
     const crownDates = Object.keys(crownsByDate).sort().slice(-12);
     document.getElementById('kpi-crowns-prepped').textContent = Math.round(crownDates.reduce((s,d) => s + (crownsByDate[d]['Crowns PREPPED'] || 0), 0) / crownDates.length);
     document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length);
+
+    // Batting Average: total visits / crowns added
+    const batVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)) batVisitsByDate[r.date] = (batVisitsByDate[r.date]||0) + (r.count||0); });
+    const batExamsByDate = {}; activeData.exams.forEach(r => { if (r.dimension === '0120 Periodic Exam') batExamsByDate[r.date] = (batExamsByDate[r.date]||0) + (r.count||0); });
+    const batDates = [...new Set([...Object.keys(batVisitsByDate), ...Object.keys(batExamsByDate)])].sort().slice(-12);
+    const avgCrownsAdded = crownDates.length > 0 ? crownDates.reduce((s, d) => { const p = crownsByDate[d]['Crowns PREPPED']||0; const fb = crownsByDate[d]['Future Booked']||0; const fl = crownsByDate[d]['From Last Month']||0; return s + p + fb - fl; }, 0) / crownDates.length : 0;
+    const avgBatVisits = batDates.length > 0 ? batDates.reduce((s, d) => s + (batVisitsByDate[d]||0) + (batExamsByDate[d]||0), 0) / batDates.length : 0;
+    const batAvgVal = avgCrownsAdded > 0 ? (avgBatVisits / avgCrownsAdded) : 0;
+    document.getElementById('kpi-batavg-label').textContent = 'Avg. Batting Average (Last 12 Months)';
+    document.getElementById('kpi-batavg').textContent = batAvgVal > 0 ? batAvgVal.toFixed(1) : String.fromCharCode(8212);
 
     const revDates = allResultDates;
     const revPR = revDates.length <= 3 ? 5 : 0;
