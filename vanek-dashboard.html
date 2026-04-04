@@ -93,6 +93,20 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
     .kpi-row { grid-template-columns: repeat(3, 1fr); }
     .chart-grid, .chart-grid-bottom, .chart-grid-hyg { grid-template-columns: 1fr; }
 }
+
+/* EXPAND / FULLSCREEN CHART STYLES */
+.chart-box { position: relative; }
+.chart-expand-btn { position: absolute; top: 8px; right: 10px; background: rgba(42,63,95,0.6); border: 1px solid rgba(42,63,95,0.8); color: #8899aa; width: 28px; height: 28px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; z-index: 5; transition: all 0.2s; line-height: 1; }
+.chart-expand-btn:hover { background: #e8872a; color: #fff; border-color: #e8872a; }
+.chart-fullscreen-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10,20,35,0.92); z-index: 10000; align-items: center; justify-content: center; padding: 24px; }
+.chart-fullscreen-overlay.active { display: flex; }
+.chart-fullscreen-overlay .chart-box { width: 95vw; height: 90vh; max-width: none; display: flex; flex-direction: column; border: 1px solid #2a3f5f; }
+.chart-fullscreen-overlay .chart-box h3 { font-size: 22px; margin-bottom: 4px; }
+.chart-fullscreen-overlay .chart-box .chart-sub { font-size: 14px; margin-bottom: 10px; }
+.chart-fullscreen-overlay .chart-box > div:last-child { flex: 1; height: auto !important; min-height: 0; }
+.chart-fullscreen-overlay .chart-box canvas { width: 100% !important; height: 100% !important; }
+.chart-fullscreen-overlay .chart-expand-btn { font-size: 20px; width: 34px; height: 34px; }
+.chart-fullscreen-overlay .specialty-grid { flex: 1; overflow-y: auto; }
 </style>
 </head>
 <body>
@@ -746,6 +760,95 @@ function initDashboard() {
     initializeFilterDropdowns();
     setPresetFilter('all');
 }
+
+
+/* --- Expand / Fullscreen Chart Feature --- */
+(function() {
+    const overlay = document.createElement('div');
+    overlay.className = 'chart-fullscreen-overlay';
+    document.body.appendChild(overlay);
+
+    function closeFullscreen() {
+        const expanded = overlay.querySelector('.chart-box');
+        if (expanded && expanded._originalParent) {
+            expanded._originalParent.insertBefore(expanded, expanded._originalNext);
+            const canvasWrap = expanded.querySelector('div[style*="position"]');
+            if (canvasWrap && expanded._origHeight) canvasWrap.style.height = expanded._origHeight;
+            const canvas = expanded.querySelector('canvas');
+            if (canvas) {
+                const cid = canvas.id;
+                if (chartInstances[cid]) {
+                    setTimeout(function() { chartInstances[cid].resize(); }, 50);
+                }
+            }
+        }
+        overlay.classList.remove('active');
+    }
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeFullscreen();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeFullscreen();
+    });
+
+    function setupExpandButtons() {
+        document.querySelectorAll('.chart-box').forEach(function(box) {
+            if (box.querySelector('.chart-expand-btn')) return;
+            var btn = document.createElement('button');
+            btn.className = 'chart-expand-btn';
+            btn.title = 'Expand';
+            btn.innerHTML = '&#x26F6;';
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var isExpanded = overlay.classList.contains('active');
+                if (isExpanded) {
+                    closeFullscreen();
+                    return;
+                }
+                box._originalParent = box.parentNode;
+                box._originalNext = box.nextSibling;
+                var canvasWrap = box.querySelector('div[style*="position"]');
+                if (canvasWrap) box._origHeight = canvasWrap.style.height;
+                overlay.innerHTML = '';
+                overlay.appendChild(box);
+                overlay.classList.add('active');
+                btn.innerHTML = '&#x2715;';
+                btn.title = 'Close';
+                if (canvasWrap) canvasWrap.style.height = '100%';
+                var canvas = box.querySelector('canvas');
+                if (canvas) {
+                    var cid = canvas.id;
+                    if (chartInstances[cid]) {
+                        setTimeout(function() { chartInstances[cid].resize(); }, 100);
+                    }
+                }
+            });
+            box.appendChild(btn);
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(setupExpandButtons, 500); });
+    } else {
+        setTimeout(setupExpandButtons, 500);
+    }
+    var origSetPreset = window.setPresetFilter;
+    if (origSetPreset) {
+        window.setPresetFilter = function() {
+            origSetPreset.apply(this, arguments);
+            setTimeout(setupExpandButtons, 300);
+        };
+    }
+    var origApply = window.applyFilter;
+    if (origApply) {
+        window.applyFilter = function() {
+            origApply.apply(this, arguments);
+            setTimeout(setupExpandButtons, 300);
+        };
+    }
+})();
 </script>
 </body>
 </html>
