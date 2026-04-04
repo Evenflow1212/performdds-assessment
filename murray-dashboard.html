@@ -141,39 +141,39 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="tab" onclick="switchTab(2)">Reporting Hub</div>
     </div>
     <div class="user-area">
+        <a href="practice-form.html?practice=murray" target="_blank" style="background:#e8872a;color:#fff;padding:8px 16px;border-radius:6px;font-weight:600;font-size:13px;text-decoration:none;white-space:nowrap;letter-spacing:0.3px;">Data Upload</a>
         <span>Welcome, <span id="welcomeName"></span></span>
         <a onclick="handleLogout()">Sign Out</a>
     </div>
 </div>
 
 <div class="filter-bar">
-    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <label style="font-size: 12px; color: #8899aa; text-transform: uppercase;">From</label>
-            <select id="filterFromMonth" onchange="applyFilter()" style="background: #1a2332; border: 1px solid #2a3f5f; color: #fff; border-radius: 4px; padding: 6px 10px; font-size: 12px;"></select>
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 11px; color: #8899aa; text-transform: uppercase;">From</label>
+            <select id="filterFromMonth" onchange="applyFilter()" style="background: #1a2332; border: 1px solid #2a3f5f; color: #fff; border-radius: 4px; padding: 5px 8px; font-size: 11px;"></select>
         </div>
-        <div style="flex: 1; height: 4px; background: #1a2f4a; border-radius: 2px; position: relative; min-width: 100px;">
+        <div style="flex: 0 1 80px; height: 4px; background: #1a2f4a; border-radius: 2px; position: relative; min-width: 40px;">
             <div id="rangeVisual" style="position: absolute; height: 100%; background: #e8872a; border-radius: 2px; left: 0%; right: 0%;"></div>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <label style="font-size: 12px; color: #8899aa; text-transform: uppercase;">To</label>
-            <select id="filterToMonth" onchange="applyFilter()" style="background: #1a2332; border: 1px solid #2a3f5f; color: #fff; border-radius: 4px; padding: 6px 10px; font-size: 12px;"></select>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 11px; color: #8899aa; text-transform: uppercase;">To</label>
+            <select id="filterToMonth" onchange="applyFilter()" style="background: #1a2332; border: 1px solid #2a3f5f; color: #fff; border-radius: 4px; padding: 5px 8px; font-size: 11px;"></select>
         </div>
-    </div>
-    <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center;">
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button onclick="setPresetFilter('3m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 6px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s;">Last 3 Months</button>
-            <button onclick="setPresetFilter('6m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 6px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s;">Last 6 Months</button>
-            <button onclick="setPresetFilter('12m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 6px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s;">Last 12 Months</button>
-            <button onclick="setPresetFilter('ytd')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 6px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s;">YTD</button>
-            <button onclick="setPresetFilter('all')" class="filter-preset active" style="background: #e8872a; color: #fff; border: none; border-radius: 16px; padding: 6px 14px; font-size: 12px; cursor: pointer; transition: all 0.2s;">All Time</button>
+        <div style="width: 1px; height: 20px; background: #2a3f5f;"></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button onclick="setPresetFilter('3m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">3M</button>
+            <button onclick="setPresetFilter('6m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">6M</button>
+            <button onclick="setPresetFilter('12m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">12M</button>
+            <button onclick="setPresetFilter('ytd')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">YTD</button>
+            <button onclick="setPresetFilter('all')" class="filter-preset active" style="background: #e8872a; color: #fff; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">All</button>
         </div>
-        <div style="display: flex; align-items: center; gap: 6px; margin-left: 16px;">
-            <button onclick="navMonth(-1)" title="Previous month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9664;</button>
-            <button onclick="navMonth(0)" title="Most recent month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 6px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">Latest</button>
-            <button onclick="navMonth(1)" title="Next month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9654;</button>
+        <div style="display: flex; align-items: center; gap: 4px;">
+            <button onclick="navMonth(-1)" title="Previous month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9664;</button>
+            <button onclick="navMonth(0)" title="Most recent month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">Latest</button>
+            <button onclick="navMonth(1)" title="Next month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9654;</button>
         </div>
-        <div style="margin-left: auto; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: 0.3px;">Showing: <span id="filterRangeText" style="color: #e8872a;">All Data</span></div>
+        <div style="margin-left: auto; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.3px; white-space: nowrap;">Showing: <span id="filterRangeText" style="color: #e8872a;">All Data</span></div>
     </div>
 </div>
 
