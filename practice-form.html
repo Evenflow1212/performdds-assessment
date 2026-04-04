@@ -270,11 +270,10 @@
     <div class="section">
         <div class="section-title">Days & Crowns</div>
         <div class="fields-grid">
-            <div class="field-wrapper"><label>Dr. Days IN</label><input type="number" id="daysIn" step="0.5" min="0"></div>
-            <div class="field-wrapper"><label>Crowns from Last Month</label><input type="number" id="crownsLastMonth" min="0"></div>
+            <div class="field-wrapper"><label>Total Dr. Days Worked This Month</label><input type="number" id="daysIn" step="0.5" min="0"></div>
+            <div class="field-wrapper"><label>Crowns from Last Month (Same as Future Booked from Last Month)</label><input type="number" id="crownsLastMonth" min="0"></div>
             <div class="field-wrapper"><label>Crowns Prepped</label><input type="number" id="crownsPrepped" min="0"></div>
-            <div class="field-wrapper"><label>Same Day Crowns</label><input type="number" id="crownsSameDay" min="0"></div>
-            <div class="field-wrapper"><label>Future Booked (Next Month)</label><input type="number" id="crownsFutureBooked" min="0"></div>
+            <div class="field-wrapper"><label>Future Booked Into Next Month</label><input type="number" id="crownsFutureBooked" min="0"></div>
             <div class="field-wrapper"><label>Crowns Diagnosed (Non-Cosmetic)</label><input type="number" id="crownsDiagnosed" min="0"></div>
         </div>
     </div>
@@ -295,10 +294,7 @@
     <div class="section">
         <div class="section-title">Visits & Patients</div>
         <div class="fields-grid">
-            <div class="field-wrapper"><label>New Patients Seen & Scheduled</label><input type="number" id="newPatients" min="0"></div>
-            <div class="field-wrapper"><label>NP Cash</label><input type="number" id="npCash" min="0"></div>
-            <div class="field-wrapper"><label>NP PPO</label><input type="number" id="npPPO" min="0"></div>
-            <div class="field-wrapper"><label>NP HMO</label><input type="number" id="npHMO" min="0"></div>
+            <div class="field-wrapper"><label>New Patients Seen</label><input type="number" id="newPatients" min="0"></div>
             <div class="field-wrapper"><label>1110/1120 Prophies</label><input type="number" id="prophies" min="0"></div>
             <div class="field-wrapper"><label>4910 Perio Maint</label><input type="number" id="perioMaint" min="0"></div>
             <div class="field-wrapper"><label>SRP (Patient, Not Quads)</label><input type="number" id="srp" min="0"></div>
@@ -311,9 +307,9 @@
     <div class="section">
         <div class="section-title">Hygiene Production</div>
         <div id="hygienistsContainer"></div>
-        <div class="field-wrapper" style="margin-top:16px;">
-            <label>Empties in HYG Schedule (Whole Month)</label>
-            <input type="number" id="empties" min="0">
+        <div class="fields-grid" style="margin-top:16px;">
+            <div class="field-wrapper"><label>Total Hygiene Days</label><input type="number" id="hygieneDays" step="0.5" min="0"></div>
+            <div class="field-wrapper"><label>Empties in Hygiene Schedule (Whole Month)</label><input type="number" id="emptiesHygSchedule" min="0"></div>
         </div>
         <div class="hygiene-total">
             <span class="ht-label">Hygiene Total</span>
@@ -328,7 +324,6 @@
             <div class="field-wrapper"><label>0150 Comp Exam</label><input type="number" id="compExam" min="0"></div>
             <div class="field-wrapper"><label>0120 Periodic Exam</label><input type="number" id="periodicExam" min="0"></div>
             <div class="field-wrapper"><label>0140 Limited Exam</label><input type="number" id="limitedExam" min="0"></div>
-            <div class="field-wrapper"><label>PTX $</label><div class="dollar-input"><span class="prefix">$</span><input type="number" id="ptx" step="0.01" min="0"></div></div>
             <div class="field-wrapper"><label>Bite Wellness Completed</label><input type="number" id="biteWellness" min="0"></div>
         </div>
     </div>
@@ -387,9 +382,9 @@ const PRACTICES = {
         name: "Dr. Vanek's Practice",
         code: 'vanek',
         passcode: 'vanek2026',
-        doctors: ['Dr. Vanek', 'Dr. Soldin'],
+        doctors: ['Dr. Vanek', 'Temp Doctor'],
         hygienists: ['Sandra', 'Natalia', 'Ann', 'Jenny', 'Jodie', 'Kathy', 'Chelsea'],
-        specialties: ['Ortho Prod', 'Oral Surgery', 'Cosmetic'],
+        specialties: ['Ortho Prod', 'Oral Surgery', 'Cosmetic', 'Endo'],
         imaging: ['Panos', 'FMX', 'CBCT', 'Digital Scan']
     },
     pigneri: {
@@ -644,7 +639,6 @@ function getFormData() {
         crowns: {
             lastMonth: n('crownsLastMonth'),
             prepped: n('crownsPrepped'),
-            sameDay: n('crownsSameDay'),
             futureBooked: n('crownsFutureBooked'),
             diagnosedNonCosmetic: n('crownsDiagnosed')
         },
@@ -652,9 +646,6 @@ function getFormData() {
         specialties,
         visits: {
             newPatients: n('newPatients'),
-            npCash: n('npCash'),
-            npPPO: n('npPPO'),
-            npHMO: n('npHMO'),
             prophies: n('prophies'),
             perioMaint: n('perioMaint'),
             srp: n('srp'),
@@ -663,14 +654,13 @@ function getFormData() {
         },
         hygiene: {
             hygienists,
-            empties: n('empties'),
+            totalHygieneDays: n('hygieneDays'),
             total: parseFloat(document.getElementById('hygieneTotal').textContent.replace(/[$,]/g, '')) || 0
         },
         exams: {
             comp: n('compExam'),
             periodic: n('periodicExam'),
             limited: n('limitedExam'),
-            ptx: n('ptx'),
             biteWellness: n('biteWellness')
         },
         imaging,
@@ -784,7 +774,7 @@ function emailReport() {
     const subject = encodeURIComponent(`${d.practice} - ${d.month} ${d.year} Month End Report`);
 
     let body = `${d.practice} — ${d.month} ${d.year} Month End Report\n\n`;
-    body += `Dr. Days IN: ${d.daysIn || '—'}\n\n`;
+    body += `Total Dr. Days Worked This Month: ${d.daysIn || '—'}\n\n`;
     body += `── CROWNS ──\n`;
     body += `From Last Month: ${d.crowns.lastMonth || '—'}\n`;
     body += `Prepped: ${d.crowns.prepped || '—'} (${d.crowns.sameDay || 0} SD)\n`;
@@ -801,7 +791,6 @@ function emailReport() {
     Object.entries(d.specialties).forEach(([k,v]) => { body += `${k}: $${v.toLocaleString()}\n`; });
 
     body += `\n── VISITS ──\n`;
-    body += `New Patients: ${d.visits.newPatients || '—'} (Cash: ${d.visits.npCash||'—'}, PPO: ${d.visits.npPPO||'—'}, HMO: ${d.visits.npHMO||'—'})\n`;
     body += `Prophies: ${d.visits.prophies || '—'}\n`;
     body += `Perio Maint: ${d.visits.perioMaint || '—'}\n`;
     body += `SRP: ${d.visits.srp || '—'}\n`;
