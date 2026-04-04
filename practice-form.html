@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Month End Report - Perform DDS</title>
+    <style>
+        :root {
+            --bg-page: #111a27;
+            --bg-card: #0f1c2e;
+            --bg-input: #1a2332;
+            --border: #2a3f5f;
+            --divider: rgba(42, 63, 95, 0.5);
+            --accent: #e8872a;
+            --accent-hover: #f59a3e;
+            --success: #2ecc71;
+            --label: #8899aa;
+            --text: #ffffff;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            background: var(--bg-page);
+            color: var(--text);
+            font-family: var(--font);
+            line-height: 1.6;
+        }
+
+        body { padding: 24px 16px; min-height: 100vh; }
+
+        .container { max-width: 680px; margin: 0 auto; }
+
+        /* ── Login Screen ── */
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+            text-align: center;
+        }
+        .login-screen .logo { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: var(--accent); text-transform: uppercase; margin-bottom: 12px; }
+        .login-screen h1 { font-size: 24px; margin-bottom: 8px; }
+        .login-screen p { color: var(--label); font-size: 14px; margin-bottom: 32px; }
+        .login-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            width: 100%;
+            max-width: 360px;
+        }
+        .login-box label { display: block; font-size: 13px; color: var(--label); margin-bottom: 6px; text-align: left; }
+        .login-box input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: var(--font);
+            margin-bottom: 16px;
+        }
+        .login-box input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,135,42,0.15); }
+        .login-box .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font);
+        }
+        .login-box .login-btn:hover { background: var(--accent-hover); }
+        .login-error { color: #ff6b6b; font-size: 13px; margin-bottom: 12px; display: none; }
+
+        /* ── Header ── */
+        .header { margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--divider); }
+        .brand { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: var(--accent); text-transform: uppercase; margin-bottom: 8px; }
+        .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { font-size: 13px; color: var(--label); margin-bottom: 24px; }
+        .header-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        /* ── Form Elements ── */
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label, .field-wrapper label { font-size: 13px; font-weight: 500; color: var(--label); margin-bottom: 6px; }
+        .form-group input, .form-group select, .field-wrapper input {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 500;
+            font-family: var(--font);
+        }
+        .form-group input:focus, .form-group select:focus, .field-wrapper input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(232,135,42,0.15);
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+
+        /* ── Sections ── */
+        .section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 20px;
+        }
+        .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .field-wrapper { display: flex; flex-direction: column; }
+
+        /* Dollar input */
+        .dollar-input { position: relative; }
+        .dollar-input .prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--label); font-size: 15px; pointer-events: none; }
+        .dollar-input input { padding-left: 26px; width: 100%; }
+
+        /* ── Provider Rows ── */
+        .provider-row {
+            display: grid;
+            grid-template-columns: 1fr 70px 1fr;
+            gap: 12px;
+            align-items: end;
+            padding: 14px;
+            background: rgba(42,63,95,0.15);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid var(--divider);
+        }
+        .provider-row .field-wrapper input { padding: 8px 10px; font-size: 14px; }
+        .provider-row .dollar-input input { padding-left: 26px; }
+        .provider-name-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            padding: 8px 0;
+        }
+
+        /* ── Hygiene Total ── */
+        .hygiene-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: rgba(232,135,42,0.08);
+            border: 1px solid rgba(232,135,42,0.25);
+            border-radius: 6px;
+            margin-top: 16px;
+        }
+        .hygiene-total .ht-label { font-size: 13px; font-weight: 600; color: var(--label); text-transform: uppercase; letter-spacing: 1px; }
+        .hygiene-total .ht-value { font-size: 20px; font-weight: 700; color: var(--accent); }
+
+        /* ── Submit ── */
+        .submit-area { text-align: center; margin: 32px 0; }
+        .submit-btn {
+            padding: 14px 48px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: var(--font);
+            letter-spacing: 0.5px;
+        }
+        .submit-btn:hover { background: var(--accent-hover); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .clear-link { margin-top: 16px; font-size: 13px; color: var(--label); cursor: pointer; }
+        .clear-link:hover { color: var(--text); }
+
+        /* ── Modal ── */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 440px;
+            width: 100%;
+            text-align: center;
+        }
+        .checkmark { width: 48px; height: 48px; background: var(--success); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; }
+        .checkmark::after { content: '\2713'; color: #fff; font-size: 24px; font-weight: 700; }
+        .modal-heading { font-size: 18px; margin-bottom: 16px; }
+        .modal-summary { background: var(--bg-input); border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 14px; text-align: left; }
+        .modal-summary strong { color: var(--accent); }
+        .modal-buttons { display: flex; gap: 12px; justify-content: center; }
+        .modal-btn { padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; font-family: var(--font); }
+        .modal-btn-primary { background: var(--accent); color: #fff; }
+        .modal-btn-secondary { background: transparent; color: var(--label); border: 1px solid var(--border); }
+
+        /* ── Responsive ── */
+        @media (max-width: 600px) {
+            .fields-grid { grid-template-columns: 1fr; }
+            .provider-row { grid-template-columns: 1fr 1fr; }
+            .header-row { grid-template-columns: 1fr; }
+        }
+
+        /* Hidden */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════ LOGIN SCREEN ═══════════ -->
+<div id="loginScreen" class="login-screen">
+    <div class="logo">Perform DDS</div>
+    <h1>Month End Report</h1>
+    <p>Enter your practice code to continue</p>
+    <div class="login-box">
+        <label for="practiceCode">Practice Code</label>
+        <input type="text" id="practiceCode" placeholder="e.g. vanek" autocomplete="off" autofocus>
+        <div class="login-error" id="loginError">Invalid practice code. Please try again.</div>
+        <button class="login-btn" id="loginBtn">Continue</button>
+    </div>
+</div>
+
+<!-- ═══════════ FORM (hidden until login) ═══════════ -->
+<div id="formContainer" class="container hidden">
+
+    <div class="header">
+        <div class="brand">Perform DDS</div>
+        <div class="page-title" id="formTitle">Month End Report</div>
+        <div class="subtitle">Fill in your end-of-month data and submit</div>
+        <div class="header-row">
+            <div class="form-group">
+                <label for="month">Month</label>
+                <select id="month">
+                    <option value="">Select month...</option>
+                    <option value="01">January</option><option value="02">February</option>
+                    <option value="03">March</option><option value="04">April</option>
+                    <option value="05">May</option><option value="06">June</option>
+                    <option value="07">July</option><option value="08">August</option>
+                    <option value="09">September</option><option value="10">October</option>
+                    <option value="11">November</option><option value="12">December</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="year">Year</label>
+                <select id="year">
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Days & Crowns -->
+    <div class="section">
+        <div class="section-title">Days & Crowns</div>
+        <div class="fields-grid">
+            <div class="field-wrapper"><label>Dr. Days IN</label><input type="number" id="daysIn" step="0.5" min="0"></div>
+            <div class="field-wrapper"><label>Crowns from Last Month</label><input type="number" id="crownsLastMonth" min="0"></div>
+            <div class="field-wrapper"><label>Crowns Prepped</label><input type="number" id="crownsPrepped" min="0"></div>
+            <div class="field-wrapper"><label>Same Day Crowns</label><input type="number" id="crownsSameDay" min="0"></div>
+            <div class="field-wrapper"><label>Future Booked (Next Month)</label><input type="number" id="crownsFutureBooked" min="0"></div>
+            <div class="field-wrapper"><label>Crowns Diagnosed (Non-Cosmetic)</label><input type="number" id="crownsDiagnosed" min="0"></div>
+        </div>
+    </div>
+
+    <!-- Doctor Production (dynamic) -->
+    <div class="section">
+        <div class="section-title">Doctor Production</div>
+        <div id="doctorsContainer"></div>
+    </div>
+
+    <!-- Specialty Production (dynamic) -->
+    <div class="section">
+        <div class="section-title">Specialty Production</div>
+        <div class="fields-grid" id="specialtyContainer"></div>
+    </div>
+
+    <!-- Visits & Patients -->
+    <div class="section">
+        <div class="section-title">Visits & Patients</div>
+        <div class="fields-grid">
+            <div class="field-wrapper"><label>New Patients Seen & Scheduled</label><input type="number" id="newPatients" min="0"></div>
+            <div class="field-wrapper"><label>NP Cash</label><input type="number" id="npCash" min="0"></div>
+            <div class="field-wrapper"><label>NP PPO</label><input type="number" id="npPPO" min="0"></div>
+            <div class="field-wrapper"><label>NP HMO</label><input type="number" id="npHMO" min="0"></div>
+            <div class="field-wrapper"><label>1110/1120 Prophies</label><input type="number" id="prophies" min="0"></div>
+            <div class="field-wrapper"><label>4910 Perio Maint</label><input type="number" id="perioMaint" min="0"></div>
+            <div class="field-wrapper"><label>SRP (Patient, Not Quads)</label><input type="number" id="srp" min="0"></div>
+            <div class="field-wrapper"><label>Arrestin $</label><div class="dollar-input"><span class="prefix">$</span><input type="number" id="arrestin" step="0.01" min="0"></div></div>
+            <div class="field-wrapper"><label>Laser $</label><div class="dollar-input"><span class="prefix">$</span><input type="number" id="laser" step="0.01" min="0"></div></div>
+        </div>
+    </div>
+
+    <!-- Hygiene Production (dynamic) -->
+    <div class="section">
+        <div class="section-title">Hygiene Production</div>
+        <div id="hygienistsContainer"></div>
+        <div class="field-wrapper" style="margin-top:16px;">
+            <label>Empties in HYG Schedule (Whole Month)</label>
+            <input type="number" id="empties" min="0">
+        </div>
+        <div class="hygiene-total">
+            <span class="ht-label">Hygiene Total</span>
+            <span class="ht-value" id="hygieneTotal">$0</span>
+        </div>
+    </div>
+
+    <!-- Exams -->
+    <div class="section">
+        <div class="section-title">Exams</div>
+        <div class="fields-grid">
+            <div class="field-wrapper"><label>0150 Comp Exam</label><input type="number" id="compExam" min="0"></div>
+            <div class="field-wrapper"><label>0120 Periodic Exam</label><input type="number" id="periodicExam" min="0"></div>
+            <div class="field-wrapper"><label>0140 Limited Exam</label><input type="number" id="limitedExam" min="0"></div>
+            <div class="field-wrapper"><label>PTX $</label><div class="dollar-input"><span class="prefix">$</span><input type="number" id="ptx" step="0.01" min="0"></div></div>
+            <div class="field-wrapper"><label>Bite Wellness Completed</label><input type="number" id="biteWellness" min="0"></div>
+        </div>
+    </div>
+
+    <!-- Imaging (dynamic) -->
+    <div class="section">
+        <div class="section-title">Imaging</div>
+        <div class="fields-grid" id="imagingContainer"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="section">
+        <div class="section-title">Practice Results</div>
+        <div class="fields-grid">
+            <div class="field-wrapper"><label>Total Production</label><div class="dollar-input"><span class="prefix">$</span><input type="number" id="resultsProduction" step="0.01" min="0"></div></div>
+            <div class="field-wrapper"><label>Total Collections</label><div class="dollar-input"><span class="prefix">$</span><input type="number" id="resultsCollections" step="0.01" min="0"></div></div>
+            <div class="field-wrapper"><label>Next Month on Schedule</label><div class="dollar-input"><span class="prefix">$</span><input type="number" id="resultsFutureScheduled" step="0.01" min="0"></div></div>
+        </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="submit-area">
+        <button class="submit-btn" id="submitBtn">Submit Month End Report</button>
+        <div class="clear-link" id="clearBtn">Clear Form</div>
+    </div>
+</div>
+
+<!-- ═══════════ SUCCESS MODAL ═══════════ -->
+<div class="modal" id="successModal">
+    <div class="modal-content">
+        <div class="checkmark"></div>
+        <h2 class="modal-heading">Report Submitted</h2>
+        <div class="modal-summary" id="modalSummary"></div>
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-primary" id="copyDataBtn">Copy JSON</button>
+            <button class="modal-btn modal-btn-primary" id="emailDataBtn">Email Report</button>
+            <button class="modal-btn modal-btn-secondary" id="closeModalBtn">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   PRACTICE CONFIGURATIONS
+   Add new practices here. Each practice gets:
+   - name: display name
+   - code: URL param / login code (lowercase)
+   - passcode: simple access code
+   - doctors: array of doctor names
+   - hygienists: array of hygienist names
+   - specialties: array of specialty categories
+   - imaging: array of imaging equipment
+   ══════════════════════════════════════════ */
+const PRACTICES = {
+    vanek: {
+        name: "Dr. Vanek's Practice",
+        code: 'vanek',
+        passcode: 'vanek2026',
+        doctors: ['Dr. Vanek', 'Dr. Soldin'],
+        hygienists: ['Sandra', 'Natalia', 'Ann', 'Jenny', 'Jodie', 'Kathy', 'Chelsea'],
+        specialties: ['Ortho Prod', 'Oral Surgery', 'Cosmetic'],
+        imaging: ['Panos', 'FMX', 'CBCT', 'Digital Scan']
+    },
+    pigneri: {
+        name: "Dr. Pigneri's Practice",
+        code: 'pigneri',
+        passcode: 'pigneri2026',
+        doctors: ['Dr. Pigneri', 'Dr. Akers', 'Dr. Trun'],
+        hygienists: ['Deissy', 'Rashida', 'Temp'],
+        specialties: ['Ortho Prod', 'Oral Surgery', 'Endo', 'Perio', 'Cosmetic', 'Dr Su'],
+        imaging: ['Panos', 'FMX', 'CBCT']
+    },
+    murray: {
+        name: "Dr. Murray's Practice",
+        code: 'murray',
+        passcode: 'murray2026',
+        doctors: ['Dr. Murray', 'Dr. Najem'],
+        hygienists: ['Mia', 'Brenda', 'Phoung', 'Temp'],
+        specialties: ['Ortho Prod', 'Oral Surgery', 'Endo', 'Cosmetic'],
+        imaging: ['Panos', 'FMX', 'CBCT']
+    }
+};
+
+/* ══════════════════════════════════════════
+   APPLICATION
+   ══════════════════════════════════════════ */
+let activePractice = null;
+let lastSubmitData = null;
+
+// ── Check URL for practice code ──
+function checkURLPractice() {
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get('practice') || '').toLowerCase().trim();
+    if (code && PRACTICES[code]) {
+        return PRACTICES[code];
+    }
+    // Also check path: /form/vanek style
+    const path = window.location.pathname.split('/').filter(Boolean);
+    if (path.length > 0) {
+        const last = path[path.length - 1].replace('.html', '').toLowerCase();
+        if (PRACTICES[last]) return PRACTICES[last];
+    }
+    return null;
+}
+
+// ── Login ──
+function initLogin() {
+    const urlPractice = checkURLPractice();
+
+    if (urlPractice) {
+        // Practice identified from URL — still need passcode
+        document.getElementById('practiceCode').value = urlPractice.code;
+        document.getElementById('practiceCode').placeholder = 'Enter passcode for ' + urlPractice.name;
+        document.querySelector('.login-box label').textContent = 'Passcode';
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', doLogin);
+    document.getElementById('practiceCode').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doLogin();
+    });
+}
+
+function doLogin() {
+    const input = document.getElementById('practiceCode').value.toLowerCase().trim();
+    const errorEl = document.getElementById('loginError');
+
+    // Try matching as practice code first
+    if (PRACTICES[input]) {
+        activePractice = PRACTICES[input];
+        showForm();
+        return;
+    }
+
+    // Try matching as passcode
+    for (const key of Object.keys(PRACTICES)) {
+        if (PRACTICES[key].passcode === input) {
+            activePractice = PRACTICES[key];
+            showForm();
+            return;
+        }
+    }
+
+    // Check URL practice and treat input as passcode
+    const urlPractice = checkURLPractice();
+    if (urlPractice && urlPractice.passcode === input) {
+        activePractice = urlPractice;
+        showForm();
+        return;
+    }
+
+    errorEl.style.display = 'block';
+}
+
+// ── Build Form ──
+function showForm() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('formContainer').classList.remove('hidden');
+    document.getElementById('formTitle').textContent = activePractice.name + ' — Month End Report';
+
+    buildDoctors();
+    buildSpecialties();
+    buildHygienists();
+    buildImaging();
+    attachListeners();
+}
+
+function buildDoctors() {
+    const container = document.getElementById('doctorsContainer');
+    container.innerHTML = '';
+    activePractice.doctors.forEach(name => {
+        container.innerHTML += `
+            <div class="provider-row" data-provider-type="doctor" data-provider-name="${name}">
+                <div class="field-wrapper">
+                    <label>Doctor</label>
+                    <div class="provider-name-label">${name}</div>
+                </div>
+                <div class="field-wrapper">
+                    <label>Days</label>
+                    <input type="number" class="doc-days" step="0.5" min="0" data-name="${name}">
+                </div>
+                <div class="field-wrapper">
+                    <label>Production</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" class="doc-prod" step="0.01" min="0" data-name="${name}">
+                    </div>
+                </div>
+            </div>`;
+    });
+}
+
+function buildSpecialties() {
+    const container = document.getElementById('specialtyContainer');
+    container.innerHTML = '';
+    activePractice.specialties.forEach(name => {
+        container.innerHTML += `
+            <div class="field-wrapper">
+                <label>${name}</label>
+                <div class="dollar-input">
+                    <span class="prefix">$</span>
+                    <input type="number" class="specialty-input" step="0.01" min="0" data-name="${name}">
+                </div>
+            </div>`;
+    });
+}
+
+function buildHygienists() {
+    const container = document.getElementById('hygienistsContainer');
+    container.innerHTML = '';
+    activePractice.hygienists.forEach(name => {
+        container.innerHTML += `
+            <div class="provider-row" data-provider-type="hygienist" data-provider-name="${name}">
+                <div class="field-wrapper">
+                    <label>Hygienist</label>
+                    <div class="provider-name-label">${name}</div>
+                </div>
+                <div class="field-wrapper">
+                    <label>Days</label>
+                    <input type="number" class="hyg-days" step="0.5" min="0" data-name="${name}">
+                </div>
+                <div class="field-wrapper">
+                    <label>Production</label>
+                    <div class="dollar-input">
+                        <span class="prefix">$</span>
+                        <input type="number" class="hyg-prod" step="0.01" min="0" data-name="${name}">
+                    </div>
+                </div>
+            </div>`;
+    });
+}
+
+function buildImaging() {
+    const container = document.getElementById('imagingContainer');
+    container.innerHTML = '';
+    activePractice.imaging.forEach(name => {
+        container.innerHTML += `
+            <div class="field-wrapper">
+                <label>${name}</label>
+                <input type="number" class="imaging-input" min="0" data-name="${name}">
+            </div>`;
+    });
+}
+
+// ── Event Listeners ──
+function attachListeners() {
+    // Live hygiene total
+    document.addEventListener('input', e => {
+        if (e.target.classList.contains('hyg-prod')) {
+            updateHygieneTotal();
+        }
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', handleSubmit);
+    document.getElementById('clearBtn').addEventListener('click', clearForm);
+    document.getElementById('closeModalBtn').addEventListener('click', () => {
+        document.getElementById('successModal').classList.remove('show');
+    });
+    document.getElementById('copyDataBtn').addEventListener('click', copyJSON);
+    document.getElementById('emailDataBtn').addEventListener('click', emailReport);
+}
+
+function updateHygieneTotal() {
+    let total = 0;
+    document.querySelectorAll('.hyg-prod').forEach(el => {
+        total += parseFloat(el.value) || 0;
+    });
+    document.getElementById('hygieneTotal').textContent = '$' + total.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+// ── Collect Form Data ──
+function getFormData() {
+    const n = id => parseFloat(document.getElementById(id)?.value) || null;
+    const monthSelect = document.getElementById('month');
+    const monthName = monthSelect.options[monthSelect.selectedIndex]?.text || '';
+    const monthAbbr = monthName.substring(0, 3);
+
+    const doctors = [];
+    document.querySelectorAll('.provider-row[data-provider-type="doctor"]').forEach(row => {
+        const name = row.dataset.providerName;
+        const days = parseFloat(row.querySelector('.doc-days')?.value) || null;
+        const prod = parseFloat(row.querySelector('.doc-prod')?.value) || null;
+        if (days || prod) doctors.push({ name, days, production: prod });
+    });
+
+    const hygienists = [];
+    document.querySelectorAll('.provider-row[data-provider-type="hygienist"]').forEach(row => {
+        const name = row.dataset.providerName;
+        const days = parseFloat(row.querySelector('.hyg-days')?.value) || null;
+        const prod = parseFloat(row.querySelector('.hyg-prod')?.value) || null;
+        if (days || prod) hygienists.push({ name, days, production: prod });
+    });
+
+    const specialties = {};
+    document.querySelectorAll('.specialty-input').forEach(el => {
+        const val = parseFloat(el.value) || null;
+        if (val) specialties[el.dataset.name] = val;
+    });
+
+    const imaging = {};
+    document.querySelectorAll('.imaging-input').forEach(el => {
+        const val = parseInt(el.value) || null;
+        if (val) imaging[el.dataset.name] = val;
+    });
+
+    return {
+        practice: activePractice.name,
+        practiceCode: activePractice.code,
+        month: monthAbbr,
+        monthNum: monthSelect.value,
+        year: parseInt(document.getElementById('year').value),
+        submittedAt: new Date().toISOString(),
+        daysIn: n('daysIn'),
+        crowns: {
+            lastMonth: n('crownsLastMonth'),
+            prepped: n('crownsPrepped'),
+            sameDay: n('crownsSameDay'),
+            futureBooked: n('crownsFutureBooked'),
+            diagnosedNonCosmetic: n('crownsDiagnosed')
+        },
+        doctors,
+        specialties,
+        visits: {
+            newPatients: n('newPatients'),
+            npCash: n('npCash'),
+            npPPO: n('npPPO'),
+            npHMO: n('npHMO'),
+            prophies: n('prophies'),
+            perioMaint: n('perioMaint'),
+            srp: n('srp'),
+            arrestin: n('arrestin'),
+            laser: n('laser')
+        },
+        hygiene: {
+            hygienists,
+            empties: n('empties'),
+            total: parseFloat(document.getElementById('hygieneTotal').textContent.replace(/[$,]/g, '')) || 0
+        },
+        exams: {
+            comp: n('compExam'),
+            periodic: n('periodicExam'),
+            limited: n('limitedExam'),
+            ptx: n('ptx'),
+            biteWellness: n('biteWellness')
+        },
+        imaging,
+        results: {
+            production: n('resultsProduction'),
+            collections: n('resultsCollections'),
+            futureScheduled: n('resultsFutureScheduled')
+        }
+    };
+}
+
+// ── Convert to Dashboard RAW format ──
+function toDashboardFormat(data) {
+    const date = `${data.year}-${data.monthNum}-01`;
+    const entries = [];
+
+    // Results
+    if (data.results.production) entries.push({ category: 'results', date, dimension: 'Production', value: data.results.production });
+    if (data.results.collections) entries.push({ category: 'results', date, dimension: 'Collections', value: data.results.collections });
+
+    // Days
+    if (data.daysIn) entries.push({ category: 'days', date, dimension: 'Days In', count: data.daysIn });
+
+    // Crowns
+    if (data.crowns.prepped) entries.push({ category: 'crowns', date, dimension: 'Crowns PREPPED', count: data.crowns.prepped });
+    if (data.crowns.lastMonth) entries.push({ category: 'crowns', date, dimension: 'Crowns from LAST MONTH', count: data.crowns.lastMonth });
+    if (data.crowns.futureBooked) entries.push({ category: 'crowns', date, dimension: 'FUTURE BOOKED', count: data.crowns.futureBooked });
+    if (data.crowns.diagnosedNonCosmetic) entries.push({ category: 'crowns', date, dimension: 'Diagnosed Non Cosmetic', count: data.crowns.diagnosedNonCosmetic });
+
+    // Doctor production
+    data.doctors.forEach(d => {
+        if (d.production) entries.push({ category: 'doctor', date, dimension: d.name, value: d.production });
+    });
+
+    // Specialty
+    Object.entries(data.specialties).forEach(([name, val]) => {
+        entries.push({ category: 'specialty', date, dimension: name, value: val });
+    });
+
+    // Hygiene
+    data.hygiene.hygienists.forEach(h => {
+        if (h.production) entries.push({ category: 'hygiene', date, dimension: h.name, value: h.production });
+    });
+
+    // Visits
+    if (data.visits.newPatients) entries.push({ category: 'visits', date, dimension: 'New Patients', count: data.visits.newPatients });
+    if (data.visits.prophies) entries.push({ category: 'visits', date, dimension: '1110/1120 Prophies', count: data.visits.prophies });
+    if (data.visits.perioMaint) entries.push({ category: 'visits', date, dimension: '4910 Perio Maint', count: data.visits.perioMaint });
+    if (data.visits.srp) entries.push({ category: 'visits', date, dimension: 'SRP', count: data.visits.srp });
+
+    // Exams
+    if (data.exams.comp) entries.push({ category: 'exams', date, dimension: '0150 Comp Exam', count: data.exams.comp });
+    if (data.exams.periodic) entries.push({ category: 'exams', date, dimension: '0120 Periodic Exam', count: data.exams.periodic });
+    if (data.exams.limited) entries.push({ category: 'exams', date, dimension: '0140 Limited Exam', count: data.exams.limited });
+
+    // Imaging
+    Object.entries(data.imaging).forEach(([name, val]) => {
+        entries.push({ category: 'imaging', date, dimension: name, count: val });
+    });
+
+    return entries;
+}
+
+// ── Submit ──
+function handleSubmit() {
+    const month = document.getElementById('month').value;
+    const year = document.getElementById('year').value;
+    if (!month || !year) {
+        alert('Please select a month and year.');
+        return;
+    }
+
+    lastSubmitData = getFormData();
+
+    // Show modal
+    const summary = document.getElementById('modalSummary');
+    const prod = lastSubmitData.results.production;
+    const coll = lastSubmitData.results.collections;
+    summary.innerHTML = `
+        <div><strong>${lastSubmitData.practice}</strong></div>
+        <div>${lastSubmitData.month} ${lastSubmitData.year}</div>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--divider);">
+            <div>Production: <strong>${prod ? '$' + prod.toLocaleString() : '—'}</strong></div>
+            <div>Collections: <strong>${coll ? '$' + coll.toLocaleString() : '—'}</strong></div>
+            <div>Dr. Days: <strong>${lastSubmitData.daysIn || '—'}</strong></div>
+            <div>Hygiene Total: <strong>${'$' + (lastSubmitData.hygiene.total || 0).toLocaleString()}</strong></div>
+        </div>
+    `;
+    document.getElementById('successModal').classList.add('show');
+}
+
+// ── Copy JSON ──
+function copyJSON() {
+    if (!lastSubmitData) return;
+    const dashboardData = toDashboardFormat(lastSubmitData);
+    const output = {
+        formData: lastSubmitData,
+        dashboardEntries: dashboardData
+    };
+    navigator.clipboard.writeText(JSON.stringify(output, null, 2)).then(() => {
+        const btn = document.getElementById('copyDataBtn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy JSON', 2000);
+    });
+}
+
+// ── Email Report ──
+function emailReport() {
+    if (!lastSubmitData) return;
+    const d = lastSubmitData;
+    const subject = encodeURIComponent(`${d.practice} - ${d.month} ${d.year} Month End Report`);
+
+    let body = `${d.practice} — ${d.month} ${d.year} Month End Report\n\n`;
+    body += `Dr. Days IN: ${d.daysIn || '—'}\n\n`;
+    body += `── CROWNS ──\n`;
+    body += `From Last Month: ${d.crowns.lastMonth || '—'}\n`;
+    body += `Prepped: ${d.crowns.prepped || '—'} (${d.crowns.sameDay || 0} SD)\n`;
+    body += `Future Booked: ${d.crowns.futureBooked || '—'}\n`;
+    body += `Diagnosed Non-Cosmetic: ${d.crowns.diagnosedNonCosmetic || '—'}\n\n`;
+
+    body += `── DOCTOR PRODUCTION ──\n`;
+    d.doctors.forEach(dr => {
+        const avg = (dr.days && dr.production) ? Math.round(dr.production / dr.days) : '—';
+        body += `${dr.name}: $${(dr.production||0).toLocaleString()} / ${dr.days||0} days (AVG: $${typeof avg === 'number' ? avg.toLocaleString() : avg})\n`;
+    });
+
+    body += `\n── SPECIALTY ──\n`;
+    Object.entries(d.specialties).forEach(([k,v]) => { body += `${k}: $${v.toLocaleString()}\n`; });
+
+    body += `\n── VISITS ──\n`;
+    body += `New Patients: ${d.visits.newPatients || '—'} (Cash: ${d.visits.npCash||'—'}, PPO: ${d.visits.npPPO||'—'}, HMO: ${d.visits.npHMO||'—'})\n`;
+    body += `Prophies: ${d.visits.prophies || '—'}\n`;
+    body += `Perio Maint: ${d.visits.perioMaint || '—'}\n`;
+    body += `SRP: ${d.visits.srp || '—'}\n`;
+    body += `Arrestin: $${d.visits.arrestin || '—'} | Laser: $${d.visits.laser || '—'}\n`;
+
+    body += `\n── HYGIENE ──\n`;
+    d.hygiene.hygienists.forEach(h => {
+        const avg = (h.days && h.production) ? Math.round(h.production / h.days) : '—';
+        body += `${h.name}: $${(h.production||0).toLocaleString()} / ${h.days||0} days (AVG: $${typeof avg === 'number' ? avg.toLocaleString() : avg})\n`;
+    });
+    body += `Empties: ${d.hygiene.empties || '—'}\nTotal: $${d.hygiene.total.toLocaleString()}\n`;
+
+    body += `\n── EXAMS ──\n`;
+    body += `Comp: ${d.exams.comp||'—'} | Periodic: ${d.exams.periodic||'—'} | Limited: ${d.exams.limited||'—'} | PTX: $${d.exams.ptx||'—'}\n`;
+
+    body += `\n── IMAGING ──\n`;
+    Object.entries(d.imaging).forEach(([k,v]) => { body += `${k}: ${v}\n`; });
+
+    body += `\n── RESULTS ──\n`;
+    body += `Production: $${(d.results.production||0).toLocaleString()}\n`;
+    body += `Collections: $${(d.results.collections||0).toLocaleString()}\n`;
+    body += `Next Month Schedule: $${(d.results.futureScheduled||0).toLocaleString()}\n`;
+
+    const mailto = `mailto:dashboard@performdds.com?subject=${subject}&body=${encodeURIComponent(body)}`;
+    window.open(mailto, '_blank');
+}
+
+// ── Clear ──
+function clearForm() {
+    document.querySelectorAll('input[type="number"]').forEach(el => el.value = '');
+    document.getElementById('month').value = '';
+    updateHygieneTotal();
+}
+
+// ── Init ──
+initLogin();
+</script>
+</body>
+</html>
