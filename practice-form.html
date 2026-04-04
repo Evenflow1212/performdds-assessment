@@ -32,7 +32,7 @@
 
         .container { max-width: 680px; margin: 0 auto; }
 
-        /* ── Login Screen ── */
+        /* ââ Login Screen ââ */
         .login-screen {
             display: flex;
             flex-direction: column;
@@ -80,14 +80,14 @@
         .login-box .login-btn:hover { background: var(--accent-hover); }
         .login-error { color: #ff6b6b; font-size: 13px; margin-bottom: 12px; display: none; }
 
-        /* ── Header ── */
+        /* ââ Header ââ */
         .header { margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--divider); }
         .brand { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: var(--accent); text-transform: uppercase; margin-bottom: 8px; }
         .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
         .subtitle { font-size: 13px; color: var(--label); margin-bottom: 24px; }
         .header-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-        /* ── Form Elements ── */
+        /* ââ Form Elements ââ */
         .form-group { display: flex; flex-direction: column; }
         .form-group label, .field-wrapper label { font-size: 13px; font-weight: 500; color: var(--label); margin-bottom: 6px; }
         .form-group input, .form-group select, .field-wrapper input {
@@ -109,7 +109,7 @@
         input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
 
-        /* ── Sections ── */
+        /* ââ Sections ââ */
         .section {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -133,7 +133,7 @@
         .dollar-input .prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--label); font-size: 15px; pointer-events: none; }
         .dollar-input input { padding-left: 26px; width: 100%; }
 
-        /* ── Provider Rows ── */
+        /* ââ Provider Rows ââ */
         .provider-row {
             display: grid;
             grid-template-columns: 1fr 70px 1fr;
@@ -154,7 +154,7 @@
             padding: 8px 0;
         }
 
-        /* ── Hygiene Total ── */
+        /* ââ Hygiene Total ââ */
         .hygiene-total {
             display: flex;
             justify-content: space-between;
@@ -168,7 +168,7 @@
         .hygiene-total .ht-label { font-size: 13px; font-weight: 600; color: var(--label); text-transform: uppercase; letter-spacing: 1px; }
         .hygiene-total .ht-value { font-size: 20px; font-weight: 700; color: var(--accent); }
 
-        /* ── Submit ── */
+        /* ââ Submit ââ */
         .submit-area { text-align: center; margin: 32px 0; }
         .submit-btn {
             padding: 14px 48px;
@@ -187,7 +187,7 @@
         .clear-link { margin-top: 16px; font-size: 13px; color: var(--label); cursor: pointer; }
         .clear-link:hover { color: var(--text); }
 
-        /* ── Modal ── */
+        /* ââ Modal ââ */
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
         .modal.show { display: flex; }
         .modal-content {
@@ -209,7 +209,7 @@
         .modal-btn-primary { background: var(--accent); color: #fff; }
         .modal-btn-secondary { background: transparent; color: var(--label); border: 1px solid var(--border); }
 
-        /* ── Responsive ── */
+        /* ââ Responsive ââ */
         @media (max-width: 600px) {
             .fields-grid { grid-template-columns: 1fr; }
             .provider-row { grid-template-columns: 1fr 1fr; }
@@ -222,7 +222,7 @@
 </head>
 <body>
 
-<!-- ═══════════ LOGIN SCREEN ═══════════ -->
+<!-- âââââââââââ LOGIN SCREEN âââââââââââ -->
 <div id="loginScreen" class="login-screen">
     <div class="logo">Perform DDS</div>
     <h1>Month End Report</h1>
@@ -235,7 +235,7 @@
     </div>
 </div>
 
-<!-- ═══════════ FORM (hidden until login) ═══════════ -->
+<!-- âââââââââââ FORM (hidden until login) âââââââââââ -->
 <div id="formContainer" class="container hidden">
 
     <div class="header">
@@ -351,7 +351,7 @@
     </div>
 </div>
 
-<!-- ═══════════ SUCCESS MODAL ═══════════ -->
+<!-- âââââââââââ SUCCESS MODAL âââââââââââ -->
 <div class="modal" id="successModal">
     <div class="modal-content">
         <div class="checkmark"></div>
@@ -366,7 +366,7 @@
 </div>
 
 <script>
-/* ══════════════════════════════════════════
+/* ââââââââââââââââââââââââââââââââââââââââââ
    PRACTICE CONFIGURATIONS
    Add new practices here. Each practice gets:
    - name: display name
@@ -376,7 +376,7 @@
    - hygienists: array of hygienist names
    - specialties: array of specialty categories
    - imaging: array of imaging equipment
-   ══════════════════════════════════════════ */
+   ââââââââââââââââââââââââââââââââââââââââââ */
 const PRACTICES = {
     vanek: {
         name: "Dr. Vanek's Practice",
@@ -407,13 +407,13 @@ const PRACTICES = {
     }
 };
 
-/* ══════════════════════════════════════════
+/* ââââââââââââââââââââââââââââââââââââââââââ
    APPLICATION
-   ══════════════════════════════════════════ */
+   ââââââââââââââââââââââââââââââââââââââââââ */
 let activePractice = null;
 let lastSubmitData = null;
 
-// ── Check URL for practice code ──
+// ââ Check URL for practice code ââ
 function checkURLPractice() {
     const params = new URLSearchParams(window.location.search);
     const code = (params.get('practice') || '').toLowerCase().trim();
@@ -429,12 +429,12 @@ function checkURLPractice() {
     return null;
 }
 
-// ── Login ──
+// ââ Login ââ
 function initLogin() {
     const urlPractice = checkURLPractice();
 
     if (urlPractice) {
-        // Practice identified from URL — still need passcode
+        // Practice identified from URL â still need passcode
         document.getElementById('practiceCode').value = urlPractice.code;
         document.getElementById('practiceCode').placeholder = 'Enter passcode for ' + urlPractice.name;
         document.querySelector('.login-box label').textContent = 'Passcode';
@@ -477,11 +477,11 @@ function doLogin() {
     errorEl.style.display = 'block';
 }
 
-// ── Build Form ──
+// ââ Build Form ââ
 function showForm() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('formContainer').classList.remove('hidden');
-    document.getElementById('formTitle').textContent = activePractice.name + ' — Month End Report';
+    document.getElementById('formTitle').textContent = activePractice.name + ' â Month End Report';
 
     buildDoctors();
     buildSpecialties();
@@ -567,7 +567,7 @@ function buildImaging() {
     });
 }
 
-// ── Event Listeners ──
+// ââ Event Listeners ââ
 function attachListeners() {
     // Live hygiene total
     document.addEventListener('input', e => {
@@ -593,7 +593,7 @@ function updateHygieneTotal() {
     document.getElementById('hygieneTotal').textContent = '$' + total.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-// ── Collect Form Data ──
+// ââ Collect Form Data ââ
 function getFormData() {
     const n = id => parseFloat(document.getElementById(id)?.value) || null;
     const monthSelect = document.getElementById('month');
@@ -672,7 +672,7 @@ function getFormData() {
     };
 }
 
-// ── Convert to Dashboard RAW format ──
+// ââ Convert to Dashboard RAW format ââ
 function toDashboardFormat(data) {
     const date = `${data.year}-${data.monthNum}-01`;
     const entries = [];
@@ -724,7 +724,7 @@ function toDashboardFormat(data) {
     return entries;
 }
 
-// ── Submit ──
+// ââ Submit ââ
 function handleSubmit() {
     const month = document.getElementById('month').value;
     const year = document.getElementById('year').value;
@@ -743,16 +743,16 @@ function handleSubmit() {
         <div><strong>${lastSubmitData.practice}</strong></div>
         <div>${lastSubmitData.month} ${lastSubmitData.year}</div>
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--divider);">
-            <div>Production: <strong>${prod ? '$' + prod.toLocaleString() : '—'}</strong></div>
-            <div>Collections: <strong>${coll ? '$' + coll.toLocaleString() : '—'}</strong></div>
-            <div>Dr. Days: <strong>${lastSubmitData.daysIn || '—'}</strong></div>
+            <div>Production: <strong>${prod ? '$' + prod.toLocaleString() : 'â'}</strong></div>
+            <div>Collections: <strong>${coll ? '$' + coll.toLocaleString() : 'â'}</strong></div>
+            <div>Dr. Days: <strong>${lastSubmitData.daysIn || 'â'}</strong></div>
             <div>Hygiene Total: <strong>${'$' + (lastSubmitData.hygiene.total || 0).toLocaleString()}</strong></div>
         </div>
     `;
     document.getElementById('successModal').classList.add('show');
 }
 
-// ── Copy JSON ──
+// ââ Copy JSON ââ
 function copyJSON() {
     if (!lastSubmitData) return;
     const dashboardData = toDashboardFormat(lastSubmitData);
@@ -767,49 +767,48 @@ function copyJSON() {
     });
 }
 
-// ── Email Report ──
+// ââ Email Report ââ
 function emailReport() {
     if (!lastSubmitData) return;
     const d = lastSubmitData;
     const subject = encodeURIComponent(`${d.practice} - ${d.month} ${d.year} Month End Report`);
 
-    let body = `${d.practice} — ${d.month} ${d.year} Month End Report\n\n`;
-    body += `Total Dr. Days Worked This Month: ${d.daysIn || '—'}\n\n`;
-    body += `── CROWNS ──\n`;
-    body += `From Last Month: ${d.crowns.lastMonth || '—'}\n`;
-    body += `Prepped: ${d.crowns.prepped || '—'} (${d.crowns.sameDay || 0} SD)\n`;
-    body += `Future Booked: ${d.crowns.futureBooked || '—'}\n`;
-    body += `Diagnosed Non-Cosmetic: ${d.crowns.diagnosedNonCosmetic || '—'}\n\n`;
+    let body = `${d.practice} â ${d.month} ${d.year} Month End Report\n\n`;
+    body += `Total Dr. Days Worked This Month: ${d.daysIn || 'â'}\n\n`;
+    body += `ââ CROWNS ââ\n`;
+    body += `From Last Month: ${d.crowns.lastMonth || 'â'}\n`;
+    body += `Prepped: ${d.crowns.prepped || 'â'} (${d.crowns.sameDay || 0} SD)\n`;
+    body += `Future Booked: ${d.crowns.futureBooked || 'â'}\n`;
+    body += `Diagnosed Non-Cosmetic: ${d.crowns.diagnosedNonCosmetic || 'â'}\n\n`;
 
-    body += `── DOCTOR PRODUCTION ──\n`;
+    body += `ââ DOCTOR PRODUCTION ââ\n`;
     d.doctors.forEach(dr => {
-        const avg = (dr.days && dr.production) ? Math.round(dr.production / dr.days) : '—';
+        const avg = (dr.days && dr.production) ? Math.round(dr.production / dr.days) : 'â';
         body += `${dr.name}: $${(dr.production||0).toLocaleString()} / ${dr.days||0} days (AVG: $${typeof avg === 'number' ? avg.toLocaleString() : avg})\n`;
     });
 
-    body += `\n── SPECIALTY ──\n`;
+    body += `\nââ SPECIALTY ââ\n`;
     Object.entries(d.specialties).forEach(([k,v]) => { body += `${k}: $${v.toLocaleString()}\n`; });
 
-    body += `\n── VISITS ──\n`;
-    body += `Prophies: ${d.visits.prophies || '—'}\n`;
-    body += `Perio Maint: ${d.visits.perioMaint || '—'}\n`;
-    body += `SRP: ${d.visits.srp || '—'}\n`;
-    body += `Arrestin: $${d.visits.arrestin || '—'} | Laser: $${d.visits.laser || '—'}\n`;
+    body += `\nââ VISITS ââ\n`;
+    body += `Prophies: ${d.visits.prophies || 'â'}\n`;
+    body += `Perio Maint: ${d.visits.perioMaint || 'â'}\n`;
+    body += `SRP: ${d.visits.srp || 'â'}\n`;
+    body += `Arrestin: $${d.visits.arrestin || 'â'} | Laser: $${d.visits.laser || 'â'}\n`;
 
-    body += `\n── HYGIENE ──\n`;
+    body += `\nââ HYGIENE ââ\n`;
     d.hygiene.hygienists.forEach(h => {
-        const avg = (h.days && h.production) ? Math.round(h.production / h.days) : '—';
+        const avg = (h.days && h.production) ? Math.round(h.production / h.days) : 'â';
         body += `${h.name}: $${(h.production||0).toLocaleString()} / ${h.days||0} days (AVG: $${typeof avg === 'number' ? avg.toLocaleString() : avg})\n`;
     });
-    body += `Empties: ${d.hygiene.empties || '—'}\nTotal: $${d.hygiene.total.toLocaleString()}\n`;
+    body += `Empties: ${d.hygiene.empties || 'â'}\nTotal: $${d.hygiene.total.toLocaleString()}\n`;
 
-    body += `\n── EXAMS ──\n`;
-    body += `Comp: ${d.exams.comp||'—'} | Periodic: ${d.exams.periodic||'—'} | Limited: ${d.exams.limited||'—'} | PTX: $${d.exams.ptx||'—'}\n`;
+    body += `\nââ EXAMS ââ\n`;
 
-    body += `\n── IMAGING ──\n`;
+    body += `\nââ IMAGING ââ\n`;
     Object.entries(d.imaging).forEach(([k,v]) => { body += `${k}: ${v}\n`; });
 
-    body += `\n── RESULTS ──\n`;
+    body += `\nââ RESULTS ââ\n`;
     body += `Production: $${(d.results.production||0).toLocaleString()}\n`;
     body += `Collections: $${(d.results.collections||0).toLocaleString()}\n`;
     body += `Next Month Schedule: $${(d.results.futureScheduled||0).toLocaleString()}\n`;
@@ -818,14 +817,14 @@ function emailReport() {
     window.open(mailto, '_blank');
 }
 
-// ── Clear ──
+// ââ Clear ââ
 function clearForm() {
     document.querySelectorAll('input[type="number"]').forEach(el => el.value = '');
     document.getElementById('month').value = '';
     updateHygieneTotal();
 }
 
-// ── Init ──
+// ââ Init ââ
 initLogin();
 </script>
 </body>
