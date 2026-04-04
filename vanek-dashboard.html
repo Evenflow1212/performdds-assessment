@@ -190,10 +190,10 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label">Avg. Hygiene Production</div><div class="kpi-value" id="kpi-hygprod"></div></div>
         <div class="kpi-card"><div class="kpi-label">Avg. Hygiene Prod/Day/Producer</div><div class="kpi-value orange" id="kpi-hygpd"></div></div>
     </div>
-    <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:18vh;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
+    <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:28vh;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
     <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
-        <div class="chart-box" style=""><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="height:16vh;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
-        <div class="chart-box" style=""><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="height:16vh;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
+        <div class="chart-box" style=""><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="height:22vh;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
+        <div class="chart-box" style=""><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="height:22vh;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
     </div>
     <div class="chart-grid-hyg" style="margin-top:20px;">
         <div class="chart-box">
@@ -530,7 +530,7 @@ function initCharts(data = null) {
             { label: 'Production', data: revDates.map(d => resultsByDate[d]['Production']||null), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
             { label: 'Collections', data: revDates.map(d => resultsByDate[d]['Collections']||null), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
             { label: 'Future Scheduled', data: revDates.map(d => resultsByDate[d]['Future Scheduled']||null), borderColor: '#6bc47f', backgroundColor: 'rgba(107,196,127,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true }
-        ]}, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: true, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y != null ? Math.round(ctx.parsed.y).toLocaleString() : '-'); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k', font: { size: 12 } }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } } } }
+        ]}, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: tfalse interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y != null ? Math.round(ctx.parsed.y).toLocaleString() : '-'); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k', font: { size: 12 } }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } } } }
     });
 
     const docByDate = {}; activeData.doctor.forEach(r => { if (!docByDate[r.date]) docByDate[r.date] = {}; docByDate[r.date][r.name] = r.production; });
