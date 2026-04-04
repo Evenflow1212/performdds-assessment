@@ -628,7 +628,7 @@ function initCharts(data = null) {
         const batVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)) batVisitsByDate[r.date] = (batVisitsByDate[r.date]||0) + (r.count||0); });
         const batExamsByDate = {}; activeData.exams.forEach(r => { if (r.dimension === '0120 Periodic Exam') batExamsByDate[r.date] = (batExamsByDate[r.date]||0) + (r.count||0); });
         const batDates = [...new Set([...Object.keys(batVisitsByDate), ...Object.keys(batExamsByDate)])].sort().slice(-12);
-        const avgCrownsAdded = crownDates.length > 0 ? crownDates.reduce((s, d) => { const p = crownsByDate[d]['Crowns Prepped']||0; const fb = crownsByDate[d]['Future Booked']||0; const fl = crownsByDate[d]['From Last Month']||0; return s + p + fb - fl; }, 0) / crownDates.length : 0;
+        const avgCrownsAdded = crownDates.length > 0 ? crownDates.reduce((s, d) => { const p = crownsByDate[d]['Crowns PREPPED']||0; const fb = crownsByDate[d]['FUTURE BOOKED']||0; const fl = crownsByDate[d]['Crowns from LAST MONTH']||0; return s + p + fb - fl; }, 0) / crownDates.length : 0;
         const avgBatVisits = batDates.length > 0 ? batDates.reduce((s, d) => s + (batVisitsByDate[d]||0) + (batExamsByDate[d]||0), 0) / batDates.length : 0;
         const batAvgVal = avgCrownsAdded > 0 ? (avgBatVisits / avgCrownsAdded) : 0;
         document.getElementById('kpi-batavg-label').textContent = 'Avg. Batting Average (Last 12 Months)';
