@@ -3,38 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dr. Bilbeisi (Cedar Creek) - Perform DDS</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #fff; min-height: 100vh; }
-
-/* LOGIN STYLES */
-.login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #1a2332; z-index: 9999; display: flex; align-items: center; justify-content: center; }
-.login-overlay.hidden { display: none; }
-.login-box { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 12px; padding: 40px; width: 100%; max-width: 400px; }
-.login-box .icon { font-size: 40px; text-align: center; margin-bottom: 16px; }
-.login-box h1 { font-size: 22px; margin-bottom: 6px; color: #fff; text-align: center; }
-.login-box .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 28px; text-align: center; }
-.login-box label { display: block; font-size: 12px; color: #8899aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-.login-box input { width: 100%; padding: 12px 14px; background: #1a2f4a; border: 1px solid #2a3f5f; border-radius: 8px; color: #fff; font-size: 15px; margin-bottom: 18px; outline: none; }
-.login-box input:focus { border-color: #e8872a; }
-.login-box button { width: 100%; padding: 12px; background: #e8872a; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
-.login-box button:hover { background: #d07520; }
-.login-error { color: #d94a7a; font-size: 13px; text-align: center; margin-bottom: 12px; display: none; }
-
-/* DASHBOARD STYLES */
-.dashboard-wrap { display: none; }
-.dashboard-wrap.visible { display: block; }
-.header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; background: #0f1c2e; border-bottom: 1px solid #2a3f5f; }
-.header h1 { font-size: clamp(16px, 2vw, 22px); font-weight: 700; }
-.header-left { display: flex; align-items: baseline; gap: 12px; }
-.tabs { display: flex; gap: 4px; }
-.tab { padding: 7px 18px; border-radius: 20px; font-size: 13px; cursor: pointer; background: transparent; color: #8899aa; transition: all 0.2s; }
-.tab.active { background: #e8872a; color: #fff; }
-.tab:hover:not(.active) { color: #ccc; }
-.logout-btn { background: #2a3f5f; color: #8899aa; border: none; border-radius: 8px; padding: 7px 16px; font-size: 12px; cursor: pointer; }
-.logout-btn:hover { background: #3a5070; color: #fff; }
+<title>Dr. Bilbeisi (Cedar Creek) - Perform DDSCòö6Fâæ§4FVÆg"ææWBöçÒö6'Bæ§4BãBãöF7Bö6'BçVÖBæÖâæ§2#ãÂ÷67&Cà£Ç7GÆSà¢¢²Ö&vã¢²FFæs¢²&÷×6¦æs¢&÷&FW"Ö&÷²Ð¦&öG²föçBÖfÖÇ¢&ÂÂVÇfWF6Â6ç2×6W&c²&6¶w&÷VæC¢3#33#²6öÆ÷#¢6ffc²ÖâÖVvC¢f²Ð ¢ò¢Äôtâ5EÄU2¢ð¢æÆövâÖ÷fW&Æ²÷6Föã¢fVC²F÷¢²ÆVgC¢²vGF¢gs²VvC¢f²&6¶w&÷VæC¢3#33#²¢ÖæFW¢²F7Æ¢fÆW²ÆâÖFV×3¢6VçFW#²§W7FgÖ6öçFVçC¢6VçFW#²Ð¢æÆövâÖ÷fW&ÆæFFVâ²F7Æ¢æöæS²Ð¢æÆövâÖ&÷²&6¶w&÷VæC¢3c3&S²&÷&FW#¢6öÆB3&6cVc²&÷&FW"×&FW3¢'²FFæs¢C²vGF¢S²Ö×vGF¢C²Ð¢æÆövâÖ&÷æ6öâ²föçB×6¦S¢C²FWBÖÆvã¢6VçFW#²Ö&vâÖ&÷GFöÓ¢g²Ð¢æÆövâÖ&÷²föçB×6¦S¢#'²Ö&vâÖ&÷GFöÓ¢g²6öÆ÷#¢6ffc²FWBÖÆvã¢6VçFW#²Ð¢æÆövâÖ&÷ç7V'FFÆR²föçB×6¦S¢7²6öÆ÷#¢3²Ö&vâÖ&÷GFöÓ¢#²FWBÖÆvã¢6VçFW#²Ð¢æÆövâÖ&÷Æ&VÂ²F7Æ¢&Æö6³²föçB×6¦S¢'²6öÆ÷#¢3²Ö&vâÖ&÷GFöÓ¢g²FWB×G&ç6f÷&Ó¢WW&66S²ÆWGFW"×76æs¢ãW²Ð¢æÆövâÖ&÷çWB²vGF¢S²FFæs¢'G²&6¶w&÷VæC¢3&cF²&÷&FW#¢6öÆB3&6cVc²&÷&FW"×&FW3¢²6öÆ÷#¢6ffc²föçB×6¦S¢W²Ö&vâÖ&÷GFöÓ¢²÷WFÆæS¢æöæS²Ð¢æÆövâÖ&÷çWC¦fö7W2²&÷&FW"Ö6öÆ÷#¢6Ss&²Ð¢æÆövâÖ&÷'WGFöâ²vGF¢S²FFæs¢'²&6¶w&÷VæC¢6Ss&²6öÆ÷#¢6ffc²&÷&FW#¢æöæS²&÷&FW"×&FW3¢²föçB×6¦S¢S²föçB×vVvC¢c²7W'6÷#¢öçFW#²Ð¢æÆövâÖ&÷'WGFöã¦÷fW"²&6¶w&÷VæC¢6CsS#²Ð¢æÆövâÖW'&÷"²6öÆ÷#¢6CFv²föçB×6¦S¢7²FWBÖÆvã¢6VçFW#²Ö&vâÖ&÷GFöÓ¢'²F7Æ¢æöæS²Ð ¢ò¢D4$ô$B5EÄU2¢ð¢æF6&ö&B×w&²F7Æ¢æöæS²Ð¢æF6&ö&B×w&çf6&ÆR²F7Æ¢&Æö6³²Ð¢æVFW"²F7Æ¢fÆW²ÆâÖFV×3¢6VçFW#²§W7FgÖ6öçFVçC¢76RÖ&WGvVVã²FFæs¢#G²&6¶w&÷VæC¢3c3&S²&÷&FW"Ö&÷GFöÓ¢6öÆB3&6cVc²Ð¢æVFW"²föçB×6¦S¢6Æ×cÂ'grÂ#'²föçB×vVvC¢s²Ð¢æVFW"ÖÆVgB²F7Æ¢fÆW²ÆâÖFV×3¢&6VÆæS²v¢'²Ð¢çF'2²F7Æ¢fÆW²v¢G²Ð¢çF"²FFæs¢w²&÷&FW"×&FW3¢#²föçB×6¦S¢7²7W'6÷#¢öçFW#²&6¶w&÷VæC¢G&ç7&VçC²6öÆ÷#¢3²G&ç6Föã¢ÆÂã'3²Ð¢çF"æ7FfR²&6¶w&÷VæC¢6Ss&²6öÆ÷#¢6ff3²Ð¢çF#¦÷fW#¦æ÷Bæ7FfR²6öÆ÷#¢6663²Ð¢æÆöv÷WBÖ'Fâ²&6¶w&÷VæC¢3&6cVc²6öÆ÷#¢3²&÷&FW#¢æöæS²&÷&FW"×&FW3¢²FFæs¢wg²föçB×6¦S¢'²7W'6÷#¢öçFW#²Ð¢æÆöv÷WBÖ'Fã¦÷fW"²&6¶w&÷VæC¢36Ss²olor: #fff; }
 
 /* KPI ROW */
 .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; padding: 20px 24px; }
@@ -55,7 +24,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 /* FULLSCREEN OVERLAY */
 .fullscreen-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10,20,35,0.95); z-index: 10000; padding: 40px; }
 .fullscreen-overlay.active { display: flex; flex-direction: column; }
-.fullscreen-close { position: absolute; top: 16px; right: 24px; background: #2a3f5f; border: none; color: #fff; font-size: 14px; cursor: pointer; border-radius: 8px; padding: 8px 16px; }
+.fullscreen-close { position: absolute; top: 16px; right: 24px; background: #2a3f5f; border: none; color: #ffc; font-size: 14px; cursor: pointer; border-radius: 8px; padding: 8px 16px; }
 .fullscreen-chart { flex: 1; position: relative; }
 
 /* REPORT TABLE */
@@ -67,9 +36,9 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .report-table tr:hover td { background: rgba(42,63,95,0.2); }
 
 /* SPECIALTY / DONUT */
-.spec-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 4px; }
+.spec-row { display: flex; justify-content: space-between; alin-items: center; padding: 8px 10px; border-radius: 4px; }
 .spec-row:nth-child(even) { background: rgba(42, 63, 95, 0.15); }
-.spec-bar { flex: 1; margin: 0 12px; height: 6px; background: #1a2f4a; border-radius: 3px; }
+.spec-bar-wrap { flex: 1; margin: 0 12px; height: 6px; background: #1a2f4a; border-radius: 3px; }
 .spec-bar { height: 100%; background: #e8872a; border-radius: 3px; }
 .spec-label { font-size: clamp(11px, 1.1vw, 15px); color: #8899aa; min-width: 80px; }
 .spec-val { font-size: clamp(11px, 1.1vw, 15px); color: #fff; font-weight: 600; min-width: 60px; text-align: right; }
@@ -79,7 +48,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .filter-bar { background: #0d1926; border-bottom: 1px solid #2a3f5f; padding: 12px 24px; }
 .filter-preset { transition: all 0.2s; }
 .filter-preset:hover { background: #2a3f5f; color: #ccc; }
-.filter-preset.active { background: #e8872a; color: #fff; }
+.filter-preset.active { background: #e8872a; color: #ffc; }
 
 @media (max-width: 900px) {
     .kpi-row { grid-template-columns: repeat(3, 1fr); }
@@ -127,88 +96,11 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 <!-- FILTER BAR -->
 <div class="filter-bar" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
     <span style="font-size: 12px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px;">Filter:</span>
-    <button onclick="setPresetFilter('1m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">1M</button>
-    <button onclick="setPresetFilter('3m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">3M</button>
-    <button onclick="setPresetFilter('6m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">6M</button>
+    <button onclick="setPresetFilter('1m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer"/ transition: all 0.2s;">1M</button>
+    <button onclick="setPresetFilter('3m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer"; transition: all 0.2s;">3M</button>
+    <button onclick="setPresetFilter('6m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer"; transition: all 0.2s;">6M</button>
     <button onclick="setPresetFilter('12m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">12M</button>
-    <button onclick="setPresetFilter('ytD')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">YTD</button>
-    <button onclick="setPresetFilter('all')" class="filter-preset active" style="background: #e8872a; color: #fff; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">ALL</button>
-    <button onclick="navMonth(-1)" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer; margin-left: 8px;">&#9664;</button>
-    <button onclick="navMonth(1)" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer;">&#9654;</button>
-    <div style="margin-left: auto; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.3px; white-space: nowrap;">Showing: <span id="filterRangeText" style="color: #e8872a;">All Data</span></div>
-</div>
-</div>
-
-<div class="content active" id="tab-0">
-    <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label" id="kpi-prod-label">Avg. Production</div><div class="kpi-value" id="kpi-prod"></div></div>
-        <div class="kpi-card"><div class="kpi-label" id="kpi-coll-label">Avg. Collection</div><div class="kpi-value" id="kpi-coll"></div></div>
-        <div class="kpi-card"><div class="kpi-label" id="kpi-days-label">Avg. Days Worked</div><div class="kpi-value orange" id="kpi-days"></div></div>
-        <dborder-radius: 4px; }
-.spec-row:nth-child(even) { background: rgba(42, 63, 95, 0.15); }
-.spec-bar { flex: 1; margin: 0 12px; height: 6px; background: #1a2f4a; border-radius: 3px; }
-.spec-bar { height: 100%; background: #e8872a; border-radius: 3px; }
-.spec-label { font-size: clamp(11px, 1.1vw, 15px); color: #8899aa; min-width: 80px; }
-.spec-val { font-size: clamp(11px, 1.1vw, 15px); color: #fff; font-weight: 600; min-width: 60px; text-align: right; }
-.specialty-grid { display: grid; grid-template-columns: 1fr; gap: 4px; }
-
-/* FILTER BAR STYLES */
-.filter-bar { background: #0d1926; border-bottom: 1px solid #2a3f5f; padding: 12px 24px; }
-.filter-preset { transition: all 0.2s; }
-.filter-preset:hover { background: #2a3f5f; color: #ccc; }
-.filter-preset.active { background: #e8872a; color: #fff; }
-
-@media (max-width: 900px) {
-    .kpi-row { grid-template-columns: repeat(3, 1fr); }
-    .chart-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 600px) {
-    .kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .header { flex-direction: column; gap: 10px; }
-}
-</style>
-</head>
-<body>
-
-<!-- LOGIN OVERLAY -->
-<div class="login-overlay" id="loginOverlay">
-<div class="login-box">
-    <div class="icon">&#x1f4ca;</div>
-    <h1>Dr. Bilbeisi (Cedar Creek)</h1>
-    <div class="subtitle">Perform DDS &mdash; Practice Analytics</div>
-    <div class="login-error" id="loginError">Invalid username or password.</div>
-    <form onsubmit="return handleLogin(event)">
-        <label>Username</label>
-        <input type="text" id="loginUser" required autofocus>
-        <label>Password</label>
-        <input type="text" id="loginPass" required>
-        <button type="submit">Sign In</button>
-    </form>
-</div>
-</div>
-
-<!-- DASHBOARD -->
-<div class="dashboard-wrap" id="dashboardWrap">
-<div class="header">
-    <div class="header-left">
-        <h1>Dr. Bilbeisi's Report</h1>
-        <span id="headerDateRange" style="display:none;"></span>
-    </div>
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab(0)">Dashboard</div>
-        <div class="tab" onclick="switchTab(1)">Data Table</div>
-    </div>
-    <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
-</div>
-
-<!-- FILTER BAR -->
-<div class="filter-bar" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-    <span style="font-size: 12px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px;">Filter:</span>
-    <button onclick="setPresetFilter('1m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">1M</button>
-    <button onclick="setPresetFilter('3m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">3M</button>
-    <button onclick="setPresetFilter('6m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">6M</button>
-    <button onclick="setPresetFilter('12m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">12M</button>
-    <button onclick="setPresetFilter('ytD')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">YTD</button>
+    <button onclick="setPresetFilter('ytd')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">YTD</button>
     <button onclick="setPresetFilter('all')" class="filter-preset active" style="background: #e8872a; color: #ffc; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">ALL</button>
     <button onclick="navMonth(-1)" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer; margin-left: 8px;">&#9664;</button>
     <button onclick="navMonth(1)" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer;">&#9654;</button>
@@ -221,7 +113,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label" id="kpi-prod-label">Avg. Production</div><div class="kpi-value" id="kpi-prod"></div></div>
         <div class="kpi-card"><div class="kpi-label" id="kpi-coll-label">Avg. Collection</div><div class="kpi-value" id="kpi-coll"></div></div>
         <div class="kpi-card"><div class="kpi-label" id="kpi-days-label">Avg. Days Worked</div><div class="kpi-value orange" id="kpi-days"></div></div>
-        <dis class="kpi-card"><div class="kpi-label" id="kpi-crowns-prepped-label">Avg. Crowns Prepped</div><div class="kpi-value green" id="kpi-crowns-prepped"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-prepped-label">Avg. Crowns Prepped</div><div class="kpi-value green" id="kpi-crowns-prepped"></div></div>
         <div class="kpi-card"><div class="kpi-label" id="kpi-np-label">Avg. New Patients</div><div class="kpi-value" id="kpi-np"></div></div>
     </div>
 
@@ -233,26 +125,26 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         </div>
         <div class="chart-card">
             <h3>Crown Metrics</h3>
-            <button class="expand-btn" onclick="expandChart('chartCrowns'))"';>&#x26F6;</button>
+            <button class="expand-btn" onclick="expandChart('chartCrowns')">&#x26F6;</button>
             <div class="chart-wrap"><canvas id="chartCrowns"></canvas></div>
         </div>
         <div class="chart-card">
             <h3>Doctor vs Hygienist Production</h3>
-            <button class="expand-btn" onclick="expandChart('chartMaster')"';>&#x26F6;</button>
+            <button class="expand-btn" onclick="expandChart('chartMaster')">&#x26F6;</button>
             <div class="chart-wrap"><canvas id="chartMaster"></canvas></div>
         </div>
         <div class="chart-card">
             <h3>Hygienist Production &mdash; Linda</h3>
-            <button class="expand-btn" onclick="expandChart('chartHygProd')"';>&#x26F6;</button>
+            <button class="expand-btn" onclick="expandChart('chartHygProd'))">&#x26F6;</button>
             <div class="chart-wrap"><canvas id="chartHygProd"></canvas></div>
         </div>
         <div class="chart-card">
-            <h3>Exam Types</h3>
+            <h3>Exam Types#</h3>
             <button class="expand-btn" onclick="expandChart('chartNewPat')">&#x26F6;</button>
             <div class="chart-wrap"><canvas id="chartNewPat"></canvas></div>
         </div>
         <div class="chart-card">
-            <h3>Hygiene &amp; Perio Stats</h3>
+            <h3>Hygiene &&amp; Perio Stats</h3>
             <button class="expand-btn" onclick="expandChart('chartHygStats')">&#x26F6;</button>
             <div class="chart-wrap"><canvas id="chartHygStats"></canvas></div>
         </div>
@@ -321,7 +213,7 @@ const RAW = {"results":[
 {"date":"2025-09","dimension":"New Patients seen","value":10},
 {"date":"2025-09","dimension":"SRP--PATIENTS NOT Quads","value":1},
 {"date":"2025-09","dimension":"0120 Periodic Exam","value":55},
-{"date":"2025-09","dimension":"0140 Limited Exam","value":7},
+{"date":"2025-09","dimension":"014@ Limited Exam","value":7},
 {"date":"2025-09","dimension":"0150 Comp Exam","value":10},
 {"date":"2025-09","dimension":"FMX","value":15},
 {"date":"2025-09","dimension":"Panos","value":0},
@@ -337,7 +229,7 @@ const RAW = {"results":[
 {"date":"2025-10","dimension":"New Patients seen","value":0},
 {"date":"2025-10","dimension":"SRP--PATIENTS NOT Quads","value":10},
 {"date":"2025-10","dimension":"0120 Periodic Exam","value":78},
-{"date":"2025-10","dimension":"0140 Limited Exam","value":13},
+{"date":"2025-10","dimension":"014@ Limited Exam","value":13},
 {"date":"2025-10","dimension":"0150 Comp Exam","value":17},
 {"date":"2025-10","dimension":"FMX","value":22},
 {"date":"2025-10","dimension":"Panos","value":8},
@@ -353,7 +245,7 @@ const RAW = {"results":[
 {"date":"2025-12","dimension":"New Patients seen","value":11},
 {"date":"2025-12","dimension":"SRP--PATIENTS NOT Quads","value":4},
 {"date":"2025-12","dimension":"0120 Periodic Exam","value":59},
-{"date":"2025-12","dimension":"0140 Limited Exam","value":9},
+{"date":"2025-12","dimension":"014@ Limited Exam","value":9},
 {"date":"2025-12","dimension":"0150 Comp Exam","value":12},
 {"date":"2025-12","dimension":"FMX","value":13},
 {"date":"2025-12","dimension":"Panos","value":9},
@@ -369,7 +261,7 @@ const RAW = {"results":[
 {"date":"2026-01","dimension":"New Patients seen","value":13},
 {"date":"2026-01","dimension":"SRP--PATIENTS NOT Quads","value":5},
 {"date":"2026-01","dimension":"0120 Periodic Exam","value":47},
-{"date":"2026-01","dimension":"0140 Limited Exam","value":10},
+{"date":"2026-01","dimension":"014@ Limited Exam","value":10},
 {"date":"2026-01","dimension":"0150 Comp Exam","value":11},
 {"date":"2026-01","dimension":"FMX","value":8},
 {"date":"2026-01","dimension":"Panos","value":4},
@@ -401,7 +293,7 @@ const RAW = {"results":[
 {"date":"2026-03","dimension":"New Patients seen","value":15},
 {"date":"2026-03","dimension":"SRP--PATIENTS NOT Quads","value":6},
 {"date":"2026-03","dimension":"0120 Periodic Exam","value":47},
-{"date":"2026-03","dimension":"0140 Limited Exam","value":22},
+{"date":"2026-03","dimension":"014@ Limited Exam","value":22},
 {"date":"2026-03","dimension":"0150 Comp Exam","value":17},
 {"date":"2026-03","dimension":"FMX","value":15},
 {"date":"2026-03","dimension":"Panos","value":15}
@@ -513,22 +405,66 @@ function setPresetFilter(preset) {
         start = last; end = last;
     } else if (preset === '3m') {
         const d = new Date(last + '-01');
-        d.setMonth(dBÖWD6öçG"Ò"°¢7F'BÒBçFô4õ7G&ærç6Æ6RÂr°¢ÒVÇ6Rb&W6WBÓÓÒsfÒr°¢6öç7BBÒæWrFFRÆ7B²rÓr°¢Bç6WDÖöçFBævWDÖöçFÒR°¢7F'BÒBçFô4õ7G&ærç6Æ6RÂr°¢ÒVÇ6Rb&W6WBÓÓÒs&Òr°¢6öç7BBÒæWrFFRÆ7B²rÓr°¢Bç6WDÖöçFBævWDÖöçFÒ°¢7F'BÒBçFô4õ7G&ærç6Æ6RÂr°¢ÒVÇ6Rb&W6WBÓÓÒwFBr°¢7F'BÒÆ7Bç6Æ6RÂB²rÓs°¢ÒVÇ6R°¢7F'BÒÆÄFFW5³Ó°¢Ð ¢WFFT7FfTfÇFW$'WGFöâ&W6WB°¢WFFTfÇFW$F7Æ7F'BÂVæB°¢WFFTF6&ö&B7F'BÂVæB°§Ð ¦gVæ7FöâædÖöçFF"°¢'ÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢#&÷"Â'fÇVR#£CwÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢#CW&òÖçB"Â'fÇVR#£7ÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢$æWrFVçG26VVâ"Â'fÇVR#£WÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢%5%ÒÕDTåE2äõBVG2"Â'fÇVR#£gÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢##W&öF2WÒ"Â'fÇVR#£CwÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢#CÆÖFVBWÒ"Â'fÇVR#£#'ÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢#S6ö×WÒ"Â'fÇVR#£wÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢$dÕ"Â'fÇVR#£WÒÀ§²&FFR#¢###bÓ2"Â&FÖVç6öâ#¢%æ÷2"Â'fÇVR#£WÐ¥ÒÀ¢&Fö7F÷"#¥°§²&FFR#¢###RÓb"Â&æÖR#¢$G"â&Æ&V6"Â'&öGV7Föâ#£CcsrÂ&F2#£ÒÀ§²&FFR#¢###RÓ"Â&æÖR#¢$G"â&Æ&V6"Â'&öGV7Föâ#£33CÂ&F2#£#ÒÀ§²&FFR#¢###RÓ"Â&æÖR#¢$G"â&Æ&V6"Â'&öGV7Föâ#£#CCrÂ&F2#£7ÒÀ§²&FFR#¢###RÓ"Â&æÖR#¢$G"â&Æ&V6"Â'&öGV7Föâ#£3CÂ&F2#£WÒÀ§²&FFR#¢###RÓ""Â&æÖR#¢$G"â&Æ&V6"Â'&öGV7Föâ#£##ãsÂ&F2#£GÒÀ§²&FFR#¢###bÓ"Â&æÖR#¢$G"â&Æ&V6"Â'&öGV7Föâ#£##csbÂ&F2#£GÒÀ§²&FFR#¢###bÓ""Â&æÖR#¢$G"â&Æ&V6"Â'&öGV7Föâ#£sbÂ&F2#£GÒÀ§²&FFR#¢###bÓ2"Â&æÖR#¢$G"â&Æ&V6"Â'&öGV7Föâ#£#3#Â&F2#£'Ð¥ÒÀ¢&vVæ7B#¥°§²&FFR#¢###RÓb"Â&æÖR#¢$ÆæF"Â'&öGV7Föâ#£bÂ&F2#£ÒÀ§²&FFR#¢###RÓ"Â&æÖR#¢$ÆæF"Â'&öGV7Föâ#£CRÂ&F2#£wÒÀ§²&FFR#¢###RÓ"Â&æÖR#¢$ÆæF"Â'&öGV7Föâ#£C"Â&F2#£'ÒÀ§²&FFR#¢###RÓ"Â&æÖR#¢$ÆæF"Â'&öGV7Föâ#£CcBÂ&F2#£WÒÀ§²&FFR#¢###RÓ""Â&æÖR#¢$ÆæF"Â'&öGV7Föâ#£##RãRÂ&F2#£GÒÀ§²&FFR#¢###bÓ"Â&æÖR#¢$ÆæF"Â'&öGV7Föâ#£#cãÂ&F2#£gÒÀ§²&FFR#¢###bÓ""Â&æÖR#¢$ÆæF"Â'&öGV7Föâ#£3#"ãSbÂ&F2#£gÒÀ§²&FFR#¢###bÓ2"Â&æÖR#¢$ÆæF"Â'&öGV7Föâ#£s"ãCrÂ&F2#£GÐ¥×Ó° ¢ò¢)H)HUDÄEeTä5Dôå2)H)H¢ð¦6öç7BÖöçF2Ò²t¦ârÂtfV"rÂtÖ"rÂt"rÂtÖrÂt§VârÂt§VÂrÂtVrrÂu6WrÂtö7BrÂtæ÷brÂtFV2uÓ° ¦gVæ7Föâf×Bâ²&WGW&ârBr²ÖFç&÷VæBâçFôÆö6ÆU7G&ær²Ð¦gVæ7Föâf×Dââ²&WGW&âÖFç&÷VæBâçFôÆö6ÆU7G&ær²Ð ¦gVæ7Föâ6÷'FVDFFW2'"°¢&WGW&â²ââææWr6WB'"æÖ"Óâ"æFFRÒç6÷'B°§Ð ¦gVæ7Föâw&÷W'FFR'"°¢6öç7BrÒ·Ó°¢'"æf÷$V6"Óâ°¢bu·"æFFUÒu·"æFFUÒÒ·Ó°¢u·"æFFUÕ·"æFÖVç6öåÒÒu·"æFFUÕ·"æFÖVç6öåÒÇÂ²"çfÇVS°¢Ò°¢&WGW&âs°§Ð ¦7æ2gVæ7Föâ6#SbÖW76vR°¢6öç7B×6t'VffW"ÒæWrFWDVæ6öFW"æVæ6öFRÖW76vR°¢6öç7B6'VffW"ÒvB7'Fòç7V'FÆRæFvW7Bu4Ó#SbrÂ×6t'VffW"°¢6öç7B6'&Ò'&æg&öÒæWrVçC'&6'VffW"°¢&WGW&â6'&æÖ"Óâ"çFõ7G&ærbçE7F'B"Âsræ¦öârr°§Ð ¦7æ2gVæ7FöâæFÆTÆövâR°¢Rç&WfVçDFVfVÇB°¢6öç7BW6W"ÒFö7VÖVçBævWDVÆVÖVçD'BvÆövåW6W"rçfÇVRçFôÆ÷vW$66RçG&Ò°¢6öç7B72ÒFö7VÖVçBævWDVÆVÖVçD'BvÆövå72rçfÇVS°¢6öç7B6ÒvB6#Sb72°¢bU4U%5·W6W%ÒbbU4U%5·W6W%ÒÓÓÒ6°¢6W76öå7F÷&vRç6WDFVÒvFG5÷W6W"rÂW6W"°¢6÷tF6&ö&BW6W"°¢ÒVÇ6R°¢Fö7VÖVçBævWDVÆVÖVçD'BvÆöväW'&÷"rç7GÆRæF7ÆÒv&Æö6²s°¢Ð¢&WGW&âfÇ6S°§Ð ¦gVæ7FöâæFÆTÆöv÷WB°¢6W76öå7F÷&vRç&VÖ÷fTFVÒvFG5÷W6W"r°¢Fö7VÖVçBævWDVÆVÖVçD'BvÆövä÷fW&Æræ6Æ74Æ7Bç&VÖ÷fRvFFVâr°¢Fö7VÖVçBævWDVÆVÖVçD'BvF6&ö&Ew&ræ6Æ74Æ7Bç&VÖ÷fRwf6&ÆRr°§Ð ¦gVæ7Föâ6÷tF6&ö&BW6W"°¢Fö7VÖVçBævWDVÆVÖVçD'BvÆövä÷fW&Æræ6Æ74Æ7BæFBvFFVâr°¢Fö7VÖVçBævWDVÆVÖVçD'BvF6&ö&Ew&ræ6Æ74Æ7BæFBwf6&ÆRr°¢æDF6&ö&B°§Ð ¦gVæ7FöâWG&7DÆÄFFW2°¢&WGW&â6÷'FVDFFW2$rç&W7VÇG2°§Ð ¦gVæ7FöâfÇFW$FF'FFU&ævR7F'DFFRÂVæDFFR°¢6öç7BfÇFW$fâÒ"Óâ"æFFRãÒ7F'DFFRbb"æFFRÃÒVæDFFS°¢&WGW&â°¢&W7VÇG3¢$rç&W7VÇG2æfÇFW"fÇFW$fâÀ¢Fö7F÷#¢$ræFö7F÷"æfÇFW"fÇFW$fâÀ¢vVæ7C¢$rævVæ7BæfÇFW"fÇFW$fâ¢Ó°§Ð ¦ÆWB6'Dç7Fæ6W2Ò·Ó°¦gVæ7FöâFW7G&÷6'G2°¢ö&¦V7BçfÇVW26'Dç7Fæ6W2æf÷$V62Óâ²b22æFW7G&÷²Ò°¢6'Dç7Fæ6W2Ò·Ó°§Ð ¦ÆWB7W'&VçDfÇFW"ÒvÆÂs°¦ÆWB7W'&VçDÖöçFGÒÓ°¦ÆWBÆÄFFW2ÒµÓ° ¦gVæ7Föâ6WE&W6WDfÇFW"&W6WB°¢7W'&VçDfÇFW"Ò&W6WC°¢ÆÄFFW2ÒWG&7DÆÄFFW2°¢bÆÄFFW2æÆVæwFÓÓÒ&WGW&ã°¢6öç7BÆ7BÒÆÄFFW5¶ÆÄFFW2æÆVæwFÒÓ°¢ÆWB7F'BÂVæBÒÆ7C° ¢b&W6WBÓÓÒsÒr°¢7F'BÒÆ7C²VæBÒÆ7C°¢ÒVÇ6Rb&W6WBÓÓÒs6Òr°¢6öç7BBÒæWrFFRÆ7B²rÓr°¢Bç6WDÖöæBBævWDÖöçBÒ"°¢7F'BÒBçFô4õ7G&ærç6Æ6RÂr°¢ÒVÇ6Rb&W6WBÓÓÒsfÒr°¢6öç7BBÒæWrFFRÆ7B²rÓr°¢Bç6WDÖöçFBævWDÖöçFÒR°¢7F'BÒBçFô4õ7G&ærç6Æ6RÂr°¢ÒVÇ6Rb&W6WBÓÓÒs&Òr°¢6öç7BBÒæWrFFRÆ7B²rÓr°¢Bç6WDÖöçFBævWDÖöçFÒ°¢7F'BÒBçFô4õ7G&ærç6Æ6RÂr°¢ÒVÇ6Rb&W6WBÓÓÒwFBr°¢7F'BÒÆ7Bç6Æ6RÂB²rÓs°¢ÒVÇ6R°¢7F'BÒÆÄFFW5³Ó°¢Ð ¢WFFT7FfTfÇFW$'WGFöâ&W6WB°¢WFFTfÇFW$F7Æ7F'BÂVæB°¢WFFTF6&ö&B7F'BÂVæB°§Ð ¦gVæ7FöâædÖöçFF"°¢ÆÄFFW2ÒWG&7DÆÄFFW2°¢bÆÄFFW2æÆVæwFÓÓÒ&WGW&ã°¢b7W'&VçDÖöçFGÓÓÒÓ7W'&VçDÖöçFGÒÆÄFFW2æÆVæwFÒ°¢7W'&VçDÖöçFGÒÖFæÖÂÖFæÖâÆÄFFW2æÆVæwFÒÂ7W'&VçDÖöçFG²F"°¢6öç7BBÒÆÄFFW5¶7W'&VçDÖöçFGÓ°¢WFFT7FfTfÇFW$'WGFöâvæbr°¢WFFTfÇFW$F7ÆBÂB°¢WFFTF6&ö&BBÂB°§Ð ¦gVæ7FöâWFFT7FfTfÇFW$'WGFöâ&W6WB°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂræfÇFW"×&W6WBræf÷$V6'FâÓâ°¢'Fâç7GÆRæ&6¶w&÷VæBÒr3&cFs°¢'Fâç7GÆRæ6öÆ÷"Òr3s°¢Ò°¢b&W6WBÓÒvæbr°¢6öç7BÆ&VÇ2Ò²sÒs¢sÒrÂs6Òs¢s4ÒrÂsfÒs¢sdÒrÂs&Òs¢s$ÒrÂwFBs¢uDBrÂvÆÂs¢tÄÂwÓ°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂræfÇFW"×&W6WBræf÷$V6'FâÓâ°¢b'FâçFWD6öçFVçBÓÓÒÆ&VÇ5·&W6WEÒ°¢'Fâç7GÆRæ&6¶w&÷VæBÒr6Ss&s°¢'Fâç7GÆRæ6öÆ÷"Òr6ffbs°¢Ð¢Ò°¢Ð¢b&W6WBÓÒsÒrbb&W6WBÓÒvæbr7W'&VçDÖöçFGÒÓ°§Ð ¦gVæ7FöâWFFTfÇFW$F7Æ7F'BÂVæB°¢6öç7Bf÷&ÖDFFRÒBÓâ°¢6öç7B·ÂÕÒÒBç7ÆBrÒr°¢&WGW&âÖöçF5·'6TçBÒÒÒ²rr²°¢Ó°¢6öç7BFWCÒ7F'BÓÒVæBòf÷&ÖDFFR7F'B¢f÷&ÖDFFR7F'B²ràââ' + formatDate(end);
+        d.setMonth(d.getMonth() - 2);
+        start = d.toISOString().slice(0, 7);
+    } else if (preset === '6m') {
+        const d = new Date(last + '-01');
+        d.setMonth(d.getMonth() - 5);
+        start = d.toISOString().slice(0, 7);
+    } else if (preset === '12m') {
+        const d = new Date(last + '-01');
+        d.setMonth(d.getMonth() - 11);
+        start = d.toISOString().slice(0, 7);
+    } else if (preset === 'ytd') {
+        start = last.slice(0, 4) + '-01';
+    } else {
+        start = allDates[0];
+    }
+
+    updateActiveFilterButton(preset);
+    updateFilterDisplay(start, end);
+    updateDashboard(start, end);
+}
+
+function navMonth(dir) {
+    allDates = extractAllDates();
+    if (allDates.length === 0) return;
+    if (currentMonthIdx === -1) currentMonthIdx = allDates.length - 1;
+    currentMonthIdx = Math.max(0, Math.min(allDates.length - 1, currentMonthIdx + dir));
+    const d = allDates[currentMonthIdx];
+    updateActiveFilterButton('nav');
+    updateFilterDisplay(d, d);
+    updateDashboard(d, d);
+}
+
+function updateActiveFilterButton(preset) {
+    document.querySelectorAll('.filter-preset').forEach(btn => {
+        btn.style.background = '#1a2f4a';
+        btn.style.color = '#8899aa';
+    });
+    if (preset !== 'nav')+{
+        const labels = {'1m':'1M','3m':'3M','6m':'6M','12m':'12M','ytd':'YTD','all':'ALL'};
+        document.querySelectorAll('.filter-preset').forEach(btn => {
+            if (btn.textContent === labels[preset]) {
+                btn.style.background = '#e8872a';
+                btn.style.color = '#fff';
+            }
+        });
+    }
+    if (preset !== '1m' && preset !== 'nav') currentMonthIdx = -1;
+}
+
+function updateFilterDisplay(start, end) {
+    const formatDate = d => {
+        const [y, m] = d.split('-');
+        return months[parseInt(m) - 1] + ' ' + y;
+    };
+    const text = start === end ? formatDate(start) : formatDate(start) + ' câ ' + formatDate(end);
     document.getElementById('filterRangeText').textContent = text;
 }
 
 function updateDashboard(startDate, endDate) {
-    const filtered = filterDataByDateRange(startDate, endDate);
-    destroyCharts();
-    initCharts(filtered, startDate, endDate);
-}
-
-function initCharts(data, startDate, endDate) {
-    if (!data) data = { results: RAW.results, doctor: RAW.doctor, hygienist: RAW.hygienist };
-
-    const resultsByDate = groupByDate(data.results);
-    const allResultDates = sortedDates(data.results);
-    const isSingleMonth = allResultDates.length <= 1;
+    consd ffÇFW&VBÒfÇFW$FF'FFU&ævR7F'DFFRÂVæDFFR°¢FW7G&÷6'G2°¢æD6'G2fÇFW&VBÂ7F'DFFRÂVæDFFR°§Ð ¦gVæ7FöâæD6'G2FFÂ7F'DFFRÂVæDFFR°¢bFFFFÒ²&W7VÇG3¢$rç&W7VÇG2ÂFö7F÷#¢$ræFö7F÷"ÂvVæ7C¢$rævVæ7BÓ° ¢6öç7B&W7VÇG4'FFRÒw&÷W'FFRFFç&W7VÇG2°¢6öç7BÆÅ&W7VÇDFFW2Ò6÷'FVDFFW2FFç&W7VÇG2°¢6öç7B56ævÆTÖöçFÒÆÅ&W7VÇDFFW> length <= 1;
 
     // Previous month data for comparison
     let prevMonthData = null;
@@ -545,9 +481,9 @@ function initCharts(data, startDate, endDate) {
     function fmtChange(current, previous) {
         if (!previous || previous === 0) return '';
         const pctChange = ((current - previous) / previous * 100).toFixed(1);
-        const arrow = pctChange > 0 ? '\u25B2' : '\u25BC';
+        const arrow = pctChange > 0 ? '\u25B2' : '\u254#C';
         const color = pctChange > 0 ? '#6bc47f' : '#d94a7a';
-        return '<span style="font-size:12px;color:' + color + ';">' + arrow + ' ' + Math.abs(pctChange) + '% vs prior month</span>';
+        return '<span style="font-size:12px;color:' + color + ';">' + arrow + ' ' + Math.abs(pctChange) + '% vs priñ month</span>';
     }
 
     /* Year divider plugin */
@@ -563,7 +499,7 @@ function initCharts(data, startDate, endDate) {
                 const presYear = labels[i - 1].split(' ').pop();
                 const curYear = labels[i].split(' ').pop();
                 if (prevYear !== curYear) {
-                    const x = (xScale.getPixelForValue(i  - 1) + xScale.getPixelForValue(i)) / 2;
+                    const x = (xScale.getPixelForValue(i - 1) + xScale.getPixelForValue(i)) / 2;
                     ctx.save();
                     ctx.strokeStyle = '#e8872a';
                     ctx.lineWidth = 1.5;
@@ -602,7 +538,7 @@ function initCharts(data, startDate, endDate) {
                     ctx.textAlign = 'center';
                     if (chart.options.indexAxis === 'y') {
                         ctx.textAlign = 'left';
-                        ctx.fillText(isCurrency ? '$' + Math.round(val).toLocaleString() : label, bar.x + 6, bar.y + 4);
+                        ctx.fillText isCurrency ? '$' + Math.round(val).toLocaleString() : label, bar.x + 6, bar.y + 4);
                     } else {
                         ctx.fillText(label, bar.x, bar.y - 6);
                     }
@@ -614,33 +550,12 @@ function initCharts(data, startDate, endDate) {
 
     /* ââ KPI CARDS ââ */
     const numMonths = allResultDates.length || 1;
-    let totalProd= 0, totalColl = 0, totalDays = 0, totalPrepped = 0, totalNP = 0;
+    let totalProd=0, totalColl = 0, totalDays = 0, totalPrepped = 0, totalNP = 0;
     allResultDates.forEach(d => {
         totalProd += resultsByDate[d]['Production'] || 0;
         totalColl += resultsByDate[d]['Collections'] || 0;
         totalPrepped += resultsByDate[d]['Crowns PREPPED'] || 0;
-        totalNP += resultsByDate[d]['New Patients seen'] || 0;
-    });
-    data.doctor.forEach(r => { totalDays += r.days || 0; });
-
-    const avgProd = totalProd / numMonths;
-    const avgColl = totalColl / numMonths;
-    const avgDays = totalDays / numMonths;
-    const avgPrepped = totalPrepped / numMonths;
-    const avgNP = totalNP / numMonths;
-
-    const kpiProdEl = document.getElementById('kpi-prod');
-    const kpiCollEl = document.getElementById('kpi-coll');
-    const kpiDaysEl = document.getElementById('kpi-days');
-    const kpiPreppedEl = document.getElementById('kpi-crowns-prepped');
-    const kpiNPEl = document.getElementById('kpi-np');
-
-    if (isSingleMonth) {
-        document.getElementById('kpi-prod-label').textContent = 'Production';
-        document.getElementById('kpi-coll-label').textContent = 'Collections';
-        document.getElementById('kpi-days-label').textContent = 'Days Worked';
-        document.getElementById('kpi-crowns-prepped-label').textContent = 'Crowns Prepped';
-        document.getElementById('kpi-np-label').textContent = 'New Patients';
+        totalNP += resultsByDate[d]['New PatVçG26VVâuÒÇÂ°¢Ò°¢FFæFö7F÷"æf÷$V6"Óâ²F÷FÄF2³Ò"æF2ÇÂ²Ò° ¢6öç7Bfu&öCÒF÷FÅ&öBòçVÔÖöçF3°¢6öç7Bft6öÆÂÒF÷FÄ6öÆÂòçVÔÖöçF3°¢6öç7BftF2ÒF÷FÄF2òçVÔÖöçF3°¢6öç7Bfu&WVBÒF÷FÅ&WVBòçVÔÖöçF3°¢6öç7BftåÒF÷FÄåòçVÔÖöçF3° ¢6öç7B·&öDVÂÒFö7VÖVçBævWDVÆVÖVçD'Bv·×&öBr°¢6öç7B·6öÆÄVÂÒFö7VÖVçBævWDVÆVÖVçD'Bv·Ö6öÆÂr°¢6öç7B·F4VÂÒFö7VÖVçBævWDVÆVÖVçD'Bv·ÖF2r°¢6öç7B·&WVDVÂÒFö7VÖVçBævWDVÆVÖVçD'Bv·Ö7&÷vç2×&WVBr°¢6öç7B·åVÂÒFö7VÖVçBævWDVÆVÖVçD'Bv·Öçr° ¢b56ævÆTÖöçF°¢Fö7VÖVçBævWDVÆVÖVçD'Bv·×&öBÖÆ&VÂrçFWD6öçFVçBÒu&öGV7Föâs°¢Fö7VÖVçBævWDVÆVÖVçD'Bv·Ö6öÆÂÖÆ&VÂrçFWD6öçFVçBÒt6öÆÆV7Föç2s°¢Fö7VÖVçBævWDVÆVÖVçD'Bv·ÖF2ÖÆ&VÂrçFWD6öçFVçBÒtF2v÷&¶VBs°¢Fö7VÖVçBævWDVÆVÖVçD'Bv·Ö7&÷vç2×&WVBÖÆ&VÂrçFWD6öçFVçBÒt7&÷vç2&WVBs°¢Fö7VÖVçBævWDVÆVÖVçD'Bv·ÖçÖÆ&VÂrçFWD6öçFVçBÒtæWrIents';
         kpiProdEl.innerHTML = fmt(totalProd);
         kpiCollEl.innerHTML = fmt(totalColl);
         kpiDaysEl.innerHTML = Math.round(totalDays);
@@ -648,7 +563,7 @@ function initCharts(data, startDate, endDate) {
         kpiNPEl.innerHTML = Math.round(totalNP);
 
         if (prevMonthData) {
-            const prevResults = groupByDate(prevMonthData.results);
+            consd prevReslts = groupByDate(prevMonthData.results);
             const prevDate = sortedDates(prevMonthData.results)[0];
             if (prevDate && prevResults[prevDate]) {
                 kpiProdEl.innerHTML += '<br>' + fmtChange(totalProd, prevResults[prevDate]['Production'] || 0);
@@ -660,26 +575,7 @@ function initCharts(data, startDate, endDate) {
         document.getElementById('kpi-coll-label').textContent = 'Avg. Collection';
         document.getElementById('kpi-days-label').textContent = 'Avg. Days Worked';
         document.getElementById('kpi-crowns-prepped-label').textContent = 'Avg. Crowns Prepped';
-        document.getElementById('kpi-np-label').textContent = 'Avg. New Patients';
-        kpiProdEl.innerHTML = fmt(avgProd);
-        kpiCollEl.innerHTML = fmt(avgColl);
-        kpiDaysEl.innerHTML = avgDays.toFixed(1);
-        kpiPreppedEl.innerHTML = avgPrepped.toFixed(1);
-        kpiNPEl.innerHTML = avgNP.toFixed(1);
-    }
-
-    /* ââ CHART 1: REVENUE ââ */
-    if (isSingleMonth) {
-        const d = allResultDates[0] || sortedDates(RAW.results)[0];
-        const rd = resultsByDate[d] || {};
-        const avg12 = calcAvg12('Production');
-        const avg12C = calcAvg12('Collections');
-        chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
-            type: 'bar', data: { labels: ['Production', 'Collections', 'Future Scheduled'], datasets: [
-                { data: [rd['Production']||0, rd['Collections']||0, rd['Future Scheduled']||0], backgroundColor: ['#e8872a', '#4a90d9', '#6bc47f'], borderRadius: 6, barPercentage: 0.5 },
-                { type: 'line', label: '12-mo Avg Prod', data: [avg12, avg12, avg12], borderColor: '#e8872a', borderDash: [8,4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 },
-                { type: 'line', label: '12-mo Avg Coll', data: [avg12C, avg12C, avg12C], borderColor: '#4a90d9', borderDash: [8,4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 }
-            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        document.getElementById('kpi-np-label').textContent = 'Avg. New PatVçG2s°¢·&öDVÂæææW$DÔÂÒf×Bfu&öB°¢·6öÆÄVÂæææW$DÔÂÒf×Bft6öÆÂ°¢·F4VÂæææW$DÔÂÒ&tF2çFôfVB°¢·&WVDVÂæææW$DÔÂÒ&u&WVBçFôfVB°¢·åVÂæææW$DÔÂÒftåçFôfVB°¢Ð¢ò¢)H)H4%B¢$UdTåTR)H)H¢ð¢b56ævÆTÖöçF°¢6öç7BBÒÆÅ&W7VÇDFFW5³ÒÇÂ6÷'FVDFFW2$rç&W7VÇG2³Ó°¢6öç7B&BÒ&W7VÇG4'FFU¶EÒÇÂ·Ó°¢6öç7Bfs"Ò6Æ4fs"u&öGV7Föâr°¢6öç7Bfs$2Ò6Æ4fs"t6öÆÆV7Föç2r°¢6'Dç7Fæ6W5²v6'E&WfVçVRuÒÒæWr6'BFö7VÖVçBævWDVÆVÖVçD'Bv6'E&WfVçVRrÂ°¢GS¢v&"rÂFF¢²Æ&VÇ3¢²u&öGV7FöârÂt6öÆÆV7Föç2rÂtgWGW&R66VGVÆVBuÒÂFF6WG3¢°¢²FF¢·&E²u&öGV7Föâu×ÇÃÂ&E²t6öÆÆV7Föç2u×ÇÃÂ&E²tgWGW&R66VGVÆVBu×ÇÃÒÂ&6¶w&÷VæD6öÆ÷#¢²r6Ss&rÂr3FCrÂr3f&3CvbuÒÂ&÷&FW%&FW3¢bÂ&%W&6VçFvS¢ãRÒÀ¢²GS¢vÆæRrÂÆ&VÃ¢s"ÖÖòfr&öBrÂFF¢¶fs"Âfs"Âfs%ÒÂ&÷&FW$6öÆ÷#¢r6Ss&rÂ&÷&FW$F6¢³ÃEÒÂ&÷&FW%vGF¢"ÂöçE&FW3¢ÂfÆÃ¢fÇ6R÷&FW#¢ÒÀ¢²GS¢vÆæRrÂÆ&VÃ¢s"ÖÖòfr6öÆÂrÂFF¢¶fs$2Âfs$2Âfs$5ÒÂ&÷&FW$6öÆ÷#¢r3FCrÂ&÷&FW$F6¢³ÃEÒÂ&÷&FW%vGF¢"ÂöçE&FW3¢ÂfÆÃ¢fÇ6R÷&FW#¢Ð¢×ÒÂÇVvç3¢¶&$Æ&VÅÇVvåÒÂ÷Bns: { _isCurrency: true, responsive: true, maintainAspectRatio: false plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
         chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
@@ -690,7 +586,7 @@ function initCharts(data, startDate, endDate) {
                     { label: 'Future Scheduled', data: allResultDates.map(d => resultsByDate[d]['Future Scheduled']||0), borderColor: '#6bc47f', backgroundColor: 'rgba(107,196,127,0.1)', fill: true, tension: 0.3, pointRadius: 3 }
                 ]
             }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } } }
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false $callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } } }
         });
     }
 
@@ -703,7 +599,7 @@ function initCharts(data, startDate, endDate) {
         chartInstances['chartCrowns'] = new Chart(document.getElementById('chartCrowns'), {
             type: 'bar', data: { labels: ['From Last Mo','Prepped','Future Booked','Diagnosed'], datasets: [
                 { data: crownDims.map(dim => rd[dim]||0), backgroundColor: crownColors, borderRadius: 6, barPercentage: 0.5 }
-            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: {} }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false plugins: { legend: { display: false }, tooltip: {} }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
         chartInstances['chartCrowns'] = new Chart(document.getElementById('chartCrowns'), {
@@ -717,7 +613,7 @@ function initCharts(data, startDate, endDate) {
                     borderRadius: 3
                 }))
             }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
+            options: { responsive: true, maintainAspectRatio: false interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
         });
     }
 
@@ -727,8 +623,7 @@ function initCharts(data, startDate, endDate) {
     if (isSingleMonth) {
         chartInstances['chartMaster'] = new Chart(document.getElementById('chartMaster'), {
             type: 'doughnut', data: { labels: ['Dr. Bilbeisi', 'Linda (Hygienist)'], datasets: [{ data: [totalDocProd, totalHygProd], backgroundColor: ['#e8872a', '#4a90d9'], borderColor: '#0f1c2e', borderWidth: 3, hoverOffset: 8 }] },
-            options: { responsive: true, maintainAspectRatio: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } }
-        });
+            options: { responsive: true, maintainAspectRatio: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } });
     } else {
         const docByDate = {};
         data.doctor.forEach(r => { docByDate[r.date] = (docByDate[r.date] || 0) + r.production; });
@@ -738,10 +633,10 @@ function initCharts(data, startDate, endDate) {
             type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
                 datasets: [
                     { label: 'Dr. Bilbeisi', data: allResultDates.map(d => docByDate[d] || 0), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.1)', fill: true, tension: 0.3, pointRadius: 3 },
-                    { label: 'Linda', data: allResultDates.map(d => hygByDate[d] || 0), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.1)', fill: true, tension: 0.3, pointRadius: 3 }
+                    { label: 'Linda', data: allResultDates.map(d => hygByDate[d] || 0), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.15)', fill: true, tension: 0.3, pointRadius: 3 }
                 ]
             }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } } }
+            options: { responsive: true, maintainAspectRatio: false interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxeÅvidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false $callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } } }
         });
     }
 
@@ -751,13 +646,13 @@ function initCharts(data, startDate, endDate) {
         const hygForMonth = data.hygienist.filter(r => r.date === d);
         const hygNames = hygForMonth.map(r => r.name);
         const hygProds = hygForMonth.map(r => r.production);
-        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygPor'), {
+        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
             type: 'bar', data: { labels: hygNames.length ? hygNames : ['Linda'], datasets: [
                 { label: 'Production', data: hygProds.length ? hygProds : [0], backgroundColor: ['#4a90d9','#6bc47f'], borderRadius: 4 }
-            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspecTatia: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspectRatio: false plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
-        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygPor'), {
+        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
             type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
                 datasets: [{
                     label: 'Linda',
@@ -768,12 +663,12 @@ function initCharts(data, startDate, endDate) {
                     borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.15)', fill: true, tension: 0.3, pointRadius: 4
                 }]
             }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspecTatia: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } } }
+            options: { responsive: true, maintainAspectRatio: false interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false $callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } } }
         });
     }
 
     /* ââ CHART 5: EXAM TYPES ââ */
-    const examTypes = ['0150 Comp Exam', '0120 Periodic Exam', '0140 Limited Exam'];
+ const examTypes = ['0150 Comp Exam', '0120 Periodic Exam', '014@ Limited Exam'];
     const examLabels = ['Comp Exam', 'Periodic Exam', 'Limited Exam'];
     if (isSingleMonth) {
         const d = allResultDates[0];
@@ -781,26 +676,25 @@ function initCharts(data, startDate, endDate) {
         chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
             type: 'bar', data: { labels: examLabels, datasets: [
                 { label: 'Count', data: examTypes.map(t => rd[t] || 0), backgroundColor: ['#4a90d9', '#6bc47f', '#d94a7a'], borderRadius: 4 }
-            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspecTatia: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' exams' } } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' exams' } } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
         chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
             type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
                 datasets: examTypes.map((t, i) => ({
-                    label: examLabels[i],
+                     label: examLabels[i],
                     data: allResultDates.map(d => resultsByDate[d][t] || 0),
                     borderColor: ['#4a90d9', '#6bc47f', '#d94a7a'][i],
                     backgroundColor: ['rgba(74,144,217,0.1)', 'rgba(107,196,127,0.1)', 'rgba(217,74,122,0.1)'][i],
                     fill: true, tension: 0.3, pointRadius: 3
                 }))
             }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspecTatia: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
+            options: { responsive: true, maintainAspectRatio: false interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
         });
     }
 
     /* ââ CHART 6: HYGIENE & PERIO STATS ââ */
-    const hygStatDims = ['1110 Prophy','4910 Perio Maint','SRP--PATIENTS NOT Quads','New Patients seen'];
-    const hygStatLabels = ['Prophy','Perio Maint','SRP','New Patients'];
+    const hygStatdims = ['1110 Prophy','4910 Perio Maint','SRP--PATIENTS NOT Quads','New PatVçG26VVâuÓ°¢6öç7Bu7FDÆ&VÇ2Ò²u&÷rÂuW&òÖçBrÂu5%rÂtæWrIents'];
     const hygStatColors = ['#4a90d9','#e8872a','#6bc47f','#d94a7a'];
     if (isSingleMonth) {
         const d = allResultDates[0];
@@ -814,8 +708,8 @@ function initCharts(data, startDate, endDate) {
         chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
             type: 'bar', data: { labels: ['Dr. Bilbeisi $/Day', 'Linda $/Day'], datasets: [
                 { label: '$/Day', data: [docDollarPerDay, hygDollarPerDay], backgroundColor: ['#e8872a', '#4a90d9'], borderRadius: 4 }
-            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, layout: { padding: { right: 60 } }, indexAxis: 'y', responsive: true, maintainAspecTatia: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.x).toLocaleString() + '/day' } } }, scales: { x: { beginAtZero: true, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, y: { grid: { display: false } } } }
-        });
+            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, layout: { padding: { right: 60 } }, indexAxis: 'y', responsive: true, maintainAspectRatio: false plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.x).toLocaleString() + '/day' } } }, scales: { x: { beginAtZero: true, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, y: { grid: { display: false } } } }
+        });            
     } else {
         chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
             type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
@@ -824,10 +718,10 @@ function initCharts(data, startDate, endDate) {
                     data: allResultDates.map(d => resultsByDate[d][dim] || 0),
                     borderColor: hygStatColors[i],
                     backgroundColor: hygStatColors[i] + '1a',
-                    fill: false, tension: 0.3, pointRadius: 3
+                    fill: false  tension: 0.3, pointRadius: 3
                 }))
             }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspecTatia: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
+            options: { responsive: true, maintainAspectRatio: false interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
         });
     }
 
@@ -845,97 +739,4 @@ function calcAvg12(dimension) {
 }
 
 function renderReportTable(data, dates, resultsByDate) {
-    const dims = ['Production','Collections','Future Scheduled','New Patients seen','1110 Prophy','4910 Perio Maint','SRP--PATIENTS NOT Quads','0150 Comp Exam','0120 Periodic Exam','0140 Limited Exam','Panos','FMX','Crowns from LAST MONTH','Crowns PREPPED','Crowns FUTURE BOOKED','Crown diagnosed - NON Cosmetic'];
-    const table = document.getElementById('reportTable');
-    let html = '<thead><tr><th>Metric</th>';
-    dates.forEach(d => {
-        const [y, m] = d.split('-');
-        html += '<th>' + months[parseInt(m)-1] + ' ' + y.slice(2) + '</th>';
-    });
-    html += '</tr></thead><tbody>';
-    dims.forEach(dim => {
-        html += '<tr><td style="color:#8899aa;">' + dim + '</td>';
-        dates.forEach(d => {
-            const val = resultsByDate[d][dim] || 0;
-            const isCurr = dim === 'Production' || dim === 'Collections' || dim === 'Future Scheduled';
-            html += '<td>' + (isCurr ? fmt(val) : fmtN(val)) + '</td>';
-        });
-        html += '</tr>';
-    });
-
-    // Doctor row
-    html += '<tr><td style="color:#e8872a; font-weight:600;">Dr. Bilbeisi Prod</td>';
-    dates.forEach(d => {
-        const rec = data.doctor.find(r => r.date === d);
-        html += '<td>' + (rec ? fmt(rec.production) : '-') + '</td>';
-    });
-    html += '</tr>';
-
-    html += '<tr><td style="color:#e8872a;">Dr. Bilbeisi Days</td>';
-    dates.forEach(d => {
-        const rec = data.doctor.find(r => r.date === d);
-        html += '<td>' + (rec ? rec.days : '-') + '</td>';
-    });
-    html += '</tr>';
-
-    html += '<tr><td style="color:#4a90d9; font-weight:600;">Linda Prod</td>';
-    dates.forEach(d => {
-        const rec = data.hygienist.find(r => r.date === d && r.name === 'Linda');
-        html += '<td>' + (rec ? fmt(rec.production) : '-') + '</td>';
-    });
-    html += '</tr>';
-
-    html += '<tr><td style="color:#4a90d9;">Linda Days</td>';
-    dates.forEach(d => {
-        const rec = data.hygienist.find(r => r.date === d && r.name === 'Linda');
-        html += '<td>' + (rec ? rec.days : '-') + '</td>';
-    });
-    html += '</tr>';
-
-    html += '</tbody>';
-    table.innerHTML = html;
-}
-
-function switchTab(idx) {
-    document.querySelectorAll('.content').forEach((el, i) => {
-        el.classList.toggle('active', i === idx);
-    });
-    document.querySelectorAll('.tab').forEach((el, i) => {
-        el.classList.toggle('active', i === idx);
-    });
-}
-
-function expandChart(chartId) {
-    const overlay = document.getElementById('fullscreenOverlay');
-    overlay.classList.add('active');
-    const srcChart = chartInstances[chartId];
-    if (!srcChart) return;
-    const titleMap = { chartRevenue: 'Revenue Overview', chartCrowns: 'Crown Metrics', chartMaster: 'Doctor vs Hygienist Production', chartHygProd: 'Hygienist Production', chartNewPat: 'Exam Types', chartHygStats: 'Hygiene & Perio Stats' };
-    document.getElementById('fullscreenTitle').textContent = titleMap[chartId] || '';
-    const canvas = document.getElementById('fullscreenCanvas');
-    if (window._fsChart) window._fsChart.destroy();
-    const cfg = JSON.parse(JSON.stringify(srcChart.config));
-    cfg.data = JSON.parse(JSON.stringify(srcChart.config.data));
-    window._fsChart = new Chart(canvas, { type: cfg.type, data: cfg.data, options: { ...cfg.options, maintainAspecTatia: false } });
-}
-
-function closeFullscreen() {
-    document.getElementById('fullscreenOverlay').classList.remove('active');
-    if (window._fsChart) { window._fsChart.destroy(); window._fsChart = null; }
-}
-
-function initDashboard() {
-    allDates = extractAllDates();
-    setPresetFilter('all');
-}
-
-// Auto-login check
-window.addEventListener('DOMContentLoaded', () => {
-    const saved = sessionStorage.getItem('dds_user');
-    if (saved && USERS[saved]) {
-        showDashboard(saved);
-    }
-});
-</script>
-</body>
-</html>
+    const dims = ['Production','Collections','Future Scheduled','New PattVçG26VVârÂs&÷rÂsCW&òÖçBrÂu5%ÒÕDTåE2äõBVG2rÂsS6ö×WÒrÂs#W&öF2WÒrÂsDÆÖFVBWÒrÂuæ÷2rÂtdÕrÂt7&÷vç2g&öÒÄ5BÔôåDrÂt7&÷vç2$UTBrÂt7&÷vç2eUEU$R$ôô´TBrÂt7&÷vâFvæ÷6VBÒäôâ6÷6ÖWF2uÓ°¢6öç7BF&ÆRÒFö7VÖVçBævWDVÆVÖVçD'Bw&W÷'EF&ÆRr°¢ÆWBFÖÂÒsÇFVCãÇG#ãÇFäÖWG&3Â÷Fâs°¢FFW2æf÷$V6BÓâ°¢6öç7B·ÂÕÒÒBç7ÆBrÒr°¢FÖÂ³ÒsÇFâr²ÖöçF5·'6TçBÒÓÒ²rr²ç6Æ6R"²sÂ÷Fâs°¢Ò°¢FÖÂ³ÒsÂ÷G#ãÂ÷FVCãÇF&öGâs°¢F×2æf÷$V6FÒÓâ°¢FÖÂ³ÒsÇG#ãÇFB7GÆSÒ&6öÆ÷#¢3²#âr²FÒ²sÂ÷FCâs°¢FFW2æf÷$V6BÓâ°¢6öç7BfÂÒ&W7VÇG4'FFU¶EÕ¶FÕÒÇÂ°¢6öç7B47W'"ÒFÒÓÓÒu&öGV7FöârÇÂFÒÓÓÒt6öÆÆV7Föç2rÇÂFÒÓÓÒtgWGW&R66VGVÆVBs°¢FÖÂ³ÒsÇFCâr²47W'"òf×BfÂ¢f×DâfÂ²sÂ÷FCâs°¢Ò°¢FÖÂ³ÒsÂ÷G#âs°¢Ò° ¢òòFö7F÷"&÷p¢FÖÂ³ÒsÇG#ãÇFB7GÆSÒ&6öÆ÷#¢6Ss&²föçB×vVvC£c²#äG"â&Æ&V6&öCÂ÷FCâs°¢FFW2æf÷$V6BÓâ°¢6öç7B&V2ÒFFæFö7F÷"æfæB"Óâ"æFFRÓÓÒB°¢FÖÂ³ÒsÇFCâr²&V2òf×B&V2ç&öGV7Föâ¢rÒr²sÂ÷FCâs°¢Ò°¢FÖÂ³ÒsÂ÷G#âs° ¢FÖÂ³ÒsÇG#ãÇFB7GÆSÒ&6öÆ÷#¢6Ss&²#äG"â&Æ&V6F3Â÷FCâs°¢FFW2æf÷$V6BÓâ°¢6öç7B&V2ÒFFæFö7F÷"æfæB"Óâ"æFFRÓÓÒB°¢FÖÂ³ÒsÇFCâr²&V2ò&V2æF2¢rÒr²sÂ÷FCâs°¢Ò°¢FÖÂ³ÒsÂ÷G#âs° ¢FÖÂ³ÒsÇG#ãÇFB7GÆSÒ&6öÆ÷#¢3FC²föçB×vVvC£c²#äÆæF&öCÂ÷FCâs°¢FFW2æf÷$V6BÓâ°¢6öç7B&V2ÒFFævVæ7BæfæB"Óâ"æFFRÓÓÒBbb"ææÖRÓÓÒtÆæFr°¢FÖÂ³ÒsÇFCâr²&V2òf×B&V2ç&öGV7Föâ¢rÒr²sÂ÷FCâs°¢Ò°¢FÖÂ³ÒsÂ÷G#âs° ¢FÖÂ³ÒsÇG#ãÇFB7GÆSÒ&6öÆ÷#¢3FC²#äÆæFF3Â÷FCâs°¢FFW2æf÷$V6BÓâ°¢6öç7B&V2ÒFFævVæ7BæfæB"Óâ"æFFRÓÓÒBbb"ææÖRÓÓÒtÆæFr°¢FÖÂ³ÒsÇFCâr²&V2ò&V2æF2¢rÒr²sÂ÷FCâs°¢Ò°¢FÖÂ³ÒsÂ÷G#âs° ¢FÖÂ³ÒsÂ÷F&öGâs°¢F&ÆRæææW$DÔÂÒFÖÃ°§Ð ¦gVæ7Föâ7vF6F"G°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂræ6öçFVçBræf÷$V6VÂÂÓâ°¢VÂæ6Æ74Æ7BçFövvÆRv7FfRrÂÓÓÒG°¢Ò°¢Fö7VÖVçBçVW'6VÆV7F÷$ÆÂrçF"ræf÷$V6VÂÂÓâ°¢VÂæ6Æ74Æ7BçFövvÆRv7FfRrÂÓÓÒG°¢Ò°§Ð ¦gVæ7FöâWæD6'B6'DB°¢6öç7B÷fW&ÆÒFö7VÖVçBævWDVÆVÖVçD'BvgVÆÇ67&VVä÷fW&Ær°¢÷fW&Ææ6Æ74Æ7BæFBv7FfRr°¢6öç7B7&46'BÒ6'Dç7Fæ6W5¶6'DEÓ°¢b7&46'B&WGW&ã°¢6öç7BFFÆTÖÒ²6'E&WfVçVS¢u&WfVçVR÷fW'fWrrÂ6'D7&÷vç3¢t7&÷vâÖWG&72rÂ6'DÖ7FW#¢tFö7F÷"g2vVæ7B&öGV7FöârÂ6'Du&öC¢tvVæ7B&öGV7FöârÂ6'DæWuC¢tWÒGW2rÂ6'Du7FG3¢tvVæRbW&ò7FG2rÓ°¢Fö7VÖVçBævWDVÆVÖVçD'BvgVÆÇ67&VVåFFÆRrçFWD6öçFVçBÒFFÆTÖ¶6'DEÒÇÂrs°¢6öç7B6çf2ÒFö7VÖVçBævWDVÆVÖVçD'BvgVÆÇ67&VVä6çf2r°¢bvæF÷råög46'BvæF÷råög46'BæFW7G&÷°¢6öç7B6frÒ¥4ôâç'6R¥4ôâç7G&ævg7&46'Bæ6öæfr°¢6fræFFÒ¥4ôâç'6R¥4ôâç7G&ævg7&46'Bæ6öæfræFF°¢væF÷råög46'BÒæWr6'B6çf2Â²GS¢6frçGRÂFF¢6fræFFÂ÷Föç3¢²ââæ6fræ÷Föç2ÂÖçFä7V7E&Fó¢fÇ6RÒÒ°§Ð ¦gVæ7Föâ6Æ÷6TgVÆÇ67&VVâ°¢Fö7VÖVçBævWDVÆVÖVçD'BvgVÆÇ67&VVä÷fW&Æræ6Æ74Æ7Bç&VÖ÷fRv7FfRr°¢bvæF÷råög46'B²væF÷råög46'BæFW7G&÷²væF÷råög46'BÒçVÆÃ²Ð§Ð ¦gVæ7FöâæDF6&ö&B°¢ÆÄFFW2ÒWG&7DÆÄFFW2°¢6WE&W6WDfÇFW"vÆÂr°§Ð ¢òòWFòÖÆövâ6V6°§væF÷ræFDWfVçDÆ7FVæW"tDôÔ6öçFVçDÆöFVBrÂÓâ°¢6öç7B6fVBÒ6W76öå7F÷&vRævWDFVÒvFG5÷W6W"r°¢b6fVBbbU4U%5·6fVEÒ°¢6÷tF6&ö&B6fVB°¢Ð§Ò°£Â÷67&Cà£Âö&öGà£ÂöFÖÃà
