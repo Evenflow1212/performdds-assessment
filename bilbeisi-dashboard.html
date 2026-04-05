@@ -37,15 +37,19 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .logout-btn:hover { background: #3a5070; color: #fff; }
 
 /* KPI ROW */
-.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; padding: 20px 24px; }
+.kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 10px; padding: 10px 24px; }
 .kpi-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 10px; padding: 16px 18px; }
 .kpi-label { font-size: clamp(10px, 1vw, 12px); color: #8899aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px; }
 .kpi-value { font-size: clamp(18px, 2.5vw, 28px); font-weight: 700; color: #fff; }
 .kpi-value.orange { color: #e8872a; }
 .kpi-value.green { color: #6bc47f; }
 
-/* CHART GRID */
-.chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 0 24px 24px; }
+/* CHART BOX */
+.chart-box { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 8px 12px; position: relative; margin: 0 24px 10px; }
+.chart-box h3 { font-size: clamp(12px, 1.2vw, 15px); color: #fff; margin-bottom: 2px; }
+.chart-sub { font-size: clamp(10px, 0.9vw, 13px); color: #8899aa; margin-bottom: 4px; }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 24px 10px; }
+.chart-grid .chart-box { margin: 0; }
 .chart-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 10px; padding: 20px; position: relative; }
 .chart-card h3 { font-size: clamp(12px, 1.2vw, 15px); color: #8899aa; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
 .chart-wrap { position: relative; height: 300px; }
@@ -97,7 +101,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 <div class="login-overlay" id="loginOverlay">
 <div class="login-box">
     <div class="icon">&#x1f4ca;</div>
-    <h1>Dr. Bilbeisi (Cedar Creek)</h1>
+    <h1>Dr. Bilbeisi's Dashboard</h1>
     <div class="subtitle">Perform DDS &mdash; Practice Analytics</div>
     <div class="login-error" id="loginError">Invalid username or password.</div>
     <form onsubmit="return handleLogin(event)">
@@ -120,65 +124,67 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
     <div class="tabs">
         <div class="tab active" onclick="switchTab(0)">Overview</div>
         <div class="tab" onclick="switchTab(1)">Hygiene &amp; Exams</div>
-        <div class="tab" onclick="switchTab(2)">Data Table</div>
+        <div class="tab" onclick="switchTab(2)">Reporting Hub</div>
     </div>
     <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
 </div>
 
 <!-- FILTER BAR -->
 <div class="filter-bar" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-    <span style="font-size: 12px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px;">Filter:</span>
-    <button onclick="setPresetFilter('1m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">1M</button>
-    <button onclick="setPresetFilter('3m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">3M</button>
-    <button onclick="setPresetFilter('6m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">6M</button>
-    <button onclick="setPresetFilter('12m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">12M</button>
-    <button onclick="setPresetFilter('ytd')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">YTD</button>
-    <button onclick="setPresetFilter('all')" class="filter-preset active" style="background: #e8872a; color: #fff; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">ALL</button>
-    <button onclick="navMonth(-1)" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer; margin-left: 8px;">&#9664;</button>
-    <button onclick="navMonth(1)" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer;">&#9654;</button>
+    <div>
+        <span style="font-size: 11px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px;">From</span>
+        <select id="filterFrom" onchange="applyDropdownFilter()" style="background: #1a2f4a; color: #fff; border: 1px solid #2a3f5f; border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; margin-left: 4px;"></select>
+    </div>
+    <div style="width: 40px; height: 3px; background: #e8872a; border-radius: 2px; margin: 0 4px;"></div>
+    <div>
+        <span style="font-size: 11px; color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px;">To</span>
+        <select id="filterTo" onchange="applyDropdownFilter()" style="background: #1a2f4a; color: #fff; border: 1px solid #2a3f5f; border-radius: 8px; padding: 5px 10px; font-size: 12px; cursor: pointer; margin-left: 4px;"></select>
+    </div>
+    <div style="margin-left: 16px; display: flex; gap: 4px;">
+        <button onclick="setPresetFilter('3m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer;">3M</button>
+        <button onclick="setPresetFilter('6m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer;">6M</button>
+        <button onclick="setPresetFilter('12m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer;">12M</button>
+        <button onclick="setPresetFilter('ytd')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer;">YTD</button>
+        <button onclick="setPresetFilter('all')" class="filter-preset active" style="background: #e8872a; color: #fff; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer;">All</button>
+    </div>
+    <div style="display: flex; gap: 4px; margin-left: 8px;">
+        <button onclick="navMonth(-1)" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer;">&#9664;</button>
+        <button onclick="setPresetFilter('latest')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer;">Latest</button>
+        <button onclick="navMonth(1)" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer;">&#9654;</button>
+    </div>
     <div style="margin-left: auto; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.3px; white-space: nowrap;">Showing: <span id="filterRangeText" style="color: #e8872a;">All Data</span></div>
 </div>
 </div>
 
 <div class="content active" id="tab-0">
     <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label" id="kpi-prod-label">Avg. Production</div><div class="kpi-value" id="kpi-prod"></div></div>
-        <div class="kpi-card"><div class="kpi-label" id="kpi-coll-label">Avg. Collection</div><div class="kpi-value" id="kpi-coll"></div></div>
-        <div class="kpi-card"><div class="kpi-label" id="kpi-days-label">Avg. Days Worked</div><div class="kpi-value orange" id="kpi-days"></div></div>
-        <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-prepped-label">Avg. Crowns Prepped</div><div class="kpi-value green" id="kpi-crowns-prepped"></div></div>
-        <div class="kpi-card"><div class="kpi-label" id="kpi-np-label">Avg. New Patients</div><div class="kpi-value" id="kpi-np"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-prod-label">Avg. Production (Last 12 Months)</div><div class="kpi-value" id="kpi-prod"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-coll-label">Avg. Collection (Last 12 Months)</div><div class="kpi-value" id="kpi-coll"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-days-label">Avg. Days (Last 12 Months)</div><div class="kpi-value orange" id="kpi-days"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-prepped-label">Avg. Crowns Prepped (Last 12 Months)</div><div class="kpi-value green" id="kpi-crowns-prepped"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-added-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value" id="kpi-crowns-added"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-np-label">Avg. New Patients (Last 12 Months)</div><div class="kpi-value" id="kpi-np"></div></div>
+    </div>
+
+    <div class="chart-box">
+        <h3>Revenue</h3>
+        <div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div>
+        <button class="expand-btn" onclick="expandChart('chartRevenue')">&#x26F6;</button>
+        <div class="chart-wrap"><canvas id="chartRevenue"></canvas></div>
     </div>
 
     <div class="chart-grid">
-        <div class="chart-card">
-            <h3>Revenue Overview</h3>
-            <button class="expand-btn" onclick="expandChart('chartRevenue')">&#x26F6;</button>
-            <div class="chart-wrap"><canvas id="chartRevenue"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <h3>Crown Metrics</h3>
+        <div class="chart-box">
+            <h3>Crown Summary</h3>
+            <div class="chart-sub">Crown metrics by Month</div>
             <button class="expand-btn" onclick="expandChart('chartCrowns')">&#x26F6;</button>
             <div class="chart-wrap"><canvas id="chartCrowns"></canvas></div>
         </div>
-        <div class="chart-card">
-            <h3>Doctor vs Hygienist Production</h3>
+        <div class="chart-box">
+            <h3>Practice Production</h3>
+            <div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div>
             <button class="expand-btn" onclick="expandChart('chartMaster')">&#x26F6;</button>
             <div class="chart-wrap"><canvas id="chartMaster"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <h3>Hygienist Production &mdash; Linda</h3>
-            <button class="expand-btn" onclick="expandChart('chartHygProd')">&#x26F6;</button>
-            <div class="chart-wrap"><canvas id="chartHygProd"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <h3>Exam Types</h3>
-            <button class="expand-btn" onclick="expandChart('chartNewPat')">&#x26F6;</button>
-            <div class="chart-wrap"><canvas id="chartNewPat"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <h3>Hygiene &amp; Perio Stats</h3>
-            <button class="expand-btn" onclick="expandChart('chartHygStats')">&#x26F6;</button>
-            <div class="chart-wrap"><canvas id="chartHygStats"></canvas></div>
         </div>
     </div>
 </div>
@@ -384,7 +390,7 @@ const RAW = {"results":[
 {"date":"2026-03","name":"Linda","production":9972.47,"days":14}
 ]};
 
-/* ── UTILITY FUNCTIONS ── */
+/* ââ UTILITY FUNCTIONS ââ */
 const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function fmt(n) { return '$' + Math.round(n).toLocaleString(); }
@@ -482,6 +488,8 @@ function setPresetFilter(preset) {
         start = d.toISOString().slice(0, 7);
     } else if (preset === 'ytd') {
         start = last.slice(0, 4) + '-01';
+    } else if (preset === 'latest') {
+        start = last; end = last;
     } else {
         start = allDates[0];
     }
@@ -508,7 +516,7 @@ function updateActiveFilterButton(preset) {
         btn.style.color = '#8899aa';
     });
     if (preset !== 'nav') {
-        const labels = {'1m':'1M','3m':'3M','6m':'6M','12m':'12M','ytd':'YTD','all':'ALL'};
+        const labels = {'1m':'1M','3m':'3M','6m':'6M','12m':'12M','ytd':'YTD','all':'All','latest':'Latest'};
         document.querySelectorAll('.filter-preset').forEach(btn => {
             if (btn.textContent === labels[preset]) {
                 btn.style.background = '#e8872a';
@@ -524,8 +532,40 @@ function updateFilterDisplay(start, end) {
         const [y, m] = d.split('-');
         return months[parseInt(m) - 1] + ' ' + y;
     };
-    const text = start === end ? formatDate(start) : formatDate(start) + ' – ' + formatDate(end);
+    const text = start === end ? formatDate(start) : formatDate(start) + ' - ' + formatDate(end);
     document.getElementById('filterRangeText').textContent = text;
+    // Sync dropdowns
+    const fromSel = document.getElementById('filterFrom');
+    const toSel = document.getElementById('filterTo');
+    if (fromSel && toSel) {
+        fromSel.value = start;
+        toSel.value = end;
+    }
+}
+
+function populateDropdowns() {
+    allDates = extractAllDates();
+    const fromSel = document.getElementById('filterFrom');
+    const toSel = document.getElementById('filterTo');
+    if (!fromSel || !toSel) return;
+    fromSel.innerHTML = '';
+    toSel.innerHTML = '';
+    allDates.forEach(d => {
+        const [y, m] = d.split('-');
+        const label = months[parseInt(m) - 1] + ' ' + y;
+        fromSel.innerHTML += '<option value="' + d + '">' + label + '</option>';
+        toSel.innerHTML += '<option value="' + d + '">' + label + '</option>';
+    });
+    fromSel.value = allDates[0];
+    toSel.value = allDates[allDates.length - 1];
+}
+
+function applyDropdownFilter() {
+    const start = document.getElementById('filterFrom').value;
+    const end = document.getElementById('filterTo').value;
+    updateActiveFilterButton('nav');
+    updateFilterDisplay(start, end);
+    updateDashboard(start, end);
 }
 
 function updateDashboard(startDate, endDate) {
@@ -623,13 +663,14 @@ function initCharts(data, startDate, endDate) {
         }
     };
 
-    /* ── KPI CARDS ── */
+    /* ââ KPI CARDS ââ */
     const numMonths = allResultDates.length || 1;
-    let totalProd = 0, totalColl = 0, totalDays = 0, totalPrepped = 0, totalNP = 0;
+    let totalProd = 0, totalColl = 0, totalDays = 0, totalPrepped = 0, totalNP = 0, totalAdded = 0;
     allResultDates.forEach(d => {
         totalProd += resultsByDate[d]['Production'] || 0;
         totalColl += resultsByDate[d]['Collections'] || 0;
         totalPrepped += resultsByDate[d]['Crowns PREPPED'] || 0;
+        totalAdded += resultsByDate[d]['Crowns from LAST MONTH'] || 0;
         totalNP += resultsByDate[d]['New Patients seen'] || 0;
     });
     data.doctor.forEach(r => { totalDays += r.days || 0; });
@@ -638,12 +679,14 @@ function initCharts(data, startDate, endDate) {
     const avgColl = totalColl / numMonths;
     const avgDays = totalDays / numMonths;
     const avgPrepped = totalPrepped / numMonths;
+    const avgAdded = totalAdded / numMonths;
     const avgNP = totalNP / numMonths;
 
     const kpiProdEl = document.getElementById('kpi-prod');
     const kpiCollEl = document.getElementById('kpi-coll');
     const kpiDaysEl = document.getElementById('kpi-days');
     const kpiPreppedEl = document.getElementById('kpi-crowns-prepped');
+    const kpiAddedEl = document.getElementById('kpi-crowns-added');
     const kpiNPEl = document.getElementById('kpi-np');
 
     if (isSingleMonth) {
@@ -651,11 +694,13 @@ function initCharts(data, startDate, endDate) {
         document.getElementById('kpi-coll-label').textContent = 'Collections';
         document.getElementById('kpi-days-label').textContent = 'Days Worked';
         document.getElementById('kpi-crowns-prepped-label').textContent = 'Crowns Prepped';
+        document.getElementById('kpi-crowns-added-label').textContent = 'Crowns Added';
         document.getElementById('kpi-np-label').textContent = 'New Patients';
         kpiProdEl.innerHTML = fmt(totalProd);
         kpiCollEl.innerHTML = fmt(totalColl);
         kpiDaysEl.innerHTML = Math.round(totalDays);
         kpiPreppedEl.innerHTML = Math.round(totalPrepped);
+        kpiAddedEl.innerHTML = Math.round(totalAdded);
         kpiNPEl.innerHTML = Math.round(totalNP);
 
         if (prevMonthData) {
@@ -667,29 +712,29 @@ function initCharts(data, startDate, endDate) {
             }
         }
     } else {
-        document.getElementById('kpi-prod-label').textContent = 'Avg. Production';
-        document.getElementById('kpi-coll-label').textContent = 'Avg. Collection';
-        document.getElementById('kpi-days-label').textContent = 'Avg. Days Worked';
-        document.getElementById('kpi-crowns-prepped-label').textContent = 'Avg. Crowns Prepped';
-        document.getElementById('kpi-np-label').textContent = 'Avg. New Patients';
+        document.getElementById('kpi-prod-label').textContent = 'Avg. Production (Last 12 Months)';
+        document.getElementById('kpi-coll-label').textContent = 'Avg. Collection (Last 12 Months)';
+        document.getElementById('kpi-days-label').textContent = 'Avg. Days (Last 12 Months)';
+        document.getElementById('kpi-crowns-prepped-label').textContent = 'Avg. Crowns Prepped (Last 12 Months)';
+        document.getElementById('kpi-crowns-added-label').textContent = 'Avg. Crowns Added (Last 12 Months)';
+        document.getElementById('kpi-np-label').textContent = 'Avg. New Patients (Last 12 Months)';
         kpiProdEl.innerHTML = fmt(avgProd);
         kpiCollEl.innerHTML = fmt(avgColl);
         kpiDaysEl.innerHTML = avgDays.toFixed(1);
         kpiPreppedEl.innerHTML = avgPrepped.toFixed(1);
+        kpiAddedEl.innerHTML = avgAdded.toFixed(1);
         kpiNPEl.innerHTML = avgNP.toFixed(1);
     }
 
-    /* ── CHART 1: REVENUE ── */
+    /* ââ CHART 1: REVENUE ââ */
     if (isSingleMonth) {
         const d = allResultDates[0] || sortedDates(RAW.results)[0];
         const rd = resultsByDate[d] || {};
         const avg12 = calcAvg12('Production');
-        const avg12C = calcAvg12('Collections');
         chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
             type: 'bar', data: { labels: ['Production', 'Collections', 'Future Scheduled'], datasets: [
                 { data: [rd['Production']||0, rd['Collections']||0, rd['Future Scheduled']||0], backgroundColor: ['#e8872a', '#4a90d9', '#6bc47f'], borderRadius: 6, barPercentage: 0.5 },
-                { type: 'line', label: '12-mo Avg Prod', data: [avg12, avg12, avg12], borderColor: '#e8872a', borderDash: [8,4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 },
-                { type: 'line', label: '12-mo Avg Coll', data: [avg12C, avg12C, avg12C], borderColor: '#4a90d9', borderDash: [8,4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 }
+                { type: 'line', label: '12-mo Avg Prod', data: [avg12, avg12, avg12], borderColor: '#e8872a', borderDash: [8,4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 }
             ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
@@ -705,7 +750,7 @@ function initCharts(data, startDate, endDate) {
         });
     }
 
-    /* ── CHART 2: CROWNS ── */
+    /* ââ CHART 2: CROWNS ââ */
     const crownDims = ['Crowns from LAST MONTH','Crowns PREPPED','Crowns FUTURE BOOKED','Crown diagnosed - NON Cosmetic'];
     const crownColors = ['#4a90d9','#e8872a','#6bc47f','#d94a7a'];
     if (isSingleMonth) {
@@ -715,6 +760,10 @@ function initCharts(data, startDate, endDate) {
             type: 'bar', data: { labels: ['From Last Mo','Prepped','Future Booked','Diagnosed'], datasets: [
                 { data: crownDims.map(dim => rd[dim]||0), backgroundColor: crownColors, borderRadius: 6, barPercentage: 0.5 }
             ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: {} }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        chartInstances['chartCrowns'] = new Chart(document.getElementById('chartCrowns'), {
+            type: 'barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: {} }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
         chartInstances['chartCrowns'] = new Chart(document.getElementById('chartCrowns'), {
@@ -732,7 +781,7 @@ function initCharts(data, startDate, endDate) {
         });
     }
 
-    /* ── CHART 3: DOCTOR vs HYGIENIST (MASTER) ── */
+    /* ââ CHART 3: DOCTOR vs HYGIENIST (MASTER) ââ */
     const totalDocProd = data.doctor.reduce((s, r) => s + (r.production || 0), 0);
     const totalHygProd = data.hygienist.reduce((s, r) => s + (r.production || 0), 0);
     if (isSingleMonth) {
@@ -756,96 +805,10 @@ function initCharts(data, startDate, endDate) {
         });
     }
 
-    /* ── CHART 4: HYGIENIST PRODUCTION ── */
-    if (isSingleMonth) {
-        const d = allResultDates[0];
-        const hygForMonth = data.hygienist.filter(r => r.date === d);
-        const hygNames = hygForMonth.map(r => r.name);
-        const hygProds = hygForMonth.map(r => r.production);
-        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
-            type: 'bar', data: { labels: hygNames.length ? hygNames : ['Linda'], datasets: [
-                { label: 'Production', data: hygProds.length ? hygProds : [0], backgroundColor: ['#4a90d9','#6bc47f'], borderRadius: 4 }
-            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
-        });
-    } else {
-        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
-            type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
-                datasets: [{
-                    label: 'Linda',
-                    data: allResultDates.map(d => {
-                        const rec = data.hygienist.find(r => r.date === d && r.name === 'Linda');
-                        return rec ? rec.production : 0;
-                    }),
-                    borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.15)', fill: true, tension: 0.3, pointRadius: 4
-                }]
-            }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } } }
-        });
-    }
-
-    /* ── CHART 5: EXAM TYPES ── */
-    const examTypes = ['0150 Comp Exam', '0120 Periodic Exam', '0140 Limited Exam'];
-    const examLabels = ['Comp Exam', 'Periodic Exam', 'Limited Exam'];
-    if (isSingleMonth) {
-        const d = allResultDates[0];
-        const rd = resultsByDate[d] || {};
-        chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
-            type: 'bar', data: { labels: examLabels, datasets: [
-                { label: 'Count', data: examTypes.map(t => rd[t] || 0), backgroundColor: ['#4a90d9', '#6bc47f', '#d94a7a'], borderRadius: 4 }
-            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' exams' } } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
-        });
-    } else {
-        chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
-            type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
-                datasets: examTypes.map((t, i) => ({
-                    label: examLabels[i],
-                    data: allResultDates.map(d => resultsByDate[d][t] || 0),
-                    borderColor: ['#4a90d9', '#6bc47f', '#d94a7a'][i],
-                    backgroundColor: ['rgba(74,144,217,0.1)', 'rgba(107,196,127,0.1)', 'rgba(217,74,122,0.1)'][i],
-                    fill: true, tension: 0.3, pointRadius: 3
-                }))
-            }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
-        });
-    }
-
-    /* ── CHART 6: HYGIENE & PERIO STATS ── */
-    const hygStatDims = ['1110 Prophy','4910 Perio Maint','SRP--PATIENTS NOT Quads','New Patients seen'];
-    const hygStatLabels = ['Prophy','Perio Maint','SRP','New Patients'];
-    const hygStatColors = ['#4a90d9','#e8872a','#6bc47f','#d94a7a'];
-    if (isSingleMonth) {
-        const d = allResultDates[0];
-        const rd = resultsByDate[d] || {};
-        // Horizontal bar for single month - show Linda's $/day
-        const hygRec = data.hygienist.find(r => r.date === d && r.name === 'Linda');
-        const hygDollarPerDay = hygRec && hygRec.days > 0 ? Math.round(hygRec.production / hygRec.days) : 0;
-        const docRec = data.doctor.find(r => r.date === d);
-        const docDollarPerDay = docRec && docRec.days > 0 ? Math.round(docRec.production / docRec.days) : 0;
-
-        chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
-            type: 'bar', data: { labels: ['Dr. Bilbeisi $/Day', 'Linda $/Day'], datasets: [
-                { label: '$/Day', data: [docDollarPerDay, hygDollarPerDay], backgroundColor: ['#e8872a', '#4a90d9'], borderRadius: 4 }
-            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, layout: { padding: { right: 60 } }, indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.x).toLocaleString() + '/day' } } }, scales: { x: { beginAtZero: true, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, y: { grid: { display: false } } } }
-        });
-    } else {
-        chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
-            type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
-                datasets: hygStatDims.map((dim, i) => ({
-                    label: hygStatLabels[i],
-                    data: allResultDates.map(d => resultsByDate[d][dim] || 0),
-                    borderColor: hygStatColors[i],
-                    backgroundColor: hygStatColors[i] + '1a',
-                    fill: false, tension: 0.3, pointRadius: 3
-                }))
-            }, plugins: [yearDividerPlugin],
-            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
-        });
-    }
-
-    /* ── REPORT TABLE ── */
+    /* ââ REPORT TABLE ââ */
     renderReportTable(data, allResultDates, resultsByDate);
 
-    /* -- HYGIENE TAB KPIs -- */
+    /* ââ HYGIENE TAB KPIs ââ */
     const hygTotalProd = data.hygienist.reduce((s, r) => s + (r.production || 0), 0);
     const hygTotalDays = data.hygienist.reduce((s, r) => s + (r.days || 0), 0);
     const totalVisits = allResultDates.reduce((s, d) => s + (resultsByDate[d]['1110 Prophy']||0) + (resultsByDate[d]['4910 Perio Maint']||0), 0);
@@ -870,7 +833,7 @@ function initCharts(data, startDate, endDate) {
         document.getElementById('kpi-hygpd').innerHTML = hygTotalDays > 0 ? fmt(hygTotalProd / hygTotalDays) : '-';
     }
 
-    /* -- HYGIENE CHART 1: HYGIENIST PRODUCTION -- */
+    /* ââ HYGIENE CHART 1: HYGIENIST PRODUCTION ââ */
     if (isSingleMonth) {
         const d = allResultDates[0];
         const hygForMonth = data.hygienist.filter(r => r.date === d);
@@ -891,7 +854,7 @@ function initCharts(data, startDate, endDate) {
         });
     }
 
-    /* -- HYGIENE CHART 2: NEW PATIENTS & EXAMS -- */
+    /* ââ HYGIENE CHART 2: NEW PATIENTS & EXAMS ââ */
     const npExamDims = ['New Patients seen','0150 Comp Exam','0120 Periodic Exam','0140 Limited Exam'];
     const npExamLabels = ['New Patients','Comp Exam','Periodic Exam','Limited Exam'];
     const npExamColors = ['#e8872a','#4a90d9','#6bc47f','#d94a7a'];
@@ -914,7 +877,7 @@ function initCharts(data, startDate, endDate) {
         });
     }
 
-    /* -- HYGIENE CHART 3: $/DAY -- */
+    /* ââ HYGIENE CHART 3: $/DAY ââ */
     if (isSingleMonth) {
         const d = allResultDates[0];
         const hygRec2 = data.hygienist.find(r => r.date === d && r.name === 'Linda');
@@ -939,7 +902,7 @@ function initCharts(data, startDate, endDate) {
         });
     }
 
-    /* -- HYGIENE: VISITS & EXAMS BREAKDOWN (bars) -- */
+    /* ââ HYGIENE: VISITS & EXAMS BREAKDOWN (bars) ââ */
     const visitsDims = ['1110 Prophy','4910 Perio Maint','SRP--PATIENTS NOT Quads','New Patients seen','0150 Comp Exam','0120 Periodic Exam','0140 Limited Exam'];
     const visitsLabels = ['Prophy','Perio Maint','SRP','New Patients','Comp Exam','Periodic Exam','Limited Exam'];
     const visitsTotal = visitsDims.map(dim => allResultDates.reduce((s, d) => s + (resultsByDate[d][dim]||0), 0));
@@ -952,7 +915,7 @@ function initCharts(data, startDate, endDate) {
     });
     document.getElementById('visitsBreakdown').innerHTML = vHtml;
 
-    /* -- HYGIENE: IMAGING BREAKDOWN (bars) -- */
+    /* ââ HYGIENE: IMAGING BREAKDOWN (bars) ââ */
     const imgDims = ['FMX','Panos'];
     const imgLabels = ['FMX','Panos'];
     const imgTotal = imgDims.map(dim => allResultDates.reduce((s, d) => s + (resultsByDate[d][dim]||0), 0));
@@ -964,7 +927,6 @@ function initCharts(data, startDate, endDate) {
         iHtml += '<div class="spec-row"><span class="spec-label">' + label + '</span><div class="spec-bar-wrap"><div class="spec-bar" style="width:' + pct + '%"></div></div><span class="spec-val">' + (isSingleMonth ? Math.round(val) : val) + '</span></div>';
     });
     document.getElementById('imagingBreakdown').innerHTML = iHtml;
-
 }
 
 function calcAvg12(dimension) {
@@ -1035,6 +997,7 @@ function switchTab(idx) {
     document.querySelectorAll('.tab').forEach((el, i) => {
         el.classList.toggle('active', i === idx);
     });
+    // Resize charts when switching to Hygiene tab (hidden canvases need resize)
     if (idx === 1) {
         setTimeout(() => {
             ['chartHygProd2','chartNewPat2','chartHygPerDay'].forEach(id => {
@@ -1049,7 +1012,7 @@ function expandChart(chartId) {
     overlay.classList.add('active');
     const srcChart = chartInstances[chartId];
     if (!srcChart) return;
-    const titleMap = { chartRevenue: 'Revenue Overview', chartCrowns: 'Crown Metrics', chartMaster: 'Doctor vs Hygienist Production', chartHygProd: 'Hygienist Production', chartNewPat: 'Exam Types', chartHygStats: 'Hygiene & Perio Stats', chartHygProd2: 'Hygienist Production', chartNewPat2: 'New Patients & Exams', chartHygPerDay: 'Hygienist $/Day' };
+    const titleMap = { chartRevenue: 'Revenue', chartCrowns: 'Crown Summary', chartMaster: 'Practice Production', chartHygProd2: 'Hygienist Production', chartNewPat2: 'New Patients & Exams', chartHygPerDay: 'Hygienist $/Day' };
     document.getElementById('fullscreenTitle').textContent = titleMap[chartId] || '';
     const canvas = document.getElementById('fullscreenCanvas');
     if (window._fsChart) window._fsChart.destroy();
@@ -1065,6 +1028,7 @@ function closeFullscreen() {
 
 function initDashboard() {
     allDates = extractAllDates();
+    populateDropdowns();
     setPresetFilter('all');
 }
 
