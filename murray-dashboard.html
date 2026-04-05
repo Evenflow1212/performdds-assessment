@@ -782,7 +782,7 @@ function initCharts(data = null) {
         chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
             type: 'bar', data: { labels: hygNamesForMonth, datasets: [
                 { label: '$/Day', data: hygValuesForMonth, backgroundColor: hygStatColors.slice(0, hygNamesForMonth.length), borderRadius: 4 }
-            ]}, plugins: [barLabelPlugin], options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + Math.round(ctx.parsed.x).toLocaleString() + '/day'; } } } }, scales: { x: { beginAtZero: false, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, y: { grid: { display: false } } } }
+            ]}, plugins: [barLabelPlugin], options: { layout: { padding: { right: 60 } }, indexAxis: 'y', responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + Math.round(ctx.parsed.x).toLocaleString() + '/day'; } } } }, scales: { x: { beginAtZero: false, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, y: { grid: { display: false } } } }
         });
     } else {
         // Multi-month: show line chart
