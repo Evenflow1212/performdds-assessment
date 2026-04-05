@@ -661,11 +661,23 @@ function initCharts(data = null) {
     const hygStatNames = [...new Set(activeData.hygiene.map(r => r.name))];
     const hygStatColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a', '#9b59b6'];
     const hygStatPR = hygStatDates.length <= 3 ? 5 : 0;
+    const isSingleMonth = document.getElementById('filterFromMonth').value === document.getElementById('filterToMonth').value;
+    const barLabelPlugin = { id: 'barLabels', afterDatasetsDraw(chart) { const {ctx} = chart; chart.data.datasets.forEach((ds, di) => { if (ds.type === 'line' || ds.borderDash) return; chart.getDatasetMeta(di).data.forEach((bar, i) => { const v = ds.data[i]; if (v == null || v === 0) return; ctx.save(); ctx.fillStyle='#fff'; ctx.font='bold 12px Arial'; const cur = chart.config.options._isCurrency; const hz = chart.config.options.indexAxis==='y'; const lb = cur ? '$'+Math.round(v).toLocaleString() : Math.round(v).toLocaleString(); if (hz) { ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(lb, bar.x+6, bar.y); } else { ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText(lb, bar.x, bar.y-4); } ctx.restore(); }); }); } };
+    if (isSingleMonth) {
+      const singleDate = hygStatDates[hygStatDates.length - 1];
+      const perDayData = hygStatNames.map(name => (hygPdPerName[singleDate] && hygPdPerName[singleDate][name]) || 0);
+      chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
+        type: 'bar', data: { labels: hygStatNames, datasets: [{ data: perDayData, backgroundColor: hygStatNames.map((_, i) => hygStatColors[i % hygStatColors.length]), borderRadius: 6 }] },
+        plugins: [barLabelPlugin],
+        options: { indexAxis: 'y', _isCurrency: true, layout: { padding: { right: 60 } }, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { color: '#fff', font: { size: 13 } }, grid: { display: false } } } }
+      });
+    } else {
     chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
         type: 'line', data: { labels: hygStatDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
             datasets: hygStatNames.map((name, i) => ({ label: name, data: hygStatDates.map(d => (hygPdPerName[d] && hygPdPerName[d][name]) || null), borderColor: hygStatColors[i % hygStatColors.length], backgroundColor: hygStatColors[i % hygStatColors.length] + '15', borderWidth: 2.5, pointRadius: hygStatPR, pointHoverRadius: 6, tension: 0.35, fill: false, spanGaps: true }))
         }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  $' + Math.round(total).toLocaleString(); }, label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y ? Math.round(ctx.parsed.y).toLocaleString() : '-') + '/day'; } } } }, scales: { y: { beginAtZero: false, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } } } }
     });
+    }
 
     const hygNames = [...new Set(activeData.hygiene.map(r => r.name))];
     const hygByDate = {}; activeData.hygiene.forEach(r => { if (!hygByDate[r.date]) hygByDate[r.date] = {}; hygByDate[r.date][r.name] = r.production; });
