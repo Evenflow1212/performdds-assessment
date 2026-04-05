@@ -434,7 +434,7 @@ function initLogin() {
     const urlPractice = checkURLPractice();
 
     if (urlPractice) {
-        // Practice identified from URL â still need passcode
+        // Practice identified from URL -- still need passcode
         document.getElementById('practiceCode').value = urlPractice.code;
         document.getElementById('practiceCode').placeholder = 'Enter passcode for ' + urlPractice.name;
         document.querySelector('.login-box label').textContent = 'Passcode';
@@ -481,7 +481,7 @@ function doLogin() {
 function showForm() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('formContainer').classList.remove('hidden');
-    document.getElementById('formTitle').textContent = activePractice.name + ' â Month End Report';
+    document.getElementById('formTitle').textContent = activePractice.name + ' -- Month End Report';
 
     buildDoctors();
     buildSpecialties();
@@ -743,9 +743,9 @@ function handleSubmit() {
         <div><strong>${lastSubmitData.practice}</strong></div>
         <div>${lastSubmitData.month} ${lastSubmitData.year}</div>
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--divider);">
-            <div>Production: <strong>${prod ? '$' + prod.toLocaleString() : 'â'}</strong></div>
-            <div>Collections: <strong>${coll ? '$' + coll.toLocaleString() : 'â'}</strong></div>
-            <div>Dr. Days: <strong>${lastSubmitData.daysIn || 'â'}</strong></div>
+            <div>Production: <strong>${prod ? '$' + prod.toLocaleString() : '--'}</strong></div>
+            <div>Collections: <strong>${coll ? '$' + coll.toLocaleString() : '--'}</strong></div>
+            <div>Dr. Days: <strong>${lastSubmitData.daysIn || '--'}</strong></div>
             <div>Hygiene Total: <strong>${'$' + (lastSubmitData.hygiene.total || 0).toLocaleString()}</strong></div>
         </div>
     `;
@@ -773,17 +773,17 @@ function emailReport() {
     const d = lastSubmitData;
     const subject = encodeURIComponent(`${d.practice} - ${d.month} ${d.year} Month End Report`);
 
-    let body = `${d.practice} â ${d.month} ${d.year} Month End Report\n\n`;
-    body += `Total Dr. Days Worked This Month: ${d.daysIn || 'â'}\n\n`;
+    let body = `${d.practice} -- ${d.month} ${d.year} Month End Report\n\n`;
+    body += `Total Dr. Days Worked This Month: ${d.daysIn || '--'}\n\n`;
     body += `ââ CROWNS ââ\n`;
-    body += `From Last Month: ${d.crowns.lastMonth || 'â'}\n`;
-    body += `Prepped: ${d.crowns.prepped || 'â'} (${d.crowns.sameDay || 0} SD)\n`;
-    body += `Future Booked: ${d.crowns.futureBooked || 'â'}\n`;
-    body += `Diagnosed Non-Cosmetic: ${d.crowns.diagnosedNonCosmetic || 'â'}\n\n`;
+    body += `From Last Month: ${d.crowns.lastMonth || '--'}\n`;
+    body += `Prepped: ${d.crowns.prepped || '--'} (${d.crowns.sameDay || 0} SD)\n`;
+    body += `Future Booked: ${d.crowns.futureBooked || '--'}\n`;
+    body += `Diagnosed Non-Cosmetic: ${d.crowns.diagnosedNonCosmetic || '--'}\n\n`;
 
     body += `ââ DOCTOR PRODUCTION ââ\n`;
     d.doctors.forEach(dr => {
-        const avg = (dr.days && dr.production) ? Math.round(dr.production / dr.days) : 'â';
+        const avg = (dr.days && dr.production) ? Math.round(dr.production / dr.days) : '--';
         body += `${dr.name}: $${(dr.production||0).toLocaleString()} / ${dr.days||0} days (AVG: $${typeof avg === 'number' ? avg.toLocaleString() : avg})\n`;
     });
 
@@ -791,17 +791,17 @@ function emailReport() {
     Object.entries(d.specialties).forEach(([k,v]) => { body += `${k}: $${v.toLocaleString()}\n`; });
 
     body += `\nââ VISITS ââ\n`;
-    body += `Prophies: ${d.visits.prophies || 'â'}\n`;
-    body += `Perio Maint: ${d.visits.perioMaint || 'â'}\n`;
-    body += `SRP: ${d.visits.srp || 'â'}\n`;
-    body += `Arrestin: $${d.visits.arrestin || 'â'} | Laser: $${d.visits.laser || 'â'}\n`;
+    body += `Prophies: ${d.visits.prophies || '--'}\n`;
+    body += `Perio Maint: ${d.visits.perioMaint || '--'}\n`;
+    body += `SRP: ${d.visits.srp || '--'}\n`;
+    body += `Arrestin: $${d.visits.arrestin || '--'} | Laser: $${d.visits.laser || '--'}\n`;
 
     body += `\nââ HYGIENE ââ\n`;
     d.hygiene.hygienists.forEach(h => {
-        const avg = (h.days && h.production) ? Math.round(h.production / h.days) : 'â';
+        const avg = (h.days && h.production) ? Math.round(h.production / h.days) : '--';
         body += `${h.name}: $${(h.production||0).toLocaleString()} / ${h.days||0} days (AVG: $${typeof avg === 'number' ? avg.toLocaleString() : avg})\n`;
     });
-    body += `Empties: ${d.hygiene.empties || 'â'}\nTotal: $${d.hygiene.total.toLocaleString()}\n`;
+    body += `Empties: ${d.hygiene.empties || '--'}\nTotal: $${d.hygiene.total.toLocaleString()}\n`;
 
     body += `\nââ EXAMS ââ\n`;
 
