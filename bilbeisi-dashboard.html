@@ -104,7 +104,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <label>Username</label>
         <input type="text" id="loginUser" required autofocus>
         <label>Password</label>
-        <input type="text" id="loginPass" required>
+        <input type="password" id="loginPass" required>
         <button type="submit">Sign In</button>
     </form>
 </div>
@@ -118,8 +118,9 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <span id="headerDateRange" style="display:none;"></span>
     </div>
     <div class="tabs">
-        <div class="tab active" onclick="switchTab(0)">Dashboard</div>
-        <div class="tab" onclick="switchTab(1)">Data Table</div>
+        <div class="tab active" onclick="switchTab(0)">Overview</div>
+        <div class="tab" onclick="switchTab(1)">Hygiene &amp; Exams</div>
+        <div class="tab" onclick="switchTab(2)">Data Table</div>
     </div>
     <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
 </div>
@@ -183,6 +184,39 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 </div>
 
 <div class="content" id="tab-1">
+    <div class="kpi-row" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="kpi-card"><div class="kpi-label" id="kpi-newpat-label">Avg. New Patients / Month</div><div class="kpi-value" id="kpi-newpat"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-visits-label">Avg. Total Visits / Month</div><div class="kpi-value" id="kpi-visits"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-hygprod-label">Avg. Hygiene Production</div><div class="kpi-value orange" id="kpi-hygprod"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-hygpd-label">Avg. Hygiene Prod/Day</div><div class="kpi-value green" id="kpi-hygpd"></div></div>
+    </div>
+
+    <div class="chart-grid">
+        <div class="chart-card">
+            <h3>Hygienist Production</h3>
+            <button class="expand-btn" onclick="expandChart('chartHygProd2')">&#x26F6;</button>
+            <div class="chart-wrap"><canvas id="chartHygProd2"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <h3>New Patients &amp; Exams</h3>
+            <button class="expand-btn" onclick="expandChart('chartNewPat2')">&#x26F6;</button>
+            <div class="chart-wrap"><canvas id="chartNewPat2"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <h3>Hygienist $/Day</h3>
+            <button class="expand-btn" onclick="expandChart('chartHygPerDay')">&#x26F6;</button>
+            <div class="chart-wrap"><canvas id="chartHygPerDay"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <h3>Visits &amp; Exams Breakdown</h3>
+            <div class="specialty-grid" id="visitsBreakdown"></div>
+            <h3 style="margin-top:16px;">Imaging Breakdown</h3>
+            <div class="specialty-grid" id="imagingBreakdown"></div>
+        </div>
+    </div>
+</div>
+
+<div class="content" id="tab-2">
     <div style="padding: 20px 24px; overflow-x: auto;">
         <table class="report-table" id="reportTable"></table>
     </div>
@@ -810,6 +844,127 @@ function initCharts(data, startDate, endDate) {
 
     /* ── REPORT TABLE ── */
     renderReportTable(data, allResultDates, resultsByDate);
+
+    /* -- HYGIENE TAB KPIs -- */
+    const hygTotalProd = data.hygienist.reduce((s, r) => s + (r.production || 0), 0);
+    const hygTotalDays = data.hygienist.reduce((s, r) => s + (r.days || 0), 0);
+    const totalVisits = allResultDates.reduce((s, d) => s + (resultsByDate[d]['1110 Prophy']||0) + (resultsByDate[d]['4910 Perio Maint']||0), 0);
+
+    if (isSingleMonth) {
+        document.getElementById('kpi-newpat-label').textContent = 'New Patients';
+        document.getElementById('kpi-visits-label').textContent = 'Total Visits';
+        document.getElementById('kpi-hygprod-label').textContent = 'Hygiene Production';
+        document.getElementById('kpi-hygpd-label').textContent = 'Hygiene Prod/Day';
+        document.getElementById('kpi-newpat').innerHTML = Math.round(totalNP);
+        document.getElementById('kpi-visits').innerHTML = Math.round(totalVisits);
+        document.getElementById('kpi-hygprod').innerHTML = fmt(hygTotalProd);
+        document.getElementById('kpi-hygpd').innerHTML = hygTotalDays > 0 ? fmt(hygTotalProd / hygTotalDays) : '-';
+    } else {
+        document.getElementById('kpi-newpat-label').textContent = 'Avg. New Patients / Month';
+        document.getElementById('kpi-visits-label').textContent = 'Avg. Total Visits / Month';
+        document.getElementById('kpi-hygprod-label').textContent = 'Avg. Hygiene Production';
+        document.getElementById('kpi-hygpd-label').textContent = 'Avg. Hygiene Prod/Day';
+        document.getElementById('kpi-newpat').innerHTML = (totalNP / numMonths).toFixed(1);
+        document.getElementById('kpi-visits').innerHTML = (totalVisits / numMonths).toFixed(1);
+        document.getElementById('kpi-hygprod').innerHTML = fmt(hygTotalProd / numMonths);
+        document.getElementById('kpi-hygpd').innerHTML = hygTotalDays > 0 ? fmt(hygTotalProd / hygTotalDays) : '-';
+    }
+
+    /* -- HYGIENE CHART 1: HYGIENIST PRODUCTION -- */
+    if (isSingleMonth) {
+        const d = allResultDates[0];
+        const hygForMonth = data.hygienist.filter(r => r.date === d);
+        chartInstances['chartHygProd2'] = new Chart(document.getElementById('chartHygProd2'), {
+            type: 'bar', data: { labels: hygForMonth.map(r => r.name), datasets: [
+                { label: 'Production', data: hygForMonth.map(r => r.production), backgroundColor: ['#4a90d9','#6bc47f','#d94a7a'], borderRadius: 6, barPercentage: 0.5 }
+            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        chartInstances['chartHygProd2'] = new Chart(document.getElementById('chartHygProd2'), {
+            type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: [{
+                    label: 'Linda', data: allResultDates.map(d => { const rec = data.hygienist.find(r => r.date === d && r.name === 'Linda'); return rec ? rec.production : 0; }),
+                    borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.15)', fill: true, tension: 0.3, pointRadius: 4
+                }]
+            }, plugins: [yearDividerPlugin],
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } } }
+        });
+    }
+
+    /* -- HYGIENE CHART 2: NEW PATIENTS & EXAMS -- */
+    const npExamDims = ['New Patients seen','0150 Comp Exam','0120 Periodic Exam','0140 Limited Exam'];
+    const npExamLabels = ['New Patients','Comp Exam','Periodic Exam','Limited Exam'];
+    const npExamColors = ['#e8872a','#4a90d9','#6bc47f','#d94a7a'];
+    if (isSingleMonth) {
+        const d = allResultDates[0]; const rd = resultsByDate[d] || {};
+        chartInstances['chartNewPat2'] = new Chart(document.getElementById('chartNewPat2'), {
+            type: 'bar', data: { labels: npExamLabels, datasets: [
+                { data: npExamDims.map(dim => rd[dim]||0), backgroundColor: npExamColors, borderRadius: 6, barPercentage: 0.5 }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        chartInstances['chartNewPat2'] = new Chart(document.getElementById('chartNewPat2'), {
+            type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: npExamDims.map((dim, i) => ({
+                    label: npExamLabels[i], data: allResultDates.map(d => resultsByDate[d][dim]||0),
+                    borderColor: npExamColors[i], backgroundColor: npExamColors[i] + '1a', fill: false, tension: 0.3, pointRadius: 3
+                }))
+            }, plugins: [yearDividerPlugin],
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
+        });
+    }
+
+    /* -- HYGIENE CHART 3: $/DAY -- */
+    if (isSingleMonth) {
+        const d = allResultDates[0];
+        const hygRec2 = data.hygienist.find(r => r.date === d && r.name === 'Linda');
+        const hygDPD = hygRec2 && hygRec2.days > 0 ? Math.round(hygRec2.production / hygRec2.days) : 0;
+        chartInstances['chartHygPerDay'] = new Chart(document.getElementById('chartHygPerDay'), {
+            type: 'bar', data: { labels: ['Linda'], datasets: [
+                { label: '$/Day', data: [hygDPD], backgroundColor: ['#4a90d9'], borderRadius: 6, barPercentage: 0.4 }
+            ]}, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        chartInstances['chartHygPerDay'] = new Chart(document.getElementById('chartHygPerDay'), {
+            type: 'line', data: { labels: allResultDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: [{
+                    label: 'Linda $/Day', data: allResultDates.map(d => {
+                        const rec = data.hygienist.find(r => r.date === d && r.name === 'Linda');
+                        return rec && rec.days > 0 ? Math.round(rec.production / rec.days) : 0;
+                    }),
+                    borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.15)', fill: true, tension: 0.3, pointRadius: 4
+                }]
+            }, plugins: [yearDividerPlugin],
+            options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, font: { size: 10 } } }, y: { beginAtZero: true, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } } } }
+        });
+    }
+
+    /* -- HYGIENE: VISITS & EXAMS BREAKDOWN (bars) -- */
+    const visitsDims = ['1110 Prophy','4910 Perio Maint','SRP--PATIENTS NOT Quads','New Patients seen','0150 Comp Exam','0120 Periodic Exam','0140 Limited Exam'];
+    const visitsLabels = ['Prophy','Perio Maint','SRP','New Patients','Comp Exam','Periodic Exam','Limited Exam'];
+    const visitsTotal = visitsDims.map(dim => allResultDates.reduce((s, d) => s + (resultsByDate[d][dim]||0), 0));
+    const visitsMax = Math.max(...visitsTotal, 1);
+    let vHtml = '';
+    visitsLabels.forEach((label, i) => {
+        const val = isSingleMonth ? visitsTotal[i] : (visitsTotal[i] / numMonths).toFixed(1);
+        const pct = Math.round(visitsTotal[i] / visitsMax * 100);
+        vHtml += '<div class="spec-row"><span class="spec-label">' + label + '</span><div class="spec-bar-wrap"><div class="spec-bar" style="width:' + pct + '%"></div></div><span class="spec-val">' + (isSingleMonth ? Math.round(val) : val) + '</span></div>';
+    });
+    document.getElementById('visitsBreakdown').innerHTML = vHtml;
+
+    /* -- HYGIENE: IMAGING BREAKDOWN (bars) -- */
+    const imgDims = ['FMX','Panos'];
+    const imgLabels = ['FMX','Panos'];
+    const imgTotal = imgDims.map(dim => allResultDates.reduce((s, d) => s + (resultsByDate[d][dim]||0), 0));
+    const imgMax = Math.max(...imgTotal, 1);
+    let iHtml = '';
+    imgLabels.forEach((label, i) => {
+        const val = isSingleMonth ? imgTotal[i] : (imgTotal[i] / numMonths).toFixed(1);
+        const pct = Math.round(imgTotal[i] / imgMax * 100);
+        iHtml += '<div class="spec-row"><span class="spec-label">' + label + '</span><div class="spec-bar-wrap"><div class="spec-bar" style="width:' + pct + '%"></div></div><span class="spec-val">' + (isSingleMonth ? Math.round(val) : val) + '</span></div>';
+    });
+    document.getElementById('imagingBreakdown').innerHTML = iHtml;
+
 }
 
 function calcAvg12(dimension) {
@@ -880,6 +1035,13 @@ function switchTab(idx) {
     document.querySelectorAll('.tab').forEach((el, i) => {
         el.classList.toggle('active', i === idx);
     });
+    if (idx === 1) {
+        setTimeout(() => {
+            ['chartHygProd2','chartNewPat2','chartHygPerDay'].forEach(id => {
+                if (chartInstances[id]) chartInstances[id].resize();
+            });
+        }, 50);
+    }
 }
 
 function expandChart(chartId) {
@@ -887,7 +1049,7 @@ function expandChart(chartId) {
     overlay.classList.add('active');
     const srcChart = chartInstances[chartId];
     if (!srcChart) return;
-    const titleMap = { chartRevenue: 'Revenue Overview', chartCrowns: 'Crown Metrics', chartMaster: 'Doctor vs Hygienist Production', chartHygProd: 'Hygienist Production', chartNewPat: 'Exam Types', chartHygStats: 'Hygiene & Perio Stats' };
+    const titleMap = { chartRevenue: 'Revenue Overview', chartCrowns: 'Crown Metrics', chartMaster: 'Doctor vs Hygienist Production', chartHygProd: 'Hygienist Production', chartNewPat: 'Exam Types', chartHygStats: 'Hygiene & Perio Stats', chartHygProd2: 'Hygienist Production', chartNewPat2: 'New Patients & Exams', chartHygPerDay: 'Hygienist $/Day' };
     document.getElementById('fullscreenTitle').textContent = titleMap[chartId] || '';
     const canvas = document.getElementById('fullscreenCanvas');
     if (window._fsChart) window._fsChart.destroy();
