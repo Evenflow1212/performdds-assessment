@@ -850,6 +850,8 @@ function initCharts(data = null) {
 function switchTab(idx) {
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
     document.querySelectorAll('.content').forEach((c, i) => c.classList.toggle('active', i === idx));
+    // Resize charts after tab becomes visible so Chart.js can render
+    setTimeout(function() { Object.values(chartInstances).forEach(function(c) { if (c) c.resize(); }); }, 50);
 }
 
 function renderReportTable(data) {
