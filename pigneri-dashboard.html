@@ -463,14 +463,17 @@ function navMonth(direction) {
 }
 
 function updateActiveFilterButton(preset) {
-    document.querySelectorAll('.filter-preset').forEach(btn => btn.classList.remove('active'));
     const map = {'all':'All','3m':'3M','6m':'6M','12m':'12M','ytd':'YTD','latest':'Latest'};
     const label = map[preset];
-    if (label) {
-        document.querySelectorAll('.filter-preset').forEach(btn => {
-            if (btn.textContent.trim() === label) btn.classList.add('active');
-        });
-    }
+    document.querySelectorAll('.filter-preset').forEach(btn => {
+        if (btn.textContent.trim() === label) {
+            btn.style.background = '#e8872a';
+            btn.style.color = '#fff';
+        } else {
+            btn.style.background = '#1a2f4a';
+            btn.style.color = '#8899aa';
+        }
+    });
 }
 
 function updateDashboard(startDate, endDate) {
