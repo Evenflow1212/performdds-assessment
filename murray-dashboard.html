@@ -8,7 +8,6 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #fff; min-height: 100vh; }
-
 /* LOGIN STYLES */
 .login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #1a2332; z-index: 9999; display: flex; align-items: center; justify-content: center; }
 .login-overlay.hidden { display: none; }
@@ -37,19 +36,18 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 .tab { padding: 12px 20px; cursor: pointer; color: #8899aa; font-size: clamp(12px, 1.2vw, 16px); font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.2s; display: flex; align-items: center; }
 .tab:hover { color: #ccc; }
 .tab.active { color: #e8872a; border-bottom-color: #e8872a; }
-.content { padding: 10px 20px; display: none; }
+.content { padding: 20px 24px; display: none; }
 .content.active { display: block; }
-.kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 10px; }
+.kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 20px; }
 .kpi-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 8px 12px; }
 .kpi-label { font-size: clamp(10px, 1.1vw, 15px); color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; line-height: 1.3; }
 .kpi-value { font-size: clamp(18px, 2.2vw, 30px); font-weight: 700; color: #fff; line-height: 1.2; }
 .kpi-value.orange { color: #e8872a; }
-.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
 .chart-box { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 8px 12px; }
 .chart-box h3 { font-size: clamp(13px, 1.2vw, 17px); font-weight: 600; margin-bottom: 2px; color: #fff; }
 .chart-box .chart-sub { font-size: clamp(10px, 0.9vw, 13px); color: #8899aa; margin-bottom: 4px; }
 .chart-box canvas { width: 100% !important; }
-#chartMaster { width: auto !important; max-width: 100%; }
 .chart-grid-bottom { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; margin-bottom: 20px; }
 .report-table-wrap { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 20px; overflow-x: auto; }
 .report-table-wrap h3 { font-size: 16px; margin-bottom: 16px; }
@@ -170,7 +168,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         </div>
         <div style="display: flex; align-items: center; gap: 4px;">
             <button onclick="navMonth(-1)" title="Previous month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9664;</button>
-            <button onclick="navMonth(0)" title="Most recent month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">Latest</button>
+            <button onclick="navMonth(0)" title="Most recent month" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">Latest</button>
             <button onclick="navMonth(1)" title="Next month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9654;</button>
         </div>
         <div style="margin-left: auto; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.3px; white-space: nowrap;">Showing: <span id="filterRangeText" style="color: #e8872a;">All Data</span></div>
@@ -186,16 +184,12 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
         <div class="kpi-card"><div class="kpi-label" id="kpi-batavg-label">Avg. Batting Average (Last 12 Months)</div><div class="kpi-value orange" id="kpi-batavg"></div></div>
     </div>
-    <div style="margin-bottom: 20px;">
-        <div class="chart-box" style=""><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:180px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
-    </div>
-    <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
+    <div class="chart-box" style="margin-bottom:16px;display:flex;flex-direction:column;"><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:200px;max-height:200px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
+    <div class="chart-grid" style="grid-template-columns: 2fr 1fr; align-items: stretch;">
         <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="height:300px;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
-        <div class="chart-box" style=""><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="height:350px;display:flex;align-items:center;justify-content:center;"><canvas id="chartMaster"></canvas></div></div>
+        <div class="chart-box"><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="height:350px;position:relative;"><canvas id="chartMaster"></canvas></div></div>
     </div>
-    <div style="margin-bottom: 20px;">
-        <div class="chart-box"><h3>Specialty Overview</h3><div class="chart-sub">Total Production by Specialty</div><div id="specialtyList" class="specialty-grid"></div></div>
-    </div>
+    <div class="chart-box" style="margin-top:16px;"><h3>Specialty Overview</h3><div class="chart-sub">Total Production by Specialty</div><div id="specialtyList" class="specialty-grid"></div></div>
 </div>
 
 <div class="content" id="tab-1">
@@ -205,10 +199,10 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label" id="kpi-hygprod-label">Avg. Hygiene Production</div><div class="kpi-value" id="kpi-hygprod"></div></div>
         <div class="kpi-card"><div class="kpi-label" id="kpi-hygpd-label">Avg. Hygiene Prod/Day/Producer</div><div class="kpi-value orange" id="kpi-hygpd"></div></div>
     </div>
-    <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:160px;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
+    <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:240px;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
     <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
-        <div class="chart-box" style=""><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="height:150px;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
-        <div class="chart-box" style=""><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="height:150px;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
+        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="flex:1;min-height:0;height:140px;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
+        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="flex:1;min-height:0;height:140px;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
     </div>
     <div class="chart-grid-hyg" style="margin-top:20px;">
         <div class="chart-box">
@@ -413,7 +407,7 @@ function setPresetFilter(preset) {
     if (!allDates || allDates.length === 0) return;
 
     let startDate, endDate = allDates[allDates.length - 1];
-    const now = new Date(2025, 11, 31);
+    const now = new Date();
     const currentYear = now.getFullYear().toString();
 
     switch(preset) {
@@ -465,22 +459,21 @@ function navMonth(direction) {
     updateHeaderDateRange(currentFilterStart, currentFilterEnd);
     document.getElementById('filterRangeText').textContent = formatDateRange(currentFilterStart, currentFilterEnd);
     updateDashboard(currentFilterStart, currentFilterEnd);
-    updateActiveFilterButton(null);
+    updateActiveFilterButton(direction === 0 ? 'latest' : null);
 }
 
 function updateActiveFilterButton(preset) {
-    document.querySelectorAll('.filter-preset').forEach(btn => btn.classList.remove('active'));
-    if (preset === 'all') {
-        document.querySelectorAll('.filter-preset').forEach(btn => {
-            if (btn.textContent.includes('All Time')) btn.classList.add('active');
-        });
-    } else if (preset) {
-        document.querySelectorAll('.filter-preset').forEach(btn => {
-            if (btn.textContent.includes(preset === '3m' ? 'Last 3' : preset === '6m' ? 'Last 6' : preset === '12m' ? 'Last 12' : 'YTD')) {
-                btn.classList.add('active');
-            }
-        });
-    }
+    const map = {'all':'All','3m':'3M','6m':'6M','12m':'12M','ytd':'YTD','latest':'Latest'};
+    const label = map[preset];
+    document.querySelectorAll('.filter-preset').forEach(btn => {
+        if (btn.textContent.trim() === label) {
+            btn.style.background = '#e8872a';
+            btn.style.color = '#fff';
+        } else {
+            btn.style.background = '#1a2f4a';
+            btn.style.color = '#8899aa';
+        }
+    });
 }
 
 function updateDashboard(startDate, endDate) {
@@ -497,6 +490,32 @@ function initCharts(data = null) {
     Chart.defaults.font.family = 'Arial, sans-serif';
     Chart.defaults.font.size = 15;
     Chart.defaults.plugins.legend.labels.boxWidth = 12;
+
+    // Detect single-month view
+    const resultsByDate = groupByDate(activeData.results, 'dimension', 'value');
+    const allResultDates = Object.keys(resultsByDate).sort();
+    const isSingleMonth = allResultDates.length === 1;
+
+    // Get previous month data for comparison
+    let prevMonthData = null;
+    if (isSingleMonth) {
+        const currentDate = allResultDates[0];
+        const allRAWDates = sortedDates(RAW.results);
+        const currentIdx = allRAWDates.indexOf(currentDate);
+        if (currentIdx > 0) {
+            const prevDate = allRAWDates[currentIdx - 1];
+            prevMonthData = filterDataByDateRange(prevDate, prevDate);
+        }
+    }
+
+    // Helper function for month-over-month change display
+    function fmtChange(current, previous) {
+        if (!previous || previous === 0) return '';
+        const pctChange = ((current - previous) / previous * 100).toFixed(1);
+        const arrow = pctChange >= 0 ? 'â²' : 'â¼';
+        const color = pctChange >= 0 ? '#6bc47f' : '#d94a7a';
+        return `<span style="font-size:12px;color:${color};">${arrow} ${Math.abs(pctChange)}% vs prior month</span>`;
+    }
 
     const yearDividerPlugin = {
         id: 'yearDivider',
@@ -522,93 +541,94 @@ function initCharts(data = null) {
         }
     };
 
-    const resultsByDate = groupByDate(activeData.results, 'dimension', 'value');
-    const allResultDates = Object.keys(resultsByDate).sort();
-    const isSingleMonth = allResultDates.length === 1;
-    let prevMonthData = null;
-    if (isSingleMonth) {
-        const cd = allResultDates[0];
-        const allRAWDates = [...new Set(RAW.results.map(r=>r.date))].sort();
-        const ci = allRAWDates.indexOf(cd);
-        if (ci > 0) prevMonthData = filterDataByDateRange(allRAWDates[ci-1], allRAWDates[ci-1]);
-    }
-    function fmtChange(cur, prev) {
-        if (!prev || prev === 0) return '';
-        const p = ((cur - prev) / prev * 100).toFixed(1);
-        const a = p >= 0 ? '\u25B2' : '\u25BC';
-        const c = p >= 0 ? '#6bc47f' : '#d94a7a';
-        return '<div style="font-size:12px;color:'+c+';margin-top:4px;">'+a+' '+Math.abs(p)+'% vs prior mo</div>';
-    }
+    // Plugin for bar chart labels
     const barLabelPlugin = {
         id: 'barLabels',
         afterDatasetsDraw(chart) {
-            const {ctx} = chart;
-            chart.data.datasets.forEach((ds, di) => {
-                if (ds.type === 'line' || ds.borderDash) return;
-                chart.getDatasetMeta(di).data.forEach((bar, i) => {
-                    const v = ds.data[i]; if (v == null || v === 0) return;
-                    ctx.save(); ctx.fillStyle='#fff'; ctx.font='bold 12px Arial';
-                    const cur = chart.config.options._isCurrency;
-                    const hz = chart.config.options.indexAxis==='y';
-                    const lb = cur ? '$'+Math.round(v).toLocaleString() : Math.round(v).toLocaleString();
-                    if (hz) { ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(lb, bar.x+6, bar.y); }
-                    else { ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText(lb, bar.x, bar.y-4); }
+            const { ctx } = chart;
+            chart.data.datasets.forEach((dataset, di) => {
+                if (dataset.type === 'line' || dataset.borderDash) return;
+                const meta = chart.getDatasetMeta(di);
+                meta.data.forEach((bar, i) => {
+                    const value = dataset.data[i];
+                    if (value == null || value === 0) return;
+                    ctx.save();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    const label = '$' + Math.round(value).toLocaleString();
+                    ctx.fillText(label, bar.x, bar.y - 4);
                     ctx.restore();
                 });
             });
         }
     };
+
+    // Update KPI labels and values - Overview Tab
     const last12 = allResultDates.slice(-12);
-    const daysMap = {}; activeData.days.forEach(r => daysMap[r.date] = r.value);
-    const daysDates = sortedDates(activeData.days).slice(-12);
-    const crownsByDate = groupByDate(activeData.crowns, 'dimension', 'value');
-    const crownDates = Object.keys(crownsByDate).sort().slice(-12);
+
     if (isSingleMonth) {
-        const d = allResultDates[0];
-        const prod = resultsByDate[d]['Production']||0, coll = resultsByDate[d]['Collections']||0;
-        const days = daysMap[d]||0;
-        const cp = crownsByDate[d]?.['Crowns PREPPED']||0;
-        const cfb = crownsByDate[d]?.['Crowns FUTURE BOOKED']||0;
-        const cfl = crownsByDate[d]?.['Crowns from LAST MONTH']||0;
+        // Single month: show actual values with MoM comparison
+        const currentProd = resultsByDate[allResultDates[0]]['Production'] || 0;
+        const currentColl = resultsByDate[allResultDates[0]]['Collections'] || 0;
+
         document.getElementById('kpi-prod-label').textContent = 'PRODUCTION';
+        document.getElementById('kpi-prod').innerHTML = fmt$(currentProd) + '<br>' + fmtChange(currentProd, prevMonthData ? groupByDate(prevMonthData.results, 'dimension', 'value')[Object.keys(groupByDate(prevMonthData.results, 'dimension', 'value'))[0]]?.['Production'] || 0 : 0);
+
         document.getElementById('kpi-coll-label').textContent = 'COLLECTION';
-        document.getElementById('kpi-days-label').textContent = 'DAYS WORKED';
+        document.getElementById('kpi-coll').innerHTML = fmt$(currentColl) + '<br>' + fmtChange(currentColl, prevMonthData ? groupByDate(prevMonthData.results, 'dimension', 'value')[Object.keys(groupByDate(prevMonthData.results, 'dimension', 'value'))[0]]?.['Collections'] || 0 : 0);
+
+        const crownsByDate = groupByDate(activeData.crowns, 'dimension', 'value');
+        const currentCrownDates = Object.keys(crownsByDate).sort();
+        const currentDays = activeData.days.find(r => r.date === allResultDates[0])?.value || 0;
+        const currentCrownsPrepped = crownsByDate[allResultDates[0]]?.['Crowns PREPPED'] || 0;
+        const currentCrownsAdded = (crownsByDate[allResultDates[0]]?.['Crowns PREPPED'] || 0) + (crownsByDate[allResultDates[0]]?.['Crowns FUTURE BOOKED'] || 0) - (crownsByDate[allResultDates[0]]?.['Crowns from LAST MONTH'] || 0);
+
+        document.getElementById('kpi-days-label').textContent = 'DAYS';
+        document.getElementById('kpi-days').textContent = currentDays;
+
         document.getElementById('kpi-crowns-prepped-label').textContent = 'CROWNS PREPPED';
+        document.getElementById('kpi-crowns-prepped').textContent = Math.round(currentCrownsPrepped);
+
         document.getElementById('kpi-crowns-label').textContent = 'CROWNS ADDED';
-        let prevRes = prevMonthData ? groupByDate(prevMonthData.results,'dimension','value') : null;
-        let prevD = prevRes ? Object.keys(prevRes).sort()[0] : null;
-        document.getElementById('kpi-prod').innerHTML = fmt$(prod) + (prevD ? fmtChange(prod, prevRes[prevD]['Production']||0) : '');
-        document.getElementById('kpi-coll').innerHTML = fmt$(coll) + (prevD ? fmtChange(coll, prevRes[prevD]['Collections']||0) : '');
-        document.getElementById('kpi-days').innerHTML = days + (prevMonthData && prevMonthData.days[0] ? fmtChange(days, prevMonthData.days[0].value) : '');
-        document.getElementById('kpi-crowns-prepped').innerHTML = cp;
-        document.getElementById('kpi-crowns').innerHTML = (cp+cfb-cfl);
+        document.getElementById('kpi-crowns').textContent = Math.round(currentCrownsAdded);
 
         // Batting Average: total visits / crowns added
         const batVisits = activeData.visits.filter(r => r.date === allResultDates[0] && ['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)).reduce((s, r) => s + (r.count || 0), 0);
         const batPeriodic = activeData.exams.filter(r => r.date === allResultDates[0] && r.dimension === '0120 Periodic Exam').reduce((s, r) => s + (r.count || 0), 0);
         const batTotal = batVisits + batPeriodic;
-        const crownsAdded = (cp+cfb-cfl);
+        const crownsAdded = currentCrownsAdded;
         const batAvg = crownsAdded > 0 ? (batTotal / crownsAdded) : 0;
         document.getElementById('kpi-batavg-label').textContent = 'BATTING AVERAGE';
         document.getElementById('kpi-batavg').textContent = batAvg > 0 ? batAvg.toFixed(1) : String.fromCharCode(8212);
     } else {
+        // Multi-month: show 12-month averages
         document.getElementById('kpi-prod-label').textContent = 'Avg. Production (Last 12 Months)';
-        document.getElementById('kpi-coll-label').textContent = 'Avg. Collection (Last 12 Months)';
-        document.getElementById('kpi-days-label').textContent = 'Avg. Days (Last 12 Months)';
-        document.getElementById('kpi-crowns-prepped-label').textContent = 'Avg. Crowns Prepped (Last 12 Months)';
-        document.getElementById('kpi-crowns-label').textContent = 'Avg. Crowns Added (Last 12 Months)';
         document.getElementById('kpi-prod').textContent = fmt$(last12.reduce((s,d) => s + (resultsByDate[d]['Production'] || 0), 0) / last12.length);
+
+        document.getElementById('kpi-coll-label').textContent = 'Avg. Collection (Last 12 Months)';
         document.getElementById('kpi-coll').textContent = fmt$(last12.reduce((s,d) => s + (resultsByDate[d]['Collections'] || 0), 0) / last12.length);
+
+        const daysMap = {}; activeData.days.forEach(r => daysMap[r.date] = r.value);
+        const daysDates = sortedDates(activeData.days).slice(-12);
+        document.getElementById('kpi-days-label').textContent = 'Avg. Days (Last 12 Months)';
         document.getElementById('kpi-days').textContent = Math.round(daysDates.reduce((s,d) => s + (daysMap[d]||0), 0) / daysDates.length);
+
+        const crownsByDate = groupByDate(activeData.crowns, 'dimension', 'value');
+        const crownDates = Object.keys(crownsByDate).sort().slice(-12);
+        document.getElementById('kpi-crowns-prepped-label').textContent = 'Avg. Crowns Prepped (Last 12 Months)';
         document.getElementById('kpi-crowns-prepped').textContent = Math.round(crownDates.reduce((s,d) => s + (crownsByDate[d]['Crowns PREPPED'] || 0), 0) / crownDates.length);
+
+        document.getElementById('kpi-crowns-label').textContent = 'Avg. Crowns Added (Last 12 Months)';
         document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length);
 
-        // Batting Average: avg monthly visits / avg monthly crowns added
-        const avgCrownsAdded = crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length;
+        // Batting Average for multi-month
         const batVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)) batVisitsByDate[r.date] = (batVisitsByDate[r.date]||0) + (r.count||0); });
         const batExamsByDate = {}; activeData.exams.forEach(r => { if (r.dimension === '0120 Periodic Exam') batExamsByDate[r.date] = (batExamsByDate[r.date]||0) + (r.count||0); });
         const batDates = [...new Set([...Object.keys(batVisitsByDate), ...Object.keys(batExamsByDate)])].sort().slice(-12);
-        const avgBatVisits = batDates.length > 0 ? batDates.reduce((s,d) => s + (batVisitsByDate[d]||0) + (batExamsByDate[d]||0), 0) / batDates.length : 0;
+        const avgCrownsAdded = crownDates.length > 0 ? crownDates.reduce((s, d) => { const p = crownsByDate[d]['Crowns PREPPED']||0; const fb = crownsByDate[d]['FUTURE BOOKED']||0; const fl = crownsByDate[d]['Crowns from LAST MONTH']||0; return s + p + fb - fl; }, 0) / crownDates.length : 0;
+        const avgBatVisits = batDates.length > 0 ? batDates.reduce((s, d) => s + (batVisitsByDate[d]||0) + (batExamsByDate[d]||0), 0) / batDates.length : 0;
         const batAvgVal = avgCrownsAdded > 0 ? (avgBatVisits / avgCrownsAdded) : 0;
         document.getElementById('kpi-batavg-label').textContent = 'Avg. Batting Average (Last 12 Months)';
         document.getElementById('kpi-batavg').textContent = batAvgVal > 0 ? batAvgVal.toFixed(1) : String.fromCharCode(8212);
@@ -616,17 +636,28 @@ function initCharts(data = null) {
 
     const revDates = allResultDates;
     const revLabels = revDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); });
+    const revPR = revDates.length <= 3 ? 5 : 0;
+
     if (isSingleMonth) {
-        const d = revDates[0];
+        // Calculate 12-month averages
         const allRawDatesAvg = [...new Set(RAW.results.map(r=>r.date))].sort().slice(-12);
         const rawByDateAvg = {}; RAW.results.forEach(r => { if (!rawByDateAvg[r.date]) rawByDateAvg[r.date] = {}; rawByDateAvg[r.date][r.dimension] = r.value; });
         const avg12Prod = Math.round(allRawDatesAvg.reduce((s,d2) => s + (rawByDateAvg[d2]?.['Production'] || 0), 0) / allRawDatesAvg.length);
         const avg12Coll = Math.round(allRawDatesAvg.reduce((s,d2) => s + (rawByDateAvg[d2]?.['Collections'] || 0), 0) / allRawDatesAvg.length);
+        // Single month: show bar chart with 3 bars
         chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
-            type: 'bar', data: { labels: ['Production', 'Collections', 'Future Scheduled'], datasets: [{ data: [resultsByDate[d]['Production']||0, resultsByDate[d]['Collections']||0, resultsByDate[d]['Future Scheduled']||0], backgroundColor: ['#e8872a', '#4a90d9', '#6bc47f'], borderRadius: 6, barPercentage: 0.5 }, { type: 'line', label: '12-mo Avg Production', data: [avg12Prod, avg12Prod, avg12Prod], borderColor: '#e8872a', borderDash: [8, 4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 }, { type: 'line', label: '12-mo Avg Collections', data: [avg12Coll, avg12Coll, avg12Coll], borderColor: '#4a90d9', borderDash: [8, 4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 }] }, plugins: [barLabelPlugin], options: { _isCurrency: true, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + Math.round(ctx.parsed.y).toLocaleString() } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+            type: 'bar', data: { labels: ['Production', 'Collections', 'Future Scheduled'], datasets: [
+                { label: 'Values', data: [
+                    resultsByDate[revDates[0]]['Production'] || 0,
+                    resultsByDate[revDates[0]]['Collections'] || 0,
+                    resultsByDate[revDates[0]]['Future Scheduled'] || 0
+                ], backgroundColor: ['#e8872a', '#4a90d9', '#6bc47f'], borderRadius: 4 },
+                { type: 'line', label: '12-mo Avg Production', data: [avg12Prod, avg12Prod, avg12Prod], borderColor: '#e8872a', borderDash: [8, 4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 },
+                { type: 'line', label: '12-mo Avg Collections', data: [avg12Coll, avg12Coll, avg12Coll], borderColor: '#4a90d9', borderDash: [8, 4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, indexAxis: undefined, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + (ctx.parsed.y != null ? Math.round(ctx.parsed.y).toLocaleString() : '-'); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k', font: { size: 12 } }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
-        const revPR = revDates.length <= 3 ? 5 : 0;
+        // Multi-month: show line chart
         chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
             type: 'line', data: { labels: revLabels, datasets: [
                 { label: 'Production', data: revDates.map(d => resultsByDate[d]['Production']||null), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
@@ -642,12 +673,21 @@ function initCharts(data = null) {
     const docColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a'];
     const donutLabels = [];
     const donutData = [];
-    const donutColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a', '#9b59b6', '#f39c12', '#1abc9c', '#e74c3c', '#3498db', '#2ecc71'];
-    docNames.forEach(n => { const v = activeData.doctor.filter(r => r.name === n).reduce((s, r) => s + (r.production || 0), 0); if (v > 0) { donutLabels.push(n); donutData.push(v); } });
+    const donutColors = [];
+    const perioDocs = ['akers', 'trun', 'turin'];
+    let perioDocTotal = 0;
+    const otherDocProd = {};
+    docNames.forEach(n => { const v = activeData.doctor.filter(r => r.name === n).reduce((s, r) => s + (r.production || 0), 0); if (v > 0) { if (perioDocs.some(p => n.toLowerCase().replace(/[\\.\s]/g, '').includes(p))) { perioDocTotal += v; } else { otherDocProd[n] = v; } } });
     const hygTotal = activeData.hygiene.reduce((s, r) => s + (r.production || 0), 0);
-    if (hygTotal > 0) { donutLabels.push('Hygiene'); donutData.push(hygTotal); }
     const specByType = {}; activeData.specialty.forEach(r => { if (r.production > 0) specByType[r.dimension] = (specByType[r.dimension] || 0) + r.production; });
-    Object.entries(specByType).sort((a,b) => b[1]-a[1]).forEach(([k, v]) => { if (v > 0) { donutLabels.push(k); donutData.push(v); } });
+    perioDocTotal += (specByType['Perio'] || 0); delete specByType['Perio'];
+    const allCats = {}; Object.entries(otherDocProd).forEach(function(e) { allCats[e[0]] = e[1]; }); if (perioDocTotal > 0) allCats['Perio'] = perioDocTotal; if (hygTotal > 0) allCats['Hygiene'] = hygTotal; Object.entries(specByType).forEach(function(e) { if (e[1] > 0) allCats[e[0]] = e[1]; });
+    const orderMap = [['Dr. Murray','murray'],['Dr. Najem','najem'],['Hygiene','hygiene'],['Ortho Prod','orthoprod'],['Oral Surgery','oralsurgery'],['Endo','endo'],['Cosmetic','cosmetic']];
+    const colorMap = {'Dr. Murray':'#4a90d9','Dr. Najem':'#e74c3c','Hygiene':'#d94a7a','Ortho Prod':'#9b59b6','Oral Surgery':'#e8872a','Endo':'#1abc9c','Cosmetic':'#e74c8c'};
+    const extraColors = ['#f39c12','#6bc47f','#3498db','#2ecc71','#e67e22'];
+    const used = new Set(); let ei = 0;
+    orderMap.forEach(([display, match]) => { const key = Object.keys(allCats).find(k => k.toLowerCase().replace(/[.\s]/g,'').includes(match)); if (key && allCats[key] > 0) { donutLabels.push(display); donutData.push(allCats[key]); donutColors.push(colorMap[display] || extraColors[ei++]); used.add(key); } });
+    Object.entries(allCats).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => { if (!used.has(k) && v > 0) { donutLabels.push(k); donutData.push(v); donutColors.push(extraColors[ei++ % extraColors.length]); } });
     const donutLabelPlugin = {
         id: 'donutLabels',
         afterDatasetsDraw(chart) {
@@ -659,7 +699,6 @@ function initCharts(data = null) {
             meta.data.forEach((arc, i) => {
                 const pct = Math.round(dataset.data[i] / total * 100);
                 if (pct < 3) return;
-                const cp = arc.getCenterPoint();
                 const { startAngle, endAngle, innerRadius, outerRadius } = arc.getProps(['startAngle', 'endAngle', 'innerRadius', 'outerRadius']);
                 const midAngle = (startAngle + endAngle) / 2;
                 const midRadius = (innerRadius + outerRadius) / 2;
@@ -676,67 +715,86 @@ function initCharts(data = null) {
         }
     };
     chartInstances['chartMaster'] = new Chart(document.getElementById('chartMaster'), {
-        type: 'doughnut', data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors.slice(0, donutLabels.length), borderColor: '#0f1c2e', borderWidth: 3, hoverOffset: 8 }] },
+        type: 'doughnut', data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderColor: '#0f1c2e', borderWidth: 3, hoverOffset: 8 }] },
         plugins: [donutLabelPlugin],
-        options: { responsive: true, maintainAspectRatio: true, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } }
+        options: { responsive: true, maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } }
     });
 
+    const crownsByDateAll = groupByDate(activeData.crowns, 'dimension', 'value');
     const crownDims = ['Crowns from LAST MONTH', 'Crowns PREPPED', 'Crowns FUTURE BOOKED'];
-    const crownAllDates = Object.keys(crownsByDate).sort();
+    const crownAllDates = Object.keys(crownsByDateAll).sort();
     const crownColors = ['#4a90d9','#e8872a','#6bc47f','#9b59b6'];
     const crownAddedData = crownAllDates.map(d => {
-        const prepped = crownsByDate[d]['Crowns PREPPED'] || 0;
-        const futureBooked = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0;
-        const fromLast = crownsByDate[d]['Crowns from LAST MONTH'] || 0;
+        const prepped = crownsByDateAll[d]['Crowns PREPPED'] || 0;
+        const futureBooked = crownsByDateAll[d]['Crowns FUTURE BOOKED'] || 0;
+        const fromLast = crownsByDateAll[d]['Crowns from LAST MONTH'] || 0;
         return prepped + futureBooked - fromLast;
     });
-    const crownDatasets = crownDims.map((dim, i) => ({ label: dim.replace('Crown diagnosed - NON Cosmetic','Diagnosed Non-Cosmetic').replace('Crowns from LAST MONTH','From Last Month').replace('Crowns FUTURE BOOKED','Future Booked').replace('Crowns PREPPED','Prepped'), data: crownAllDates.map(d => crownsByDate[d][dim] || 0), backgroundColor: crownColors[i], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }));
+    const crownDatasets = crownDims.map((dim, i) => ({ label: dim.replace('Crown diagnosed - NON Cosmetic','Diagnosed Non-Cosmetic').replace('Crowns from LAST MONTH','From Last Month').replace('Crowns FUTURE BOOKED','Future Booked').replace('Crowns PREPPED','Prepped'), data: crownAllDates.map(d => crownsByDateAll[d][dim] || 0), backgroundColor: crownColors[i], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }));
     crownDatasets.push({ label: 'Crowns Added', data: crownAddedData, backgroundColor: crownColors[3], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 });
     chartInstances['chartCrowns'] = new Chart(document.getElementById('chartCrowns'), {
         type: 'bar', data: { labels: crownAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
             datasets: crownDatasets
         }, plugins: [yearDividerPlugin],
-        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12, font: { size: 10 } }}, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45 } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
     });
 
     const specTotals = {}; activeData.specialty.forEach(r => { specTotals[r.dimension] = (specTotals[r.dimension]||0) + (r.production||0); });
     const specSorted = Object.entries(specTotals).sort((a,b) => b[1]-a[1]);
-    const totalDocProd = activeData.doctor.reduce((s,r)=>s+(r.production||0),0); const totalHygProd = activeData.hygiene.reduce((s,r)=>s+(r.production||0),0); const totalSpecProd = Object.values(specTotals).reduce((s,v)=>s+v,0); const maxSpec = Math.max(totalDocProd + totalHygProd + totalSpecProd, 1);
+    // Calculate total practice production for scaling
+    const totalDocProd = activeData.doctor.reduce((s, r) => s + (r.production || 0), 0);
+    const totalHygProd = activeData.hygiene.reduce((s, r) => s + (r.production || 0), 0);
+    const totalSpecProd = Object.values(specTotals).reduce((a, b) => a + b, 0);
+    const maxSpec = totalDocProd + totalHygProd + totalSpecProd;
     document.getElementById('specialtyList').innerHTML = specSorted.map(([name, val]) => '<div class="spec-row"><span class="spec-label">'+name+'</span><div class="spec-bar-wrap"><div class="spec-bar" style="width:'+Math.round(val/maxSpec*100)+'%"></div></div><span class="spec-val">'+fmt$(val)+'</span></div>').join('');
 
     const newPatByDate = {}; activeData.visits.forEach(r => { if (r.dimension === 'New Patients seen') newPatByDate[r.date] = r.count; });
     const npDates = Object.keys(newPatByDate).sort();
+
     const totalVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)) totalVisitsByDate[r.date] = (totalVisitsByDate[r.date]||0) + (r.count||0); });
     const tvDates = Object.keys(totalVisitsByDate).sort();
+
     const hygProdByDate = {}; activeData.hygiene.forEach(r => { hygProdByDate[r.date] = (hygProdByDate[r.date]||0) + (r.production||0); });
     const hpDates = Object.keys(hygProdByDate).sort();
     const last12hp = hpDates.slice(-12);
+
     const hygPdByDate = {}; activeData.hygiene.forEach(r => { if (!hygPdByDate[r.date]) hygPdByDate[r.date] = []; if (r.days > 0 && r.production > 0) hygPdByDate[r.date].push(r.production / r.days); });
     const hdDates = Object.keys(hygPdByDate).sort().slice(-12);
 
+    // Update Hygiene Tab KPIs
     if (isSingleMonth) {
-        const d = npDates[0] || tvDates[0] || hpDates[0];
+        // Single month: show actual values with MoM comparison
+        const currentNP = newPatByDate[allResultDates[0]] || 0;
+        const currentVisits = totalVisitsByDate[allResultDates[0]] || 0;
+        const currentHygProd = hygProdByDate[allResultDates[0]] || 0;
+        const currentHygPd = (hygPdByDate[allResultDates[0]] || []).length > 0 ? (hygPdByDate[allResultDates[0]].reduce((a,b)=>a+b,0) / hygPdByDate[allResultDates[0]].length) : 0;
+
         document.getElementById('kpi-newpat-label').textContent = 'NEW PATIENTS';
+        document.getElementById('kpi-newpat').innerHTML = Math.round(currentNP) + '<br>' + fmtChange(currentNP, prevMonthData ? (prevMonthData.visits.find(r => r.dimension === 'New Patients seen')?.count || 0) : 0);
+
         document.getElementById('kpi-visits-label').textContent = 'TOTAL VISITS';
+        const prevVisits = prevMonthData ? prevMonthData.visits.filter(r => ['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)).reduce((s, r) => s + (r.count || 0), 0) : 0;
+        document.getElementById('kpi-visits').innerHTML = Math.round(currentVisits) + '<br>' + fmtChange(currentVisits, prevVisits);
+
         document.getElementById('kpi-hygprod-label').textContent = 'HYGIENE PRODUCTION';
-        document.getElementById('kpi-hygpd-label').textContent = 'HYG PROD/DAY/PRODUCER';
-        const npVal = newPatByDate[d]||0;
-        const tvVal = totalVisitsByDate[d]||0;
-        const hpVal = hygProdByDate[d]||0;
-        const hdRates = hygPdByDate[d]||[];
-        const hpdVal = hdRates.length > 0 ? hdRates.reduce((a,b)=>a+b,0)/hdRates.length : 0;
-        document.getElementById('kpi-newpat').innerHTML = npVal + (prevMonthData ? fmtChange(npVal, Object.values(groupByDate(prevMonthData.visits,'dimension','count')).map(v=>v['New Patients seen']||0)[0]||0) : '');
-        document.getElementById('kpi-visits').innerHTML = tvVal;
-        document.getElementById('kpi-hygprod').innerHTML = fmt$(hpVal) + (prevMonthData ? fmtChange(hpVal, prevMonthData.hygiene.reduce((s,r)=>s+(r.production||0),0)) : '');
-        document.getElementById('kpi-hygpd').innerHTML = fmt$(hpdVal);
+        const prevHygProd = prevMonthData ? prevMonthData.hygiene.reduce((s, r) => s + (r.production || 0), 0) : 0;
+        document.getElementById('kpi-hygprod').innerHTML = fmt$(currentHygProd) + '<br>' + fmtChange(currentHygProd, prevHygProd);
+
+        document.getElementById('kpi-hygpd-label').textContent = 'PROD/DAY/PRODUCER';
+        const prevHygPd = prevMonthData ? (prevMonthData.hygiene.length > 0 ? prevMonthData.hygiene.filter(r => r.days > 0 && r.production > 0).reduce((s, r) => s + (r.production / r.days), 0) / Math.max(1, prevMonthData.hygiene.filter(r => r.days > 0 && r.production > 0).length) : 0) : 0;
+        document.getElementById('kpi-hygpd').innerHTML = fmt$(currentHygPd) + '<br>' + fmtChange(currentHygPd, prevHygPd);
     } else {
+        // Multi-month: show averages
         document.getElementById('kpi-newpat-label').textContent = 'Avg. New Patients / Month';
-        document.getElementById('kpi-visits-label').textContent = 'Avg. Total Visits / Month';
-        document.getElementById('kpi-hygprod-label').textContent = 'Avg. Hygiene Production';
-        document.getElementById('kpi-hygpd-label').textContent = 'Avg. Hygiene Prod/Day/Producer';
         document.getElementById('kpi-newpat').textContent = Math.round(npDates.reduce((s,d) => s + (newPatByDate[d]||0), 0) / npDates.length);
+
+        document.getElementById('kpi-visits-label').textContent = 'Avg. Total Visits / Month';
         document.getElementById('kpi-visits').textContent = Math.round(tvDates.reduce((s,d) => s + totalVisitsByDate[d], 0) / tvDates.length);
+
+        document.getElementById('kpi-hygprod-label').textContent = 'Avg. Hygiene Production';
         document.getElementById('kpi-hygprod').textContent = fmt$(last12hp.reduce((s,d) => s + hygProdByDate[d], 0) / last12hp.length);
+
+        document.getElementById('kpi-hygpd-label').textContent = 'Avg. Hygiene Prod/Day/Producer';
         document.getElementById('kpi-hygpd').textContent = fmt$(hdDates.reduce((s,d) => { const rates = hygPdByDate[d]; return s + (rates.length > 0 ? rates.reduce((a,b)=>a+b,0) / rates.length : 0); }, 0) / hdDates.length);
     }
 
@@ -793,7 +851,9 @@ function initCharts(data = null) {
         });
     }
 
-    const hygNames = [...new Set(activeData.hygiene.map(r => r.name))];
+    const hygNamesAll = [...new Set(activeData.hygiene.map(r => r.name))];
+    const hygTotalProd = {}; activeData.hygiene.forEach(r => { hygTotalProd[r.name] = (hygTotalProd[r.name] || 0) + (r.production || 0); });
+    const hygNames = hygNamesAll.filter(n => hygTotalProd[n] > 0);
     const hygByDate = {}; activeData.hygiene.forEach(r => { if (!hygByDate[r.date]) hygByDate[r.date] = {}; hygByDate[r.date][r.name] = r.production; });
     const hygAllDates = Object.keys(hygByDate).sort();
     const hygProdColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a', '#9b59b6'];
@@ -816,14 +876,14 @@ function initCharts(data = null) {
         chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
             type: 'bar', data: { labels: hygNamesForMonth, datasets: [
                 { label: 'Production', data: hygProdValuesForMonth, backgroundColor: hygProdColors.slice(0, hygNamesForMonth.length), borderRadius: 4 }
-            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + Math.round(ctx.parsed.y).toLocaleString(); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { const total = ctx.chart.data.datasets[0].data.reduce((s,v) => s + v, 0); const pct = total > 0 ? (ctx.parsed.y / total * 100).toFixed(1) : '0.0'; return '$' + Math.round(ctx.parsed.y).toLocaleString() + '  (' + pct + '%)'; } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
         });
     } else {
         // Multi-month: show stacked area line chart
         chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
             type: 'line', data: { labels: hygAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
                 datasets: hygNames.map((name, i) => ({ label: name, data: hygAllDates.map(d => hygByDate[d][name] || 0), borderColor: hygAreaColors[i % hygAreaColors.length].border, backgroundColor: hygAreaColors[i % hygAreaColors.length].bg, borderWidth: 2, pointRadius: hygProdPR, pointHoverRadius: 5, tension: 0.35, fill: true }))
-            }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, filter: function(item) { return item.parsed.y > 0; }, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  Total: $' + Math.round(total).toLocaleString(); }, label: function(ctx) { return ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString(); } } } } }
+            }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, filter: function(item) { return item.parsed.y > 0; }, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  Total: $' + Math.round(total).toLocaleString(); }, label: function(ctx) { const total = ctx.chart.data.datasets.reduce((s, ds) => s + (ds.data[ctx.dataIndex] || 0), 0); const pct = total > 0 ? (ctx.parsed.y / total * 100).toFixed(1) : '0.0'; return ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() + '  (' + pct + '%)'; } } } } }
         });
     }
 
@@ -850,9 +910,16 @@ function initCharts(data = null) {
 function switchTab(idx) {
     document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
     document.querySelectorAll('.content').forEach((c, i) => c.classList.toggle('active', i === idx));
+    location.hash = 'tab' + idx;
     // Resize charts after tab becomes visible so Chart.js can render
     setTimeout(function() { Object.values(chartInstances).forEach(function(c) { if (c) c.resize(); }); }, 50);
 }
+
+// Restore active tab from URL hash on refresh
+window.addEventListener('DOMContentLoaded', () => {
+    const h = location.hash.match(/^#tab(\d+)$/);
+    if (h) switchTab(parseInt(h[1]));
+});
 
 function renderReportTable(data) {
     const resultMap = {}; data.results.forEach(r => { resultMap[r.date+'|'+r.dimension] = r.value; });
