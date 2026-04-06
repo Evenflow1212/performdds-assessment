@@ -595,8 +595,8 @@ function initCharts(data = null) {
         document.getElementById('kpi-crowns').textContent = Math.round(currentCrownsAdded);
 
         // Batting Average: total visits / crowns added
-        const batVisits = activeData.visits.filter(r => r.date === allResultDates[0] && ['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)).reduce((s, r) => s + (r.count || 0), 0);
-        const batPeriodic = activeData.exams.filter(r => r.date === allResultDates[0] && r.dimension === '0120 Periodic Exam').reduce((s, r) => s + (r.count || 0), 0);
+        const batVisits = activeData.visits.filter(r => r.date === allResultDates[0] && ['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)).reduce((s, r) => s + (r.value || 0), 0);
+        const batPeriodic = activeData.exams.filter(r => r.date === allResultDates[0] && r.dimension === '0120 Periodic Exam').reduce((s, r) => s + (r.value || 0), 0);
         const batTotal = batVisits + batPeriodic;
         const crownsAdded = currentCrownsAdded;
         const batAvg = crownsAdded > 0 ? (batTotal / crownsAdded) : 0;
@@ -624,8 +624,8 @@ function initCharts(data = null) {
         document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length);
 
         // Batting Average for multi-month
-        const batVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)) batVisitsByDate[r.date] = (batVisitsByDate[r.date]||0) + (r.count||0); });
-        const batExamsByDate = {}; activeData.exams.forEach(r => { if (r.dimension === '0120 Periodic Exam') batExamsByDate[r.date] = (batExamsByDate[r.date]||0) + (r.count||0); });
+        const batVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)) batVisitsByDate[r.date] = (batVisitsByDate[r.date]||0) + (r.value||0); });
+        const batExamsByDate = {}; activeData.exams.forEach(r => { if (r.dimension === '0120 Periodic Exam') batExamsByDate[r.date] = (batExamsByDate[r.date]||0) + (r.value||0); });
         const batDates = [...new Set([...Object.keys(batVisitsByDate), ...Object.keys(batExamsByDate)])].sort().slice(-12);
         const avgCrownsAdded = crownDates.length > 0 ? crownDates.reduce((s, d) => { const p = crownsByDate[d]['Crowns PREPPED']||0; const fb = crownsByDate[d]['FUTURE BOOKED']||0; const fl = crownsByDate[d]['Crowns from LAST MONTH']||0; return s + p + fb - fl; }, 0) / crownDates.length : 0;
         const avgBatVisits = batDates.length > 0 ? batDates.reduce((s, d) => s + (batVisitsByDate[d]||0) + (batExamsByDate[d]||0), 0) / batDates.length : 0;
@@ -748,10 +748,10 @@ function initCharts(data = null) {
     const maxSpec = totalDocProd + totalHygProd + totalSpecProd;
     document.getElementById('specialtyList').innerHTML = specSorted.map(([name, val]) => '<div class="spec-row"><span class="spec-label">'+name+'</span><div class="spec-bar-wrap"><div class="spec-bar" style="width:'+Math.round(val/maxSpec*100)+'%"></div></div><span class="spec-val">'+fmt$(val)+'</span></div>').join('');
 
-    const newPatByDate = {}; activeData.visits.forEach(r => { if (r.dimension === 'New Patients seen') newPatByDate[r.date] = r.count; });
+    const newPatByDate = {}; activeData.visits.forEach(r => { if (r.dimension === 'New Patients seen') newPatByDate[r.date] = r.value; });
     const npDates = Object.keys(newPatByDate).sort();
 
-    const totalVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)) totalVisitsByDate[r.date] = (totalVisitsByDate[r.date]||0) + (r.count||0); });
+    const totalVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)) totalVisitsByDate[r.date] = (totalVisitsByDate[r.date]||0) + (r.value||0); });
     const tvDates = Object.keys(totalVisitsByDate).sort();
 
     const hygProdByDate = {}; activeData.hygiene.forEach(r => { hygProdByDate[r.date] = (hygProdByDate[r.date]||0) + (r.production||0); });
@@ -773,7 +773,7 @@ function initCharts(data = null) {
         document.getElementById('kpi-newpat').innerHTML = Math.round(currentNP) + '<br>' + fmtChange(currentNP, prevMonthData ? (prevMonthData.visits.find(r => r.dimension === 'New Patients seen')?.count || 0) : 0);
 
         document.getElementById('kpi-visits-label').textContent = 'TOTAL VISITS';
-        const prevVisits = prevMonthData ? prevMonthData.visits.filter(r => ['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)).reduce((s, r) => s + (r.count || 0), 0) : 0;
+        const prevVisits = prevMonthData ? prevMonthData.visits.filter(r => ['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)).reduce((s, r) => s + (r.value || 0), 0) : 0;
         document.getElementById('kpi-visits').innerHTML = Math.round(currentVisits) + '<br>' + fmtChange(currentVisits, prevVisits);
 
         document.getElementById('kpi-hygprod-label').textContent = 'HYGIENE PRODUCTION';
@@ -798,7 +798,7 @@ function initCharts(data = null) {
         document.getElementById('kpi-hygpd').textContent = fmt$(hdDates.reduce((s,d) => { const rates = hygPdByDate[d]; return s + (rates.length > 0 ? rates.reduce((a,b)=>a+b,0) / rates.length : 0); }, 0) / hdDates.length);
     }
 
-    const examsByDate = groupByDate(activeData.exams, 'dimension', 'count');
+    const examsByDate = groupByDate(activeData.exams, 'dimension', 'value');
     const examDates = Object.keys(examsByDate).sort();
     const examPR = examDates.length <= 3 ? 5 : 0;
 
@@ -887,10 +887,10 @@ function initCharts(data = null) {
         });
     }
 
-    const imagingByDate = groupByDate(activeData.imaging, 'dimension', 'count');
+    const imagingByDate = groupByDate(activeData.imaging, 'dimension', 'value');
     const imagingDates = Object.keys(imagingByDate).sort();
     const imagingTypes = [...new Set(activeData.imaging.map(r => r.dimension))];
-    const visitsBreakdown = Object.entries(groupByDate(activeData.visits, 'dimension', 'count')).reduce((s, [d, dims]) => {
+    const visitsBreakdown = Object.entries(groupByDate(activeData.visits, 'dimension', 'value')).reduce((s, [d, dims]) => {
         Object.entries(dims).forEach(([k, v]) => { if (!s[k]) s[k] = []; s[k].push(v); });
         return s;
     }, {});
@@ -952,7 +952,7 @@ function renderReportTable(data) {
             let prod=null,coll=null,dayV=null,npV=null,crV=null;
             Object.keys(resultMap).forEach(k => { if (k.startsWith(dateKey)) { const dim=k.split('|')[1]; if(dim==='Production')prod=resultMap[k]; if(dim==='Collections')coll=resultMap[k]; }});
             data.days.forEach(r => { if(r.date.startsWith(dateKey)) dayV=r.value; });
-            data.visits.forEach(r => { if(r.date.startsWith(dateKey) && r.dimension==='New Patients seen') npV=r.count; });
+            data.visits.forEach(r => { if(r.date.startsWith(dateKey) && r.dimension==='New Patients seen') npV=r.value; });
             data.crowns.forEach(r => { if(r.date.startsWith(dateKey) && r.dimension==='Crowns PREPPED') crV=r.value; });
             if(prod!=null) yearTotals[y].prod.push(prod); if(coll!=null) yearTotals[y].coll.push(coll); if(dayV!=null) yearTotals[y].days.push(dayV); if(npV!=null) yearTotals[y].np.push(npV); if(crV!=null) yearTotals[y].crowns.push(crV);
             const sep = yi > 0 ? ' class="year-sep"' : '';
