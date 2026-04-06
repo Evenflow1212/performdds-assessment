@@ -295,6 +295,8 @@ function extractAllDates() {
     return Array.from(dates).sort();
 }
 
+RAW.specialty.forEach(r => { r.name = r.dimension; r.production = r.value; });
+
 function filterDataByDateRange(startDate, endDate) {
     return {
         results: RAW.results.filter(r => r.date >= startDate && r.date <= endDate),
