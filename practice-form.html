@@ -834,7 +834,23 @@ function clearForm() {
 }
 
 // ââ Init ââ
-initLogin();
+// Auto-authenticate if auth param provided from dashboard
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get('auth');
+    if (authCode) {
+        const code = params.get('practice') || '';
+        const p = PRACTICES[code];
+        if (p && authCode === p.passcode) {
+            initLogin();
+            const inp = document.getElementById('passcodeInput');
+            if (inp) { inp.value = authCode; }
+            doLogin();
+            return;
+        }
+    }
+    initLogin();
+})();
 </script>
 </body>
 </html>
