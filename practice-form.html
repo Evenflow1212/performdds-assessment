@@ -308,7 +308,7 @@
         <div class="section-title">Hygiene Production</div>
         <div id="hygienistsContainer"></div>
         <div class="fields-grid" style="margin-top:16px;">
-            <div class="field-wrapper"><label>Total Hygiene Days</label><input type="number" id="hygieneDays" step="0.5" min="0"></div>
+            <div class="field-wrapper"><label>Total Hygiene Days</label><input type="number" id="hygieneDays" step="0.5" min="0" readonly style="background:#2a2a3e;cursor:default;"></div>
             <div class="field-wrapper"><label>Empties in Hygiene Schedule (Whole Month)</label><input type="number" id="emptiesHygSchedule" min="0"></div>
         </div>
         <div class="hygiene-total">
@@ -358,7 +358,7 @@
         <h2 class="modal-heading">Report Submitted</h2>
         <div class="modal-summary" id="modalSummary"></div>
         <div class="modal-buttons">
-            <button class="modal-btn modal-btn-primary" id="copyDataBtn">Copy JSON</button>
+            <button class="modal-btn modal-btn-primary" id="copyDataBtn">Submit</button>
             <button class="modal-btn modal-btn-primary" id="emailDataBtn">Email Report</button>
             <button class="modal-btn modal-btn-secondary" id="closeModalBtn">Close</button>
         </div>
@@ -592,6 +592,19 @@ function attachListeners() {
     });
     document.getElementById('copyDataBtn').addEventListener('click', copyJSON);
     document.getElementById('emailDataBtn').addEventListener('click', emailReport);
+
+    // Auto-total hygiene days from individual hygienist day inputs
+    function updateTotalHygieneDays() {
+        let total = 0;
+        document.querySelectorAll('.hyg-days').forEach(input => {
+            total += parseFloat(input.value) || 0;
+        });
+        document.getElementById('hygieneDays').value = total;
+    }
+    document.querySelectorAll('.hyg-days').forEach(input => {
+        input.addEventListener('input', updateTotalHygieneDays);
+    });
+    updateTotalHygieneDays();
 }
 
 function updateHygieneTotal() {
