@@ -168,7 +168,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         </div>
         <div style="display: flex; align-items: center; gap: 4px;">
             <button onclick="navMonth(-1)" title="Previous month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9664;</button>
-            <button onclick="navMonth(0)" title="Most recent month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">Latest</button>
+            <button onclick="navMonth(0)" title="Most recent month" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">Latest</button>
             <button onclick="navMonth(1)" title="Next month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9654;</button>
         </div>
         <div style="margin-left: auto; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.3px; white-space: nowrap;">Showing: <span id="filterRangeText" style="color: #e8872a;">All Data</span></div>
@@ -459,12 +459,12 @@ function navMonth(direction) {
     updateHeaderDateRange(currentFilterStart, currentFilterEnd);
     document.getElementById('filterRangeText').textContent = formatDateRange(currentFilterStart, currentFilterEnd);
     updateDashboard(currentFilterStart, currentFilterEnd);
-    updateActiveFilterButton(null);
+    updateActiveFilterButton(direction === 0 ? 'latest' : null);
 }
 
 function updateActiveFilterButton(preset) {
     document.querySelectorAll('.filter-preset').forEach(btn => btn.classList.remove('active'));
-    const map = {'all':'All','3m':'3M','6m':'6M','12m':'12M','ytd':'YTD'};
+    const map = {'all':'All','3m':'3M','6m':'6M','12m':'12M','ytd':'YTD','latest':'Latest'};
     const label = map[preset];
     if (label) {
         document.querySelectorAll('.filter-preset').forEach(btn => {
