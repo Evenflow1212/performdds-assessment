@@ -436,6 +436,11 @@ function showDashboard(user) {
     initDashboard();
 }
 
+
+// Initialize missing RAW keys as empty arrays for compatibility
+['days','crowns','hygiene','visits','exams','imaging','specialty','referrals','appointments','collections','production','scheduled','newPatients'].forEach(k => { if (!RAW[k]) RAW[k] = []; });
+if (RAW.hygienist && !RAW.hygiene.length) RAW.hygiene = RAW.hygienist;
+
 function extractAllDates() {
     return sortedDates(RAW.results);
 }
