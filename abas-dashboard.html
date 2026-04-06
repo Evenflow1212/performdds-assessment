@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dr. Abas Dashboard - Perform DDS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #fff; min-height: 100vh; }
+/* LOGIN STYLES */
+.login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #1a2332; z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.login-overlay.hidden { display: none; }
+.login-box { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 12px; padding: 40px; width: 100%; max-width: 400px; }
+.login-box .icon { font-size: 40px; text-align: center; margin-bottom: 16px; }
+.login-box h1 { font-size: 22px; margin-bottom: 6px; color: #fff; text-align: center; }
+.login-box .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 28px; text-align: center; }
+.login-box label { display: block; font-size: 12px; color: #8899aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.login-box input { width: 100%; padding: 12px 14px; background: #1a2332; border: 1px solid #2a3f5f; border-radius: 6px; color: #fff; font-size: 14px; margin-bottom: 18px; outline: none; transition: border 0.2s; }
+.login-box input:focus { border-color: #e8872a; }
+.login-box button { width: 100%; padding: 12px; background: #e8872a; color: #fff; border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.login-box button:hover { background: #d07520; }
+.login-error { background: rgba(220,53,69,0.15); border: 1px solid rgba(220,53,69,0.3); color: #ff6b7a; padding: 10px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; display: none; }
+
+/* DASHBOARD STYLES */
+.dashboard-wrap { display: none; }
+.dashboard-wrap.visible { display: block; }
+.header { background: #0d1926; padding: 6px 24px; display: flex; align-items: stretch; border-bottom: 2px solid #2a3f5f; position: relative; }
+.header .header-left { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.header h1 { font-size: 20px; font-weight: 600; color: #fff; white-space: nowrap; }
+.header .subtitle { display: none; }
+.header .user-area { margin-left: auto; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.header .user-area span { font-size: 13px; color: #8899aa; }
+.header .user-area a { font-size: 13px; color: #e8872a; text-decoration: none; cursor: pointer; }
+.tabs { display: flex; align-items: stretch; justify-content: center; flex: 1; padding: 0; }
+.tab { padding: 12px 20px; cursor: pointer; color: #8899aa; font-size: clamp(12px, 1.2vw, 16px); font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.2s; display: flex; align-items: center; }
+.tab:hover { color: #ccc; }
+.tab.active { color: #e8872a; border-bottom-color: #e8872a; }
+.content { padding: 20px 24px; display: none; }
+.content.active { display: block; }
+.kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 20px; }
+.kpi-card { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 8px 12px; }
+.kpi-label { font-size: clamp(10px, 1.1vw, 15px); color: #8899aa; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; line-height: 1.3; }
+.kpi-value { font-size: clamp(18px, 2.2vw, 30px); font-weight: 700; color: #fff; line-height: 1.2; }
+.kpi-value.orange { color: #e8872a; }
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.chart-box { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 8px 12px; }
+.chart-box h3 { font-size: clamp(13px, 1.2vw, 17px); font-weight: 600; margin-bottom: 2px; color: #fff; }
+.chart-box .chart-sub { font-size: clamp(10px, 0.9vw, 13px); color: #8899aa; margin-bottom: 4px; }
+.chart-box canvas { width: 100% !important; }
+.chart-grid-bottom { display: grid; grid-template-columns: 3fr 1fr; gap: 16px; margin-bottom: 20px; }
+.report-table-wrap { background: #0f1c2e; border: 1px solid #2a3f5f; border-radius: 8px; padding: 20px; overflow-x: auto; }
+.report-table-wrap h3 { font-size: 16px; margin-bottom: 16px; }
+.report-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.report-table th { background: #1a2f4a; color: #8899aa; padding: 10px 12px; text-align: right; font-weight: 600; border-bottom: 2px solid #2a3f5f; white-space: nowrap; }
+.report-table th:first-child { text-align: left; position: sticky; left: 0; z-index: 2; background: #1a2f4a; }
+.report-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid rgba(42,63,95,0.4); white-space: nowrap; }
+.report-table td:first-child { text-align: left; font-weight: 600; color: #e8872a; position: sticky; left: 0; z-index: 1; background: #0f1c2e; }
+.report-table tr:nth-child(even) td:first-child { background: #0f1c2e; }
+.report-table tr:nth-child(even) { background: rgba(42, 63, 95, 0.12); }
+.report-table tr:hover { background: rgba(42, 63, 95, 0.35); }
+.report-table tr.avg-row { background: #162640; font-weight: 700; }
+.report-table tr.avg-row td:first-child { background: #162640; }
+.report-table tr.total-row { background: #1a2f4a; font-weight: 700; }
+.report-table tr.total-row td:first-child { background: #1a2f4a; }
+.report-table .year-header { text-align: center; font-size: 15px; font-weight: 700; padding: 12px 10px; letter-spacing: 1px; }
+.report-table .year-header.year-odd { background: #152a42; color: #e8872a; }
+.report-table .year-header.year-even { background: #1a3350; color: #4a90d9; }
+.report-table .year-col-odd { border-left: none; }
+.report-table .year-col-even { border-left: none; }
+.report-table .year-sep { border-left: 3px solid #2a3f5f; }
+.report-table .year-group-odd { }
+.report-table .year-group-even td { color: rgba(255,255,255,0.92); }
+.report-table .sub-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.chart-grid-hyg { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.spec-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 4px; }
+.spec-row:nth-child(even) { background: rgba(42, 63, 95, 0.15); }
+.spec-bar-wrap { flex: 1; margin: 0 12px; height: 6px; background: #1a2f4a; border-radius: 3px; }
+.spec-bar { height: 100%; background: #e8872a; border-radius: 3px; }
+.spec-label { font-size: clamp(11px, 1.1vw, 15px); color: #8899aa; min-width: 80px; }
+.spec-val { font-size: clamp(11px, 1.1vw, 15px); color: #fff; font-weight: 600; min-width: 60px; text-align: right; }
+.specialty-grid { display: grid; grid-template-columns: 1fr; gap: 4px; }
+
+/* FILTER BAR STYLES */
+.filter-bar { background: #0d1926; border-bottom: 1px solid #2a3f5f; padding: 12px 24px; }
+.filter-preset { transition: all 0.2s; }
+.filter-preset:hover { background: #2a3f5f; color: #ccc; }
+.filter-preset.active { background: #e8872a; color: #fff; }
+
+@media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .chart-grid, .chart-grid-bottom, .chart-grid-hyg { grid-template-columns: 1fr; }
+}
+
+/* EXPAND / FULLSCREEN CHART STYLES */
+.chart-box { position: relative; }
+.chart-expand-btn { position: absolute; top: 8px; right: 10px; background: rgba(42,63,95,0.6); border: 1px solid rgba(42,63,95,0.8); color: #8899aa; width: 28px; height: 28px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; z-index: 5; transition: all 0.2s; line-height: 1; }
+.chart-expand-btn:hover { background: #e8872a; color: #fff; border-color: #e8872a; }
+.chart-fullscreen-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10,20,35,0.92); z-index: 10000; align-items: center; justify-content: center; padding: 24px; }
+.chart-fullscreen-overlay.active { display: flex; }
+.chart-fullscreen-overlay .chart-box { width: 95vw; height: 90vh; max-width: none; display: flex; flex-direction: column; border: 1px solid #2a3f5f; }
+.chart-fullscreen-overlay .chart-box h3 { font-size: 22px; margin-bottom: 4px; }
+.chart-fullscreen-overlay .chart-box .chart-sub { font-size: 14px; margin-bottom: 10px; }
+.chart-fullscreen-overlay .chart-box > div:last-child { flex: 1; height: auto !important; min-height: 0; }
+.chart-fullscreen-overlay .chart-box canvas { width: 100% !important; height: 100% !important; }
+.chart-fullscreen-overlay .chart-expand-btn { font-size: 20px; width: 34px; height: 34px; }
+.chart-fullscreen-overlay .specialty-grid { flex: 1; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+<div class="login-box">
+    <div class="icon">&#x1f4ca;</div>
+    <h1>Dr. Abas's Dashboard</h1>
+    <div class="subtitle">Perform DDS &mdash; Practice Analytics</div>
+    <div class="login-error" id="loginError">Invalid username or password.</div>
+    <form onsubmit="return handleLogin(event)">
+        <label>Username</label>
+        <input type="text" id="loginUser" required autofocus>
+        <label>Password</label>
+        <input type="text" id="loginPass" required>
+        <button type="submit">Sign In</button>
+    </form>
+</div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard-wrap" id="dashboardWrap">
+<div class="header">
+    <div class="header-left">
+        <h1>Dr. Abas's Report</h1>
+        <span id="headerDateRange" style="display:none;"></span>
+    </div>
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab(0)">Overview</div>
+        <div class="tab" onclick="switchTab(1)">Hygiene &amp; Exams</div>
+        <div class="tab" onclick="switchTab(2)">Reporting Hub</div>
+    </div>
+    <div class="user-area">
+        <a href="practice-form.html?practice=pigneri" target="_blank" style="background:#e8872a;color:#fff;padding:8px 16px;border-radius:6px;font-weight:600;font-size:13px;text-decoration:none;white-space:nowrap;letter-spacing:0.3px;">Data Upload</a>
+        <span>Welcome, <span id="welcomeName"></span></span>
+        <a onclick="handleLogout()">Sign Out</a>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 11px; color: #8899aa; text-transform: uppercase;">From</label>
+            <select id="filterFromMonth" onchange="applyFilter()" style="background: #1a2332; border: 1px solid #2a3f5f; color: #fff; border-radius: 4px; padding: 5px 8px; font-size: 11px;"></select>
+        </div>
+        <div style="flex: 0 1 80px; height: 4px; background: #1a2f4a; border-radius: 2px; position: relative; min-width: 40px;">
+            <div id="rangeVisual" style="position: absolute; height: 100%; background: #e8872a; border-radius: 2px; left: 0%; right: 0%;"></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <label style="font-size: 11px; color: #8899aa; text-transform: uppercase;">To</label>
+            <select id="filterToMonth" onchange="applyFilter()" style="background: #1a2332; border: 1px solid #2a3f5f; color: #fff; border-radius: 4px; padding: 5px 8px; font-size: 11px;"></select>
+        </div>
+        <div style="width: 1px; height: 20px; background: #2a3f5f;"></div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button onclick="setPresetFilter('3m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">3M</button>
+            <button onclick="setPresetFilter('6m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">6M</button>
+            <button onclick="setPresetFilter('12m')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">12M</button>
+            <button onclick="setPresetFilter('ytd')" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">YTD</button>
+            <button onclick="setPresetFilter('all')" class="filter-preset active" style="background: #e8872a; color: #fff; border: none; border-radius: 16px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: all 0.2s;">All</button>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+            <button onclick="navMonth(-1)" title="Previous month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9664;</button>
+            <button onclick="navMonth(0)" title="Most recent month" class="filter-preset" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 16px; padding: 5px 10px; font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">Latest</button>
+            <button onclick="navMonth(1)" title="Next month" style="background: #1a2f4a; color: #8899aa; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">&#9654;</button>
+        </div>
+        <div style="margin-left: auto; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.3px; white-space: nowrap;">Showing: <span id="filterRangeText" style="color: #e8872a;">All Data</span></div>
+    </div>
+</div>
+
+<div class="content active" id="tab-0">
+    <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label" id="kpi-prod-label">Avg. Production (Last 12 Months)</div><div class="kpi-value" id="kpi-prod"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-coll-label">Avg. Collection (Last 12 Months)</div><div class="kpi-value" id="kpi-coll"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-days-label">Avg. Days (Last 12 Months)</div><div class="kpi-value orange" id="kpi-days"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-prepped-label">Avg. Crowns Prepped (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns-prepped"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-batavg-label">Avg. Batting Average (Last 12 Months)</div><div class="kpi-value orange" id="kpi-batavg"></div></div>
+    </div>
+    <div class="chart-box" style="margin-bottom:16px;display:flex;flex-direction:column;"><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:200px;max-height:200px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
+    <div class="chart-grid" style="grid-template-columns: 2fr 1fr; align-items: stretch;">
+        <div class="chart-box"><h3>Crown Summary</h3><div class="chart-sub">Crown metrics by Month</div><div style="height:300px;position:relative;"><canvas id="chartCrowns"></canvas></div></div>
+        <div class="chart-box"><h3>Practice Production</h3><div class="chart-sub">Production breakdown by doctor, hygiene &amp; specialty</div><div style="height:350px;position:relative;"><canvas id="chartMaster"></canvas></div></div>
+    </div>
+    <div class="chart-box" style="margin-top:16px;"><h3>Specialty Overview</h3><div class="chart-sub">Total Production by Specialty</div><div id="specialtyList" class="specialty-grid"></div></div>
+</div>
+
+<div class="content" id="tab-1">
+    <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label" id="kpi-newpat-label">Avg. New Patients / Month</div><div class="kpi-value" id="kpi-newpat"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-visits-label">Avg. Total Visits / Month</div><div class="kpi-value" id="kpi-visits"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-hygprod-label">Avg. Hygiene Production</div><div class="kpi-value" id="kpi-hygprod"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-hygpd-label">Avg. Hygiene Prod/Day/Producer</div><div class="kpi-value orange" id="kpi-hygpd"></div></div>
+    </div>
+    <div class="chart-box" style="margin-bottom:20px;"><h3>Hygienist Production</h3><div class="chart-sub">Total production by hygienist over time</div><div style="height:240px;position:relative;"><canvas id="chartHygProd"></canvas></div></div>
+    <div class="chart-grid" style="grid-template-columns: 3fr 2fr; align-items: stretch;">
+        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>New Patients &amp; Exams</h3><div class="chart-sub">New patients, comp exams, periodic exams, limited exams by month</div><div style="flex:1;min-height:0;height:140px;position:relative;"><canvas id="chartNewPat"></canvas></div></div>
+        <div class="chart-box" style="display:flex;flex-direction:column;"><h3>Hygienist $/Day by Producer</h3><div class="chart-sub">Average production per day for each hygienist</div><div style="flex:1;min-height:0;height:140px;position:relative;"><canvas id="chartHygStats"></canvas></div></div>
+    </div>
+    <div class="chart-grid-hyg" style="margin-top:20px;">
+        <div class="chart-box">
+            <h3>Visits &amp; Exams Breakdown</h3><div class="chart-sub">Average monthly counts</div>
+            <div id="visitsBreakdown" class="specialty-grid" style="margin-bottom:16px;"></div>
+            <h3 style="margin-top:8px;">Imaging Breakdown</h3>
+            <div id="imagingBreakdown" class="specialty-grid"></div>
+        </div>
+    </div>
+</div>
+
+<div class="content" id="tab-2">
+    <div class="report-table-wrap">
+        <h3>Historical Production &amp; Collection</h3>
+        <div id="reportTable"></div>
+    </div>
+</div>
+</div>
+
+<script>
+// === GLOBAL STATE ===
+let chartInstances = {};
+let allDates = [];
+let currentFilterStart = null;
+let currentFilterEnd = null;
+const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function fmt$(n) { return n != null ? '$' + Math.round(n).toLocaleString() : '-'; }
+function fmtN(n) { return n != null ? Math.round(n).toLocaleString() : '-'; }
+function sortedDates(arr) { return [...new Set(arr.map(r => r.date))].sort(); }
+function groupByDate(arr, dimKey, valKey) { const m = {}; arr.forEach(r => { if (!m[r.date]) m[r.date] = {}; m[r.date][r[dimKey]] = r[valKey]; }); return m; }
+
+// === AUTH ===
+const USERS = {"abas":"f1488dbbe5cbf1483afd972e67262402edaba48017575fedcddee316faaa024f"};
+
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    const user = document.getElementById('loginUser').value.toLowerCase().trim();
+    const pass = document.getElementById('loginPass').value;
+    const hash = await sha256(pass);
+    if (USERS[user] && USERS[user] === hash) {
+        sessionStorage.setItem('dds_user', user);
+        showDashboard(user);
+    } else {
+        document.getElementById('loginError').style.display = 'block';
+    }
+    return false;
+}
+
+function handleLogout() {
+    sessionStorage.removeItem('dds_user');
+    document.getElementById('loginOverlay').classList.remove('hidden');
+    document.getElementById('dashboardWrap').classList.remove('visible');
+}
+
+function showDashboard(user) {
+    document.getElementById('loginOverlay').classList.add('hidden');
+    document.getElementById('dashboardWrap').classList.add('visible');
+    document.getElementById('welcomeName').textContent = user === 'admin' ? 'Admin' : user.charAt(0).toUpperCase() + user.slice(1);
+    if (!window.chartsLoaded) { initDashboard(); window.chartsLoaded = true; }
+}
+
+// Check session on load
+window.addEventListener('DOMContentLoaded', () => {
+    const savedUser = sessionStorage.getItem('dds_user');
+    if (savedUser && USERS[savedUser]) showDashboard(savedUser);
+});
+
+// === DATA ===
+        const RAW = {"results":[{"date":"2022-01","dimension":"Production","value":75523},{"date":"2022-01","dimension":"Collections","value":84971},{"date":"2022-02","dimension":"Production","value":70711},{"date":"2022-02","dimension":"Collections","value":70801},{"date":"2022-03","dimension":"Production","value":87689},{"date":"2022-03","dimension":"Collections","value":66630},{"date":"2022-04","dimension":"Production","value":74000},{"date":"2022-04","dimension":"Collections","value":83952},{"date":"2022-04","dimension":"Future Scheduled","value":48652},{"date":"2022-05","dimension":"Production","value":78040},{"date":"2022-05","dimension":"Collections","value":77872},{"date":"2022-06","dimension":"Production","value":80672},{"date":"2022-06","dimension":"Collections","value":84214},{"date":"2022-06","dimension":"Future Scheduled","value":75020},{"date":"2022-07","dimension":"Production","value":77463},{"date":"2022-07","dimension":"Collections","value":87365},{"date":"2022-07","dimension":"Future Scheduled","value":74186},{"date":"2022-08","dimension":"Production","value":63953},{"date":"2022-08","dimension":"Collections","value":69638},{"date":"2022-08","dimension":"Future Scheduled","value":69456},{"date":"2022-09","dimension":"Production","value":58903},{"date":"2022-09","dimension":"Collections","value":75950},{"date":"2022-10","dimension":"Production","value":88900},{"date":"2022-10","dimension":"Collections","value":75600},{"date":"2022-10","dimension":"Future Scheduled","value":75900},{"date":"2022-11","dimension":"Production","value":75850},{"date":"2022-11","dimension":"Collections","value":73410},{"date":"2022-11","dimension":"Future Scheduled","value":71623},{"date":"2022-12","dimension":"Production","value":86587},{"date":"2022-12","dimension":"Collections","value":72532},{"date":"2022-12","dimension":"Future Scheduled","value":88049},{"date":"2023-01","dimension":"Production","value":84149},{"date":"2023-01","dimension":"Collections","value":87960},{"date":"2023-01","dimension":"Future Scheduled","value":42320},{"date":"2023-02","dimension":"Production","value":77572},{"date":"2023-02","dimension":"Collections","value":88405},{"date":"2023-02","dimension":"Future Scheduled","value":77513},{"date":"2023-03","dimension":"Production","value":79130},{"date":"2023-03","dimension":"Collections","value":84500},{"date":"2023-03","dimension":"Future Scheduled","value":72200},{"date":"2023-04","dimension":"Production","value":72879},{"date":"2023-04","dimension":"Collections","value":70368},{"date":"2023-04","dimension":"Future Scheduled","value":61740},{"date":"2023-05","dimension":"Production","value":81835},{"date":"2023-05","dimension":"Collections","value":94011},{"date":"2023-05","dimension":"Future Scheduled","value":59608},{"date":"2023-06","dimension":"Production","value":82024},{"date":"2023-06","dimension":"Collections","value":56441},{"date":"2023-06","dimension":"Future Scheduled","value":75846},{"date":"2023-07","dimension":"Production","value":78011},{"date":"2023-07","dimension":"Collections","value":81841},{"date":"2023-07","dimension":"Future Scheduled","value":78032},{"date":"2023-08","dimension":"Production","value":81729},{"date":"2023-08","dimension":"Collections","value":90163},{"date":"2023-08","dimension":"Future Scheduled","value":51924},{"date":"2023-09","dimension":"Production","value":59581},{"date":"2023-09","dimension":"Collections","value":63196},{"date":"2023-09","dimension":"Future Scheduled","value":78445},{"date":"2023-10","dimension":"Production","value":92803},{"date":"2023-10","dimension":"Collections","value":79921},{"date":"2023-10","dimension":"Future Scheduled","value":65757},{"date":"2023-11","dimension":"Production","value":65768},{"date":"2023-11","dimension":"Collections","value":67399},{"date":"2023-11","dimension":"Future Scheduled","value":76247},{"date":"2023-12","dimension":"Production","value":64488},{"date":"2023-12","dimension":"Collections","value":65633},{"date":"2023-12","dimension":"Future Scheduled","value":101043},{"date":"2024-01","dimension":"Production","value":86164},{"date":"2024-01","dimension":"Collections","value":81515},{"date":"2024-01","dimension":"Future Scheduled","value":67654},{"date":"2024-02","dimension":"Production","value":94090},{"date":"2024-02","dimension":"Collections","value":101732},{"date":"2024-02","dimension":"Future Scheduled","value":71386},{"date":"2024-03","dimension":"Production","value":74671},{"date":"2024-03","dimension":"Collections","value":79831},{"date":"2024-03","dimension":"Future Scheduled","value":73207},{"date":"2024-04","dimension":"Production","value":109460},{"date":"2024-04","dimension":"Collections","value":99232},{"date":"2024-04","dimension":"Future Scheduled","value":86414},{"date":"2024-05","dimension":"Production","value":90118},{"date":"2024-05","dimension":"Collections","value":103839},{"date":"2024-05","dimension":"Future Scheduled","value":50725},{"date":"2024-06","dimension":"Production","value":66517},{"date":"2024-06","dimension":"Collections","value":76943},{"date":"2024-06","dimension":"Future Scheduled","value":80826},{"date":"2024-07","dimension":"Production","value":104566},{"date":"2024-07","dimension":"Collections","value":90130},{"date":"2024-07","dimension":"Future Scheduled","value":82687},{"date":"2024-08","dimension":"Production","value":82323},{"date":"2024-08","dimension":"Collections","value":105658},{"date":"2024-08","dimension":"Future Scheduled","value":74501},{"date":"2024-09","dimension":"Production","value":100319},{"date":"2024-09","dimension":"Collections","value":89262},{"date":"2024-09","dimension":"Future Scheduled","value":53782},{"date":"2024-10","dimension":"Production","value":92803},{"date":"2024-10","dimension":"Collections","value":79921},{"date":"2024-10","dimension":"Future Scheduled","value":65757},{"date":"2024-11","dimension":"Production","value":65768},{"date":"2024-11","dimension":"Collections","value":67399},{"date":"2024-11","dimension":"Future Scheduled","value":76247},{"date":"2024-12","dimension":"Production","value":64488},{"date":"2024-12","dimension":"Collections","value":65633},{"date":"2024-12","dimension":"Future Scheduled","value":101043}],"days":[{"date":"2022-01","dimension":null,"value":18},{"date":"2022-02","dimension":null,"value":17},{"date":"2022-03","dimension":null,"value":20},{"date":"2022-04","dimension":null,"value":17},{"date":"2022-05","dimension":null,"value":18},{"date":"2022-06","dimension":null,"value":19},{"date":"2022-07","dimension":null,"value":16},{"date":"2022-08","dimension":null,"value":16},{"date":"2022-09","dimension":null,"value":17},{"date":"2022-10","dimension":null,"value":18},{"date":"2022-11","dimension":null,"value":19},{"date":"2022-12","dimension":null,"value":15},{"date":"2023-03","dimension":null,"value":19},{"date":"2023-04","dimension":null,"value":18},{"date":"2023-05","dimension":null,"value":19},{"date":"2023-06","dimension":null,"value":14},{"date":"2023-07","dimension":null,"value":18},{"date":"2023-08","dimension":null,"value":20},{"date":"2023-09","dimension":null,"value":16},{"date":"2023-10","dimension":null,"value":19},{"date":"2023-11","dimension":null,"value":18},{"date":"2023-12","dimension":null,"value":14},{"date":"2024-01","dimension":null,"value":18},{"date":"2024-02","dimension":null,"value":17.5},{"date":"2024-03","dimension":null,"value":18},{"date":"2024-04","dimension":null,"value":19},{"date":"2024-05","dimension":null,"value":18},{"date":"2024-06","dimension":null,"value":13},{"date":"2024-07","dimension":null,"value":20},{"date":"2024-08","dimension":null,"value":21},{"date":"2024-09","dimension":null,"value":19},{"date":"2024-10","dimension":null,"value":19},{"date":"2024-11","dimension":null,"value":18}],"crowns":[{"date":"2022-01","dimension":"Crowns from LAST MONTH","value":33},{"date":"2022-01","dimension":"Crowns PREPPED","value":35},{"date":"2022-01","dimension":"Crowns FUTURE BOOKED","value":16},{"date":"2022-01","dimension":"Crown diagnosed - NON Cosmetic","value":19},{"date":"2022-02","dimension":"Crowns FUTURE BOOKED","value":0},{"date":"2022-03","dimension":"Crowns PREPPED","value":25},{"date":"2022-03","dimension":"Crowns FUTURE BOOKED","value":16},{"date":"2022-03","dimension":"Crown diagnosed - NON Cosmetic","value":44},{"date":"2022-04","dimension":"Crowns from LAST MONTH","value":16},{"date":"2022-04","dimension":"Crowns PREPPED","value":32},{"date":"2022-04","dimension":"Crowns FUTURE BOOKED","value":8},{"date":"2022-04","dimension":"Crown diagnosed - NON Cosmetic","value":25},{"date":"2022-06","dimension":"Crowns from LAST MONTH","value":27},{"date":"2022-06","dimension":"Crowns PREPPED","value":0},{"date":"2022-06","dimension":"Crowns FUTURE BOOKED","value":22},{"date":"2022-06","dimension":"Crown diagnosed - NON Cosmetic","value":36},{"date":"2022-07","dimension":"Crowns from LAST MONTH","value":18},{"date":"2022-07","dimension":"Crowns FUTURE BOOKED","value":19},{"date":"2022-07","dimension":"Crown diagnosed - NON Cosmetic","value":36},{"date":"2022-08","dimension":"Crowns from LAST MONTH","value":26},{"date":"2022-08","dimension":"Crowns FUTURE BOOKED","value":12},{"date":"2022-08","dimension":"Crown diagnosed - NON Cosmetic","value":26},{"date":"2022-09","dimension":"Crowns from LAST MONTH","value":23},{"date":"2022-09","dimension":"Crowns FUTURE BOOKED","value":22},{"date":"2022-09","dimension":"Crown diagnosed - NON Cosmetic","value":34},{"date":"2022-10","dimension":"Crowns from LAST MONTH","value":22},{"date":"2022-10","dimension":"Crowns PREPPED","value":37},{"date":"2022-10","dimension":"Crowns FUTURE BOOKED","value":23},{"date":"2022-10","dimension":"Crown diagnosed - NON Cosmetic","value":44},{"date":"2022-11","dimension":"Crowns from LAST MONTH","value":23},{"date":"2022-11","dimension":"Crowns PREPPED","value":23},{"date":"2022-11","dimension":"Crowns FUTURE BOOKED","value":25},{"date":"2022-11","dimension":"Crown diagnosed - NON Cosmetic","value":51},{"date":"2022-12","dimension":"Crowns from LAST MONTH","value":25},{"date":"2022-12","dimension":"Crowns PREPPED","value":37},{"date":"2022-12","dimension":"Crowns FUTURE BOOKED","value":30},{"date":"2022-12","dimension":"Crown diagnosed - NON Cosmetic","value":29},{"date":"2023-01","dimension":"Crowns from LAST MONTH","value":30},{"date":"2023-01","dimension":"Crowns PREPPED","value":29},{"date":"2023-01","dimension":"Crowns FUTURE BOOKED","value":31},{"date":"2023-02","dimension":"Crowns from LAST MONTH","value":31},{"date":"2023-02","dimension":"Crowns PREPPED","value":33},{"date":"2023-02","dimension":"Crowns FUTURE BOOKED","value":14},{"date":"2023-03","dimension":"Crowns from LAST MONTH","value":14},{"date":"2023-03","dimension":"Crowns PREPPED","value":33},{"date":"2023-03","dimension":"Crowns FUTURE BOOKED","value":18},{"date":"2023-03","dimension":"Crown diagnosed - NON Cosmetic","value":40},{"date":"2023-05","dimension":"Crowns from LAST MONTH","value":13},{"date":"2023-05","dimension":"Crowns PREPPED","value":30},{"date":"2023-05","dimension":"Crown diagnosed - NON Cosmetic","value":55},{"date":"2023-06","dimension":"Crowns from LAST MONTH","value":21},{"date":"2023-06","dimension":"Crowns PREPPED","value":35},{"date":"2023-06","dimension":"Crowns FUTURE BOOKED","value":24},{"date":"2023-06","dimension":"Crown diagnosed - NON Cosmetic","value":42},{"date":"2023-08","dimension":"Crowns from LAST MONTH","value":24},{"date":"2023-08","dimension":"Crowns PREPPED","value":35},{"date":"2023-08","dimension":"Crowns FUTURE BOOKED","value":9},{"date":"2023-08","dimension":"Crown diagnosed - NON Cosmetic","value":41},{"date":"2023-09","dimension":"Crowns from LAST MONTH","value":9},{"date":"2023-09","dimension":"Crowns PREPPED","value":22},{"date":"2023-09","dimension":"Crowns FUTURE BOOKED","value":27},{"date":"2023-09","dimension":"Crown diagnosed - NON Cosmetic","value":47},{"date":"2023-10","dimension":"Crowns from LAST MONTH","value":27},{"date":"2023-10","dimension":"Crowns PREPPED","value":34},{"date":"2023-10","dimension":"Crowns FUTURE BOOKED","value":15},{"date":"2023-10","dimension":"Crown diagnosed - NON Cosmetic","value":41},{"date":"2023-11","dimension":"Crowns from LAST MONTH","value":15},{"date":"2023-11","dimension":"Crowns PREPPED","value":24},{"date":"2023-11","dimension":"Crowns FUTURE BOOKED","value":23},{"date":"2023-11","dimension":"Crown diagnosed - NON Cosmetic","value":46},{"date":"2023-12","dimension":"Crowns from LAST MONTH","value":23},{"date":"2023-12","dimension":"Crowns PREPPED","value":25},{"date":"2023-12","dimension":"Crowns FUTURE BOOKED","value":26},{"date":"2023-12","dimension":"Crown diagnosed - NON Cosmetic","value":33},{"date":"2024-01","dimension":"Crowns from LAST MONTH","value":19},{"date":"2024-01","dimension":"Crowns PREPPED","value":33},{"date":"2024-01","dimension":"Crowns FUTURE BOOKED","value":34},{"date":"2024-02","dimension":"Crowns from LAST MONTH","value":25},{"date":"2024-02","dimension":"Crowns PREPPED","value":38},{"date":"2024-02","dimension":"Crowns FUTURE BOOKED","value":19},{"date":"2024-02","dimension":"Crown diagnosed - NON Cosmetic","value":38},{"date":"2024-03","dimension":"Crowns from LAST MONTH","value":19},{"date":"2024-03","dimension":"Crowns PREPPED","value":28},{"date":"2024-03","dimension":"Crowns FUTURE BOOKED","value":18},{"date":"2024-03","dimension":"Crown diagnosed - NON Cosmetic","value":30},{"date":"2024-04","dimension":"Crowns from LAST MONTH","value":18},{"date":"2024-04","dimension":"Crowns PREPPED","value":43},{"date":"2024-04","dimension":"Crowns FUTURE BOOKED","value":22},{"date":"2024-04","dimension":"Crown diagnosed - NON Cosmetic","value":43},{"date":"2024-05","dimension":"Crowns from LAST MONTH","value":22},{"date":"2024-05","dimension":"Crowns PREPPED","value":30},{"date":"2024-05","dimension":"Crowns FUTURE BOOKED","value":15},{"date":"2024-05","dimension":"Crown diagnosed - NON Cosmetic","value":28},{"date":"2024-06","dimension":"Crowns from LAST MONTH","value":15},{"date":"2024-06","dimension":"Crowns PREPPED","value":27},{"date":"2024-06","dimension":"Crowns FUTURE BOOKED","value":20},{"date":"2024-06","dimension":"Crown diagnosed - NON Cosmetic","value":24},{"date":"2024-07","dimension":"Crowns from LAST MONTH","value":20},{"date":"2024-07","dimension":"Crowns PREPPED","value":34},{"date":"2024-07","dimension":"Crowns FUTURE BOOKED","value":21},{"date":"2024-07","dimension":"Crown diagnosed - NON Cosmetic","value":27},{"date":"2024-08","dimension":"Crowns from LAST MONTH","value":21},{"date":"2024-08","dimension":"Crowns PREPPED","value":28},{"date":"2024-08","dimension":"Crowns FUTURE BOOKED","value":18},{"date":"2024-08","dimension":"Crown diagnosed - NON Cosmetic","value":61},{"date":"2024-09","dimension":"Crowns from LAST MONTH","value":18},{"date":"2024-09","dimension":"Crowns PREPPED","value":43},{"date":"2024-09","dimension":"Crowns FUTURE BOOKED","value":16},{"date":"2024-09","dimension":"Crown diagnosed - NON Cosmetic","value":32},{"date":"2024-10","dimension":"Crowns from LAST MONTH","value":27},{"date":"2024-10","dimension":"Crowns PREPPED","value":34},{"date":"2024-10","dimension":"Crowns FUTURE BOOKED","value":15},{"date":"2024-10","dimension":"Crown diagnosed - NON Cosmetic","value":41},{"date":"2024-11","dimension":"Crowns from LAST MONTH","value":15},{"date":"2024-11","dimension":"Crowns PREPPED","value":24},{"date":"2024-11","dimension":"Crowns FUTURE BOOKED","value":23},{"date":"2024-11","dimension":"Crown diagnosed - NON Cosmetic","value":46},{"date":"2024-12","dimension":"Crowns from LAST MONTH","value":23},{"date":"2024-12","dimension":"Crowns PREPPED","value":25},{"date":"2024-12","dimension":"Crowns FUTURE BOOKED","value":26},{"date":"2024-12","dimension":"Crown diagnosed - NON Cosmetic","value":33}],"doctor":[{"date":"2022-01","dimension":"Dr. Abas","value":58777},{"date":"2022-03","dimension":"Dr. Abas","value":59000},{"date":"2022-04","dimension":"Dr. Abas","value":52547},{"date":"2022-06","dimension":"Dr. Abas","value":57139},{"date":"2022-07","dimension":"Dr. Abas","value":52000},{"date":"2022-08","dimension":"Dr. Abas","value":40675},{"date":"2022-09","dimension":"Dr. Abas","value":31061},{"date":"2022-10","dimension":"Dr. Abas","value":64980},{"date":"2022-11","dimension":"Dr. Abas","value":52744},{"date":"2022-12","dimension":"Dr. Abas","value":62250},{"date":"2023-01","dimension":"Dr. Abas","value":62397},{"date":"2023-02","dimension":"Dr. Abas","value":60800},{"date":"2023-03","dimension":"Dr. Abas","value":52793},{"date":"2023-04","dimension":"Dr. Abas","value":53896},{"date":"2023-05","dimension":"Dr. Abas","value":60760},{"date":"2023-06","dimension":"Dr. Abas","value":68068},{"date":"2023-07","dimension":"Dr. Abas","value":52062},{"date":"2023-08","dimension":"Dr. Abas","value":61740},{"date":"2023-09","dimension":"Dr. Abas","value":40921},{"date":"2023-10","dimension":"Dr. Abas","value":70191},{"date":"2023-11","dimension":"Dr. Abas","value":42456},{"date":"2023-12","dimension":"Dr. Abas","value":48888},{"date":"2024-01","dimension":"Dr. Abas","value":71874},{"date":"2024-02","dimension":"Dr. Abas","value":71705},{"date":"2024-03","dimension":"Dr. Abas","value":51594},{"date":"2024-04","dimension":"Dr. Abas","value":85926},{"date":"2024-05","dimension":"Dr. Abas","value":64700},{"date":"2024-06","dimension":"Dr. Abas","value":49756},{"date":"2024-07","dimension":"Dr. Abas","value":78080},{"date":"2024-08","dimension":"Dr. Abas","value":55587},{"date":"2024-09","dimension":"Dr. Abas","value":75016},{"date":"2024-10","dimension":"Dr. Abas","value":70186},{"date":"2024-11","dimension":"Dr. Abas","value":42456},{"date":"2024-12","dimension":"Dr. Abas","value":48888}],"hygiene":[{"date":"2022-01","dimension":"Tina","value":16747},{"date":"2022-02","dimension":"Tina","value":20881},{"date":"2022-03","dimension":"Tina","value":24735},{"date":"2022-04","dimension":"Tina","value":17000},{"date":"2022-05","dimension":"Tina","value":20632},{"date":"2022-06","dimension":"Tina","value":23831},{"date":"2022-07","dimension":"Tina","value":22627},{"date":"2022-08","dimension":"Tina","value":23308},{"date":"2022-09","dimension":"Tina","value":26879},{"date":"2022-10","dimension":"Tina","value":24790},{"date":"2022-11","dimension":"Tina","value":23088},{"date":"2022-12","dimension":"Tina","value":18244},{"date":"2023-01","dimension":"Tina","value":21753},{"date":"2023-02","dimension":"Tina","value":16771},{"date":"2023-03","dimension":"Tina","value":18627},{"date":"2023-04","dimension":"Tina","value":18982},{"date":"2023-05","dimension":"Tina","value":21075},{"date":"2023-06","dimension":"Tina","value":13947},{"date":"2023-07","dimension":"Tina","value":25949},{"date":"2023-08","dimension":"Tina","value":19985},{"date":"2023-09","dimension":"Tina","value":18659},{"date":"2023-10","dimension":"Tina","value":22611},{"date":"2023-11","dimension":"Tina","value":22635},{"date":"2023-12","dimension":"Tina","value":14032},{"date":"2024-01","dimension":"Tina","value":14286},{"date":"2024-02","dimension":"Tina","value":22701},{"date":"2024-03","dimension":"Tina","value":27783},{"date":"2024-04","dimension":"Tina","value":21670},{"date":"2024-05","dimension":"Tina","value":21279},{"date":"2024-06","dimension":"Tina","value":16859},{"date":"2024-07","dimension":"Tina","value":23932},{"date":"2024-08","dimension":"Tina","value":24864},{"date":"2024-09","dimension":"Tina","value":19632},{"date":"2024-10","dimension":"Tina","value":22611},{"date":"2024-11","dimension":"Tina","value":22635},{"date":"2024-12","dimension":"Tina","value":14032}],"visits":[{"date":"2022-01","dimension":"New Patients seen","value":9},{"date":"2022-01","dimension":"1110 Prophy","value":105},{"date":"2022-01","dimension":"4910 Perio Maint","value":6},{"date":"2022-01","dimension":"SRP--PATIENTS NOT Quads","value":0},{"date":"2022-03","dimension":"New Patients seen","value":12},{"date":"2022-03","dimension":"1110 Prophy","value":128},{"date":"2022-03","dimension":"4910 Perio Maint","value":6},{"date":"2022-03","dimension":"SRP--PATIENTS NOT Quads","value":4},{"date":"2022-04","dimension":"New Patients seen","value":10},{"date":"2022-04","dimension":"1110 Prophy","value":107},{"date":"2022-04","dimension":"4910 Perio Maint","value":7},{"date":"2022-04","dimension":"SRP--PATIENTS NOT Quads","value":4},{"date":"2022-06","dimension":"New Patients seen","value":14},{"date":"2022-06","dimension":"1110 Prophy","value":109},{"date":"2022-06","dimension":"4910 Perio Maint","value":7},{"date":"2022-06","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2022-07","dimension":"New Patients seen","value":15},{"date":"2022-07","dimension":"1110 Prophy","value":101},{"date":"2022-07","dimension":"4910 Perio Maint","value":5},{"date":"2022-07","dimension":"SRP--PATIENTS NOT Quads","value":0},{"date":"2022-08","dimension":"New Patients seen","value":16},{"date":"2022-08","dimension":"1110 Prophy","value":104},{"date":"2022-08","dimension":"4910 Perio Maint","value":9},{"date":"2022-08","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2022-09","dimension":"New Patients seen","value":11},{"date":"2022-09","dimension":"1110 Prophy","value":115},{"date":"2022-09","dimension":"4910 Perio Maint","value":7},{"date":"2022-09","dimension":"SRP--PATIENTS NOT Quads","value":0},{"date":"2022-10","dimension":"New Patients seen","value":19},{"date":"2022-10","dimension":"1110 Prophy","value":119},{"date":"2022-10","dimension":"4910 Perio Maint","value":10},{"date":"2022-10","dimension":"SRP--PATIENTS NOT Quads","value":0},{"date":"2022-11","dimension":"New Patients seen","value":20},{"date":"2022-11","dimension":"1110 Prophy","value":120},{"date":"2022-11","dimension":"4910 Perio Maint","value":5},{"date":"2022-11","dimension":"SRP--PATIENTS NOT Quads","value":3},{"date":"2022-12","dimension":"New Patients seen","value":8},{"date":"2022-12","dimension":"1110 Prophy","value":90},{"date":"2022-12","dimension":"4910 Perio Maint","value":7},{"date":"2022-12","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2023-01","dimension":"New Patients seen","value":15},{"date":"2023-01","dimension":"1110 Prophy","value":123},{"date":"2023-01","dimension":"4910 Perio Maint","value":11},{"date":"2023-01","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2023-02","dimension":"New Patients seen","value":4},{"date":"2023-02","dimension":"1110 Prophy","value":97},{"date":"2023-02","dimension":"4910 Perio Maint","value":3},{"date":"2023-02","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2023-03","dimension":"New Patients seen","value":9},{"date":"2023-03","dimension":"1110 Prophy","value":116},{"date":"2023-03","dimension":"4910 Perio Maint","value":7},{"date":"2023-03","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2023-04","dimension":"New Patients seen","value":14},{"date":"2023-04","dimension":"1110 Prophy","value":114},{"date":"2023-04","dimension":"4910 Perio Maint","value":8},{"date":"2023-04","dimension":"SRP--PATIENTS NOT Quads","value":0},{"date":"2023-05","dimension":"New Patients seen","value":16},{"date":"2023-05","dimension":"1110 Prophy","value":123},{"date":"2023-05","dimension":"4910 Perio Maint","value":8},{"date":"2023-05","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2023-06","dimension":"New Patients seen","value":10},{"date":"2023-06","dimension":"1110 Prophy","value":91},{"date":"2023-06","dimension":"4910 Perio Maint","value":0},{"date":"2023-06","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2023-07","dimension":"New Patients seen","value":12},{"date":"2023-07","dimension":"1110 Prophy","value":118},{"date":"2023-07","dimension":"4910 Perio Maint","value":14},{"date":"2023-07","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2023-08","dimension":"New Patients seen","value":12},{"date":"2023-08","dimension":"1110 Prophy","value":134},{"date":"2023-08","dimension":"4910 Perio Maint","value":9},{"date":"2023-08","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2023-09","dimension":"New Patients seen","value":5},{"date":"2023-09","dimension":"1110 Prophy","value":104},{"date":"2023-09","dimension":"4910 Perio Maint","value":4},{"date":"2023-09","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2023-10","dimension":"New Patients seen","value":11},{"date":"2023-10","dimension":"1110 Prophy","value":122},{"date":"2023-10","dimension":"4910 Perio Maint","value":10},{"date":"2023-10","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2023-11","dimension":"New Patients seen","value":25},{"date":"2023-11","dimension":"1110 Prophy","value":126},{"date":"2023-11","dimension":"4910 Perio Maint","value":6},{"date":"2023-11","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2023-12","dimension":"New Patients seen","value":8},{"date":"2023-12","dimension":"1110 Prophy","value":93},{"date":"2023-12","dimension":"4910 Perio Maint","value":5},{"date":"2023-12","dimension":"SRP--PATIENTS NOT Quads","value":0},{"date":"2024-01","dimension":"New Patients seen","value":10},{"date":"2024-02","dimension":"New Patients seen","value":10},{"date":"2024-02","dimension":"1110 Prophy","value":127},{"date":"2024-02","dimension":"4910 Perio Maint","value":8},{"date":"2024-02","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2024-03","dimension":"New Patients seen","value":12},{"date":"2024-03","dimension":"1110 Prophy","value":128},{"date":"2024-03","dimension":"4910 Perio Maint","value":8},{"date":"2024-03","dimension":"SRP--PATIENTS NOT Quads","value":0},{"date":"2024-04","dimension":"New Patients seen","value":15},{"date":"2024-04","dimension":"1110 Prophy","value":117},{"date":"2024-04","dimension":"4910 Perio Maint","value":9},{"date":"2024-04","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2024-05","dimension":"New Patients seen","value":13},{"date":"2024-05","dimension":"1110 Prophy","value":118},{"date":"2024-05","dimension":"4910 Perio Maint","value":10},{"date":"2024-05","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2024-06","dimension":"New Patients seen","value":7},{"date":"2024-06","dimension":"1110 Prophy","value":95},{"date":"2024-06","dimension":"4910 Perio Maint","value":6},{"date":"2024-06","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2024-07","dimension":"New Patients seen","value":15},{"date":"2024-07","dimension":"1110 Prophy","value":141},{"date":"2024-07","dimension":"4910 Perio Maint","value":10},{"date":"2024-07","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2024-08","dimension":"New Patients seen","value":19},{"date":"2024-08","dimension":"1110 Prophy","value":133},{"date":"2024-08","dimension":"4910 Perio Maint","value":13},{"date":"2024-08","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2024-09","dimension":"New Patients seen","value":3},{"date":"2024-09","dimension":"1110 Prophy","value":127},{"date":"2024-09","dimension":"4910 Perio Maint","value":6},{"date":"2024-09","dimension":"SRP--PATIENTS NOT Quads","value":2},{"date":"2024-10","dimension":"New Patients seen","value":11},{"date":"2024-10","dimension":"1110 Prophy","value":122},{"date":"2024-10","dimension":"4910 Perio Maint","value":10},{"date":"2024-10","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2024-11","dimension":"New Patients seen","value":25},{"date":"2024-11","dimension":"1110 Prophy","value":126},{"date":"2024-11","dimension":"4910 Perio Maint","value":6},{"date":"2024-11","dimension":"SRP--PATIENTS NOT Quads","value":1},{"date":"2024-12","dimension":"New Patients seen","value":8},{"date":"2024-12","dimension":"1110 Prophy","value":93},{"date":"2024-12","dimension":"4910 Perio Maint","value":5},{"date":"2024-12","dimension":"SRP--PATIENTS NOT Quads","value":0}],"exams":[{"date":"2022-01","dimension":"0150 Comp Exam","value":9},{"date":"2022-01","dimension":"0120 Periodic Exam","value":105},{"date":"2022-01","dimension":"0140 Limited Exam","value":16},{"date":"2022-02","dimension":"0150 Comp Exam","value":23},{"date":"2022-02","dimension":"0120 Periodic Exam","value":114},{"date":"2022-02","dimension":"0140 Limited Exam","value":16},{"date":"2022-03","dimension":"0150 Comp Exam","value":14},{"date":"2022-03","dimension":"0120 Periodic Exam","value":120},{"date":"2022-03","dimension":"0140 Limited Exam","value":10},{"date":"2022-04","dimension":"0150 Comp Exam","value":10},{"date":"2022-04","dimension":"0120 Periodic Exam","value":114},{"date":"2022-04","dimension":"0140 Limited Exam","value":12},{"date":"2023-02","dimension":"0150 Comp Exam","value":7},{"date":"2023-02","dimension":"0120 Periodic Exam","value":94},{"date":"2023-02","dimension":"0140 Limited Exam","value":7},{"date":"2023-03","dimension":"0150 Comp Exam","value":11},{"date":"2023-03","dimension":"0120 Periodic Exam","value":114},{"date":"2023-03","dimension":"0140 Limited Exam","value":6},{"date":"2023-08","dimension":"0150 Comp Exam","value":13},{"date":"2023-08","dimension":"0120 Periodic Exam","value":131},{"date":"2023-08","dimension":"0140 Limited Exam","value":12},{"date":"2023-09","dimension":"0150 Comp Exam","value":9},{"date":"2023-09","dimension":"0120 Periodic Exam","value":97},{"date":"2023-09","dimension":"0140 Limited Exam","value":9},{"date":"2023-10","dimension":"0150 Comp Exam","value":17},{"date":"2023-10","dimension":"0120 Periodic Exam","value":110},{"date":"2023-10","dimension":"0140 Limited Exam","value":15},{"date":"2023-11","dimension":"0150 Comp Exam","value":25},{"date":"2023-11","dimension":"0120 Periodic Exam","value":107},{"date":"2023-11","dimension":"0140 Limited Exam","value":11},{"date":"2023-12","dimension":"0150 Comp Exam","value":11},{"date":"2023-12","dimension":"0120 Periodic Exam","value":86},{"date":"2023-12","dimension":"0140 Limited Exam","value":12},{"date":"2024-05","dimension":"0150 Comp Exam","value":7},{"date":"2024-05","dimension":"0120 Periodic Exam","value":119},{"date":"2024-05","dimension":"0140 Limited Exam","value":9},{"date":"2024-06","dimension":"0150 Comp Exam","value":9},{"date":"2024-06","dimension":"0120 Periodic Exam","value":90},{"date":"2024-06","dimension":"0140 Limited Exam","value":8},{"date":"2024-07","dimension":"0150 Comp Exam","value":10},{"date":"2024-07","dimension":"0120 Periodic Exam","value":124},{"date":"2024-07","dimension":"0140 Limited Exam","value":8},{"date":"2024-08","dimension":"0150 Comp Exam","value":13},{"date":"2024-08","dimension":"0120 Periodic Exam","value":131},{"date":"2024-08","dimension":"0140 Limited Exam","value":12},{"date":"2024-09","dimension":"0150 Comp Exam","value":1},{"date":"2024-09","dimension":"0120 Periodic Exam","value":125},{"date":"2024-09","dimension":"0140 Limited Exam","value":10},{"date":"2024-10","dimension":"0150 Comp Exam","value":17},{"date":"2024-10","dimension":"0120 Periodic Exam","value":110},{"date":"2024-10","dimension":"0140 Limited Exam","value":15},{"date":"2024-11","dimension":"0150 Comp Exam","value":25},{"date":"2024-11","dimension":"0120 Periodic Exam","value":107},{"date":"2024-11","dimension":"0140 Limited Exam","value":11},{"date":"2024-12","dimension":"0150 Comp Exam","value":11},{"date":"2024-12","dimension":"0120 Periodic Exam","value":86},{"date":"2024-12","dimension":"0140 Limited Exam","value":12}],"imaging":[{"date":"2022-01","dimension":"FMX","value":13},{"date":"2022-02","dimension":"FMX","value":6},{"date":"2022-03","dimension":"FMX","value":9},{"date":"2022-04","dimension":"FMX","value":10},{"date":"2022-06","dimension":"FMX","value":12},{"date":"2022-07","dimension":"FMX","value":13},{"date":"2022-08","dimension":"FMX","value":15},{"date":"2022-09","dimension":"FMX","value":6},{"date":"2022-10","dimension":"FMX","value":18},{"date":"2022-11","dimension":"FMX","value":12},{"date":"2023-02","dimension":"FMX","value":4},{"date":"2023-03","dimension":"FMX","value":10},{"date":"2023-04","dimension":"FMX","value":16},{"date":"2023-05","dimension":"FMX","value":13},{"date":"2023-06","dimension":"FMX","value":9},{"date":"2023-07","dimension":"FMX","value":18},{"date":"2023-08","dimension":"FMX","value":13},{"date":"2023-09","dimension":"FMX","value":10},{"date":"2023-10","dimension":"FMX","value":17},{"date":"2023-11","dimension":"Panos","value":1},{"date":"2023-11","dimension":"FMX","value":17},{"date":"2023-12","dimension":"Panos","value":0},{"date":"2023-12","dimension":"FMX","value":8},{"date":"2023-12","dimension":"CBCT","value":0},{"date":"2024-02","dimension":"FMX","value":19},{"date":"2024-03","dimension":"FMX","value":16},{"date":"2024-04","dimension":"FMX","value":20},{"date":"2024-05","dimension":"FMX","value":18},{"date":"2024-06","dimension":"FMX","value":20},{"date":"2024-07","dimension":"FMX","value":18},{"date":"2024-08","dimension":"FMX","value":14},{"date":"2024-09","dimension":"FMX","value":3},{"date":"2024-10","dimension":"Panos","value":17},{"date":"2024-11","dimension":"FMX","value":17},{"date":"2024-12","dimension":"FMX","value":8}],"specialty":[{"date":"2022-03","dimension":"Oral Surgery","value":3954},{"date":"2022-04","dimension":"Oral Surgery","value":4468},{"date":"2022-06","dimension":"Oral Surgery","value":5200},{"date":"2022-07","dimension":"Oral Surgery","value":2837},{"date":"2022-09","dimension":"Oral Surgery","value":963},{"date":"2022-11","dimension":"Pedo","value":676},{"date":"2023-05","dimension":"Perio","value":4076},{"date":"2023-08","dimension":"Perio","value":1859},{"date":"2024-03","dimension":"Perio","value":1931},{"date":"2024-10","dimension":"Perio","value":676},{"date":"2024-11","dimension":"Perio","value":1568}]};
+
+function extractAllDates() {
+    let dates = new Set();
+    RAW.results.forEach(r => dates.add(r.date));
+    RAW.days.forEach(r => dates.add(r.date));
+    RAW.crowns.forEach(r => dates.add(r.date));
+    RAW.doctor.forEach(r => dates.add(r.date));
+    RAW.hygiene.forEach(r => dates.add(r.date));
+    RAW.visits.forEach(r => dates.add(r.date));
+    RAW.exams.forEach(r => dates.add(r.date));
+    RAW.imaging.forEach(r => dates.add(r.date));
+    RAW.specialty.forEach(r => dates.add(r.date));
+    return Array.from(dates).sort();
+}
+
+function filterDataByDateRange(startDate, endDate) {
+    return {
+        results: RAW.results.filter(r => r.date >= startDate && r.date <= endDate),
+        days: RAW.days.filter(r => r.date >= startDate && r.date <= endDate),
+        crowns: RAW.crowns.filter(r => r.date >= startDate && r.date <= endDate),
+        doctor: RAW.doctor.filter(r => r.date >= startDate && r.date <= endDate),
+        hygiene: RAW.hygiene.filter(r => r.date >= startDate && r.date <= endDate),
+        visits: RAW.visits.filter(r => r.date >= startDate && r.date <= endDate),
+        exams: RAW.exams.filter(r => r.date >= startDate && r.date <= endDate),
+        imaging: RAW.imaging.filter(r => r.date >= startDate && r.date <= endDate),
+        specialty: RAW.specialty.filter(r => r.date >= startDate && r.date <= endDate)
+    };
+}
+
+function destroyCharts() {
+    Object.keys(chartInstances).forEach(key => {
+        if (chartInstances[key]) {
+            chartInstances[key].destroy();
+            delete chartInstances[key];
+        }
+    });
+}
+
+function initializeFilterDropdowns() {
+    allDates = extractAllDates();
+    const fromSelect = document.getElementById('filterFromMonth');
+    const toSelect = document.getElementById('filterToMonth');
+
+    allDates.forEach(date => {
+        const [year, month] = date.split('-');
+        const monthName = months[parseInt(month) - 1];
+        const label = monthName + ' ' + year;
+
+        const option1 = document.createElement('option');
+        option1.value = date;
+        option1.textContent = label;
+        fromSelect.appendChild(option1);
+
+        const option2 = document.createElement('option');
+        option2.value = date;
+        option2.textContent = label;
+        toSelect.appendChild(option2);
+    });
+
+    if (allDates.length > 0) {
+        fromSelect.value = allDates[0];
+        toSelect.value = allDates[allDates.length - 1];
+        currentFilterStart = allDates[0];
+        currentFilterEnd = allDates[allDates.length - 1];
+        updateRangeVisual();
+    }
+}
+
+function updateRangeVisual() {
+    if (!allDates || allDates.length === 0) return;
+
+    const startIdx = allDates.indexOf(currentFilterStart);
+    const endIdx = allDates.indexOf(currentFilterEnd);
+    const totalCount = allDates.length - 1;
+
+    const leftPercent = (startIdx / totalCount) * 100;
+    const rightPercent = ((totalCount - endIdx) / totalCount) * 100;
+
+    const visual = document.getElementById('rangeVisual');
+    if (visual) {
+        visual.style.left = leftPercent + '%';
+        visual.style.right = rightPercent + '%';
+    }
+}
+
+function formatDateRange(start, end) {
+    const [sy, sm] = start.split('-');
+    const [ey, em] = end.split('-');
+    const fullMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const startMonth = months[parseInt(sm) - 1];
+    const endMonth = months[parseInt(em) - 1];
+    if (start === end) return fullMonths[parseInt(sm) - 1] + ' ' + sy;
+    return startMonth + ' ' + sy + ' - ' + endMonth + ' ' + ey;
+}
+
+function updateHeaderDateRange(start, end) {
+    document.getElementById('headerDateRange').textContent = formatDateRange(start, end);
+}
+
+function applyFilter() {
+    const fromSelect = document.getElementById('filterFromMonth');
+    const toSelect = document.getElementById('filterToMonth');
+
+    let startDate = fromSelect.value;
+    let endDate = toSelect.value;
+
+    if (startDate > endDate) {
+        [startDate, endDate] = [endDate, startDate];
+        fromSelect.value = startDate;
+        toSelect.value = endDate;
+    }
+
+    currentFilterStart = startDate;
+    currentFilterEnd = endDate;
+
+    updateRangeVisual();
+    updateHeaderDateRange(startDate, endDate);
+    document.getElementById('filterRangeText').textContent = formatDateRange(startDate, endDate);
+
+    updateDashboard(startDate, endDate);
+    updateActiveFilterButton(null);
+}
+
+function setPresetFilter(preset) {
+    if (!allDates || allDates.length === 0) return;
+
+    let startDate, endDate = allDates[allDates.length - 1];
+    const now = new Date();
+    const currentYear = now.getFullYear().toString();
+
+    switch(preset) {
+        case '3m':
+            startDate = allDates[Math.max(0, allDates.length - 3)];
+            break;
+        case '6m':
+            startDate = allDates[Math.max(0, allDates.length - 6)];
+            break;
+        case '12m':
+            startDate = allDates[Math.max(0, allDates.length - 12)];
+            break;
+        case 'ytd':
+            startDate = currentYear + '-01';
+            break;
+        case 'all':
+            startDate = allDates[0];
+            break;
+    }
+
+    currentFilterStart = startDate;
+    currentFilterEnd = endDate;
+    document.getElementById('filterFromMonth').value = startDate;
+    document.getElementById('filterToMonth').value = endDate;
+
+    updateRangeVisual();
+    updateHeaderDateRange(startDate, endDate);
+    document.getElementById('filterRangeText').textContent = formatDateRange(startDate, endDate);
+    updateDashboard(startDate, endDate);
+    updateActiveFilterButton(preset);
+}
+
+function navMonth(direction) {
+    if (!allDates || allDates.length === 0) return;
+    if (direction === 0) {
+        const latest = allDates[allDates.length - 1];
+        currentFilterStart = latest;
+        currentFilterEnd = latest;
+    } else {
+        const currentIdx = allDates.indexOf(currentFilterStart);
+        const newIdx = currentIdx + direction;
+        if (newIdx < 0 || newIdx >= allDates.length) return;
+        currentFilterStart = allDates[newIdx];
+        currentFilterEnd = allDates[newIdx];
+    }
+    document.getElementById('filterFromMonth').value = currentFilterStart;
+    document.getElementById('filterToMonth').value = currentFilterEnd;
+    updateRangeVisual();
+    updateHeaderDateRange(currentFilterStart, currentFilterEnd);
+    document.getElementById('filterRangeText').textContent = formatDateRange(currentFilterStart, currentFilterEnd);
+    updateDashboard(currentFilterStart, currentFilterEnd);
+    updateActiveFilterButton(direction === 0 ? 'latest' : null);
+}
+
+function updateActiveFilterButton(preset) {
+    const map = {'all':'All','3m':'3M','6m':'6M','12m':'12M','ytd':'YTD','latest':'Latest'};
+    const label = map[preset];
+    document.querySelectorAll('.filter-preset').forEach(btn => {
+        if (btn.textContent.trim() === label) {
+            btn.style.background = '#e8872a';
+            btn.style.color = '#fff';
+        } else {
+            btn.style.background = '#1a2f4a';
+            btn.style.color = '#8899aa';
+        }
+    });
+}
+
+function updateDashboard(startDate, endDate) {
+    const filtered = filterDataByDateRange(startDate, endDate);
+    destroyCharts();
+    initCharts(filtered);
+}
+
+function initCharts(data = null) {
+    const activeData = data || RAW;
+
+    Chart.defaults.color = '#8899aa';
+    Chart.defaults.borderColor = '#2a3f5f';
+    Chart.defaults.font.family = 'Arial, sans-serif';
+    Chart.defaults.font.size = 15;
+    Chart.defaults.plugins.legend.labels.boxWidth = 12;
+
+    // Detect single-month view
+    const resultsByDate = groupByDate(activeData.results, 'dimension', 'value');
+    const allResultDates = Object.keys(resultsByDate).sort();
+    const isSingleMonth = allResultDates.length === 1;
+
+    // Get previous month data for comparison
+    let prevMonthData = null;
+    if (isSingleMonth) {
+        const currentDate = allResultDates[0];
+        const allRAWDates = sortedDates(RAW.results);
+        const currentIdx = allRAWDates.indexOf(currentDate);
+        if (currentIdx > 0) {
+            const prevDate = allRAWDates[currentIdx - 1];
+            prevMonthData = filterDataByDateRange(prevDate, prevDate);
+        }
+    }
+
+    // Helper function for month-over-month change display
+    function fmtChange(current, previous) {
+        if (!previous || previous === 0) return '';
+        const pctChange = ((current - previous) / previous * 100).toFixed(1);
+        const arrow = pctChange >= 0 ? 'â²' : 'â¼';
+        const color = pctChange >= 0 ? '#6bc47f' : '#d94a7a';
+        return `<span style="font-size:12px;color:${color};">${arrow} ${Math.abs(pctChange)}% vs prior month</span>`;
+    }
+
+    const yearDividerPlugin = {
+        id: 'yearDivider',
+        afterDraw(chart) {
+            const { ctx, scales: { x, y } } = chart;
+            const labels = chart.data.labels;
+            for (let i = 1; i < labels.length; i++) {
+                const prevLabel = labels[i - 1];
+                const currLabel = labels[i];
+                if (prevLabel && currLabel && prevLabel.startsWith('Dec') && currLabel.startsWith('Jan')) {
+                    const xPos = (x.getPixelForValue(i - 1) + x.getPixelForValue(i)) / 2;
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([6, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(xPos, y.top);
+                    ctx.lineTo(xPos, y.bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+        }
+    };
+
+    // Plugin for bar chart labels
+    const barLabelPlugin = {
+        id: 'barLabels',
+        afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            chart.data.datasets.forEach((dataset, di) => {
+                if (dataset.type === 'line' || dataset.borderDash) return;
+                const meta = chart.getDatasetMeta(di);
+                meta.data.forEach((bar, i) => {
+                    const value = dataset.data[i];
+                    if (value == null || value === 0) return;
+                    ctx.save();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    const label = '$' + Math.round(value).toLocaleString();
+                    ctx.fillText(label, bar.x, bar.y - 4);
+                    ctx.restore();
+                });
+            });
+        }
+    };
+
+    // Update KPI labels and values - Overview Tab
+    const last12 = allResultDates.slice(-12);
+
+    if (isSingleMonth) {
+        // Single month: show actual values with MoM comparison
+        const currentProd = resultsByDate[allResultDates[0]]['Production'] || 0;
+        const currentColl = resultsByDate[allResultDates[0]]['Collections'] || 0;
+
+        document.getElementById('kpi-prod-label').textContent = 'PRODUCTION';
+        document.getElementById('kpi-prod').innerHTML = fmt$(currentProd) + '<br>' + fmtChange(currentProd, prevMonthData ? groupByDate(prevMonthData.results, 'dimension', 'value')[Object.keys(groupByDate(prevMonthData.results, 'dimension', 'value'))[0]]?.['Production'] || 0 : 0);
+
+        document.getElementById('kpi-coll-label').textContent = 'COLLECTION';
+        document.getElementById('kpi-coll').innerHTML = fmt$(currentColl) + '<br>' + fmtChange(currentColl, prevMonthData ? groupByDate(prevMonthData.results, 'dimension', 'value')[Object.keys(groupByDate(prevMonthData.results, 'dimension', 'value'))[0]]?.['Collections'] || 0 : 0);
+
+        const crownsByDate = groupByDate(activeData.crowns, 'dimension', 'value');
+        const currentCrownDates = Object.keys(crownsByDate).sort();
+        const currentDays = activeData.days.find(r => r.date === allResultDates[0])?.value || 0;
+        const currentCrownsPrepped = crownsByDate[allResultDates[0]]?.['Crowns PREPPED'] || 0;
+        const currentCrownsAdded = (crownsByDate[allResultDates[0]]?.['Crowns PREPPED'] || 0) + (crownsByDate[allResultDates[0]]?.['Crowns FUTURE BOOKED'] || 0) - (crownsByDate[allResultDates[0]]?.['Crowns from LAST MONTH'] || 0);
+
+        document.getElementById('kpi-days-label').textContent = 'DAYS';
+        document.getElementById('kpi-days').textContent = currentDays;
+
+        document.getElementById('kpi-crowns-prepped-label').textContent = 'CROWNS PREPPED';
+        document.getElementById('kpi-crowns-prepped').textContent = Math.round(currentCrownsPrepped);
+
+        document.getElementById('kpi-crowns-label').textContent = 'CROWNS ADDED';
+        document.getElementById('kpi-crowns').textContent = Math.round(currentCrownsAdded);
+
+        // Batting Average: total visits / crowns added
+        const batVisits = activeData.visits.filter(r => r.date === allResultDates[0] && ['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)).reduce((s, r) => s + (r.count || 0), 0);
+        const batPeriodic = activeData.exams.filter(r => r.date === allResultDates[0] && r.dimension === '0120 Periodic Exam').reduce((s, r) => s + (r.count || 0), 0);
+        const batTotal = batVisits + batPeriodic;
+        const crownsAdded = currentCrownsAdded;
+        const batAvg = crownsAdded > 0 ? (batTotal / crownsAdded) : 0;
+        document.getElementById('kpi-batavg-label').textContent = 'BATTING AVERAGE';
+        document.getElementById('kpi-batavg').textContent = batAvg > 0 ? batAvg.toFixed(1) : String.fromCharCode(8212);
+    } else {
+        // Multi-month: show 12-month averages
+        document.getElementById('kpi-prod-label').textContent = 'Avg. Production (Last 12 Months)';
+        document.getElementById('kpi-prod').textContent = fmt$(last12.reduce((s,d) => s + (resultsByDate[d]['Production'] || 0), 0) / last12.length);
+
+        document.getElementById('kpi-coll-label').textContent = 'Avg. Collection (Last 12 Months)';
+        document.getElementById('kpi-coll').textContent = fmt$(last12.reduce((s,d) => s + (resultsByDate[d]['Collections'] || 0), 0) / last12.length);
+
+        const daysMap = {}; activeData.days.forEach(r => daysMap[r.date] = r.value);
+        const daysDates = sortedDates(activeData.days).slice(-12);
+        document.getElementById('kpi-days-label').textContent = 'Avg. Days (Last 12 Months)';
+        document.getElementById('kpi-days').textContent = Math.round(daysDates.reduce((s,d) => s + (daysMap[d]||0), 0) / daysDates.length);
+
+        const crownsByDate = groupByDate(activeData.crowns, 'dimension', 'value');
+        const crownDates = Object.keys(crownsByDate).sort().slice(-12);
+        document.getElementById('kpi-crowns-prepped-label').textContent = 'Avg. Crowns Prepped (Last 12 Months)';
+        document.getElementById('kpi-crowns-prepped').textContent = Math.round(crownDates.reduce((s,d) => s + (crownsByDate[d]['Crowns PREPPED'] || 0), 0) / crownDates.length);
+
+        document.getElementById('kpi-crowns-label').textContent = 'Avg. Crowns Added (Last 12 Months)';
+        document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length);
+
+        // Batting Average for multi-month
+        const batVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)) batVisitsByDate[r.date] = (batVisitsByDate[r.date]||0) + (r.count||0); });
+        const batExamsByDate = {}; activeData.exams.forEach(r => { if (r.dimension === '0120 Periodic Exam') batExamsByDate[r.date] = (batExamsByDate[r.date]||0) + (r.count||0); });
+        const batDates = [...new Set([...Object.keys(batVisitsByDate), ...Object.keys(batExamsByDate)])].sort().slice(-12);
+        const avgCrownsAdded = crownDates.length > 0 ? crownDates.reduce((s, d) => { const p = crownsByDate[d]['Crowns PREPPED']||0; const fb = crownsByDate[d]['FUTURE BOOKED']||0; const fl = crownsByDate[d]['Crowns from LAST MONTH']||0; return s + p + fb - fl; }, 0) / crownDates.length : 0;
+        const avgBatVisits = batDates.length > 0 ? batDates.reduce((s, d) => s + (batVisitsByDate[d]||0) + (batExamsByDate[d]||0), 0) / batDates.length : 0;
+        const batAvgVal = avgCrownsAdded > 0 ? (avgBatVisits / avgCrownsAdded) : 0;
+        document.getElementById('kpi-batavg-label').textContent = 'Avg. Batting Average (Last 12 Months)';
+        document.getElementById('kpi-batavg').textContent = batAvgVal > 0 ? batAvgVal.toFixed(1) : String.fromCharCode(8212);
+    }
+
+    const revDates = allResultDates;
+    const revLabels = revDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); });
+    const revPR = revDates.length <= 3 ? 5 : 0;
+
+    if (isSingleMonth) {
+        // Calculate 12-month averages
+        const allRawDatesAvg = [...new Set(RAW.results.map(r=>r.date))].sort().slice(-12);
+        const rawByDateAvg = {}; RAW.results.forEach(r => { if (!rawByDateAvg[r.date]) rawByDateAvg[r.date] = {}; rawByDateAvg[r.date][r.dimension] = r.value; });
+        const avg12Prod = Math.round(allRawDatesAvg.reduce((s,d2) => s + (rawByDateAvg[d2]?.['Production'] || 0), 0) / allRawDatesAvg.length);
+        const avg12Coll = Math.round(allRawDatesAvg.reduce((s,d2) => s + (rawByDateAvg[d2]?.['Collections'] || 0), 0) / allRawDatesAvg.length);
+        // Single month: show bar chart with 3 bars
+        chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
+            type: 'bar', data: { labels: ['Production', 'Collections', 'Future Scheduled'], datasets: [
+                { label: 'Values', data: [
+                    resultsByDate[revDates[0]]['Production'] || 0,
+                    resultsByDate[revDates[0]]['Collections'] || 0,
+                    resultsByDate[revDates[0]]['Future Scheduled'] || 0
+                ], backgroundColor: ['#e8872a', '#4a90d9', '#6bc47f'], borderRadius: 4 },
+                { type: 'line', label: '12-mo Avg Production', data: [avg12Prod, avg12Prod, avg12Prod], borderColor: '#e8872a', borderDash: [8, 4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 },
+                { type: 'line', label: '12-mo Avg Collections', data: [avg12Coll, avg12Coll, avg12Coll], borderColor: '#4a90d9', borderDash: [8, 4], borderWidth: 2, pointRadius: 0, fill: false, order: 0 }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, indexAxis: undefined, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + (ctx.parsed.y != null ? Math.round(ctx.parsed.y).toLocaleString() : '-'); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k', font: { size: 12 } }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        // Multi-month: show line chart
+        chartInstances['chartRevenue'] = new Chart(document.getElementById('chartRevenue'), {
+            type: 'line', data: { labels: revLabels, datasets: [
+                { label: 'Production', data: revDates.map(d => resultsByDate[d]['Production']||null), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                { label: 'Collections', data: revDates.map(d => resultsByDate[d]['Collections']||null), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                { label: 'Future Scheduled', data: revDates.map(d => resultsByDate[d]['Future Scheduled']||null), borderColor: '#6bc47f', backgroundColor: 'rgba(107,196,127,0.08)', borderWidth: 2.5, pointRadius: revPR, pointHoverRadius: 5, tension: 0.35, fill: true }
+            ]}, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y != null ? Math.round(ctx.parsed.y).toLocaleString() : '-'); } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k', font: { size: 12 } }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } } } }
+        });
+    }
+
+    const docByDate = {}; activeData.doctor.forEach(r => { if (!docByDate[r.date]) docByDate[r.date] = {}; docByDate[r.date][r.name] = r.production; });
+    const docDates = Object.keys(docByDate).sort();
+    const docNames = [...new Set(activeData.doctor.map(r => r.name))];
+    const docColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a'];
+    const donutLabels = [];
+    const donutData = [];
+    const donutColors = [];
+    const perioDocs = ['akers', 'trun', 'turin'];
+    let perioDocTotal = 0;
+    const otherDocProd = {};
+    docNames.forEach(n => { const v = activeData.doctor.filter(r => r.name === n).reduce((s, r) => s + (r.production || 0), 0); if (v > 0) { if (perioDocs.some(p => n.toLowerCase().replace(/[\\.\s]/g, '').includes(p))) { perioDocTotal += v; } else { otherDocProd[n] = v; } } });
+    const hygTotal = activeData.hygiene.reduce((s, r) => s + (r.production || 0), 0);
+    const specByType = {}; activeData.specialty.forEach(r => { if (r.production > 0) specByType[r.dimension] = (specByType[r.dimension] || 0) + r.production; });
+    perioDocTotal += (specByType['Perio'] || 0); delete specByType['Perio'];
+    const allCats = {}; Object.entries(otherDocProd).forEach(function(e) { allCats[e[0]] = e[1]; }); if (perioDocTotal > 0) allCats['Perio'] = perioDocTotal; if (hygTotal > 0) allCats['Hygiene'] = hygTotal; Object.entries(specByType).forEach(function(e) { if (e[1] > 0) allCats[e[0]] = e[1]; });
+    const orderMap = [['Dr. Abas','abas'],['Hygiene','hygiene'],['Oral Surgery','oralsurgery'],['Pedo','pedo'],['Perio','perio']];
+    const colorMap = {'Dr. Abas':'#4a90d9','Hygiene':'#d94a7a','Oral Surgery':'#e74c3c','Pedo':'#9b59b6','Perio':'#e8872a'};
+    const extraColors = ['#f39c12','#6bc47f','#3498db','#2ecc71','#e67e22'];
+    const used = new Set(); let ei = 0;
+    orderMap.forEach(([display, match]) => { const key = Object.keys(allCats).find(k => k.toLowerCase().replace(/[.\s]/g,'').includes(match)); if (key && allCats[key] > 0) { donutLabels.push(display); donutData.push(allCats[key]); donutColors.push(colorMap[display] || extraColors[ei++]); used.add(key); } });
+    Object.entries(allCats).sort((a,b) => b[1]-a[1]).forEach(([k,v]) => { if (!used.has(k) && v > 0) { donutLabels.push(k); donutData.push(v); donutColors.push(extraColors[ei++ % extraColors.length]); } });
+    const donutLabelPlugin = {
+        id: 'donutLabels',
+        afterDatasetsDraw(chart) {
+            const { ctx } = chart;
+            const meta = chart.getDatasetMeta(0);
+            const dataset = chart.data.datasets[0];
+            const total = dataset.data.reduce((a, b) => a + b, 0);
+            if (total === 0) return;
+            meta.data.forEach((arc, i) => {
+                const pct = Math.round(dataset.data[i] / total * 100);
+                if (pct < 3) return;
+                const { startAngle, endAngle, innerRadius, outerRadius } = arc.getProps(['startAngle', 'endAngle', 'innerRadius', 'outerRadius']);
+                const midAngle = (startAngle + endAngle) / 2;
+                const midRadius = (innerRadius + outerRadius) / 2;
+                const labelX = arc.x + Math.cos(midAngle) * midRadius;
+                const labelY = arc.y + Math.sin(midAngle) * midRadius;
+                ctx.save();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 14px Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(pct + '%', labelX, labelY);
+                ctx.restore();
+            });
+        }
+    };
+    chartInstances['chartMaster'] = new Chart(document.getElementById('chartMaster'), {
+        type: 'doughnut', data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderColor: '#0f1c2e', borderWidth: 3, hoverOffset: 8 }] },
+        plugins: [donutLabelPlugin],
+        options: { responsive: true, maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 }, color: '#8899aa' } }, tooltip: { callbacks: { label: function(ctx) { const val = ctx.parsed; const total = ctx.dataset.data.reduce((a,b) => a+b, 0); const pct = Math.round(val/total*100); return ctx.label + ': $' + Math.round(val).toLocaleString() + ' (' + pct + '%)'; } } } } }
+    });
+
+    const crownsByDateAll = groupByDate(activeData.crowns, 'dimension', 'value');
+    const crownDims = ['Crowns from LAST MONTH', 'Crowns PREPPED', 'Crowns FUTURE BOOKED'];
+    const crownAllDates = Object.keys(crownsByDateAll).sort();
+    const crownColors = ['#4a90d9','#e8872a','#6bc47f','#9b59b6'];
+    const crownAddedData = crownAllDates.map(d => {
+        const prepped = crownsByDateAll[d]['Crowns PREPPED'] || 0;
+        const futureBooked = crownsByDateAll[d]['Crowns FUTURE BOOKED'] || 0;
+        const fromLast = crownsByDateAll[d]['Crowns from LAST MONTH'] || 0;
+        return prepped + futureBooked - fromLast;
+    });
+    const crownDatasets = crownDims.map((dim, i) => ({ label: dim.replace('Crown diagnosed - NON Cosmetic','Diagnosed Non-Cosmetic').replace('Crowns from LAST MONTH','From Last Month').replace('Crowns FUTURE BOOKED','Future Booked').replace('Crowns PREPPED','Prepped'), data: crownAllDates.map(d => crownsByDateAll[d][dim] || 0), backgroundColor: crownColors[i], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 }));
+    crownDatasets.push({ label: 'Crowns Added', data: crownAddedData, backgroundColor: crownColors[3], borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.8 });
+    chartInstances['chartCrowns'] = new Chart(document.getElementById('chartCrowns'), {
+        type: 'bar', data: { labels: crownAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+            datasets: crownDatasets
+        }, plugins: [yearDividerPlugin],
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45 } }, y: { beginAtZero: true, grid: { color: '#1a2f4a' } } } }
+    });
+
+    const specTotals = {}; activeData.specialty.forEach(r => { specTotals[r.dimension] = (specTotals[r.dimension]||0) + (r.production||0); });
+    const specSorted = Object.entries(specTotals).sort((a,b) => b[1]-a[1]);
+    // Calculate total practice production for scaling
+    const totalDocProd = activeData.doctor.reduce((s, r) => s + (r.production || 0), 0);
+    const totalHygProd = activeData.hygiene.reduce((s, r) => s + (r.production || 0), 0);
+    const totalSpecProd = Object.values(specTotals).reduce((a, b) => a + b, 0);
+    const maxSpec = totalDocProd + totalHygProd + totalSpecProd;
+    document.getElementById('specialtyList').innerHTML = specSorted.map(([name, val]) => '<div class="spec-row"><span class="spec-label">'+name+'</span><div class="spec-bar-wrap"><div class="spec-bar" style="width:'+Math.round(val/maxSpec*100)+'%"></div></div><span class="spec-val">'+fmt$(val)+'</span></div>').join('');
+
+    const newPatByDate = {}; activeData.visits.forEach(r => { if (r.dimension === 'New Patients seen') newPatByDate[r.date] = r.count; });
+    const npDates = Object.keys(newPatByDate).sort();
+
+    const totalVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)) totalVisitsByDate[r.date] = (totalVisitsByDate[r.date]||0) + (r.count||0); });
+    const tvDates = Object.keys(totalVisitsByDate).sort();
+
+    const hygProdByDate = {}; activeData.hygiene.forEach(r => { hygProdByDate[r.date] = (hygProdByDate[r.date]||0) + (r.production||0); });
+    const hpDates = Object.keys(hygProdByDate).sort();
+    const last12hp = hpDates.slice(-12);
+
+    const hygPdByDate = {}; activeData.hygiene.forEach(r => { if (!hygPdByDate[r.date]) hygPdByDate[r.date] = []; if (r.days > 0 && r.production > 0) hygPdByDate[r.date].push(r.production / r.days); });
+    const hdDates = Object.keys(hygPdByDate).sort().slice(-12);
+
+    // Update Hygiene Tab KPIs
+    if (isSingleMonth) {
+        // Single month: show actual values with MoM comparison
+        const currentNP = newPatByDate[allResultDates[0]] || 0;
+        const currentVisits = totalVisitsByDate[allResultDates[0]] || 0;
+        const currentHygProd = hygProdByDate[allResultDates[0]] || 0;
+        const currentHygPd = (hygPdByDate[allResultDates[0]] || []).length > 0 ? (hygPdByDate[allResultDates[0]].reduce((a,b)=>a+b,0) / hygPdByDate[allResultDates[0]].length) : 0;
+
+        document.getElementById('kpi-newpat-label').textContent = 'NEW PATIENTS';
+        document.getElementById('kpi-newpat').innerHTML = Math.round(currentNP) + '<br>' + fmtChange(currentNP, prevMonthData ? (prevMonthData.visits.find(r => r.dimension === 'New Patients seen')?.count || 0) : 0);
+
+        document.getElementById('kpi-visits-label').textContent = 'TOTAL VISITS';
+        const prevVisits = prevMonthData ? prevMonthData.visits.filter(r => ['1110 Prophy', '4910 Perio Maint', 'SRP--PATIENTS NOT Quads'].includes(r.dimension)).reduce((s, r) => s + (r.count || 0), 0) : 0;
+        document.getElementById('kpi-visits').innerHTML = Math.round(currentVisits) + '<br>' + fmtChange(currentVisits, prevVisits);
+
+        document.getElementById('kpi-hygprod-label').textContent = 'HYGIENE PRODUCTION';
+        const prevHygProd = prevMonthData ? prevMonthData.hygiene.reduce((s, r) => s + (r.production || 0), 0) : 0;
+        document.getElementById('kpi-hygprod').innerHTML = fmt$(currentHygProd) + '<br>' + fmtChange(currentHygProd, prevHygProd);
+
+        document.getElementById('kpi-hygpd-label').textContent = 'PROD/DAY/PRODUCER';
+        const prevHygPd = prevMonthData ? (prevMonthData.hygiene.length > 0 ? prevMonthData.hygiene.filter(r => r.days > 0 && r.production > 0).reduce((s, r) => s + (r.production / r.days), 0) / Math.max(1, prevMonthData.hygiene.filter(r => r.days > 0 && r.production > 0).length) : 0) : 0;
+        document.getElementById('kpi-hygpd').innerHTML = fmt$(currentHygPd) + '<br>' + fmtChange(currentHygPd, prevHygPd);
+    } else {
+        // Multi-month: show averages
+        document.getElementById('kpi-newpat-label').textContent = 'Avg. New Patients / Month';
+        document.getElementById('kpi-newpat').textContent = Math.round(npDates.reduce((s,d) => s + (newPatByDate[d]||0), 0) / npDates.length);
+
+        document.getElementById('kpi-visits-label').textContent = 'Avg. Total Visits / Month';
+        document.getElementById('kpi-visits').textContent = Math.round(tvDates.reduce((s,d) => s + totalVisitsByDate[d], 0) / tvDates.length);
+
+        document.getElementById('kpi-hygprod-label').textContent = 'Avg. Hygiene Production';
+        document.getElementById('kpi-hygprod').textContent = fmt$(last12hp.reduce((s,d) => s + hygProdByDate[d], 0) / last12hp.length);
+
+        document.getElementById('kpi-hygpd-label').textContent = 'Avg. Hygiene Prod/Day/Producer';
+        document.getElementById('kpi-hygpd').textContent = fmt$(hdDates.reduce((s,d) => { const rates = hygPdByDate[d]; return s + (rates.length > 0 ? rates.reduce((a,b)=>a+b,0) / rates.length : 0); }, 0) / hdDates.length);
+    }
+
+    const examsByDate = groupByDate(activeData.exams, 'dimension', 'count');
+    const examDates = Object.keys(examsByDate).sort();
+    const examPR = examDates.length <= 3 ? 5 : 0;
+
+    if (isSingleMonth) {
+        // Single month: show bar chart with exam types
+        const examTypes = ['0150 Comp Exam', '0120 Periodic Exam', '0140 Limited Exam'];
+        chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
+            type: 'bar', data: { labels: examTypes, datasets: [
+                { label: 'Count', data: examTypes.map(t => examsByDate[examDates[0]]?.[t] || 0), backgroundColor: ['#4a90d9', '#6bc47f', '#d94a7a'], borderRadius: 4 }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return ctx.parsed.y + ' exams'; } } } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        // Multi-month: show line chart
+        chartInstances['chartNewPat'] = new Chart(document.getElementById('chartNewPat'), {
+            type: 'line', data: { labels: examDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: [
+                    { label: 'Periodic (0120)', data: examDates.map(d => examsByDate[d]['0120 Periodic Exam']||0), borderColor: '#6bc47f', backgroundColor: 'rgba(107,196,127,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                    { label: 'Limited (0140)', data: examDates.map(d => examsByDate[d]['0140 Limited Exam']||0), borderColor: '#d94a7a', backgroundColor: 'rgba(217,74,122,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                    { label: 'New Patients', data: examDates.map(d => newPatByDate[d]||0), borderColor: '#e8872a', backgroundColor: 'rgba(232,135,42,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true },
+                    { label: 'Comp (0150)', data: examDates.map(d => examsByDate[d]['0150 Comp Exam']||0), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.08)', borderWidth: 2.5, pointRadius: examPR, pointHoverRadius: 5, tension: 0.35, fill: true }
+                ]
+            }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false } }, scales: { y: { beginAtZero: true, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 11 } } } } }
+        });
+    }
+
+    const hygStatDates = Object.keys(hygProdByDate).sort();
+    const hygPdPerName = {}; activeData.hygiene.forEach(r => { if (!hygPdPerName[r.date]) hygPdPerName[r.date] = {}; if (r.days > 0 && r.production > 0) hygPdPerName[r.date][r.name] = Math.round(r.production / r.days); });
+    const hygStatNames = [...new Set(activeData.hygiene.map(r => r.name))];
+    const hygStatColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a', '#9b59b6'];
+    const hygStatPR = hygStatDates.length <= 3 ? 5 : 0;
+
+    if (isSingleMonth) {
+        // Single month: show horizontal bar chart with one bar per hygienist
+        const currentDate = allResultDates[0];
+        const hygDataForMonth = {}; activeData.hygiene.forEach(r => { if (r.date === currentDate && r.days > 0 && r.production > 0) hygDataForMonth[r.name] = Math.round(r.production / r.days); });
+        const hygNamesForMonth = Object.keys(hygDataForMonth).sort();
+        const hygValuesForMonth = hygNamesForMonth.map(n => hygDataForMonth[n]);
+
+        chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
+            type: 'bar', data: { labels: hygNamesForMonth, datasets: [
+                { label: '$/Day', data: hygValuesForMonth, backgroundColor: hygStatColors.slice(0, hygNamesForMonth.length), borderRadius: 4 }
+            ]}, plugins: [barLabelPlugin], options: { layout: { padding: { right: 60 } }, indexAxis: 'y', responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '$' + Math.round(ctx.parsed.x).toLocaleString() + '/day'; } } } }, scales: { x: { beginAtZero: false, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, y: { grid: { display: false } } } }
+        });
+    } else {
+        // Multi-month: show line chart
+        chartInstances['chartHygStats'] = new Chart(document.getElementById('chartHygStats'), {
+            type: 'line', data: { labels: hygStatDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: hygStatNames.map((name, i) => ({ label: name, data: hygStatDates.map(d => (hygPdPerName[d] && hygPdPerName[d][name]) || null), borderColor: hygStatColors[i % hygStatColors.length], backgroundColor: hygStatColors[i % hygStatColors.length] + '15', borderWidth: 2.5, pointRadius: hygStatPR, pointHoverRadius: 6, tension: 0.35, fill: false, spanGaps: true }))
+            }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  $' + Math.round(total).toLocaleString(); }, label: function(ctx) { return ctx.dataset.label + ': $' + (ctx.parsed.y ? Math.round(ctx.parsed.y).toLocaleString() : '-') + '/day'; } } } }, scales: { y: { beginAtZero: false, ticks: { callback: v => '$'+v.toLocaleString() }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } } } }
+        });
+    }
+
+    const hygNamesAll = [...new Set(activeData.hygiene.map(r => r.name))];
+    const hygTotalProd = {}; activeData.hygiene.forEach(r => { hygTotalProd[r.name] = (hygTotalProd[r.name] || 0) + (r.production || 0); });
+    const hygNames = hygNamesAll.filter(n => hygTotalProd[n] > 0);
+    const hygByDate = {}; activeData.hygiene.forEach(r => { if (!hygByDate[r.date]) hygByDate[r.date] = {}; hygByDate[r.date][r.name] = r.production; });
+    const hygAllDates = Object.keys(hygByDate).sort();
+    const hygProdColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a', '#9b59b6'];
+    const hygAreaColors = [
+        { border: '#e8872a', bg: 'rgba(232,135,42,0.35)' },
+        { border: '#4a90d9', bg: 'rgba(74,144,217,0.35)' },
+        { border: '#6bc47f', bg: 'rgba(107,196,127,0.35)' },
+        { border: '#d94a7a', bg: 'rgba(217,74,122,0.35)' },
+        { border: '#9b59b6', bg: 'rgba(155,89,182,0.35)' }
+    ];
+    const hygProdPR = hygAllDates.length <= 3 ? 5 : 0;
+
+    if (isSingleMonth) {
+        // Single month: show bar chart with one bar per hygienist
+        const currentDate = allResultDates[0];
+        const hygProdForMonth = {}; activeData.hygiene.forEach(r => { if (r.date === currentDate) hygProdForMonth[r.name] = (hygProdForMonth[r.name] || 0) + (r.production || 0); });
+        const hygNamesForMonth = Object.keys(hygProdForMonth).sort();
+        const hygProdValuesForMonth = hygNamesForMonth.map(n => hygProdForMonth[n]);
+
+        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
+            type: 'bar', data: { labels: hygNamesForMonth, datasets: [
+                { label: 'Production', data: hygProdValuesForMonth, backgroundColor: hygProdColors.slice(0, hygNamesForMonth.length), borderRadius: 4 }
+            ]}, plugins: [barLabelPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { const total = ctx.chart.data.datasets[0].data.reduce((s,v) => s + v, 0); const pct = total > 0 ? (ctx.parsed.y / total * 100).toFixed(1) : '0.0'; return '$' + Math.round(ctx.parsed.y).toLocaleString() + '  (' + pct + '%)'; } } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } }, x: { grid: { display: false } } } }
+        });
+    } else {
+        // Multi-month: show stacked area line chart
+        chartInstances['chartHygProd'] = new Chart(document.getElementById('chartHygProd'), {
+            type: 'line', data: { labels: hygAllDates.map(d => { const [y,m] = d.split('-'); return months[parseInt(m)-1] + ' ' + y.slice(2); }),
+                datasets: hygNames.map((name, i) => ({ label: name, data: hygAllDates.map(d => hygByDate[d][name] || 0), borderColor: hygAreaColors[i % hygAreaColors.length].border, backgroundColor: hygAreaColors[i % hygAreaColors.length].bg, borderWidth: 2, pointRadius: hygProdPR, pointHoverRadius: 5, tension: 0.35, fill: true }))
+            }, plugins: [yearDividerPlugin], options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => '$'+Math.round(v/1000)+'k' }, grid: { color: '#1a2f4a' } } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'line' } }, tooltip: { mode: 'index', intersect: false, filter: function(item) { return item.parsed.y > 0; }, callbacks: { title: function(items) { if (!items.length) return ''; const total = items.reduce((s, it) => s + (it.parsed.y || 0), 0); return items[0].label + '  |  Total: $' + Math.round(total).toLocaleString(); }, label: function(ctx) { const total = ctx.chart.data.datasets.reduce((s, ds) => s + (ds.data[ctx.dataIndex] || 0), 0); const pct = total > 0 ? (ctx.parsed.y / total * 100).toFixed(1) : '0.0'; return ctx.dataset.label + ': $' + Math.round(ctx.parsed.y).toLocaleString() + '  (' + pct + '%)'; } } } } }
+        });
+    }
+
+    const imagingByDate = groupByDate(activeData.imaging, 'dimension', 'count');
+    const imagingDates = Object.keys(imagingByDate).sort();
+    const imagingTypes = [...new Set(activeData.imaging.map(r => r.dimension))];
+    const visitsBreakdown = Object.entries(groupByDate(activeData.visits, 'dimension', 'count')).reduce((s, [d, dims]) => {
+        Object.entries(dims).forEach(([k, v]) => { if (!s[k]) s[k] = []; s[k].push(v); });
+        return s;
+    }, {});
+    const visitsAvg = Object.entries(visitsBreakdown).map(([k, vals]) => [k, vals.length > 0 ? Math.round(vals.reduce((a,b) => a+(Number(b)||0), 0) / vals.length) : 0]);
+    document.getElementById('visitsBreakdown').innerHTML = visitsAvg.map(([name, val]) => '<div class="spec-row"><span class="spec-label">'+name+'</span><span class="spec-val">'+val+'</span></div>').join('');
+
+    const imagingBreakdown = Object.entries(imagingByDate).reduce((s, [d, dims]) => {
+        Object.entries(dims).forEach(([k, v]) => { if (!s[k]) s[k] = []; s[k].push(v); });
+        return s;
+    }, {});
+    const imagingAvg = Object.entries(imagingBreakdown).map(([k, vals]) => [k, vals.length > 0 ? Math.round(vals.reduce((a,b) => a+(Number(b)||0), 0) / vals.length) : 0]);
+    document.getElementById('imagingBreakdown').innerHTML = imagingAvg.map(([name, val]) => '<div class="spec-row"><span class="spec-label">'+name+'</span><span class="spec-val">'+val+'</span></div>').join('');
+
+    renderReportTable(activeData);
+}
+
+function switchTab(idx) {
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+    document.querySelectorAll('.content').forEach((c, i) => c.classList.toggle('active', i === idx));
+    location.hash = 'tab' + idx;
+    // Resize charts after tab becomes visible so Chart.js can render
+    setTimeout(function() { Object.values(chartInstances).forEach(function(c) { if (c) c.resize(); }); }, 50);
+}
+
+// Restore active tab from URL hash on refresh
+window.addEventListener('DOMContentLoaded', () => {
+    const h = location.hash.match(/^#tab(\d+)$/);
+    if (h) switchTab(parseInt(h[1]));
+});
+
+function renderReportTable(data) {
+    const resultMap = {}; data.results.forEach(r => { resultMap[r.date+'|'+r.dimension] = r.value; });
+    const allYears = [...new Set(data.results.map(r => r.date.split('-')[0]))].sort();
+    const yearColors = ['#e8872a', '#4a90d9', '#6bc47f', '#d94a7a'];
+
+    let thtml = '<table class="report-table"><thead><tr><th rowspan="2" style="vertical-align:bottom;border-bottom:2px solid #2a3f5f;">Month</th>';
+    allYears.forEach((y, yi) => {
+        const cls = yi % 2 === 0 ? 'year-odd' : 'year-even';
+        const sep = yi > 0 ? ' year-sep' : '';
+        const color = yearColors[yi % yearColors.length];
+        thtml += '<th colspan="5" class="year-header '+cls+sep+'" style="color:'+color+';border-bottom:3px solid '+color+';">'+y+'</th>';
+    });
+    thtml += '</tr><tr>';
+    allYears.forEach((y, yi) => {
+        const sep = yi > 0 ? ' year-sep' : '';
+        const cols = ['Prod.', 'Coll.', 'Days', 'New Pts', 'Crowns'];
+        cols.forEach((c, ci) => {
+            const sepCls = ci === 0 ? sep : '';
+            thtml += '<th class="sub-header'+sepCls+'">'+c+'</th>';
+        });
+    });
+    thtml += '</tr></thead><tbody>';
+    const yearTotals = {}; allYears.forEach(y => yearTotals[y] = { prod: [], coll: [], days: [], np: [], crowns: [] });
+    const months_short = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    months_short.forEach((mn, mi) => {
+        thtml += '<tr><td>'+mn+'</td>';
+        allYears.forEach((y, yi) => {
+            const dateKey = y + '-' + String(mi+1).padStart(2,'0');
+            let prod=null,coll=null,dayV=null,npV=null,crV=null;
+            Object.keys(resultMap).forEach(k => { if (k.startsWith(dateKey)) { const dim=k.split('|')[1]; if(dim==='Production')prod=resultMap[k]; if(dim==='Collections')coll=resultMap[k]; }});
+            data.days.forEach(r => { if(r.date.startsWith(dateKey)) dayV=r.value; });
+            data.visits.forEach(r => { if(r.date.startsWith(dateKey) && r.dimension==='New Patients seen') npV=r.count; });
+            data.crowns.forEach(r => { if(r.date.startsWith(dateKey) && r.dimension==='Crowns PREPPED') crV=r.value; });
+            if(prod!=null) yearTotals[y].prod.push(prod); if(coll!=null) yearTotals[y].coll.push(coll); if(dayV!=null) yearTotals[y].days.push(dayV); if(npV!=null) yearTotals[y].np.push(npV); if(crV!=null) yearTotals[y].crowns.push(crV);
+            const sep = yi > 0 ? ' class="year-sep"' : '';
+            const bg = yi % 2 === 1 ? ' style="background:rgba(74,144,217,0.04);"' : '';
+            thtml += '<td'+(yi>0?' class="year-sep"':'')+'>'+(prod!=null?fmt$(prod):'<span style="color:#3a4a5a;">-</span>')+'</td>';
+            thtml += '<td>'+(coll!=null?fmt$(coll):'<span style="color:#3a4a5a;">-</span>')+'</td>';
+            thtml += '<td>'+(dayV!=null?fmtN(dayV):'<span style="color:#3a4a5a;">-</span>')+'</td>';
+            thtml += '<td>'+(npV!=null?fmtN(npV):'<span style="color:#3a4a5a;">-</span>')+'</td>';
+            thtml += '<td>'+(crV!=null?fmtN(crV):'<span style="color:#3a4a5a;">-</span>')+'</td>';
+        });
+        thtml += '</tr>';
+    });
+    thtml += '<tr class="avg-row"><td>Average</td>';
+    allYears.forEach((y, yi) => { const t=yearTotals[y]; const avg=arr=>arr.length>0?arr.reduce((a,b)=>a+b,0)/arr.length:null;
+        thtml += '<td'+(yi>0?' class="year-sep"':'')+'>'+fmt$(avg(t.prod))+'</td><td>'+fmt$(avg(t.coll))+'</td><td>'+(avg(t.days)!=null?Math.round(avg(t.days)):'-')+'</td><td>'+(avg(t.np)!=null?Math.round(avg(t.np)):'-')+'</td><td>'+(avg(t.crowns)!=null?Math.round(avg(t.crowns)):'-')+'</td>';
+    });
+    thtml += '</tr>';
+    thtml += '<tr class="total-row"><td>Total</td>';
+    allYears.forEach((y, yi) => { const t=yearTotals[y]; const sum=arr=>arr.length>0?arr.reduce((a,b)=>a+b,0):null;
+        thtml += '<td'+(yi>0?' class="year-sep"':'')+'>'+fmt$(sum(t.prod))+'</td><td>'+fmt$(sum(t.coll))+'</td><td>'+(sum(t.days)!=null?Math.round(sum(t.days)):'-')+'</td><td>'+(sum(t.np)!=null?Math.round(sum(t.np)):'-')+'</td><td>'+(sum(t.crowns)!=null?Math.round(sum(t.crowns)):'-')+'</td>';
+    });
+    thtml += '</tr></tbody></table>';
+    document.getElementById('reportTable').innerHTML = thtml;
+}
+
+function initDashboard() {
+    initializeFilterDropdowns();
+    setPresetFilter('all');
+}
+
+
+/* --- Expand / Fullscreen Chart Feature --- */
+(function() {
+    const overlay = document.createElement('div');
+    overlay.className = 'chart-fullscreen-overlay';
+    document.body.appendChild(overlay);
+
+    function closeFullscreen() {
+        const expanded = overlay.querySelector('.chart-box');
+        if (expanded && expanded._originalParent) {
+            expanded._originalParent.insertBefore(expanded, expanded._originalNext);
+            const canvasWrap = expanded.querySelector('div[style*="position"]');
+            if (canvasWrap && expanded._origHeight) canvasWrap.style.height = expanded._origHeight;
+            const canvas = expanded.querySelector('canvas');
+            if (canvas) {
+                const cid = canvas.id;
+                if (chartInstances[cid]) {
+                    setTimeout(function() { chartInstances[cid].resize(); }, 50);
+                }
+            }
+        }
+        var btn = expanded ? expanded.querySelector('.chart-expand-btn') : null;
+            if (btn) { btn.innerHTML = '&#x26F6;'; btn.title = 'Expand'; }
+            overlay.classList.remove('active');
+    }
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeFullscreen();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeFullscreen();
+    });
+
+    function setupExpandButtons() {
+        document.querySelectorAll('.chart-box').forEach(function(box) {
+            if (box.querySelector('.chart-expand-btn')) return;
+            var btn = document.createElement('button');
+            btn.className = 'chart-expand-btn';
+            btn.title = 'Expand';
+            btn.innerHTML = '&#x26F6;';
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var isExpanded = overlay.classList.contains('active');
+                if (isExpanded) {
+                    closeFullscreen();
+                    return;
+                }
+                box._originalParent = box.parentNode;
+                box._originalNext = box.nextSibling;
+                var canvasWrap = box.querySelector('div[style*="position"]');
+                if (canvasWrap) box._origHeight = canvasWrap.style.height;
+                overlay.innerHTML = '';
+                overlay.appendChild(box);
+                overlay.classList.add('active');
+                btn.innerHTML = '&#x2715;';
+                btn.title = 'Close';
+                if (canvasWrap) canvasWrap.style.height = '100%';
+                var canvas = box.querySelector('canvas');
+                if (canvas) {
+                    var cid = canvas.id;
+                    if (chartInstances[cid]) {
+                        setTimeout(function() { chartInstances[cid].resize(); }, 100);
+                    }
+                }
+            });
+            box.appendChild(btn);
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(setupExpandButtons, 500); });
+    } else {
+        setTimeout(setupExpandButtons, 500);
+    }
+    var origSetPreset = window.setPresetFilter;
+    if (origSetPreset) {
+        window.setPresetFilter = function() {
+            origSetPreset.apply(this, arguments);
+            setTimeout(setupExpandButtons, 300);
+        };
+    }
+    var origApply = window.applyFilter;
+    if (origApply) {
+        window.applyFilter = function() {
+            origApply.apply(this, arguments);
+            setTimeout(setupExpandButtons, 300);
+        };
+    }
+})();
+</script>
+</body>
+</html>
