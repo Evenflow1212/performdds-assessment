@@ -231,7 +231,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
 </div>
 
 <script>
-const USERS = {"bilbeisi": "5650bc1799a55eb555103b688ad276f52a7cdf63ba679e4dbf1bcc52b241d1f6"};
+const USERS = {"bilbeisi": "0a5e932a2a836e130009d9c051a9cae7753fe094b30822d9680fbbbe33638215"};
 
 const RAW = {"results":[
 {"date":"2025-06","dimension":"Production","value":78888},
@@ -435,11 +435,6 @@ function showDashboard(user) {
     document.getElementById('dashboardWrap').classList.add('visible');
     initDashboard();
 }
-
-
-// Initialize missing RAW keys as empty arrays for compatibility
-['days','crowns','hygiene','visits','exams','imaging','specialty','referrals','appointments','collections','production','scheduled','newPatients'].forEach(k => { if (!RAW[k]) RAW[k] = []; });
-if (RAW.hygienist && !RAW.hygiene.length) RAW.hygiene = RAW.hygienist;
 
 function extractAllDates() {
     return sortedDates(RAW.results);
