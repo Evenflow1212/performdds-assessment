@@ -407,7 +407,7 @@ function setPresetFilter(preset) {
     if (!allDates || allDates.length === 0) return;
 
     let startDate, endDate = allDates[allDates.length - 1];
-    const now = new Date(2025, 11, 31);
+    const now = new Date();
     const currentYear = now.getFullYear().toString();
 
     switch(preset) {
@@ -599,7 +599,7 @@ function initCharts(data = null) {
         const batVisits = activeData.visits.filter(r => r.date === allResultDates[0] && ['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)).reduce((s, r) => s + (r.count || 0), 0);
         const batPeriodic = activeData.exams.filter(r => r.date === allResultDates[0] && r.dimension === '0120 Periodic Exam').reduce((s, r) => s + (r.count || 0), 0);
         const batTotal = batVisits + batPeriodic;
-        const crownsAdded = (cp+cfb-cfl);
+        const crownsAdded = currentCrownsAdded;
         const batAvg = crownsAdded > 0 ? (batTotal / crownsAdded) : 0;
         document.getElementById('kpi-batavg-label').textContent = 'BATTING AVERAGE';
         document.getElementById('kpi-batavg').textContent = batAvg > 0 ? batAvg.toFixed(1) : String.fromCharCode(8212);
