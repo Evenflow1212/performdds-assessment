@@ -297,6 +297,11 @@ function extractAllDates() {
 
 RAW.specialty.forEach(r => { r.name = r.dimension; r.production = r.value; });
 
+// Map doctor data fields: dimension->name, value->production, add days from RAW.days
+const _daysByDate = {};
+RAW.days.forEach(r => { _daysByDate[r.date] = r.value; });
+RAW.doctor.forEach(r => { r.name = r.dimension; r.production = r.value; r.days = _daysByDate[r.date] || 0; });
+
 function filterDataByDateRange(startDate, endDate) {
     return {
         results: RAW.results.filter(r => r.date >= startDate && r.date <= endDate),
