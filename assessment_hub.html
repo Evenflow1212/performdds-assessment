@@ -513,8 +513,6 @@
     .container { padding: 24px 16px 60px; }
   }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
 </head>
 <body>
 
@@ -1057,13 +1055,13 @@ async function extractARFromPdf(file, type) {
           if (idx2 < 0) { console.log('Insurance TOTALS not found'); return {}; }
           var after2 = text.substring(idx2 + 18);
           var allNums = after2.match(/[\d,]+\.\d+/g);
-          if (allNums && allNums.length >= 12) {
+          if (allNums && allNums.length >= 18) {
             var result2 = {
-              total: parseFloat(allNums[11].replace(/,/g,'')),
-              current: parseFloat(allNums[7].replace(/,/g,'')),
-              d3160: parseFloat(allNums[8].replace(/,/g,'')),
-              d6190: parseFloat(allNums[9].replace(/,/g,'')),
-              d90plus: parseFloat(allNums[10].replace(/,/g,''))
+              total: parseFloat(allNums[17].replace(/,/g,'')),
+              current: parseFloat(allNums[13].replace(/,/g,'')),
+              d3160: parseFloat(allNums[14].replace(/,/g,'')),
+              d6190: parseFloat(allNums[15].replace(/,/g,'')),
+              d90plus: parseFloat(allNums[16].replace(/,/g,''))
             };
             console.log('Insurance AR:', JSON.stringify(result2));
             return result2;
