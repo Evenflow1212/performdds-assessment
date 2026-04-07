@@ -1,3 +1,54 @@
+    async function extractARFromPdf(file, type) {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const pageText = content.items.map(item => item.str).join(' ');
+          fullText += pageText + '\n';
+        }
+        console.log('PDF text extracted for ' + type + ', length: ' + fullText.length);
+        console.log('Last 500 chars: ' + fullText.substring(fullText.length - 500));
+
+        if (type === 'patient') {
+          const m = fullText.match(/TOTALS[:\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)/i);
+          if (m) {
+            const result = {
+              current: parseFloat(m[1].replace(/[\s,]/g,'')),
+              d3160: parseFloat(m[2].replace(/[\s,]/g,'')),
+              d6190: parseFloat(m[3].replace(/[\s,]/g,'')),
+              d90plus: parseFloat(m[4].replace(/[\s,]/g,'')),
+              insr: parseFloat(m[5].replace(/[\s,]/g,'')),
+              total: parseFloat(m[7].replace(/[\s,]/g,''))
+            };
+            console.log('Patient AR extracted:', JSON.stringify(result));
+            return result;
+          }
+          console.log('Patient AR regex did not match');
+        } else {
+          const m = fullText.match(/TOTALS\s+ALL\s+CLAIMS[:\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)[\s]+([\ \d,]+\.\d+)/i);
+          if (m) {
+            const result = {
+              total: parseFloat(m[6].replace(/[\s,]/g,'')),
+              current: parseFloat(m[2].replace(/[\s,]/g,'')),
+              d3160: parseFloat(m[3].replace(/[\s,]/g,'')),
+              d6190: parseFloat(m[4].replace(/[\s,]/g,'')),
+              d90plus: parseFloat(m[5].replace(/[\s,]/g,''))
+            };
+            console.log('Insurance AR extracted:', JSON.stringify(result));
+            return result;
+          }
+          console.log('Insurance AR regex did not match');
+        }
+        return {};
+      } catch(e) {
+        console.error('extractARFromPdf error:', e);
+        return {};
+      }
+    }
+
 <div class="upload-zone" id="upload5" onclick="document.getElementById('file5').click()">
         <input type="file" id="file5" accept=".pdf" onchange="handleFile(5, this)">
         <div class="upload-default">
@@ -513,7 +564,9 @@
     .container { padding: 24px 16px 60px; }
   }
 </style>
-</head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    </head>
 <body>
 
 <header>
