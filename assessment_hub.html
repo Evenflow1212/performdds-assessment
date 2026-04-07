@@ -860,7 +860,7 @@
       <div id="review-list" style="margin-bottom:24px;"></div>
       <div class="callout info">
         <div class="callout-icon">⏱️</div>
-        <div>Generating your workbook takes approximately <strong>20–30 seconds</strong>. Claude AI reads your reports and populates all 10 tabs of the assessment template.</div>
+        <div>Generating your workbook takes approximately <strong>up to 60 seconds</strong>. Claude AI reads your reports and populates all 10 tabs of the assessment template.</div>
       </div>
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
@@ -874,7 +874,7 @@
     <div class="spinner"></div>
     <h3>Building your assessment workbook…</h3>
     <p>Claude AI is reading your reports and populating all 10 tabs.</p>
-    <p style="margin-top:8px;font-size:0.8rem;">This usually takes 20–30 seconds.</p>
+    <p style="margin-top:8px;font-size:0.8rem;">This usually takes up to 60 seconds.</p>
   </div>
 
   <!-- RESULT -->
@@ -1071,7 +1071,11 @@ async function generate() {
     const collBase64 = await fileToBase64(files[2]);
     const plBase64 = files[3] ? await fileToBase64(files[3]) : null;
             const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
-    const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, practiceName, software, arPatient, arInsurance };
+    const arPatient = files[4] ? await extractARFromPdf(files[4], 'patient') : {};
+        const arInsurance = files[5] ? await extractARFromPdf(files[5], 'insurance') : {};
+        console.log('AR Patient:', JSON.stringify(arPatient));
+        console.log('AR Insurance:', JSON.stringify(arInsurance));
+        const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, practiceName, software, arPatient, arInsurance };
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1107,7 +1111,7 @@ function downloadWorkbook() {
 }
 
 function resetAll() {
-  files = { 1: null, 2: null, 3: null };
+  files = { 1: null, 2: null, 3: null, 4: null, 5: null };
   skipped = { 3: false, 4: false, 5: false };
   generatedWorkbook = null;
   document.getElementById('resultCard').classList.remove('visible');
