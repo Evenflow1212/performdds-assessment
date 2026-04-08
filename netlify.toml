@@ -12,3 +12,8 @@
 
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"
+
+[[redirects]]
+  from = "/"
+  to = "/assessment_hub.html"
+  status = 200
