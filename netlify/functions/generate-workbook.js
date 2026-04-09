@@ -10,21 +10,22 @@ function parseProduction(text) {
   const codes = [];
   let months = 12, years = [];
   for (const line of text.split('\n')) {
-    const dm = line.match(/(\d{2}\/\d{2}\/\d{4})\s*[-–]\s*(\d{2}\/\d{2}\/\d{4})/);
+    const dm = line.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*[-–]\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
     if (dm && !years.length) {
       const from = new Date(dm[1]), to = new Date(dm[2]);
       months = Math.max(1, Math.round((to - from) / (1000*60*60*24*30.44)));
       for (let y = from.getFullYear(); y <= to.getFullYear(); y++) years.push(y);
       continue;
     }
-    const m4 = line.match(/^([A-Z]\d[A-Z0-9.\-]{1,10})\|(.+?)\|(\d+)\|([\d,.]+)/i);
+    /* Match: CODE|DESC|QTY|TOTAL — codes can start with letter or digit */
+    const m4 = line.match(/^([A-Z0-9][A-Z0-9.\-]{0,11})\|(.+?)\|(\d+)\|([\d,.]+)/i);
     if (m4) {
       const code = m4[1].toUpperCase(), desc = m4[2].trim();
       const qty = parseInt(m4[3]), total = parseFloat(m4[4].replace(/,/g,''));
       if (!isNaN(qty) && !isNaN(total)) codes.push({code, desc, qty, total});
       continue;
     }
-    const m3 = line.match(/^([A-Z]\d[A-Z0-9.\-]{1,10})\|(\d+)\|([\d,.]+)/i);
+    const m3 = line.match(/^([A-Z0-9][A-Z0-9.\-]{0,11})\|(\d+)\|([\d,.]+)/i);
     if (m3) {
       const code = m3[1].toUpperCase(), qty = parseInt(m3[2]), total = parseFloat(m3[3].replace(/,/g,''));
       if (!isNaN(qty) && !isNaN(total)) codes.push({code, desc:'', qty, total});
@@ -50,6 +51,7 @@ function parseCollections(text) {
 function parsePL(text) {
   const items = [];
   let totalIncome = null, totalExpense = null, netIncome = null;
+  let currentSection = 'Expense';
   for (const line of text.split('\n')) {
     const sm = line.match(/^TOTAL_INCOME\|([-\d,.]+)/i);
     if (sm) { totalIncome = Math.abs(parseFloat(sm[1].replace(/,/g,''))); continue; }
@@ -57,7 +59,9 @@ function parsePL(text) {
     if (se) { totalExpense = Math.abs(parseFloat(se[1].replace(/,/g,''))); continue; }
     const sn = line.match(/^NET_INCOME\|([-\d,.]+)/i);
     if (sn) { netIncome = parseFloat(sn[1].replace(/,/g,'')); continue; }
-    if (/^SECTION\|/i.test(line) || /^DATES?\|/i.test(line)) continue;
+    const secMatch = line.match(/^SECTION\|(.+)/i);
+    if (secMatch) { currentSection = secMatch[1].trim(); continue; }
+    if (/^DATES?\|/i.test(line)) continue;
     const m = line.match(/^(.+?)\|([-\d,.()+]+)/);
     if (m) {
       const item = m[1].trim();
@@ -65,7 +69,7 @@ function parsePL(text) {
       if (raw.startsWith('(') && raw.endsWith(')')) raw = '-' + raw.slice(1,-1);
       const amt = parseFloat(raw);
       if (!isNaN(amt) && item && !/total income|total expense|total sales|gross profit|net income|net operating|cost of goods|cogs/i.test(item)) {
-        items.push({ item, amount: Math.abs(amt) });
+        items.push({ item, amount: Math.abs(amt), section: currentSection });
       }
     }
   }
@@ -220,7 +224,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   allCodes.forEach((c, i) => {
     const r = i + 2;
-    const displayCode = c.code.replace(/^D0(\d)/, 'D$1');
+    const displayCode = c.code;
     sv(wsAC, 'A'+r, displayCode);
     sv(wsAC, 'B'+r, c.desc);
     sv(wsAC, 'C'+r, c.qty);
@@ -239,6 +243,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   });
 
   /* ═══ FINANCIAL OVERVIEW ═══ */
+  sv(wsFO, 'D4', practiceName);
   const primaryYear = years.length >= 2 ? years[1] : years[0] || new Date().getFullYear();
   sv(wsFO, 'E6', primaryYear);
   sv(wsFO, 'E20', Math.round(totalProd*100)/100);
@@ -298,11 +303,30 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsRaw, 'A3', 'Line Item'); sv(wsRaw, 'B3', 'Amount'); sv(wsRaw, 'C3', 'Category'); sv(wsRaw, 'D3', 'Notes');
 
     let rr = 5;
-    sv(wsRaw, 'A'+rr, 'INCOME'); rr++;
+    /* Income items first */
+    const incomeItems = plData.items.filter(i => i.section === 'Income');
+    const cogsItems = plData.items.filter(i => i.section === 'COGS');
+    const expenseItems = plData.items.filter(i => i.section !== 'Income' && i.section !== 'COGS');
+
+    if (incomeItems.length > 0) {
+      sv(wsRaw, 'A'+rr, 'INCOME'); rr++;
+      for (const item of incomeItems) {
+        sv(wsRaw, 'A'+rr, item.item); sv(wsRaw, 'B'+rr, item.amount); sv(wsRaw, 'C'+rr, 'Income'); rr++;
+      }
+      const totalSales = incomeItems.reduce((s,i) => s + i.amount, 0);
+      sv(wsRaw, 'A'+rr, 'Total Sales'); sv(wsRaw, 'B'+rr, totalSales); sv(wsRaw, 'C'+rr, 'Income'); rr++;
+    }
     if (plData.totalIncome) { sv(wsRaw, 'A'+rr, 'TOTAL INCOME'); sv(wsRaw, 'B'+rr, plData.totalIncome); sv(wsRaw, 'D'+rr, 'Net collections'); rr++; }
     rr++;
+    if (cogsItems.length > 0) {
+      sv(wsRaw, 'A'+rr, 'COST OF GOODS SOLD');
+      const cogsTotal = cogsItems.reduce((s,i) => s + i.amount, 0);
+      sv(wsRaw, 'B'+rr, cogsTotal); sv(wsRaw, 'C'+rr, 'COGS'); rr++;
+      if (plData.totalIncome) { sv(wsRaw, 'A'+rr, 'GROSS PROFIT'); sv(wsRaw, 'B'+rr, plData.totalIncome - cogsTotal); rr++; }
+      rr++;
+    }
     sv(wsRaw, 'A'+rr, 'EXPENSES'); rr++;
-    for (const item of plData.items) {
+    for (const item of expenseItems) {
       const cat = plCategory(item.item);
       sv(wsRaw, 'A'+rr, item.item);
       sv(wsRaw, 'B'+rr, item.amount);
