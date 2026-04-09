@@ -1088,7 +1088,7 @@ async function extractARFromPdf(file, type) {
 async function parsePdfViaServer(file, type) {
   const base64 = await fileToBase64(file);
   console.log(`Sending ${type} PDF to parse-pdf (${Math.round(base64.length/1024)}KB base64)...`);
-  const resp = await fetch('/.netlify/functions/parse-pdf', {
+  const resp = await fetch('/api/parse-pdf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pdfBase64: base64, type })
