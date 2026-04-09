@@ -1,12 +1,4 @@
-<div class="upload-zone" id="upload5" onclick="document.getElementById('file5').click()">
-        <input type="file" id="file5" accept=".pdf" onchange="handleFile(5, this)">
-        <div class="upload-default">
-          <div class="upload-icon">📄</div>
-          <h4>Upload Insurance Claim Aging Report (PDF)</h4>
-          <p>Upload the full report — Claude finds TOTALS ALL CLAIMS automatically</p>
-        </div>
-        <div class="file-name" id="fname5">✅ <span id="fname5-text"></span></div>
-      </div><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1084,19 +1076,163 @@ async function extractARFromPdf(file, type) {
       }
     }
 
-/* Helper: call parse-pdf edge function for one PDF (collections, pl only) */
-async function parsePdfViaServer(file, type) {
-  const base64 = await fileToBase64(file);
-  console.log(`Sending ${type} PDF to parse-pdf (${Math.round(base64.length/1024)}KB base64)...`);
-  const resp = await fetch('/api/parse-pdf', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pdfBase64: base64, type })
-  });
-  const data = await resp.json();
-  if (!data.success) throw new Error(`${type} parse failed: ${data.error || 'Unknown error'}`);
-  console.log(`${type} parsed: ${data.text.split('\n').length} lines`);
-  return data.text;
+/* ─── Client-side Collections PDF parser using pdf.js ─── */
+async function extractCollectionsFromPdf(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  console.log('Collections PDF pages:', pdf.numPages);
+
+  /* Extract text from all pages, joining into lines by Y position */
+  let allRows = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const rows = {};
+    content.items.forEach(item => {
+      const y = Math.round(item.transform[5]);
+      if (!rows[y]) rows[y] = '';
+      rows[y] += item.str + ' ';
+    });
+    const sortedYs = Object.keys(rows).map(Number).sort((a,b) => b - a);
+    for (const y of sortedYs) allRows.push(rows[y].trim());
+  }
+
+  const fullText = allRows.join('\n');
+  console.log('Collections text length:', fullText.length);
+
+  /* Find date range */
+  let dateRange = '';
+  const dm = fullText.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*[-–to]+\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
+  if (dm) dateRange = dm[1] + ' - ' + dm[2];
+
+  /* Find TOTAL row — look for "Total" or "TOTAL" with dollar amounts */
+  let charges = null, payments = null;
+  for (let i = allRows.length - 1; i >= 0; i--) {
+    const row = allRows[i];
+    if (/\btotal\b/i.test(row)) {
+      /* Extract all dollar amounts from this row */
+      const amts = [];
+      const re = /\(?\$?([\d,]+\.\d{2})\)?/g;
+      let m;
+      while ((m = re.exec(row)) !== null) {
+        let val = parseFloat(m[1].replace(/,/g, ''));
+        if (m[0].startsWith('(') || m[0].startsWith('-')) val = -val;
+        amts.push(val);
+      }
+      console.log('Collections TOTAL row:', row);
+      console.log('Collections amounts found:', amts);
+      /* Dentrix Analysis Summary: columns typically are Charges, Adjustments, ..., Payments */
+      if (amts.length >= 2) {
+        charges = Math.abs(amts[0]);
+        /* Payments is usually the last or second-to-last large number */
+        payments = Math.abs(amts[amts.length >= 4 ? amts.length - 2 : 1]);
+        /* Look for the largest negative number as payments */
+        for (const a of amts) {
+          if (a < 0 && Math.abs(a) > 10000) { payments = Math.abs(a); break; }
+        }
+      }
+      break;
+    }
+  }
+
+  const lines = [];
+  if (dateRange) lines.push('DATES|' + dateRange);
+  if (charges !== null) lines.push('CHARGES|' + charges.toFixed(2));
+  if (payments !== null) lines.push('PAYMENTS|' + payments.toFixed(2));
+  console.log('Collections parsed:', lines);
+  return lines.join('\n');
+}
+
+/* ─── Client-side P&L PDF parser using pdf.js ─── */
+async function extractPLFromPdf(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  console.log('P&L PDF pages:', pdf.numPages);
+
+  let allRows = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const rows = {};
+    content.items.forEach(item => {
+      const y = Math.round(item.transform[5]);
+      const x = Math.round(item.transform[4]);
+      if (!rows[y]) rows[y] = [];
+      rows[y].push({ x, str: item.str.trim() });
+    });
+    const sortedYs = Object.keys(rows).map(Number).sort((a,b) => b - a);
+    for (const y of sortedYs) {
+      const cells = rows[y].sort((a,b) => a.x - b.x);
+      allRows.push(cells.map(c => c.str).join('\t'));
+    }
+  }
+
+  console.log('P&L text rows:', allRows.length);
+
+  const lines = [];
+  let currentSection = '';
+  const sectionMap = {
+    'income': 'Income', 'revenue': 'Income', 'sales': 'Income',
+    'cost of goods': 'COGS', 'cogs': 'COGS',
+    'expense': 'Expense', 'operating expense': 'Expense',
+    'other expense': 'Other Expense', 'other income': 'Other Income'
+  };
+
+  for (const row of allRows) {
+    const cleanRow = row.replace(/\t+/g, '\t').trim();
+    if (!cleanRow) continue;
+
+    /* Check for section headers */
+    const lower = cleanRow.toLowerCase();
+    for (const [key, section] of Object.entries(sectionMap)) {
+      if (lower === key || lower === 'total ' + key || lower.startsWith(key + '\t') && !lower.match(/[\d.]/)) {
+        if (section !== currentSection && !lower.startsWith('total')) {
+          currentSection = section;
+          lines.push('SECTION|' + section);
+        }
+        break;
+      }
+    }
+
+    /* Check for summary lines */
+    const totalIncomeMatch = cleanRow.match(/total\s+(?:income|revenue|sales)[\t\s]+([\d,.()\-]+)/i);
+    if (totalIncomeMatch) {
+      let v = totalIncomeMatch[1].replace(/[,()]/g, m => m === ',' ? '' : m === '(' ? '-' : '');
+      lines.push('TOTAL_INCOME|' + v);
+      continue;
+    }
+    const totalExpenseMatch = cleanRow.match(/total\s+(?:expense|operating expense)s?[\t\s]+([\d,.()\-]+)/i);
+    if (totalExpenseMatch) {
+      let v = totalExpenseMatch[1].replace(/[,()]/g, m => m === ',' ? '' : m === '(' ? '-' : '');
+      lines.push('TOTAL_EXPENSE|' + v);
+      continue;
+    }
+    const netIncomeMatch = cleanRow.match(/net\s+(?:income|operating income|profit|loss)[\t\s]+([\d,.()\-]+)/i);
+    if (netIncomeMatch) {
+      let v = netIncomeMatch[1].replace(/[,()]/g, m => m === ',' ? '' : m === '(' ? '-' : '');
+      lines.push('NET_INCOME|' + v);
+      continue;
+    }
+
+    /* Regular line items: text followed by a dollar amount */
+    const parts = cleanRow.split('\t');
+    if (parts.length >= 2) {
+      const lastPart = parts[parts.length - 1].trim();
+      const amtMatch = lastPart.match(/^\(?([\d,]+\.\d{2})\)?$/);
+      if (amtMatch) {
+        const itemName = parts.slice(0, -1).join(' ').trim();
+        if (itemName && !/^(total|net |gross )/i.test(itemName) && itemName.length > 1) {
+          let amt = amtMatch[1].replace(/,/g, '');
+          if (lastPart.startsWith('(')) amt = '-' + amt;
+          lines.push(itemName + '|' + amt);
+        }
+      }
+    }
+  }
+
+  console.log('P&L parsed: ' + lines.length + ' lines');
+  console.log('P&L first 5:', lines.slice(0, 5));
+  return lines.join('\n');
 }
 
 /* ─── Client-side Production PDF parser using pdf.js ─── */
@@ -1213,12 +1349,12 @@ async function generate() {
   try {
     const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
 
-    /* Step 1: Parse PDFs — production extracted client-side, collections & P/L via Claude */
-    console.log('Step 1: Parsing PDFs...');
+    /* Step 1: Parse ALL PDFs client-side with pdf.js (no server calls needed) */
+    console.log('Step 1: Parsing PDFs client-side...');
     const parsePromises = [
-      extractProductionFromPdf(files[1]),                         /* client-side pdf.js */
-      parsePdfViaServer(files[2], 'collections'),                 /* Claude edge fn */
-      files[3] ? parsePdfViaServer(files[3], 'pl') : Promise.resolve(null)  /* Claude edge fn */
+      extractProductionFromPdf(files[1]),
+      extractCollectionsFromPdf(files[2]),
+      files[3] ? extractPLFromPdf(files[3]) : Promise.resolve(null)
     ];
 
     /* Extract AR data client-side in parallel */
