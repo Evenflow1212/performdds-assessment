@@ -2,58 +2,10 @@
 const ExcelJS = require('exceljs');
 const fetch   = require('node-fetch');
 
-/* ─── Claude API ─── */
-async function callClaude(pdfBase64, prompt, key, maxTokens = 4096) {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001', max_tokens: maxTokens,
-      messages: [{role:'user',content:[
-        {type:'document',source:{type:'base64',media_type:'application/pdf',data:pdfBase64}},
-        {type:'text',text:prompt}
-      ]}]
-    })
-  });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error('Claude API: ' + JSON.stringify(data).slice(0,300));
-  return data.content?.[0]?.text || '';
-}
-
+/* Helper: set cell value safely */
 function sv(ws, addr, val) { try { ws.getCell(addr).value = val; } catch(e) {} }
 
-/* ─── Prompts ─── */
-const PROD_PROMPT = `Dental Dentrix Production by Procedure Code report. Extract the date range from the header, then every procedure code with its description, quantity and dollar total.
-Return ONLY lines in this format — no other text:
-First line: DATES|MM/DD/YYYY - MM/DD/YYYY
-Then one line per code: CODE|DESCRIPTION|QTY|TOTAL
-Example:
-DATES|03/01/2025 - 02/28/2026
-D0120|Periodic Oral Evaluation - Established Patient|910|62016.00
-D1110|Prophylaxis - Adult|938|117415.00
-Include ALL codes, even those with $0 total. Maintain the order they appear in the document.`;
-
-const COLL_PROMPT = `Dentrix Analysis Summary Provider report. Find:
-1. The date range at the top (format: MM/DD/YYYY - MM/DD/YYYY)
-2. The TOTAL row at the bottom of the last page. Extract the CHARGES column total and the PAYMENTS column total (payments appear negative — return as positive number).
-Return ONLY these 3 lines:
-DATES|[start] - [end]
-CHARGES|[number]
-PAYMENTS|[number as positive]`;
-
-const PL_PROMPT = `QuickBooks Profit and Loss statement. Extract every line item with its dollar amount.
-Return ONLY lines in this format:
-SECTION|[Income/COGS/Expense/Other Expense]
-ITEM|AMOUNT
-Use these exact section markers before each group.
-For each line item under Expenses, return: ItemName|Amount
-Also include these summary lines at the end:
-TOTAL_INCOME|[amount]
-TOTAL_EXPENSE|[amount]
-NET_INCOME|[amount]
-Return negative numbers with minus sign. Include ALL line items.`;
-
-/* ─── Parsers ─── */
+/* ─── Parsers (text from Claude → structured data) ─── */
 function parseProduction(text) {
   const codes = [];
   let months = 12, years = [];
@@ -65,7 +17,6 @@ function parseProduction(text) {
       for (let y = from.getFullYear(); y <= to.getFullYear(); y++) years.push(y);
       continue;
     }
-    // CODE|DESC|QTY|TOTAL or CODE|QTY|TOTAL
     const m4 = line.match(/^([A-Z]\d[A-Z0-9.\-]{1,10})\|(.+?)\|(\d+)\|([\d,.]+)/i);
     if (m4) {
       const code = m4[1].toUpperCase(), desc = m4[2].trim();
@@ -142,31 +93,25 @@ function plCategory(item) {
 }
 
 /* ─── Production Worksheet mappings ─── */
-// Left side: code → row (D=qty, F=avg)
 const LEFT = {'D0120':10,'D0140':11,'D0150':12,'D0180':13,'D0210':16,'D0274':17,'D0330':18,
   'D1110':21,'D1120':22,'D4910':23,'D4381':25,'D4346':26,'D2740':31,'D2750':32};
-const SRP_CODES = ['D4341','D4342']; // aggregate to row 24
+const SRP_CODES = ['D4341','D4342'];
 
-// Right side: code → row (L=qty, M=total, N=avg)
 const RIGHT = {};
 const R = (codes, row) => codes.forEach(c => { RIGHT[c] = row; });
-// Other Crowns
 R(['D2960','D2961','D2962'], 3);
 R(['D2610','D2620','D2630'], 4);
 R(['D2642','D2643','D2644'], 5);
 R(['D2710','D2712','D2720','D2721','D2722'], 6);
 R(['D2780','D2781','D2782','D2783','D2790','D2791','D2792','D2794'], 7);
 R(['D6058','D6059','D6060','D6061','D6062','D6063','D6064','D6065','D6066','D6067','D6068'], 8);
-// Bridge Units
 R(['D6210','D6211','D6212','D6214','D6240','D6241','D6242','D6243','D6245','D6250','D6251','D6252','D6253',
    'D6545','D6548','D6549','D6710','D6720','D6721','D6722','D6740','D6750','D6751','D6752','D6753',
    'D6780','D6781','D6782','D6783','D6790','D6791','D6792','D6793','D6794'], 12);
 R(['D6050','D6051','D6056','D6057'], 14);
-// Ortho
 R(['D7880','D7881','D9940','D9944','D9945','D9946'], 21);
 R(['D8040'], 22); R(['D8080'], 23); R(['D8090'], 24); R(['D8220'], 25);
 R(['D8680','D8681'], 26);
-// Dentures
 R(['D5110','D5120','D5130','D5140'], 31);
 R(['D5211','D5212'], 32); R(['D5213','D5214'], 33); R(['D5225','D5226'], 34);
 R(['D6082','D6083','D6084','D6085','D6086','D6087'], 35);
@@ -174,14 +119,11 @@ R(['D5410','D5411','D5421','D5422'], 36);
 R(['D5511','D5512','D5520','D5611','D5612','D5621','D5622','D5630','D5640','D5650','D5660'], 37);
 R(['D5710','D5711','D5720','D5721','D5730','D5731','D5740','D5741','D5750','D5751','D5760','D5761'], 38);
 R(['D5810','D5811','D5820','D5821'], 39);
-// Endo
 R(['D3310'], 43); R(['D3320'], 44); R(['D3330'], 45);
 R(['D3346','D3347','D3348'], 46);
-// Perio
 R(['D4249'], 51); R(['D4266'], 52); R(['D4267'], 53); R(['D4273'], 54); R(['D4283'], 56);
 R(['D4260','D4261','D4263','D4264','D4270','D4271','D4275','D4276','D4277','D4278','D4285',
    'D4210','D4211','D4240','D4241','D4245'], 52);
-// Oral Surgery
 R(['D7922'], 58); R(['D7953'], 59); R(['D6104'], 60); R(['D7140'], 61);
 R(['D7210','D7220','D7230','D7240','D7241'], 62); R(['D6010','D6011','D6012','D6013'], 63);
 R(['D6100'], 64); R(['D7250'], 65); R(['D7286','D7287','D7288'], 66); R(['D7952','D7951'], 67);
@@ -189,15 +131,23 @@ R(['D7310','D7311','D7320','D7321','D7410','D7411','D7412','D7440','D7450','D745
    'D7461','D7465','D7471','D7472','D7473','D7510','D7511','D7920','D7921','D7950','D7955',
    'D7960','D7961','D7962','D7970','D7971'], 66);
 
-/* ─── Normalize code: D4341.1 → D4341 ─── */
 function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 
-/* ─── Build the workbook ─── */
-async function buildXlsx(prodData, collData, plData, practiceName, arPatient, arInsurance) {
+/* ─── Build the workbook from pre-parsed text ─── */
+async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance) {
+  /* Parse the Claude output text into structured data */
+  const prodData = parseProduction(prodText || '');
+  const collData = collText ? parseCollections(collText) : null;
+  const plData = plText ? parsePL(plText) : null;
+
   const { codes, months: prodMonths, years } = prodData;
   const totalProd = codes.reduce((s,c) => s + c.total, 0);
 
-  // Load template
+  console.log('Parsed:', codes.length, 'codes,', prodMonths, 'months, years:', years.join(','));
+  if (collData) console.log('Collections:', collData.payments, 'over', collData.months, 'months');
+  if (plData) console.log('P&L:', plData.items.length, 'items, income:', plData.totalIncome);
+
+  /* Load template */
   let wb;
   try {
     const tr = await fetch('https://dentalpracticeassessments.com/Blank_Assessment_Template.xlsx');
@@ -224,15 +174,12 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
   sv(wsPW, 'D5', prodMonths);
   sv(wsPW, 'G5', totalProd);
 
-  // Aggregate codes for right-side panels
-  const rightAgg = {}; // row → {qty, total}
+  const rightAgg = {};
   const srpAgg = {qty: 0, total: 0};
   const usedInPW = new Set();
 
   for (const c of codes) {
     const bc = baseCode(c.code);
-
-    // Left side single-code rows
     if (LEFT[bc]) {
       const row = LEFT[bc];
       sv(wsPW, 'D'+row, c.qty);
@@ -240,16 +187,12 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
       usedInPW.add(c.code);
       continue;
     }
-
-    // SRP aggregation
     if (SRP_CODES.includes(bc)) {
       srpAgg.qty += c.qty;
       srpAgg.total += c.total;
       usedInPW.add(c.code);
       continue;
     }
-
-    // Right side panels
     const rRow = RIGHT[bc];
     if (rRow) {
       if (!rightAgg[rRow]) rightAgg[rRow] = {qty:0, total:0};
@@ -259,13 +202,11 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
     }
   }
 
-  // Write SRP row 24
   if (srpAgg.qty > 0) {
     sv(wsPW, 'D24', srpAgg.qty);
     sv(wsPW, 'F24', Math.round(srpAgg.total/srpAgg.qty*100)/100);
   }
 
-  // Write right-side panel data (L=qty, M=total, N=avg)
   for (const [row, agg] of Object.entries(rightAgg)) {
     sv(wsPW, 'L'+row, agg.qty);
     sv(wsPW, 'M'+row, Math.round(agg.total*100)/100);
@@ -273,14 +214,12 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
   }
 
   /* ═══ ALL CODES - PRODUCTION REPORT ═══ */
-  // Non-zero codes first (in Dentrix order), then zero codes at bottom
   const nonZero = codes.filter(c => c.total > 0);
   const zero = codes.filter(c => c.total === 0);
   const allCodes = [...nonZero, ...zero];
 
   allCodes.forEach((c, i) => {
-    const r = i + 2; // row 1 is header
-    // Display as D120 format (drop leading zero after D0)
+    const r = i + 2;
     const displayCode = c.code.replace(/^D0(\d)/, 'D$1');
     sv(wsAC, 'A'+r, displayCode);
     sv(wsAC, 'B'+r, c.desc);
@@ -289,7 +228,6 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
     sv(wsAC, 'E'+r, c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0);
     sv(wsAC, 'F'+r, totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0);
 
-    // Strikethrough if code was used in Production Worksheet
     if (usedInPW.has(c.code)) {
       ['A','B','C','D','E','F'].forEach(col => {
         try {
@@ -301,30 +239,23 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
   });
 
   /* ═══ FINANCIAL OVERVIEW ═══ */
-  // Use E/F columns (second year pair); update year header
   const primaryYear = years.length >= 2 ? years[1] : years[0] || new Date().getFullYear();
   sv(wsFO, 'E6', primaryYear);
-
-  // Production total
   sv(wsFO, 'E20', Math.round(totalProd*100)/100);
   sv(wsFO, 'E21', prodMonths);
 
-  // Collections
   if (collData && collData.payments) {
     sv(wsFO, 'F20', Math.round(collData.payments*100)/100);
     sv(wsFO, 'F21', collData.months || prodMonths);
   }
 
-  // P&L-based averages
   if (plData && plData.totalIncome) {
-    const plMonths = 12; // P&L is typically annual
-    sv(wsFO, 'D25', Math.round(plData.totalIncome/plMonths*100)/100);
+    sv(wsFO, 'D25', Math.round(plData.totalIncome/12*100)/100);
   }
   if (totalProd > 0 && prodMonths > 0) {
     sv(wsFO, 'D27', Math.round(totalProd/prodMonths*100)/100);
   }
 
-  // AR data
   if (arPatient && arPatient.total) {
     sv(wsFO, 'D32', arPatient.total);
     sv(wsFO, 'E32', arPatient.current||0);
@@ -343,23 +274,19 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
 
   /* ═══ P&L INPUT ═══ */
   if (plData && plData.items && plData.items.length > 0) {
-    // B2: months reviewed
     sv(wsPI, 'B2', 12);
-    // H2: collections from P&L (total income)
     if (plData.totalIncome) sv(wsPI, 'H2', plData.totalIncome);
 
-    // Write expense lines starting at row 6
     let row = 6;
     for (const item of plData.items) {
-      if (row > 46) break; // template has P formulas up to row 46
+      if (row > 46) break;
       const col = plCategory(item.item);
-      if (col === null) continue; // excluded (depreciation/amortization)
+      if (col === null) continue;
       sv(wsPI, 'A'+row, item.item);
       sv(wsPI, col+row, item.amount);
       row++;
     }
 
-    // N55: Total Cost from P&L (for reconciliation)
     if (plData.totalExpense) sv(wsPI, 'N55', plData.totalExpense);
   }
 
@@ -371,12 +298,9 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
     sv(wsRaw, 'A3', 'Line Item'); sv(wsRaw, 'B3', 'Amount'); sv(wsRaw, 'C3', 'Category'); sv(wsRaw, 'D3', 'Notes');
 
     let rr = 5;
-    // Income section
     sv(wsRaw, 'A'+rr, 'INCOME'); rr++;
     if (plData.totalIncome) { sv(wsRaw, 'A'+rr, 'TOTAL INCOME'); sv(wsRaw, 'B'+rr, plData.totalIncome); sv(wsRaw, 'D'+rr, 'Net collections'); rr++; }
     rr++;
-
-    // Expense section
     sv(wsRaw, 'A'+rr, 'EXPENSES'); rr++;
     for (const item of plData.items) {
       const cat = plCategory(item.item);
@@ -385,7 +309,6 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
       if (cat === null) {
         sv(wsRaw, 'C'+rr, 'EXCLUDED');
         sv(wsRaw, 'D'+rr, 'Non-cash — excluded');
-        // Apply strikethrough
         ['A','B','C','D'].forEach(col => {
           try { wsRaw.getCell(col+rr).font = { ...(wsRaw.getCell(col+rr).font||{}), strike: true }; } catch(e) {}
         });
@@ -411,7 +334,19 @@ async function buildXlsx(prodData, collData, plData, practiceName, arPatient, ar
   }
 
   const buf = await wb.xlsx.writeBuffer();
-  return Buffer.from(buf).toString('base64');
+  return {
+    xlsxB64: Buffer.from(buf).toString('base64'),
+    summary: {
+      codesFound: codes.length,
+      totalProduction: totalProd.toFixed(2),
+      months: prodMonths,
+      years,
+      netCollections: collData?.payments || plData?.totalIncome || null,
+      plParsed: plData !== null && plData.items.length > 0,
+      arPatientTotal: arPatient?.total || null,
+      arInsuranceTotal: arInsurance?.total || null
+    }
+  };
 }
 
 /* ─── Handler ─── */
@@ -419,53 +354,20 @@ exports.handler = async function(event) {
   if (event.httpMethod === 'OPTIONS') return {statusCode:200, headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST,OPTIONS'}, body:''};
   if (event.httpMethod !== 'POST') return {statusCode:405, body:'Method Not Allowed'};
 
-  const KEY = process.env.ANTHROPIC_KEY;
-  if (!KEY) return {statusCode:500, body:JSON.stringify({error:'ANTHROPIC_KEY not set'})};
-
   let body;
-  try { body = JSON.parse(event.body); } catch(e) { return {statusCode:400, body:JSON.stringify({error:'Invalid JSON'})}; }
+  try { body = JSON.parse(event.body); } catch(e) { return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'Invalid JSON'})}; }
 
-  const {productionBase64, collectionsBase64, plBase64, practiceName='', arPatient={}, arInsurance={}} = body;
-  if (!productionBase64) return {statusCode:400, body:JSON.stringify({error:'productionBase64 required'})};
+  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={} } = body;
+  if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
-    console.log('Starting Claude API calls...');
-    const [prodText, collText, plText] = await Promise.all([
-      callClaude(productionBase64, PROD_PROMPT, KEY, 8192),
-      collectionsBase64 ? callClaude(collectionsBase64, COLL_PROMPT, KEY) : Promise.resolve(''),
-      plBase64 ? callClaude(plBase64, PL_PROMPT, KEY, 8192) : Promise.resolve('')
-    ]);
-    console.log('Claude done. prod lines:', prodText.split('\n').length, 'coll:', collText.slice(0,120), 'pl lines:', plText.split('\n').length);
-
-    const prodData = parseProduction(prodText);
-    const collData = collectionsBase64 ? parseCollections(collText) : null;
-    const plData = plBase64 ? parsePL(plText) : null;
-
-    console.log('Parsed:', prodData.codes.length, 'codes,', prodData.months, 'months');
-    if (collData) console.log('Collections:', collData.payments, 'over', collData.months, 'months');
-    if (plData) console.log('P&L:', plData.items.length, 'items, income:', plData.totalIncome, 'expense:', plData.totalExpense);
-    console.log('AR Patient:', JSON.stringify(arPatient));
-    console.log('AR Insurance:', JSON.stringify(arInsurance));
-
-    const xlsxB64 = await buildXlsx(prodData, collData, plData, practiceName, arPatient, arInsurance);
-    const totalProd = prodData.codes.reduce((s,c) => s+c.total, 0);
+    console.log('Building workbook from pre-parsed data...');
+    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance);
 
     return {
       statusCode: 200,
       headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
-      body: JSON.stringify({
-        success: true, xlsxB64,
-        summary: {
-          codesFound: prodData.codes.length,
-          totalProduction: totalProd.toFixed(2),
-          months: prodData.months,
-          years: prodData.years,
-          netCollections: collData?.payments || plData?.totalIncome || null,
-          plParsed: plData !== null && plData.items.length > 0,
-          arPatientTotal: arPatient?.total || null,
-          arInsuranceTotal: arInsurance?.total || null
-        }
-      })
+      body: JSON.stringify({ success: true, xlsxB64: result.xlsxB64, summary: result.summary })
     };
   } catch(err) {
     console.error('Error:', err.message, err.stack?.slice(0,500));

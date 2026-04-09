@@ -1084,6 +1084,21 @@ async function extractARFromPdf(file, type) {
       }
     }
 
+/* Helper: call parse-pdf function for one PDF */
+async function parsePdfViaServer(file, type) {
+  const base64 = await fileToBase64(file);
+  console.log(`Sending ${type} PDF to parse-pdf (${Math.round(base64.length/1024)}KB base64)...`);
+  const resp = await fetch('/.netlify/functions/parse-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdfBase64: base64, type })
+  });
+  const data = await resp.json();
+  if (!data.success) throw new Error(`${type} parse failed: ${data.error || 'Unknown error'}`);
+  console.log(`${type} parsed: ${data.text.split('\n').length} lines`);
+  return data.text;
+}
+
 async function generate() {
   if (!files[1] || !files[2]) {
     alert('Please upload both the Production Report (Step 1) and the Collections Summary (Step 2) before generating.');
@@ -1092,19 +1107,33 @@ async function generate() {
   document.getElementById('step6').classList.remove('visible');
   document.getElementById('generatingState').classList.add('visible');
   try {
-    const prodBase64 = await fileToBase64(files[1]);
-    const collBase64 = await fileToBase64(files[2]);
-    const plBase64 = files[3] ? await fileToBase64(files[3]) : null;
-            const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
-    const arPatient = files[4] ? await extractARFromPdf(files[4], 'patient') : {};
-        const arInsurance = files[5] ? await extractARFromPdf(files[5], 'insurance') : {};
-        console.log('AR Patient:', JSON.stringify(arPatient));
-        console.log('AR Insurance:', JSON.stringify(arInsurance));
-        const payload = { productionBase64: prodBase64, collectionsBase64: collBase64, plBase64, practiceName, software, arPatient, arInsurance };
+    const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
+
+    /* Step 1: Parse PDFs via Claude (parallel calls, each under 10s) */
+    console.log('Step 1: Parsing PDFs via Claude...');
+    const parsePromises = [
+      parsePdfViaServer(files[1], 'production'),
+      parsePdfViaServer(files[2], 'collections'),
+      files[3] ? parsePdfViaServer(files[3], 'pl') : Promise.resolve(null)
+    ];
+
+    /* Extract AR data client-side in parallel */
+    const arPromises = [
+      files[4] ? extractARFromPdf(files[4], 'patient') : Promise.resolve({}),
+      files[5] ? extractARFromPdf(files[5], 'insurance') : Promise.resolve({})
+    ];
+
+    const [prodText, collText, plText] = await Promise.all(parsePromises);
+    const [arPatient, arInsurance] = await Promise.all(arPromises);
+    console.log('AR Patient:', JSON.stringify(arPatient));
+    console.log('AR Insurance:', JSON.stringify(arInsurance));
+
+    /* Step 2: Build workbook from parsed data (fast, no Claude) */
+    console.log('Step 2: Building workbook from parsed data...');
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ prodText, collText, plText, practiceName, arPatient, arInsurance })
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Generation failed');
@@ -1117,7 +1146,7 @@ async function generate() {
       { val: s.totalProduction ? '$' + Number(s.totalProduction).toLocaleString() : '—', lbl: 'Total Production' },
       { val: s.months ? s.months + ' months' : '—', lbl: 'Period' },
       { val: s.netCollections ? '$' + Number(s.netCollections).toLocaleString() : '—', lbl: 'Net Collections' },
-      { val: s.plParsed ? 'Yes ✅' : (plBase64 ? 'Partial' : 'Not uploaded'), lbl: 'P&L Parsed' },
+      { val: s.plParsed ? 'Yes ✅' : (plText ? 'Partial' : 'Not uploaded'), lbl: 'P&L Parsed' },
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     document.getElementById('generatingState').classList.remove('visible');
