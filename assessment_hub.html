@@ -1076,13 +1076,10 @@ async function extractARFromPdf(file, type) {
       }
     }
 
-/* ─── Client-side Collections PDF parser using pdf.js ─── */
-async function extractCollectionsFromPdf(file) {
+/* ─── Helper: extract all text rows from a PDF using pdf.js ─── */
+async function pdfToTextRows(file) {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-  console.log('Collections PDF pages:', pdf.numPages);
-
-  /* Extract text from all pages, joining into lines by Y position */
   let allRows = [];
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
@@ -1096,7 +1093,12 @@ async function extractCollectionsFromPdf(file) {
     const sortedYs = Object.keys(rows).map(Number).sort((a,b) => b - a);
     for (const y of sortedYs) allRows.push(rows[y].trim());
   }
+  return { allRows, numPages: pdf.numPages };
+}
 
+/* ─── Client-side Collections PDF parser ─── */
+async function extractCollectionsFromPdf(file) {
+  const { allRows } = await pdfToTextRows(file);
   const fullText = allRows.join('\n');
   console.log('Collections text length:', fullText.length);
 
@@ -1105,31 +1107,18 @@ async function extractCollectionsFromPdf(file) {
   const dm = fullText.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*[-–to]+\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
   if (dm) dateRange = dm[1] + ' - ' + dm[2];
 
-  /* Find TOTAL row — look for "Total" or "TOTAL" with dollar amounts */
+  /* Find the TOTAL: row on pages 1-2 (financial summary page).
+     Format: TOTAL: 3,022,874.05 -2,686,215.68 -401,184.38 60,111.10 0.00 0.00 1,977,374.56
+     Columns: Charges, Payments, Credit Adj, Charge Adj, Offsetting Adj, Finance Chg, Billed To Ins */
   let charges = null, payments = null;
-  for (let i = allRows.length - 1; i >= 0; i--) {
-    const row = allRows[i];
-    if (/\btotal\b/i.test(row)) {
-      /* Extract all dollar amounts from this row */
-      const amts = [];
-      const re = /\(?\$?([\d,]+\.\d{2})\)?/g;
-      let m;
-      while ((m = re.exec(row)) !== null) {
-        let val = parseFloat(m[1].replace(/,/g, ''));
-        if (m[0].startsWith('(') || m[0].startsWith('-')) val = -val;
-        amts.push(val);
-      }
+  for (const row of allRows) {
+    if (/^TOTAL:/i.test(row)) {
+      const nums = row.match(/-?[\d,]+\.\d{2}/g);
       console.log('Collections TOTAL row:', row);
-      console.log('Collections amounts found:', amts);
-      /* Dentrix Analysis Summary: columns typically are Charges, Adjustments, ..., Payments */
-      if (amts.length >= 2) {
-        charges = Math.abs(amts[0]);
-        /* Payments is usually the last or second-to-last large number */
-        payments = Math.abs(amts[amts.length >= 4 ? amts.length - 2 : 1]);
-        /* Look for the largest negative number as payments */
-        for (const a of amts) {
-          if (a < 0 && Math.abs(a) > 10000) { payments = Math.abs(a); break; }
-        }
+      console.log('Collections nums:', nums);
+      if (nums && nums.length >= 2) {
+        charges = Math.abs(parseFloat(nums[0].replace(/,/g, '')));
+        payments = Math.abs(parseFloat(nums[1].replace(/,/g, '')));
       }
       break;
     }
@@ -1143,199 +1132,121 @@ async function extractCollectionsFromPdf(file) {
   return lines.join('\n');
 }
 
-/* ─── Client-side P&L PDF parser using pdf.js ─── */
+/* ─── Client-side P&L PDF parser ─── */
 async function extractPLFromPdf(file) {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-  console.log('P&L PDF pages:', pdf.numPages);
-
-  let allRows = [];
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const content = await page.getTextContent();
-    const rows = {};
-    content.items.forEach(item => {
-      const y = Math.round(item.transform[5]);
-      const x = Math.round(item.transform[4]);
-      if (!rows[y]) rows[y] = [];
-      rows[y].push({ x, str: item.str.trim() });
-    });
-    const sortedYs = Object.keys(rows).map(Number).sort((a,b) => b - a);
-    for (const y of sortedYs) {
-      const cells = rows[y].sort((a,b) => a.x - b.x);
-      allRows.push(cells.map(c => c.str).join('\t'));
-    }
-  }
-
+  const { allRows } = await pdfToTextRows(file);
   console.log('P&L text rows:', allRows.length);
 
   const lines = [];
-  let currentSection = '';
-  const sectionMap = {
-    'income': 'Income', 'revenue': 'Income', 'sales': 'Income',
-    'cost of goods': 'COGS', 'cogs': 'COGS',
-    'expense': 'Expense', 'operating expense': 'Expense',
-    'other expense': 'Other Expense', 'other income': 'Other Income'
-  };
+  let inExpenses = false, inIncome = false;
 
   for (const row of allRows) {
-    const cleanRow = row.replace(/\t+/g, '\t').trim();
-    if (!cleanRow) continue;
+    const clean = row.trim();
+    if (!clean) continue;
 
-    /* Check for section headers */
-    const lower = cleanRow.toLowerCase();
-    for (const [key, section] of Object.entries(sectionMap)) {
-      if (lower === key || lower === 'total ' + key || lower.startsWith(key + '\t') && !lower.match(/[\d.]/)) {
-        if (section !== currentSection && !lower.startsWith('total')) {
-          currentSection = section;
-          lines.push('SECTION|' + section);
-        }
-        break;
-      }
-    }
+    /* Skip page headers/footers */
+    if (/^(Cash Basis|Accrual Basis)/i.test(clean)) continue;
+    if (/^(Profit and Loss|January|February|March|April|May|June|July|August|September|October|November|December)/i.test(clean) && !/[\d.]{4,}/.test(clean)) continue;
+    if (/^TOTAL$/i.test(clean)) continue;
+    if (/^Date:/i.test(clean) || /^Page:/i.test(clean)) continue;
 
-    /* Check for summary lines */
-    const totalIncomeMatch = cleanRow.match(/total\s+(?:income|revenue|sales)[\t\s]+([\d,.()\-]+)/i);
-    if (totalIncomeMatch) {
-      let v = totalIncomeMatch[1].replace(/[,()]/g, m => m === ',' ? '' : m === '(' ? '-' : '');
-      lines.push('TOTAL_INCOME|' + v);
-      continue;
-    }
-    const totalExpenseMatch = cleanRow.match(/total\s+(?:expense|operating expense)s?[\t\s]+([\d,.()\-]+)/i);
-    if (totalExpenseMatch) {
-      let v = totalExpenseMatch[1].replace(/[,()]/g, m => m === ',' ? '' : m === '(' ? '-' : '');
-      lines.push('TOTAL_EXPENSE|' + v);
-      continue;
-    }
-    const netIncomeMatch = cleanRow.match(/net\s+(?:income|operating income|profit|loss)[\t\s]+([\d,.()\-]+)/i);
-    if (netIncomeMatch) {
-      let v = netIncomeMatch[1].replace(/[,()]/g, m => m === ',' ? '' : m === '(' ? '-' : '');
-      lines.push('NET_INCOME|' + v);
-      continue;
-    }
+    const lower = clean.toLowerCase();
 
-    /* Regular line items: text followed by a dollar amount */
-    const parts = cleanRow.split('\t');
-    if (parts.length >= 2) {
-      const lastPart = parts[parts.length - 1].trim();
-      const amtMatch = lastPart.match(/^\(?([\d,]+\.\d{2})\)?$/);
-      if (amtMatch) {
-        const itemName = parts.slice(0, -1).join(' ').trim();
-        if (itemName && !/^(total|net |gross )/i.test(itemName) && itemName.length > 1) {
-          let amt = amtMatch[1].replace(/,/g, '');
-          if (lastPart.startsWith('(')) amt = '-' + amt;
-          lines.push(itemName + '|' + amt);
-        }
+    /* Section markers */
+    if (lower === 'income' || lower === 'revenue') { inIncome = true; inExpenses = false; lines.push('SECTION|Income'); continue; }
+    if (/^expenses?$/i.test(clean)) { inExpenses = true; inIncome = false; lines.push('SECTION|Expense'); continue; }
+    if (/^cost of goods sold$/i.test(clean)) { lines.push('SECTION|COGS'); continue; }
+    if (/^other expense/i.test(clean) && !clean.match(/[\d.]/)) { lines.push('SECTION|Other Expense'); continue; }
+
+    /* Summary lines with $ amounts */
+    const totalIncM = clean.match(/^Total Income\s+\$?([\d,.-]+)/i) || clean.match(/^TOTAL INCOME\s+\$?([\d,.-]+)/i);
+    if (totalIncM) { lines.push('TOTAL_INCOME|' + totalIncM[1].replace(/[,$]/g, '')); continue; }
+
+    const totalExpM = clean.match(/^Total Expenses?\s+\$?([\d,.-]+)/i);
+    if (totalExpM) { lines.push('TOTAL_EXPENSE|' + totalExpM[1].replace(/[,$]/g, '')); continue; }
+
+    const netIncM = clean.match(/^NET (?:INCOME|OPERATING INCOME)\s+\$?\s*([-\d,.$]+)/i);
+    if (netIncM) { let v = netIncM[1].replace(/[,$]/g, ''); lines.push('NET_INCOME|' + v); continue; }
+
+    /* Cost of Goods Sold as a single line */
+    const cogsM = clean.match(/^Cost of Goods Sold\s+\$?([\d,.-]+)/i);
+    if (cogsM) { lines.push('SECTION|COGS'); lines.push('Cost of Goods Sold|' + cogsM[1].replace(/[,$]/g, '')); continue; }
+
+    /* Skip aggregate lines */
+    if (/^(Total |GROSS PROFIT|NET OTHER)/i.test(clean)) continue;
+
+    /* Regular line items: "Item Name Amount" (single or multiple spaces) */
+    const itemMatch = clean.match(/^(.+?)\s+(-?\$?[\d,]+\.\d{2})\s*$/);
+    if (itemMatch) {
+      const itemName = itemMatch[1].trim();
+      let amt = itemMatch[2].replace(/[$,]/g, '');
+      if (itemName && itemName.length > 1) {
+        lines.push(itemName + '|' + amt);
       }
     }
   }
 
   console.log('P&L parsed: ' + lines.length + ' lines');
-  console.log('P&L first 5:', lines.slice(0, 5));
+  console.log('P&L first 10:', lines.slice(0, 10));
   return lines.join('\n');
 }
 
 /* ─── Client-side Production PDF parser using pdf.js ─── */
 async function extractProductionFromPdf(file) {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-  console.log('Production PDF pages:', pdf.numPages);
-
-  /* Extract text from ALL pages with position info for column alignment */
-  let allItems = [];
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const content = await page.getTextContent();
-    /* Group items by Y position (rows) */
-    const rows = {};
-    content.items.forEach(item => {
-      const y = Math.round(item.transform[5]); // Y position
-      const x = item.transform[4]; // X position
-      if (!rows[y]) rows[y] = [];
-      rows[y].push({ x, str: item.str.trim() });
-    });
-    /* Sort rows top to bottom, items left to right */
-    const sortedYs = Object.keys(rows).map(Number).sort((a,b) => b - a);
-    for (const y of sortedYs) {
-      const cells = rows[y].sort((a,b) => a.x - b.x);
-      allItems.push(cells.map(c => c.str).join('\t'));
-    }
-  }
-
-  const fullText = allItems.join('\n');
-  console.log('Production extracted text length:', fullText.length);
+  const { allRows } = await pdfToTextRows(file);
+  console.log('Production text rows:', allRows.length);
 
   /* Find date range in header */
   let dateRange = '';
+  const fullText = allRows.join('\n');
   const dateMatch = fullText.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*[-–to]+\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
   if (dateMatch) {
     dateRange = dateMatch[1] + ' - ' + dateMatch[2];
     console.log('Production date range:', dateRange);
   }
 
-  /* Parse procedure code rows.
-     Dentrix Production by Procedure Code has rows like:
-     D0120  Periodic Oral Evaluation - Established Patient  910  $62,016.00
-     We look for lines containing a dental code (D/S/N followed by digits) */
+  /* Dentrix Production by Procedure Code format is TWO lines per code:
+     Line 1: CODE - Description
+     Line 2: Quantity: N  Total: N,NNN.NN  Average: N.NN  Percent: N.NN
+
+     Codes can be: D0120, D0150.1, 20999, BL-1, 64550, 95831, etc. */
   const lines = [];
   if (dateRange) lines.push('DATES|' + dateRange);
 
-  /* Regex: dental procedure code pattern */
-  const codeRe = /\b([DSN]\d{4}[A-Z]?)\b/i;
-  /* Amount pattern: optional $, digits with commas, decimal */
-  const amtRe = /\$?([\d,]+\.\d{2})/g;
-  /* Quantity pattern: a standalone integer */
+  for (let i = 0; i < allRows.length; i++) {
+    const row = allRows[i].trim();
 
-  for (const row of allItems) {
-    const codeMatch = row.match(codeRe);
-    if (!codeMatch) continue;
+    /* Match code line: starts with a code followed by " - Description"
+       Codes: D\d{4}(\.\d+)?, or \d{4,5}, or BL-\d, or similar alphanumeric */
+    const codeLineMatch = row.match(/^([A-Z0-9][A-Z0-9.\-]{0,12})\s*-\s*(.+)/i);
+    if (!codeLineMatch) continue;
 
-    const code = codeMatch[1].toUpperCase();
-    /* Skip header rows or non-data rows */
-    if (code === 'D0000') continue;
+    const code = codeLineMatch[1].trim();
+    const desc = codeLineMatch[2].trim();
 
-    /* Find all dollar amounts in the row */
-    const amounts = [];
-    let m;
-    const amtRe2 = /\$?([\d,]+\.\d{2})/g;
-    while ((m = amtRe2.exec(row)) !== null) {
-      amounts.push(parseFloat(m[1].replace(/,/g, '')));
-    }
+    /* Skip page headers and non-code lines */
+    if (/^(Date|Page|All |PRACTICE|INCLUDE)/i.test(code)) continue;
+    if (code.length > 12) continue;
 
-    /* Find standalone integers (quantity) - look for numbers not part of amounts or codes */
-    const withoutAmounts = row.replace(/\$?[\d,]+\.\d{2}/g, '@@').replace(/[DSN]\d{4}[A-Z]?/gi, '##');
-    const qtyMatches = withoutAmounts.match(/\b(\d{1,6})\b/g);
-    let qty = 0;
-    if (qtyMatches) {
-      /* Take the first reasonable integer as quantity */
-      for (const qm of qtyMatches) {
-        const n = parseInt(qm);
-        if (n > 0 && n < 100000) { qty = n; break; }
-      }
-    }
+    /* Next line should have Quantity/Total/Average/Percent */
+    if (i + 1 >= allRows.length) continue;
+    const dataLine = allRows[i + 1].trim();
 
-    /* Last amount is typically the total */
-    const total = amounts.length > 0 ? amounts[amounts.length - 1] : 0;
+    const qtyMatch = dataLine.match(/Quantity:\s*([\d,]+)/i);
+    const totalMatch = dataLine.match(/Total:\s*([\d,.]+)/i);
 
-    /* Extract description: text between code and first number */
-    let desc = '';
-    const codeIdx = row.indexOf(codeMatch[0]);
-    const afterCode = row.substring(codeIdx + codeMatch[0].length);
-    /* Get text up to first tab-separated number or dollar sign */
-    const descMatch = afterCode.match(/^[\t ]*(.+?)(?=\t\s*\$?\d|\t\s*\d{1,6}\t|$)/);
-    if (descMatch) {
-      desc = descMatch[1].replace(/\t+/g, ' ').trim();
-      /* Clean up: remove trailing numbers that might be qty */
-      desc = desc.replace(/\s+\d+\s*$/, '').trim();
-    }
+    if (!qtyMatch && !totalMatch) continue;
 
-    if (qty > 0 || total > 0) {
-      lines.push(code + '|' + desc + '|' + qty + '|' + total.toFixed(2));
-    }
+    const qty = qtyMatch ? parseInt(qtyMatch[1].replace(/,/g, '')) : 0;
+    const total = totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : 0;
+
+    lines.push(code + '|' + desc + '|' + qty + '|' + total.toFixed(2));
+    i++; /* skip the data line */
   }
 
-  console.log('Production parsed: ' + lines.length + ' lines (including date header)');
-  console.log('First 5 lines:', lines.slice(0, 5));
+  console.log('Production parsed: ' + lines.length + ' codes');
+  console.log('First 5:', lines.slice(0, 5));
+  console.log('Sample D-codes:', lines.filter(l => l.startsWith('D0')).slice(0, 3));
   return lines.join('\n');
 }
 
