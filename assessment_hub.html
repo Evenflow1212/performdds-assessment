@@ -1152,11 +1152,19 @@ async function extractPLFromPdf(file) {
 
     const lower = clean.toLowerCase();
 
-    /* Section markers */
-    if (lower === 'income' || lower === 'revenue') { inIncome = true; inExpenses = false; lines.push('SECTION|Income'); continue; }
-    if (/^expenses?$/i.test(clean)) { inExpenses = true; inIncome = false; lines.push('SECTION|Expense'); continue; }
-    if (/^cost of goods sold$/i.test(clean)) { lines.push('SECTION|COGS'); continue; }
-    if (/^other expense/i.test(clean) && !clean.match(/[\d.]/)) { lines.push('SECTION|Other Expense'); continue; }
+    /* Section markers — robust detection for QuickBooks P&L formats */
+    if (/^(ordinary\s+)?income(\/expense)?$/i.test(clean) || lower === 'revenue' || lower === 'income') {
+      inIncome = true; inExpenses = false; lines.push('SECTION|Income'); console.log('P&L section: INCOME detected from "' + clean + '"'); continue;
+    }
+    if (/^(ordinary\s+)?expenses?$/i.test(clean) || /^expense$/i.test(clean)) {
+      inExpenses = true; inIncome = false; lines.push('SECTION|Expense'); console.log('P&L section: EXPENSE detected from "' + clean + '"'); continue;
+    }
+    if (/^cost of goods sold$/i.test(clean) || /^cogs$/i.test(clean)) { inIncome = false; lines.push('SECTION|COGS'); console.log('P&L section: COGS detected from "' + clean + '"'); continue; }
+    if (/^other (income|expense)/i.test(clean) && !clean.match(/[\d.]/)) {
+      if (/income/i.test(clean)) { inIncome = true; inExpenses = false; lines.push('SECTION|Income'); }
+      else { inExpenses = true; inIncome = false; lines.push('SECTION|Other Expense'); }
+      console.log('P&L section: ' + clean); continue;
+    }
 
     /* Summary lines with $ amounts */
     const totalIncM = clean.match(/^Total Income\s+\$?([\d,.-]+)/i) || clean.match(/^TOTAL INCOME\s+\$?([\d,.-]+)/i);

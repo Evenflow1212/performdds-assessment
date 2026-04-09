@@ -60,7 +60,7 @@ function parsePL(text) {
     const sn = line.match(/^NET_INCOME\|([-\d,.]+)/i);
     if (sn) { netIncome = parseFloat(sn[1].replace(/,/g,'')); continue; }
     const secMatch = line.match(/^SECTION\|(.+)/i);
-    if (secMatch) { currentSection = secMatch[1].trim(); continue; }
+    if (secMatch) { currentSection = secMatch[1].trim(); console.log('P&L section marker:', currentSection); continue; }
     if (/^DATES?\|/i.test(line)) continue;
     const m = line.match(/^(.+?)\|([-\d,.()+]+)/);
     if (m) {
@@ -73,6 +73,19 @@ function parsePL(text) {
       }
     }
   }
+  /* Fallback: if no items tagged as Income but we have totalIncome,
+     identify income items by common dental practice income names */
+  const hasIncome = items.some(i => i.section === 'Income');
+  if (!hasIncome && totalIncome) {
+    const incomePatterns = /^(sales|cc payment|cash payment|check payment|care credit|credit card|insurance payment|patient payment|collections|revenue|income|refunds? received|interest income|other income|dental income|service revenue)/i;
+    for (const it of items) {
+      if (incomePatterns.test(it.item)) {
+        it.section = 'Income';
+      }
+    }
+    console.log('P&L fallback: re-tagged', items.filter(i => i.section === 'Income').length, 'items as Income');
+  }
+
   return { items, totalIncome, totalExpense, netIncome };
 }
 
@@ -282,8 +295,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsPI, 'B2', 12);
     if (plData.totalIncome) sv(wsPI, 'H2', plData.totalIncome);
 
+    /* ONLY expense items go into the expense grid — exclude Income and COGS */
+    const expenseOnly = plData.items.filter(i => i.section !== 'Income' && i.section !== 'COGS');
+    console.log('P&L Input: ' + expenseOnly.length + ' expense items (filtered from ' + plData.items.length + ' total)');
+
     let row = 6;
-    for (const item of plData.items) {
+    for (const item of expenseOnly) {
       if (row > 46) break;
       const col = plCategory(item.item);
       if (col === null) continue;
@@ -349,6 +366,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     if (plData.totalExpense) { sv(wsRaw, 'A'+rr, 'TOTAL EXPENSES'); sv(wsRaw, 'B'+rr, plData.totalExpense); sv(wsRaw, 'D'+rr, 'Per P&L'); rr++; }
     rr++;
     if (plData.netIncome != null) { sv(wsRaw, 'A'+rr, 'NET INCOME'); sv(wsRaw, 'B'+rr, plData.netIncome); sv(wsRaw, 'D'+rr, 'Per P&L'); }
+
+    /* Set column widths to prevent #### display */
+    wsRaw.getColumn('A').width = 35;
+    wsRaw.getColumn('B').width = 18;
+    wsRaw.getColumn('C').width = 18;
+    wsRaw.getColumn('D').width = 22;
   }
 
   /* ═══ P&L IMAGE (placeholder) ═══ */
