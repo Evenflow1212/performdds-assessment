@@ -255,6 +255,22 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const zero = codes.filter(c => c.total === 0);
   const allCodes = [...nonZero, ...zero];
 
+  /* Clear any row-level or column-level strikethrough inherited from the template */
+  try {
+    for (let r = 1; r <= allCodes.length + 5; r++) {
+      const row = wsAC.getRow(r);
+      if (row.font) row.font = { ...row.font, strike: false };
+      if (row.style && row.style.font) row.style = { ...row.style, font: { ...row.style.font, strike: false } };
+    }
+    ['A','B','C','D','E','F'].forEach(col => {
+      try {
+        const column = wsAC.getColumn(col);
+        if (column.font) column.font = { ...column.font, strike: false };
+        if (column.style && column.style.font) column.style = { ...column.style, font: { ...column.style.font, strike: false } };
+      } catch(e) {}
+    });
+  } catch(e) { console.warn('Could not clear AC default styles:', e.message); }
+
   allCodes.forEach((c, i) => {
     const r = i + 2;
     const displayCode = c.code;
@@ -266,13 +282,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsAC, 'F'+r, totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0);
 
     const isUsed = usedInPW.has(c.code);
+    /* Set a CLEAN font object — do NOT spread from template.
+       This guarantees no inherited strikethrough leaks through. */
+    const cleanFont = { name: 'Calibri', size: 11, bold: false, italic: false, strike: isUsed, color: { argb: 'FF000000' } };
+    const usedFont  = { name: 'Calibri', size: 11, bold: false, italic: false, strike: true,   color: { argb: 'FF999999' } };
+    const font = isUsed ? usedFont : cleanFont;
     ['A','B','C','D','E','F'].forEach(col => {
-      try {
-        const cell = wsAC.getCell(col+r);
-        /* Explicitly set strike: true for used codes, false for unused —
-           this overrides any inherited template formatting */
-        cell.font = { ...(cell.font||{}), strike: isUsed };
-      } catch(e) {}
+      try { wsAC.getCell(col+r).font = font; } catch(e) {}
     });
 
     /* Number formats for data columns */
@@ -281,6 +297,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     try { wsAC.getCell('E'+r).numFmt = '$#,##0.00'; } catch(e) {}
     try { wsAC.getCell('F'+r).numFmt = '0.00%'; } catch(e) {}
   });
+
+  console.log('All Codes: ' + allCodes.length + ' total, ' + usedInPW.size + ' struck through, ' + (allCodes.length - usedInPW.size) + ' clean');
 
   /* ═══ FINANCIAL OVERVIEW ═══ */
   sv(wsFO, 'D4', practiceName);
