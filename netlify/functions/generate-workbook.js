@@ -310,6 +310,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     }
 
     if (plData.totalExpense) sv(wsPI, 'N55', plData.totalExpense);
+
+    /* Fix column M ("Other") width — template has it too narrow */
+    try { wsPI.getColumn('M').width = 18; } catch(e) {}
   }
 
   /* ═══ P&L RAW IMPORT (new sheet) ═══ */
