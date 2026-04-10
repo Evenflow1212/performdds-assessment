@@ -1037,7 +1037,7 @@
       <table class="hs-grid" id="hsNext7">
         <thead>
           <tr>
-            <th class="week-col"></th>
+            <th class="week-col">Week</th>
             <th colspan="2" class="day-group">Monday</th>
             <th colspan="2" class="day-group">Tuesday</th>
             <th colspan="2" class="day-group">Wednesday</th>
@@ -1055,26 +1055,7 @@
             <th class="sub day-group">schd.</th><th class="sub">conf</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td class="week-label">Scheduled</td>
-            <td class="day-group"><input type="number" id="hs_n7_s_mon_s" min="0"></td><td><input type="number" id="hs_n7_s_mon_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_s_tue_s" min="0"></td><td><input type="number" id="hs_n7_s_tue_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_s_wed_s" min="0"></td><td><input type="number" id="hs_n7_s_wed_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_s_thu_s" min="0"></td><td><input type="number" id="hs_n7_s_thu_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_s_fri_s" min="0"></td><td><input type="number" id="hs_n7_s_fri_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_s_sat_s" min="0"></td><td><input type="number" id="hs_n7_s_sat_c" min="0"></td>
-          </tr>
-          <tr>
-            <td class="week-label">Confirmed</td>
-            <td class="day-group"><input type="number" id="hs_n7_c_mon_s" min="0"></td><td><input type="number" id="hs_n7_c_mon_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_c_tue_s" min="0"></td><td><input type="number" id="hs_n7_c_tue_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_c_wed_s" min="0"></td><td><input type="number" id="hs_n7_c_wed_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_c_thu_s" min="0"></td><td><input type="number" id="hs_n7_c_thu_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_c_fri_s" min="0"></td><td><input type="number" id="hs_n7_c_fri_c" min="0"></td>
-            <td class="day-group"><input type="number" id="hs_n7_c_sat_s" min="0"></td><td><input type="number" id="hs_n7_c_sat_c" min="0"></td>
-          </tr>
-        </tbody>
+        <tbody id="hsNext7Body"></tbody>
       </table>
 
       <!-- NEAR FUTURE -->
@@ -1384,8 +1365,11 @@ function populateHygieneDates() {
     rpBody.appendChild(makeRow('rp', i, fmtWeek(getMonday(-3 + i))));
   }
 
-  /* Next 7 Days label */
+  /* Next 7 Days: single row with date */
   document.getElementById('hsNext7Label').textContent = fmtWeek(thisMonday);
+  const n7Body = document.getElementById('hsNext7Body');
+  n7Body.innerHTML = '';
+  n7Body.appendChild(makeRow('n7', 0, fmtWeek(thisMonday)));
 
   /* Near Future: 3 weeks starting next week */
   const nfBody = document.getElementById('hsNearFutureBody');
@@ -1420,12 +1404,8 @@ function collectHygieneSchedule() {
     return weeks;
   }
 
-  /* Next 7 days: 2 rows (Scheduled, Confirmed) */
-  const n7Days = ['mon','tue','wed','thu','fri','sat'];
-  const n7Rows = [
-    { data: n7Days.flatMap(d => [gn('hs_n7_s_'+d+'_s'), gn('hs_n7_s_'+d+'_c')]) },
-    { data: n7Days.flatMap(d => [gn('hs_n7_c_'+d+'_s'), gn('hs_n7_c_'+d+'_c')]) }
-  ];
+  /* Next 7 days: single row with schd/conf paired per day (same structure as other grids) */
+  const n7Rows = [collectGrid('n7', 1)[0]];
 
   return {
     recentPast: collectGrid('rp', 3),
