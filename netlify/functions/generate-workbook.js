@@ -151,7 +151,7 @@ R(['D7310','D7311','D7320','D7321','D7410','D7411','D7412','D7440','D7450','D745
 function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 
 /* ─── Build the workbook from pre-parsed text ─── */
-async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance) {
+async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData) {
   /* Parse the Claude output text into structured data */
   const prodData = parseProduction(prodText || '');
   const collData = collText ? parseCollections(collText) : null;
@@ -444,26 +444,23 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   [36, 37, 38].forEach(r => { try { wsFO.getRow(r).height = 19.5; } catch(e) {} });
 
   /* ═══ HYGIENE SCHEDULE ═══ */
-  /* Auto-populate week-commencing dates relative to today.
-     Sections: recent past (rows 10-13), next 7 days (rows 19-20),
-     near future (rows 25-28), future future (rows 34-35). */
+  /* 3 weeks recent past (rows 10-12), next 7 days (rows 19-20),
+     3 weeks near future (rows 25-27), 2 weeks future future (rows 34-35).
+     All data rows get zeros. Dates pre-populated relative to today. */
   {
     const wsHS = wb.getWorksheet('Hygiene Schedule');
     if (wsHS) {
       const today = new Date();
-      /* Find the Monday of the current week */
-      const dayOfWeek = today.getDay(); /* 0=Sun, 1=Mon, ... */
+      const dayOfWeek = today.getDay();
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
       const thisMonday = new Date(today);
       thisMonday.setDate(today.getDate() + mondayOffset);
 
-      /* Helper: get Monday N weeks from thisMonday */
       function getMonday(weeksFromNow) {
         const d = new Date(thisMonday);
         d.setDate(thisMonday.getDate() + weeksFromNow * 7);
         return d;
       }
-      /* Helper: format a week as "M/D - M/D" (Mon to Fri) */
       function fmtWeek(mon) {
         const fri = new Date(mon);
         fri.setDate(mon.getDate() + 4);
@@ -472,27 +469,102 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         return m1 + '/' + d1 + ' - ' + m2 + '/' + d2;
       }
 
-      /* Recent past: 4 weeks back (rows 10-13) */
-      for (let i = 0; i < 4; i++) {
-        const mon = getMonday(-4 + i);
+      /* Recent past: 3 weeks back (rows 10-12). Row 13 left blank (eliminated). */
+      for (let i = 0; i < 3; i++) {
+        const mon = getMonday(-3 + i);
         sv(wsHS, 'B' + (10 + i), fmtWeek(mon));
       }
+      /* Ensure all recent past data rows have zeros (C-N for rows 10-12) */
+      const dataCols = ['C','D','E','F','G','H','I','J','K','L','M','N'];
+      for (let r = 10; r <= 12; r++) {
+        dataCols.forEach(col => { if (!wsHS.getCell(col+r).value) sv(wsHS, col+r, 0); });
+      }
 
-      /* Next 7 days: current week (rows 19-20 label the day names,
-         but row 19 col B has "SCHEDULED vs" — just set the date context in B18 area) */
-      /* The "NEXT 7 DAYS" header already exists. Add this week's date range to help. */
+      /* Next 7 days date context */
       sv(wsHS, 'E18', fmtWeek(thisMonday));
+      /* Ensure next-7-days rows have zeros (rows 19-20, C-N) */
+      for (let r = 19; r <= 20; r++) {
+        dataCols.forEach(col => { if (!wsHS.getCell(col+r).value) sv(wsHS, col+r, 0); });
+      }
 
-      /* Near future: next 4 weeks (rows 25-28) */
-      for (let i = 0; i < 4; i++) {
+      /* Near future: 3 weeks forward (rows 25-27). Row 28 left blank (eliminated). */
+      for (let i = 0; i < 3; i++) {
         const mon = getMonday(1 + i);
         sv(wsHS, 'B' + (25 + i), fmtWeek(mon));
       }
+      for (let r = 25; r <= 27; r++) {
+        dataCols.forEach(col => { if (!wsHS.getCell(col+r).value) sv(wsHS, col+r, 0); });
+      }
 
-      /* Future future: 2 weeks further out (rows 34-35) */
+      /* Future future: 2 weeks after near future (rows 34-35) */
       for (let i = 0; i < 2; i++) {
-        const mon = getMonday(5 + i);
+        const mon = getMonday(4 + i); /* starts week 4 (right after 3 near-future weeks) */
         sv(wsHS, 'B' + (34 + i), fmtWeek(mon));
+      }
+      for (let r = 34; r <= 35; r++) {
+        dataCols.forEach(col => { if (!wsHS.getCell(col+r).value) sv(wsHS, col+r, 0); });
+      }
+
+      /* Populate hygiene schedule form data if provided */
+      if (hygieneData) {
+        /* Patient estimates */
+        if (hygieneData.activePatients) sv(wsHS, 'N39', hygieneData.activePatients);
+        if (hygieneData.newPatientsPerMonth) sv(wsHS, 'N40', hygieneData.newPatientsPerMonth);
+        if (hygieneData.perioPct) sv(wsHS, 'N41', hygieneData.perioPct);
+        if (hygieneData.perioPosPct) sv(wsHS, 'N42', hygieneData.perioPosPct);
+        if (hygieneData.ptsPerHygDay) sv(wsHS, 'N51', hygieneData.ptsPerHygDay);
+        /* Recent past weekly data (rows 10-12, cols C-N) */
+        if (hygieneData.recentPast) {
+          hygieneData.recentPast.forEach((week, wi) => {
+            if (wi > 2) return;
+            const row = 10 + wi;
+            (week.data || []).forEach((val, ci) => {
+              if (ci < dataCols.length) sv(wsHS, dataCols[ci] + row, val || 0);
+            });
+          });
+        }
+        /* Next 7 days (rows 19-20, cols C-N) */
+        if (hygieneData.next7Days) {
+          hygieneData.next7Days.forEach((rowData, ri) => {
+            if (ri > 1) return;
+            const row = 19 + ri;
+            (rowData.data || []).forEach((val, ci) => {
+              if (ci < dataCols.length) sv(wsHS, dataCols[ci] + row, val || 0);
+            });
+          });
+        }
+        /* Near future (rows 25-27, cols C-N) */
+        if (hygieneData.nearFuture) {
+          hygieneData.nearFuture.forEach((week, wi) => {
+            if (wi > 2) return;
+            const row = 25 + wi;
+            (week.data || []).forEach((val, ci) => {
+              if (ci < dataCols.length) sv(wsHS, dataCols[ci] + row, val || 0);
+            });
+          });
+        }
+        /* Future future (rows 34-35, cols C-N) */
+        if (hygieneData.futureFuture) {
+          hygieneData.futureFuture.forEach((week, wi) => {
+            if (wi > 1) return;
+            const row = 34 + wi;
+            (week.data || []).forEach((val, ci) => {
+              if (ci < dataCols.length) sv(wsHS, dataCols[ci] + row, val || 0);
+            });
+          });
+        }
+        /* RDH scheduled per day (row 7: C, E, G, I) */
+        if (hygieneData.rdhPerDay) {
+          const rdhCols = ['C','E','G','I'];
+          hygieneData.rdhPerDay.forEach((val, i) => {
+            if (i < rdhCols.length) sv(wsHS, rdhCols[i] + '7', val || 0);
+          });
+        }
+        /* Days scheduled (F16) */
+        if (hygieneData.daysScheduled) sv(wsHS, 'F16', hygieneData.daysScheduled);
+        /* Patient flow from software (H47), % under 19 (H48) */
+        if (hygieneData.patientFlow) sv(wsHS, 'H47', hygieneData.patientFlow);
+        if (hygieneData.pctUnder19) sv(wsHS, 'H48', hygieneData.pctUnder19);
       }
 
       console.log('Hygiene Schedule: populated week dates relative to', thisMonday.toISOString().slice(0,10));
@@ -930,12 +1002,12 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); } catch(e) { return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'Invalid JSON'})}; }
 
-  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={} } = body;
+  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, hygieneData=null } = body;
   if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
     console.log('Building workbook from pre-parsed data...');
-    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance);
+    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData);
 
     return {
       statusCode: 200,

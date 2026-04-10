@@ -198,6 +198,63 @@
   }
   .prog-step.active .prog-label { color: var(--navy); font-weight: 700; }
 
+  /* STAFF / HYGIENE FORM TABLES */
+  .form-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .form-table th {
+    background: var(--navy); color: white; font-size: 0.78rem; font-weight: 600;
+    padding: 8px 10px; text-align: left; letter-spacing: 0.03em; text-transform: uppercase;
+  }
+  .form-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .form-table td.pos-label {
+    font-size: 0.85rem; color: var(--text-muted); font-weight: 500; white-space: nowrap; width: 110px;
+  }
+  .form-table input[type="text"],
+  .form-table input[type="number"] {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 6px; padding: 7px 10px;
+    font-size: 0.88rem; font-family: inherit; transition: border 0.15s;
+  }
+  .form-table input:focus { border-color: var(--navy); outline: none; }
+  .form-table input[type="number"] { text-align: right; }
+  .form-table tr:nth-child(even) td { background: #fafbfc; }
+  .form-section-label {
+    font-size: 0.95rem; font-weight: 600; color: var(--navy); margin: 20px 0 8px;
+    border-bottom: 2px solid var(--gold); padding-bottom: 4px; display: inline-block;
+  }
+  .benefits-grid {
+    display: grid; grid-template-columns: 140px 1fr; gap: 8px 12px; align-items: center; margin-bottom: 16px;
+  }
+  .benefits-grid label { font-size: 0.85rem; font-weight: 500; color: var(--text-muted); }
+  .benefits-grid input {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 6px; padding: 7px 10px;
+    font-size: 0.88rem; font-family: inherit;
+  }
+  .benefits-grid input:focus { border-color: var(--navy); outline: none; }
+
+  /* HYGIENE SCHEDULE GRID */
+  .hs-grid { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 0.78rem; }
+  .hs-grid th {
+    background: var(--navy); color: white; font-weight: 600; padding: 6px 4px;
+    text-align: center; letter-spacing: 0.03em; text-transform: uppercase; font-size: 0.72rem;
+  }
+  .hs-grid th.week-col { width: 100px; text-align: left; padding-left: 8px; }
+  .hs-grid th.day-group { border-left: 2px solid rgba(255,255,255,0.3); }
+  .hs-grid th.sub { background: #3a5a8c; font-size: 0.68rem; font-weight: 500; text-transform: none; }
+  .hs-grid td { padding: 4px 3px; border-bottom: 1px solid var(--border); text-align: center; }
+  .hs-grid td.week-label { text-align: left; padding-left: 8px; font-weight: 600; font-size: 0.82rem; color: var(--navy); white-space: nowrap; }
+  .hs-grid td.day-group { border-left: 2px solid var(--border); }
+  .hs-grid input[type="number"] {
+    width: 42px; border: 1.5px solid var(--border); border-radius: 4px; padding: 4px 2px;
+    font-size: 0.8rem; text-align: center; font-family: inherit;
+  }
+  .hs-grid input[type="number"]:focus { border-color: var(--navy); outline: none; }
+  .hs-grid tr:nth-child(even) td { background: #fafbfc; }
+  .hs-download-link {
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px;
+    color: var(--navy); font-weight: 600; font-size: 0.88rem; text-decoration: none;
+    padding: 8px 16px; border: 2px solid var(--navy); border-radius: 8px; transition: all 0.15s;
+  }
+  .hs-download-link:hover { background: var(--navy); color: white; }
+
   /* STEP CARD */
   .step-card {
     background: white;
@@ -559,6 +616,14 @@
     </div>
     <div class="prog-step" onclick="goToStep(6)">
       <div class="prog-dot">6</div>
+      <div class="prog-label">Staff Costs</div>
+    </div>
+    <div class="prog-step" onclick="goToStep(7)">
+      <div class="prog-dot">7</div>
+      <div class="prog-label">Hygiene</div>
+    </div>
+    <div class="prog-step" onclick="goToStep(8)">
+      <div class="prog-dot">8</div>
       <div class="prog-label">Generate</div>
     </div>
   </div>
@@ -843,10 +908,261 @@
     </div>
   </div>
 
-  <!-- STEP 6: GENERATE -->
+  <!-- STEP 6: EMPLOYEE COSTS -->
   <div class="step-card" id="step6">
     <div class="step-header">
       <div class="step-num">6</div>
+      <div>
+        <div class="step-title">Employee Costs</div>
+        <div class="step-subtitle">Enter staff and hygiene compensation details</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="form-section-label">Front Office &amp; Back Office Staff</div>
+      <table class="form-table" id="staffTable">
+        <thead><tr><th>Position</th><th>Name</th><th>Hourly Rate</th><th>Hours / Month</th></tr></thead>
+        <tbody>
+          <tr><td class="pos-label">Office Manager</td><td><input type="text" id="ec_name_om" placeholder="Name"></td><td><input type="number" id="ec_rate_om" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_om" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Front 1</td><td><input type="text" id="ec_name_f1" placeholder="Name"></td><td><input type="number" id="ec_rate_f1" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_f1" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Front 2</td><td><input type="text" id="ec_name_f2" placeholder="Name"></td><td><input type="number" id="ec_rate_f2" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_f2" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Front 3</td><td><input type="text" id="ec_name_f3" placeholder="Name"></td><td><input type="number" id="ec_rate_f3" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_f3" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Front 4</td><td><input type="text" id="ec_name_f4" placeholder="Name"></td><td><input type="number" id="ec_rate_f4" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_f4" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Front 5</td><td><input type="text" id="ec_name_f5" placeholder="Name"></td><td><input type="number" id="ec_rate_f5" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_f5" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Front 6</td><td><input type="text" id="ec_name_f6" placeholder="Name"></td><td><input type="number" id="ec_rate_f6" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_f6" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Back 1</td><td><input type="text" id="ec_name_b1" placeholder="Name"></td><td><input type="number" id="ec_rate_b1" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_b1" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Back 2</td><td><input type="text" id="ec_name_b2" placeholder="Name"></td><td><input type="number" id="ec_rate_b2" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_b2" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Back 3</td><td><input type="text" id="ec_name_b3" placeholder="Name"></td><td><input type="number" id="ec_rate_b3" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_b3" placeholder="0"></td></tr>
+          <tr><td class="pos-label">Back 4</td><td><input type="text" id="ec_name_b4" placeholder="Name"></td><td><input type="number" id="ec_rate_b4" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_b4" placeholder="0"></td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;gap:24px;margin-bottom:20px;">
+        <div style="flex:1;">
+          <label style="font-size:0.85rem;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Staff Benefits (monthly avg)</label>
+          <input type="number" id="ec_staff_benefits" placeholder="0.00" step="0.01" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.9rem;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.85rem;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Staff Employment Cost %</label>
+          <input type="number" id="ec_staff_empcost" placeholder="10" step="1" value="10" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.9rem;">
+        </div>
+      </div>
+
+      <div class="form-section-label">Hygiene Staff</div>
+      <table class="form-table" id="hygTable">
+        <thead><tr><th>Position</th><th>Name</th><th>Hourly Rate</th><th>Hours / Month</th></tr></thead>
+        <tbody>
+          <tr><td class="pos-label">RDH 1</td><td><input type="text" id="ec_name_h1" placeholder="Name"></td><td><input type="number" id="ec_rate_h1" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_h1" placeholder="0"></td></tr>
+          <tr><td class="pos-label">RDH 2</td><td><input type="text" id="ec_name_h2" placeholder="Name"></td><td><input type="number" id="ec_rate_h2" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_h2" placeholder="0"></td></tr>
+          <tr><td class="pos-label">RDH 3</td><td><input type="text" id="ec_name_h3" placeholder="Name"></td><td><input type="number" id="ec_rate_h3" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_h3" placeholder="0"></td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;gap:24px;margin-bottom:20px;">
+        <div style="flex:1;">
+          <label style="font-size:0.85rem;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Hygiene Benefits (monthly avg)</label>
+          <input type="number" id="ec_hyg_benefits" placeholder="0.00" step="0.01" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.9rem;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:0.85rem;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Hygiene Employment Cost %</label>
+          <input type="number" id="ec_hyg_empcost" placeholder="10" step="1" value="10" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.9rem;">
+        </div>
+      </div>
+
+      <div class="form-section-label">Benefits Policy Notes</div>
+      <div class="benefits-grid">
+        <label>Sick Pay:</label><input type="text" id="ec_ben_sick" placeholder="e.g. Per CA law">
+        <label>Paid Holidays:</label><input type="text" id="ec_ben_holidays" placeholder="e.g. 6 days/year">
+        <label>Paid Vacations:</label><input type="text" id="ec_ben_vacation" placeholder="e.g. 1 week after 1 year">
+        <label>Bonus:</label><input type="text" id="ec_ben_bonus" placeholder="e.g. Quarterly production bonus">
+        <label>401K:</label><input type="text" id="ec_ben_401k" placeholder="e.g. 3% match">
+        <label>Medical:</label><input type="text" id="ec_ben_medical" placeholder="e.g. Kaiser HMO">
+        <label>Dental:</label><input type="text" id="ec_ben_dental" placeholder="e.g. Family, lab cost only">
+        <label>Other:</label><input type="text" id="ec_ben_other" placeholder="">
+      </div>
+
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
+        <div>
+          <button class="skip-link" onclick="skipStep(6)" style="margin-right:16px;">Skip for now</button>
+          <button class="btn btn-primary" onclick="nextStep(6)">Continue →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 7: HYGIENE SCHEDULE -->
+  <div class="step-card" id="step7">
+    <div class="step-header">
+      <div class="step-num">7</div>
+      <div>
+        <div class="step-title">Hygiene Schedule</div>
+        <div class="step-subtitle">Enter weekly scheduling data — matches the printable worksheet</div>
+      </div>
+    </div>
+    <div class="step-body">
+
+      <a href="/Hygiene_Schedule_Worksheet.pdf" download class="hs-download-link">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V2h3v6H12L8 12zm-6 2h12v1.5H2V14z"/></svg>
+        Download Printable Worksheet (PDF)
+      </a>
+
+      <!-- RECENT PAST -->
+      <div class="form-section-label">Recent Past</div>
+      <table class="hs-grid" id="hsRecentPast">
+        <thead>
+          <tr>
+            <th class="week-col">Week</th>
+            <th colspan="2" class="day-group">Monday</th>
+            <th colspan="2" class="day-group">Tuesday</th>
+            <th colspan="2" class="day-group">Wednesday</th>
+            <th colspan="2" class="day-group">Thursday</th>
+            <th colspan="2" class="day-group">Friday</th>
+            <th colspan="2" class="day-group">Saturday</th>
+          </tr>
+          <tr>
+            <th class="week-col"></th>
+            <th class="sub day-group">appt</th><th class="sub">seen</th>
+            <th class="sub day-group">appt</th><th class="sub">seen</th>
+            <th class="sub day-group">appt</th><th class="sub">seen</th>
+            <th class="sub day-group">appt</th><th class="sub">seen</th>
+            <th class="sub day-group">appt</th><th class="sub">seen</th>
+            <th class="sub day-group">appt</th><th class="sub">seen</th>
+          </tr>
+        </thead>
+        <tbody id="hsRecentPastBody"></tbody>
+      </table>
+
+      <!-- NEXT 7 DAYS -->
+      <div class="form-section-label">Next 7 Days (<span id="hsNext7Label"></span>)</div>
+      <table class="hs-grid" id="hsNext7">
+        <thead>
+          <tr>
+            <th class="week-col"></th>
+            <th colspan="2" class="day-group">Monday</th>
+            <th colspan="2" class="day-group">Tuesday</th>
+            <th colspan="2" class="day-group">Wednesday</th>
+            <th colspan="2" class="day-group">Thursday</th>
+            <th colspan="2" class="day-group">Friday</th>
+            <th colspan="2" class="day-group">Saturday</th>
+          </tr>
+          <tr>
+            <th class="week-col"></th>
+            <th class="sub day-group">schd.</th><th class="sub">conf</th>
+            <th class="sub day-group">schd.</th><th class="sub">conf</th>
+            <th class="sub day-group">schd.</th><th class="sub">conf</th>
+            <th class="sub day-group">schd.</th><th class="sub">conf</th>
+            <th class="sub day-group">schd.</th><th class="sub">conf</th>
+            <th class="sub day-group">schd.</th><th class="sub">conf</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="week-label">Scheduled</td>
+            <td class="day-group"><input type="number" id="hs_n7_s_mon_s" min="0"></td><td><input type="number" id="hs_n7_s_mon_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_s_tue_s" min="0"></td><td><input type="number" id="hs_n7_s_tue_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_s_wed_s" min="0"></td><td><input type="number" id="hs_n7_s_wed_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_s_thu_s" min="0"></td><td><input type="number" id="hs_n7_s_thu_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_s_fri_s" min="0"></td><td><input type="number" id="hs_n7_s_fri_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_s_sat_s" min="0"></td><td><input type="number" id="hs_n7_s_sat_c" min="0"></td>
+          </tr>
+          <tr>
+            <td class="week-label">Confirmed</td>
+            <td class="day-group"><input type="number" id="hs_n7_c_mon_s" min="0"></td><td><input type="number" id="hs_n7_c_mon_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_c_tue_s" min="0"></td><td><input type="number" id="hs_n7_c_tue_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_c_wed_s" min="0"></td><td><input type="number" id="hs_n7_c_wed_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_c_thu_s" min="0"></td><td><input type="number" id="hs_n7_c_thu_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_c_fri_s" min="0"></td><td><input type="number" id="hs_n7_c_fri_c" min="0"></td>
+            <td class="day-group"><input type="number" id="hs_n7_c_sat_s" min="0"></td><td><input type="number" id="hs_n7_c_sat_c" min="0"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- NEAR FUTURE -->
+      <div class="form-section-label">Near Future</div>
+      <table class="hs-grid" id="hsNearFuture">
+        <thead>
+          <tr>
+            <th class="week-col">Week</th>
+            <th colspan="2" class="day-group">Monday</th>
+            <th colspan="2" class="day-group">Tuesday</th>
+            <th colspan="2" class="day-group">Wednesday</th>
+            <th colspan="2" class="day-group">Thursday</th>
+            <th colspan="2" class="day-group">Friday</th>
+            <th colspan="2" class="day-group">Saturday</th>
+          </tr>
+          <tr>
+            <th class="week-col"></th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+          </tr>
+        </thead>
+        <tbody id="hsNearFutureBody"></tbody>
+      </table>
+
+      <!-- FUTURE FUTURE -->
+      <div class="form-section-label">Future Future</div>
+      <table class="hs-grid" id="hsFutureFuture">
+        <thead>
+          <tr>
+            <th class="week-col">Week</th>
+            <th colspan="2" class="day-group">Monday</th>
+            <th colspan="2" class="day-group">Tuesday</th>
+            <th colspan="2" class="day-group">Wednesday</th>
+            <th colspan="2" class="day-group">Thursday</th>
+            <th colspan="2" class="day-group">Friday</th>
+            <th colspan="2" class="day-group">Saturday</th>
+          </tr>
+          <tr>
+            <th class="week-col"></th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+            <th class="sub day-group">appt</th><th class="sub">booked</th>
+          </tr>
+        </thead>
+        <tbody id="hsFutureFutureBody"></tbody>
+      </table>
+
+      <!-- PATIENT ESTIMATES & CAPACITY -->
+      <div class="form-section-label">Patient Estimates &amp; Capacity</div>
+      <div class="benefits-grid">
+        <label>Active Patients:</label><input type="number" id="hs_active_patients" placeholder="e.g. 1400">
+        <label>New Patients / Mo:</label><input type="number" id="hs_new_patients" placeholder="e.g. 18">
+        <label>Perio Disease %:</label><input type="number" id="hs_perio_pct" placeholder="e.g. 30" step="1" min="0" max="100">
+        <label>Perio Positive %:</label><input type="number" id="hs_perio_pos_pct" placeholder="e.g. 10" step="1" min="0" max="100">
+        <label>Patients / Hyg Day:</label><input type="number" id="hs_pts_per_day" placeholder="e.g. 8" step="1">
+        <label>Patient Flow (2yr):</label><input type="number" id="hs_patient_flow" placeholder="e.g. 1200">
+        <label>% Under Age 19:</label><input type="number" id="hs_pct_under19" placeholder="e.g. 25" step="1" min="0" max="100">
+        <label>Days Sched / Wk:</label><input type="number" id="hs_days_scheduled" placeholder="e.g. 5" step="1" min="1" max="6">
+      </div>
+
+      <!-- HYGIENIST SCHEDULE -->
+      <div class="form-section-label">Hygienist Schedule</div>
+      <div class="benefits-grid" style="grid-template-columns: 140px 80px;">
+        <label>RDH Mon:</label><input type="number" id="hs_rdh_mon" placeholder="e.g. 2" step="1" min="0">
+        <label>RDH Tue:</label><input type="number" id="hs_rdh_tue" placeholder="e.g. 2" step="1" min="0">
+        <label>RDH Wed:</label><input type="number" id="hs_rdh_wed" placeholder="e.g. 2" step="1" min="0">
+        <label>RDH Thu:</label><input type="number" id="hs_rdh_thu" placeholder="e.g. 2" step="1" min="0">
+      </div>
+
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="prevStep(7)">← Back</button>
+        <div>
+          <button class="skip-link" onclick="skipStep(7)" style="margin-right:16px;">Skip for now</button>
+          <button class="btn btn-primary" onclick="nextStep(7)">Continue →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 8: GENERATE -->
+  <div class="step-card" id="step8">
+    <div class="step-header">
+      <div class="step-num">8</div>
       <div>
         <div class="step-title">Generate Assessment Workbook</div>
         <div class="step-subtitle">Review your uploads and generate your Excel workbook</div>
@@ -859,7 +1175,7 @@
         <div>Generating your workbook takes approximately <strong>up to 60 seconds</strong>. Claude AI reads your reports and populates all 10 tabs of the assessment template.</div>
       </div>
       <div class="nav-row">
-        <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
+        <button class="btn btn-secondary" onclick="prevStep(8)">← Back</button>
         <button class="btn btn-generate" onclick="generate()" id="generateBtn">Generate Workbook ✦</button>
       </div>
     </div>
@@ -893,7 +1209,7 @@
 let currentStep = 1;
 let software = 'dentrix';
 let files = { 1: null, 2: null, 3: null, 4: null, 5: null };
-let skipped = { 3: false, 4: false, 5: false };
+let skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
 let generatedWorkbook = null;
 
 function calcDates() {
@@ -974,7 +1290,7 @@ function goToStep(n) {
     if (i + 1 < n) s.classList.add('done'); else if (i + 1 === n) s.classList.add('active');
   });
   currentStep = n;
-  if (n === 6) buildReview();
+  if (n === 8) buildReview();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -985,6 +1301,143 @@ function skipStep(n) {
   if (n === 3) { document.getElementById('next3').disabled = false; nextStep(3); }
   if (n === 4) { document.getElementById('next4').disabled = false; nextStep(4); }
   if (n === 5) { document.getElementById('next5').disabled = false; nextStep(5); }
+  if (n === 6 || n === 7) { nextStep(n); }
+}
+
+/* Collect Employee Costs form data */
+function collectEmployeeCosts() {
+  const gv = (id) => document.getElementById(id)?.value?.trim() || '';
+  const gn = (id) => parseFloat(document.getElementById(id)?.value) || 0;
+  const positions = [
+    { key: 'om', label: 'office manager', row: 7 },
+    { key: 'f1', label: 'front 1', row: 9 },
+    { key: 'f2', label: 'front 2', row: 10 },
+    { key: 'f3', label: 'front 3', row: 11 },
+    { key: 'f4', label: 'front 4', row: 12 },
+    { key: 'f5', label: 'front 5', row: 13 },
+    { key: 'f6', label: 'front 6', row: 14 },
+    { key: 'b1', label: 'back 1', row: 16 },
+    { key: 'b2', label: 'back 2', row: 17 },
+    { key: 'b3', label: 'back 3', row: 18 },
+    { key: 'b4', label: 'back 4', row: 19 }
+  ];
+  const hygPositions = [
+    { key: 'h1', label: 'rdh 1', row: 27 },
+    { key: 'h2', label: 'rdh 2', row: 28 },
+    { key: 'h3', label: 'rdh 3', row: 29 }
+  ];
+  const staff = positions.map(p => ({
+    ...p, name: gv('ec_name_' + p.key), rate: gn('ec_rate_' + p.key), hours: gn('ec_hrs_' + p.key)
+  })).filter(p => p.name || p.rate || p.hours);
+  const hygiene = hygPositions.map(p => ({
+    ...p, name: gv('ec_name_' + p.key), rate: gn('ec_rate_' + p.key), hours: gn('ec_hrs_' + p.key)
+  })).filter(p => p.name || p.rate || p.hours);
+  return {
+    staff, hygiene,
+    staffBenefits: gn('ec_staff_benefits'),
+    staffEmpCostPct: gn('ec_staff_empcost') / 100 || 0.10,
+    hygBenefits: gn('ec_hyg_benefits'),
+    hygEmpCostPct: gn('ec_hyg_empcost') / 100 || 0.10,
+    benefits: {
+      sick: gv('ec_ben_sick'), holidays: gv('ec_ben_holidays'), vacation: gv('ec_ben_vacation'),
+      bonus: gv('ec_ben_bonus'), k401: gv('ec_ben_401k'), medical: gv('ec_ben_medical'),
+      dental: gv('ec_ben_dental'), other: gv('ec_ben_other')
+    }
+  };
+}
+
+/* Populate Hygiene Schedule date labels and grid rows */
+function populateHygieneDates() {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const thisMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+
+  function getMonday(weeksFromNow) {
+    const d = new Date(thisMonday);
+    d.setDate(thisMonday.getDate() + weeksFromNow * 7);
+    return d;
+  }
+  function fmtWeek(mon) {
+    const fri = new Date(mon); fri.setDate(mon.getDate() + 4);
+    return (mon.getMonth()+1) + '/' + mon.getDate() + ' - ' + (fri.getMonth()+1) + '/' + fri.getDate();
+  }
+  function makeRow(section, weekIndex, weekLabel) {
+    const days = ['mon','tue','wed','thu','fri','sat'];
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="week-label">' + weekLabel + '</td>' +
+      days.map((d, i) =>
+        '<td' + (i === 0 ? ' class="day-group"' : '') + '><input type="number" id="hs_' + section + '_' + weekIndex + '_' + d + '_a" min="0"></td>' +
+        '<td><input type="number" id="hs_' + section + '_' + weekIndex + '_' + d + '_b" min="0"></td>'
+      ).join('');
+    return tr;
+  }
+
+  /* Recent Past: 3 weeks back */
+  const rpBody = document.getElementById('hsRecentPastBody');
+  rpBody.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    rpBody.appendChild(makeRow('rp', i, fmtWeek(getMonday(-3 + i))));
+  }
+
+  /* Next 7 Days label */
+  document.getElementById('hsNext7Label').textContent = fmtWeek(thisMonday);
+
+  /* Near Future: 3 weeks starting next week */
+  const nfBody = document.getElementById('hsNearFutureBody');
+  nfBody.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    nfBody.appendChild(makeRow('nf', i, fmtWeek(getMonday(1 + i))));
+  }
+
+  /* Future Future: 2 weeks starting week 4 */
+  const ffBody = document.getElementById('hsFutureFutureBody');
+  ffBody.innerHTML = '';
+  for (let i = 0; i < 2; i++) {
+    ffBody.appendChild(makeRow('ff', i, fmtWeek(getMonday(4 + i))));
+  }
+}
+
+/* Collect Hygiene Schedule form data */
+function collectHygieneSchedule() {
+  const gn = (id) => { const el = document.getElementById(id); return el && el.value !== '' ? parseFloat(el.value) || 0 : 0; };
+  const days = ['mon','tue','wed','thu','fri','sat'];
+
+  function collectGrid(section, numWeeks) {
+    const weeks = [];
+    for (let w = 0; w < numWeeks; w++) {
+      const data = [];
+      days.forEach(d => {
+        data.push(gn('hs_' + section + '_' + w + '_' + d + '_a'));
+        data.push(gn('hs_' + section + '_' + w + '_' + d + '_b'));
+      });
+      weeks.push({ data });
+    }
+    return weeks;
+  }
+
+  /* Next 7 days: 2 rows (Scheduled, Confirmed) */
+  const n7Days = ['mon','tue','wed','thu','fri','sat'];
+  const n7Rows = [
+    { data: n7Days.flatMap(d => [gn('hs_n7_s_'+d+'_s'), gn('hs_n7_s_'+d+'_c')]) },
+    { data: n7Days.flatMap(d => [gn('hs_n7_c_'+d+'_s'), gn('hs_n7_c_'+d+'_c')]) }
+  ];
+
+  return {
+    recentPast: collectGrid('rp', 3),
+    next7Days: n7Rows,
+    nearFuture: collectGrid('nf', 3),
+    futureFuture: collectGrid('ff', 2),
+    activePatients: gn('hs_active_patients'),
+    newPatientsPerMonth: gn('hs_new_patients'),
+    perioPct: gn('hs_perio_pct') / 100,
+    perioPosPct: gn('hs_perio_pos_pct') / 100,
+    ptsPerHygDay: gn('hs_pts_per_day'),
+    patientFlow: gn('hs_patient_flow'),
+    pctUnder19: gn('hs_pct_under19') / 100,
+    daysScheduled: gn('hs_days_scheduled'),
+    rdhPerDay: [gn('hs_rdh_mon'), gn('hs_rdh_tue'), gn('hs_rdh_wed'), gn('hs_rdh_thu')]
+  };
 }
 
 function buildReview() {
@@ -1474,7 +1927,7 @@ async function generate() {
     alert('Please upload both the Production Report (Step 1) and the Collections Summary (Step 2) before generating.');
     return;
   }
-  document.getElementById('step6').classList.remove('visible');
+  document.getElementById('step8').classList.remove('visible');
   document.getElementById('generatingState').classList.add('visible');
   try {
     const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
@@ -1554,12 +2007,16 @@ async function generate() {
       }
     }
 
+    /* Collect hygiene schedule form data (null if skipped) */
+    const hygieneData = skipped[7] ? null : collectHygieneSchedule();
+    console.log('Hygiene data:', hygieneData ? 'collected' : 'skipped');
+
     /* Step 2: Build workbook from parsed data (fast, no Claude) — do NOT send image to server */
     console.log('Step 2: Building workbook from parsed data...');
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prodText, collText, plText, practiceName, arPatient, arInsurance })
+      body: JSON.stringify({ prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData })
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Generation failed');
@@ -1591,7 +2048,7 @@ async function generate() {
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     document.getElementById('generatingState').classList.remove('visible');
-    document.getElementById('step6').classList.add('visible');
+    document.getElementById('step8').classList.add('visible');
     alert('Error generating workbook: ' + err.message + '\n\nPlease check your files and try again.');
   }
 }
@@ -1607,7 +2064,7 @@ function downloadWorkbook() {
 
 function resetAll() {
   files = { 1: null, 2: null, 3: null, 4: null, 5: null };
-  skipped = { 3: false, 4: false, 5: false };
+  skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
   generatedWorkbook = null;
   document.getElementById('resultCard').classList.remove('visible');
   document.getElementById('practiceName').value = '';
@@ -1620,12 +2077,20 @@ function resetAll() {
    'ar_ins_total','ar_ins_current','ar_ins_3160','ar_ins_6190','ar_ins_90plus'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  /* Reset hygiene schedule fields */
+  ['hs_active_patients','hs_new_patients','hs_perio_pct','hs_perio_pos_pct','hs_pts_per_day',
+   'hs_patient_flow','hs_pct_under19','hs_days_scheduled','hs_rdh_mon','hs_rdh_tue','hs_rdh_wed','hs_rdh_thu'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.querySelectorAll('.hs-grid input[type="number"]').forEach(el => { el.value = ''; });
   document.getElementById('next1').disabled = true;
+  populateHygieneDates();
   goToStep(1);
 }
 
 populateDates();
 updateSubtitles();
+populateHygieneDates();
 </script>
 </body>
 </html>
