@@ -337,9 +337,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     wsAC.getCell('F'+r).style = { ...baseStyle, numFmt: '0.00%', alignment: { horizontal: 'right', vertical: 'center' } };
   });
 
-  /* Set data row heights for All Codes (master template uses 15.0) */
+  /* Set data row heights for All Codes (master template uses 15.0) — only data rows */
   for (let r = 2; r <= allCodes.length + 1; r++) {
     try { wsAC.getRow(r).height = 15.0; } catch(e) {}
+  }
+  /* Reset trailing blank rows to default (12.75) */
+  for (let r = allCodes.length + 2; r <= 200; r++) {
+    try { wsAC.getRow(r).height = 12.75; } catch(e) {}
   }
 
   console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched, ' + sampleUnmatched.length + ' unmatched sample: ' + sampleUnmatched.join(','));
@@ -441,7 +445,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   /* ═══ P&L INPUT ═══ */
   /* P&L Input row heights (template uses 28.5 for all rows, 30.0 for row 2) */
-  for (let r = 1; r <= 59; r++) {
+  for (let r = 1; r <= 200; r++) {
     try { wsPI.getRow(r).height = 28.5; } catch(e) {}
   }
   try { wsPI.getRow(2).height = 30.0; } catch(e) {}
@@ -461,8 +465,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const piBlackFont = { name: 'Verdana', size: 10 };
   const piCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'];
 
-  /* Row 2: light blue highlight on B2, H2, N2 */
-  ['B2','H2','N2'].forEach(addr => {
+  /* Row 2: light blue highlight on B2, H2, K2, N2 */
+  ['B2','H2','K2','N2'].forEach(addr => {
     try { const c = wsPI.getCell(addr); const v = c.value; c.style = { fill: piLightBlue, font: { name: 'Verdana', size: 10, bold: true } }; c.value = v; } catch(e) {}
   });
   /* Row 5: dark navy header (A5-P5) with white text */
@@ -685,23 +689,38 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     } catch(e) {}
   }
 
-  /* ═══ GLOBAL FONT FIX: Calibri 11 → Verdana 10 ═══ */
-  /* ExcelJS corrupts theme fonts when loading xlsx templates, resetting them
-     to the ExcelJS default (Calibri 11). The master template uses Verdana 10
-     as its default font. Sweep ALL sheets and fix any corrupted defaults. */
+  /* ═══ GLOBAL FONT FIX ═══ */
+  /* ExcelJS corrupts theme-based fonts when loading xlsx templates, resolving
+     them to wrong names: Calibri 11 (ExcelJS default), Candara, Rockwell, etc.
+     Master template uses Verdana 10 as default. Must iterate by cell coordinates
+     (not eachRow/eachCell) to catch ALL cells including un-instantiated ones. */
+  const corruptedFonts = new Set(['Calibri', 'Candara', 'Rockwell', 'Cambria']);
   for (const ws of wb.worksheets) {
-    try {
-      ws.eachRow({ includeEmpty: true }, (row, rowNum) => {
-        row.eachCell({ includeEmpty: true }, (cell) => {
-          try {
-            const f = cell.font;
-            if (f && f.name === 'Calibri' && f.size === 11 && !f.bold && !f.strike && !f.italic) {
-              cell.font = { name: 'Verdana', size: 10 };
-            }
-          } catch(e) {}
-        });
-      });
-    } catch(e) {}
+    /* Skip All Codes — fully controlled by our code */
+    if (ws.name === 'All Codes - Production Report') continue;
+    const maxR = Math.max(ws.rowCount || 0, 100);
+    const maxC = Math.max(ws.columnCount || 0, 20);
+    for (let r = 1; r <= maxR; r++) {
+      for (let c = 1; c <= maxC; c++) {
+        try {
+          const cell = ws.getCell(r, c);
+          const f = cell.font;
+          if (!f || !f.name) continue;
+          if (!corruptedFonts.has(f.name)) continue;
+          /* Preserve intentionally-set white-text cells (on navy rows) */
+          if (f.color && f.color.argb === 'FFFFFFFF') continue;
+          /* Fix: change to Verdana 10, preserving bold/strike/italic/color */
+          cell.font = {
+            name: 'Verdana',
+            size: 10,
+            bold: f.bold || false,
+            italic: f.italic || false,
+            strike: f.strike || false,
+            color: f.color
+          };
+        } catch(e) {}
+      }
+    }
   }
 
   /* ═══ FIX TAB ORDER ═══ */
