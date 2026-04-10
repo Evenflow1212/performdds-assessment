@@ -371,6 +371,38 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsFO, 'H33', arInsurance.d90plus||0);
   }
 
+  /* Fix Financial Overview theme colors — ExcelJS loses theme-based fills
+     and defaults to yellow (FFFFFF00). Replace with correct RGB values. */
+  const navyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E4B7A' } };
+  const navyFont = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+  const lightBlueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF3FA' } };
+  const medBlueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
+  const darkNavyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
+
+  /* Row 42: header labels (navy blue background, white text) */
+  ['B42','C42','D42','E42','F42','G42','H42','I42'].forEach(addr => {
+    try { wsFO.getCell(addr).fill = navyFill; wsFO.getCell(addr).font = navyFont; } catch(e) {}
+  });
+  /* Row 43: sub-header labels */
+  ['B43','C43','D43','E43'].forEach(addr => {
+    try { wsFO.getCell(addr).fill = navyFill; wsFO.getCell(addr).font = navyFont; } catch(e) {}
+  });
+  /* Row 44: data values (light blue) */
+  ['B44','C44','D44','E44','F44','G44','H44'].forEach(addr => {
+    try { wsFO.getCell(addr).fill = lightBlueFill; wsFO.getCell(addr).numFmt = '$#,##0'; } catch(e) {}
+  });
+  try { wsFO.getCell('I44').fill = medBlueFill; wsFO.getCell('I44').numFmt = '$#,##0'; } catch(e) {}
+  /* Row 45: percentage formulas (light blue) — fix IFERROR wrappers */
+  ['B','C','D','E','F','G','H'].forEach(col => {
+    try {
+      wsFO.getCell(col+'45').value = { formula: 'IFERROR('+col+'44/I44,0)' };
+      wsFO.getCell(col+'45').fill = lightBlueFill;
+      wsFO.getCell(col+'45').numFmt = '0%';
+    } catch(e) {}
+  });
+  /* F36: Estimated Value of AR header (dark navy) */
+  try { wsFO.getCell('F36').fill = darkNavyFill; wsFO.getCell('F36').font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; } catch(e) {}
+
   /* ═══ P&L INPUT ═══ */
   if (plData && plData.items && plData.items.length > 0) {
     sv(wsPI, 'B2', 12);
