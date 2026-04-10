@@ -250,31 +250,49 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   try { wsPW.getCell('G5').numFmt = '$#,##0.00'; } catch(e) {}
   try { wsPW.getCell('D5').numFmt = '#,##0'; } catch(e) {}
 
+  /* Fix formula cells that have numFmt=General — they show raw decimals.
+     E column = per-month qty (should be integer), N column = avg fee (should be $) */
+  const pwIntCells = ['E10','E11','E12','E13','E16','E17','E18','E21','E22','E23','E24','E25','E26','E30','E31','E32','E34','E35','E36'];
+  pwIntCells.forEach(addr => { try { wsPW.getCell(addr).numFmt = '#,##0'; } catch(e) {} });
+  const pwDollarGeneral = ['N9','N18','N40','N47','N55','N68'];
+  pwDollarGeneral.forEach(addr => { try { wsPW.getCell(addr).numFmt = '$#,##0.00'; } catch(e) {} });
+  /* G6 per-month production */
+  try { wsPW.getCell('G6').numFmt = '$#,##0'; } catch(e) {}
+
   /* ═══ ALL CODES - PRODUCTION REPORT ═══ */
-  /* NUCLEAR OPTION: Delete the template sheet and rebuild from scratch.
-     This eliminates ALL inherited formatting (row styles, column styles,
-     conditional formatting, themes) that might force strikethrough. */
-  const acIndex = wb.worksheets.findIndex(s => s.name === 'All Codes - Production Report');
-  if (acIndex >= 0) wb.removeWorksheet(wsAC.id);
-  const wsAC2 = wb.addWorksheet('All Codes - Production Report');
-  /* Move it to the original position */
-  try { wb.moveWorksheet(wsAC2.id, acIndex); } catch(e) {}
+  /* Wipe the existing sheet IN PLACE (preserves tab order) then write fresh.
+     Use cell.style = {...} to completely replace all formatting. */
+  for (let r = 1; r <= 250; r++) {
+    ['A','B','C','D','E','F'].forEach(col => {
+      try {
+        const cell = wsAC.getCell(col + r);
+        cell.value = null;
+        cell.style = {};
+      } catch(e) {}
+    });
+    try { const row = wsAC.getRow(r); row.style = {}; row.font = undefined; } catch(e) {}
+  }
+  ['A','B','C','D','E','F'].forEach(col => {
+    try { wsAC.getColumn(col).style = {}; } catch(e) {}
+  });
 
   /* Header row */
   const acHeaders = ['Code', 'Description', 'Quantity', 'Total $', 'Avg Fee', '% of Prod'];
   acHeaders.forEach((h, i) => {
-    const cell = wsAC2.getCell(1, i + 1);
+    const cell = wsAC.getCell(1, i + 1);
     cell.value = h;
-    cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2B4A' } };
-    cell.alignment = { horizontal: i >= 2 ? 'right' : 'left' };
+    cell.style = {
+      font: { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2B4A' } },
+      alignment: { horizontal: i >= 2 ? 'right' : 'left' }
+    };
   });
-  wsAC2.getColumn('A').width = 12;
-  wsAC2.getColumn('B').width = 35;
-  wsAC2.getColumn('C').width = 12;
-  wsAC2.getColumn('D').width = 14;
-  wsAC2.getColumn('E').width = 12;
-  wsAC2.getColumn('F').width = 12;
+  wsAC.getColumn('A').width = 12;
+  wsAC.getColumn('B').width = 35;
+  wsAC.getColumn('C').width = 12;
+  wsAC.getColumn('D').width = 14;
+  wsAC.getColumn('E').width = 12;
+  wsAC.getColumn('F').width = 12;
 
   const nonZero = codes.filter(c => c.total > 0);
   const zero = codes.filter(c => c.total === 0);
@@ -290,26 +308,26 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     if (isUsed) directMatchCount++;
     else if (sampleUnmatched.length < 5) sampleUnmatched.push(c.code);
 
-    const font = isUsed
-      ? { name: 'Verdana', size: 10, strike: true,  color: { argb: 'FF999999' } }
-      : { name: 'Verdana', size: 10, strike: false, color: { argb: 'FF000000' } };
+    const usedStyle = {
+      font: { name: 'Verdana', size: 10, strike: true, color: { argb: 'FF999999' } }
+    };
+    const cleanStyle = {
+      font: { name: 'Verdana', size: 10, strike: false, color: { argb: 'FF000000' } }
+    };
+    const baseStyle = isUsed ? usedStyle : cleanStyle;
 
-    wsAC2.getCell('A'+r).value = c.code;
-    wsAC2.getCell('B'+r).value = c.desc;
-    wsAC2.getCell('C'+r).value = c.qty;
-    wsAC2.getCell('D'+r).value = Math.round(c.total*100)/100;
-    wsAC2.getCell('E'+r).value = c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0;
-    wsAC2.getCell('F'+r).value = totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0;
-
-    ['A','B','C','D','E','F'].forEach(col => { wsAC2.getCell(col+r).font = font; });
-    wsAC2.getCell('C'+r).numFmt = '#,##0';
-    wsAC2.getCell('D'+r).numFmt = '$#,##0.00';
-    wsAC2.getCell('E'+r).numFmt = '$#,##0.00';
-    wsAC2.getCell('F'+r).numFmt = '0.00%';
-    wsAC2.getCell('C'+r).alignment = { horizontal: 'right' };
-    wsAC2.getCell('D'+r).alignment = { horizontal: 'right' };
-    wsAC2.getCell('E'+r).alignment = { horizontal: 'right' };
-    wsAC2.getCell('F'+r).alignment = { horizontal: 'right' };
+    wsAC.getCell('A'+r).value = c.code;
+    wsAC.getCell('A'+r).style = baseStyle;
+    wsAC.getCell('B'+r).value = c.desc;
+    wsAC.getCell('B'+r).style = baseStyle;
+    wsAC.getCell('C'+r).value = c.qty;
+    wsAC.getCell('C'+r).style = { ...baseStyle, numFmt: '#,##0', alignment: { horizontal: 'right' } };
+    wsAC.getCell('D'+r).value = Math.round(c.total*100)/100;
+    wsAC.getCell('D'+r).style = { ...baseStyle, numFmt: '$#,##0.00', alignment: { horizontal: 'right' } };
+    wsAC.getCell('E'+r).value = c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0;
+    wsAC.getCell('E'+r).style = { ...baseStyle, numFmt: '$#,##0.00', alignment: { horizontal: 'right' } };
+    wsAC.getCell('F'+r).value = totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0;
+    wsAC.getCell('F'+r).style = { ...baseStyle, numFmt: '0.00%', alignment: { horizontal: 'right' } };
   });
 
   console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched, ' + sampleUnmatched.length + ' unmatched sample: ' + sampleUnmatched.join(','));
@@ -473,34 +491,6 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       sv(wsImg, 'A1', 'P&L Image — no image data provided');
     }
   }
-
-  /* ═══ FIX TAB ORDER ═══ */
-  /* When we delete+recreate All Codes, it gets a new id and goes to the end.
-     Rebuild the internal _worksheets array to enforce the correct tab order. */
-  const desiredOrder = [
-    'Production Worksheet', 'All Codes - Production Report', 'Hygiene Schedule',
-    'Financial Overview', 'Targets & Goal', 'Employee Costs', 'Budgetary P&L',
-    'P&L Input', 'P&L Raw Import', 'P&L Image'
-  ];
-  try {
-    const ordered = [];
-    for (const name of desiredOrder) {
-      const ws = wb.getWorksheet(name);
-      if (ws) ordered.push(ws);
-    }
-    /* Add any sheets not in the desired list */
-    for (const ws of wb.worksheets) {
-      if (!ordered.find(s => s.id === ws.id)) ordered.push(ws);
-    }
-    /* Rebuild _worksheets with ascending ids to enforce order */
-    wb._worksheets = [undefined];
-    ordered.forEach((ws, i) => {
-      const newId = i + 1;
-      ws.id = newId;
-      wb._worksheets[newId] = ws;
-    });
-    console.log('Tab order fixed:', ordered.map(s => s.name).join(', '));
-  } catch(e) { console.warn('Could not fix tab order:', e.message); }
 
   const buf = await wb.xlsx.writeBuffer();
   return {
