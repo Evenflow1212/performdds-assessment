@@ -510,8 +510,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   try { wsPI.getColumn('H').width = 24.0; } catch(e) {}
   try { wsPI.getColumn('P').width = 21.0; } catch(e) {}
 
-  /* P&L Input color fixes — ExcelJS loses theme colors from template.
-     Must use cell.style={} to override shared style references. */
+  /* P&L Input color/border/alignment fixes — ExcelJS loses theme colors and
+     cell.style={} wipes borders. Must include ALL style properties in every assignment. */
   const piLightBlue = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
   const piDarkNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
   const piNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E4B7A' } };
@@ -520,45 +520,54 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const piWhiteFont = { name: 'Verdana', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
   const piBlackFont = { name: 'Verdana', size: 10 };
   const piCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'];
+  /* Thin border on all four sides — master template uses this on every data cell */
+  const thinBorder = { style: 'thin' };
+  const piAllBorders = { left: thinBorder, right: thinBorder, top: thinBorder, bottom: thinBorder };
+  /* Accounting number format matching master (parentheses for negatives) */
+  const piAcctFmt = '$#,##0_);\\("$"#,##0\\)';
+  const piCurrFmt = '$#,##0.00';
 
-  /* Row 2: light blue highlight on B2, H2, K2, N2 */
-  ['B2','H2','K2','N2'].forEach(addr => {
-    try { const c = wsPI.getCell(addr); const v = c.value; c.style = { fill: piLightBlue, font: { name: 'Verdana', size: 10, bold: true } }; c.value = v; } catch(e) {}
+  /* Row 2: light blue highlight on B2, H2, N2 with borders */
+  ['B2','H2','N2'].forEach(addr => {
+    try { const c = wsPI.getCell(addr); const v = c.value; c.style = { fill: piLightBlue, font: { name: 'Verdana', size: 10, bold: true }, border: { left: thinBorder, top: thinBorder, bottom: thinBorder }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } }; c.value = v; } catch(e) {}
   });
   /* Row 5: dark navy header (A5-P5) with white text */
   piCols.forEach(col => {
-    try { const c = wsPI.getCell(col+'5'); const v = c.value; c.style = { fill: piDarkNavy, font: piWhiteFont, alignment: { horizontal: 'center', wrapText: true } }; c.value = v; } catch(e) {}
+    try { const c = wsPI.getCell(col+'5'); const v = c.value; c.style = { fill: piDarkNavy, font: piWhiteFont, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: piAllBorders }; c.value = v; } catch(e) {}
   });
-  /* Rows 6-32: alternating gray/white fills with light blue on col P */
+  /* Rows 6-32: alternating gray/white fills with borders, proper alignment */
   for (let r = 6; r <= 32; r++) {
-    const isEvenRow = (r % 2 === 0); /* even rows = gray, odd rows = white */
+    const isEvenRow = (r % 2 === 0);
     const rowFill = isEvenRow ? piGray : piWhiteFill;
-    ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
-      try { const c = wsPI.getCell(col+r); c.style = { fill: rowFill, font: piBlackFont, numFmt: col === 'A' ? '@' : '$#,##0.00' }; } catch(e) {}
+    /* Column A: right-aligned text label */
+    try { wsPI.getCell('A'+r).style = { fill: rowFill, font: piBlackFont, numFmt: piAcctFmt, alignment: { horizontal: 'right', vertical: 'bottom', wrapText: true }, border: { left: thinBorder, right: thinBorder, bottom: thinBorder } }; } catch(e) {}
+    /* Columns B-O: data cells with borders */
+    ['B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+      try { wsPI.getCell(col+r).style = { fill: rowFill, font: piBlackFont, numFmt: piAcctFmt, alignment: { vertical: 'bottom' }, border: piAllBorders }; } catch(e) {}
     });
-    /* Col P always light blue */
-    try { wsPI.getCell('P'+r).style = { fill: piLightBlue, font: piBlackFont }; } catch(e) {}
+    /* Col P: light blue with borders */
+    try { wsPI.getCell('P'+r).style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' }, border: piAllBorders }; } catch(e) {}
   }
-  /* Row 33: totals row (navy fill, white text) A-P */
+  /* Row 33: totals row (navy fill, white text) */
   piCols.slice(0, 15).forEach(col => {
-    try { const c = wsPI.getCell(col+'33'); c.style = { fill: piNavy, font: piWhiteFont, numFmt: '$#,##0.00' }; } catch(e) {}
+    try { wsPI.getCell(col+'33').style = { fill: piNavy, font: piWhiteFont, numFmt: piCurrFmt, border: piAllBorders }; } catch(e) {}
   });
-  try { wsPI.getCell('P33').style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
-  /* Row 34: monthly average (light blue) A-P */
+  try { wsPI.getCell('P33').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' } }; } catch(e) {}
+  /* Row 34: monthly average (light blue) */
   piCols.slice(0, 15).forEach(col => {
-    try { const c = wsPI.getCell(col+'34'); c.style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
+    try { wsPI.getCell(col+'34').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, border: piAllBorders }; } catch(e) {}
   });
-  try { wsPI.getCell('P34').style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
-  /* Row 35: adj figure (light blue) A-P */
+  try { wsPI.getCell('P34').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' } }; } catch(e) {}
+  /* Row 35: adj figure (light blue) */
   piCols.slice(0, 15).forEach(col => {
-    try { const c = wsPI.getCell(col+'35'); c.style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
+    try { wsPI.getCell(col+'35').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, border: piAllBorders }; } catch(e) {}
   });
-  try { wsPI.getCell('P35').style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
-  /* Row 36: P&L $$'s (navy fill, white text) A-P */
+  try { wsPI.getCell('P35').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' } }; } catch(e) {}
+  /* Row 36: P&L $$'s (navy fill, white text) */
   piCols.slice(0, 15).forEach(col => {
-    try { const c = wsPI.getCell(col+'36'); c.style = { fill: piNavy, font: piWhiteFont, numFmt: '$#,##0.00' }; } catch(e) {}
+    try { wsPI.getCell(col+'36').style = { fill: piNavy, font: piWhiteFont, numFmt: piCurrFmt, border: piAllBorders }; } catch(e) {}
   });
-  try { wsPI.getCell('P36').style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
+  try { wsPI.getCell('P36').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' } }; } catch(e) {}
   /* Rows 39-41: N column navy */
   [39,40,41].forEach(r => {
     try { wsPI.getCell('N'+r).style = { fill: piNavy, font: piWhiteFont }; } catch(e) {}
@@ -598,13 +607,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       const col = plCategory(item.item);
       if (col === null) continue;
       sv(wsPI, 'A'+row, item.item);
+      /* Font-only updates preserve borders/fills set in the styling pass above */
       try { wsPI.getCell('A'+row).font = { name: 'Verdana', size: 10 }; } catch(e) {}
       sv(wsPI, col+row, item.amount);
       try { wsPI.getCell(col+row).font = { name: 'Verdana', size: 10 }; } catch(e) {}
-      try { wsPI.getCell(col+row).numFmt = '$#,##0.00'; } catch(e) {}
-      /* Column P: row total formula */
+      try { wsPI.getCell(col+row).numFmt = piAcctFmt; } catch(e) {}
+      /* Column P: row total formula — use font-only to preserve style from above */
       try { wsPI.getCell('P'+row).value = { formula: 'SUM(B'+row+':O'+row+')' }; } catch(e) {}
-      try { wsPI.getCell('P'+row).style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
       row++;
     }
     /* Clear any unused data rows (between last item and row 32) */
