@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.4 – single-row N7, no Confirmed row -->
+<!-- v2.5 – UI polish, Employee Costs PDF, bug fixes -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -38,7 +38,7 @@
 
   /* HEADER */
   header {
-    background: var(--navy);
+    background: linear-gradient(135deg, var(--navy) 0%, #1e3460 100%);
     color: white;
     padding: 0 40px;
     display: flex;
@@ -249,12 +249,21 @@
   }
   .hs-grid input[type="number"]:focus { border-color: var(--navy); outline: none; }
   .hs-grid tr:nth-child(even) td { background: #fafbfc; }
-  .hs-download-link {
+  .download-link {
     display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px;
     color: var(--navy); font-weight: 600; font-size: 0.88rem; text-decoration: none;
     padding: 8px 16px; border: 2px solid var(--navy); border-radius: 8px; transition: all 0.15s;
   }
-  .hs-download-link:hover { background: var(--navy); color: white; }
+  .download-link:hover { background: var(--navy); color: white; }
+  .hs-download-link { /* legacy alias */ }
+
+  /* INLINE STYLE REPLACEMENTS */
+  .flex-row { display: flex; gap: 24px; margin-bottom: 20px; }
+  .flex-row > div { flex: 1; }
+  .flex-row label { font-size: 0.85rem; font-weight: 600; color: var(--navy); display: block; margin-bottom: 4px; }
+  .flex-row input { width: 100%; border: 1.5px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 0.9rem; font-family: inherit; }
+  .flex-row input:focus { border-color: var(--navy); outline: none; }
+  .date-flex { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
 
   /* STEP CARD */
   .step-card {
@@ -268,7 +277,7 @@
   .step-card.visible { display: block; }
 
   .step-header {
-    background: var(--navy);
+    background: linear-gradient(135deg, var(--navy) 0%, #1e3460 100%);
     color: white;
     padding: 20px 28px;
     display: flex;
@@ -554,8 +563,18 @@
   .summary-stat { background: #f5f7fb; border-radius: 10px; padding: 16px; text-align: left; }
   .summary-stat .val { font-size: 1.25rem; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
   .summary-stat .lbl { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
-  .skip-link { font-size: 0.8rem; color: var(--text-muted); text-decoration: underline; cursor: pointer; background: none; border: none; font-family: inherit; }
+  .skip-link { font-size: 0.8rem; color: var(--text-muted); text-decoration: underline; cursor: pointer; background: none; border: none; font-family: inherit; margin-right: 16px; }
   .skip-link:hover { color: var(--navy); }
+
+  /* REVIEW LIST */
+  .review-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-radius: 8px; background: #f5f7fb; margin-bottom: 8px;
+    transition: background 0.15s;
+  }
+  .review-item:hover { background: #eef1f7; }
+  .review-item .label { font-weight: 600; font-size: 0.92rem; }
+  .review-item .status { font-size: 0.82rem; font-weight: 600; }
   @media (max-width: 600px) {
     .settings-grid { grid-template-columns: 1fr; }
     .entry-grid { grid-template-columns: 1fr 1fr; }
@@ -582,9 +601,9 @@
   <!-- SOFTWARE SELECTOR -->
   <div class="software-bar">
     <label>Practice Software:</label>
-    <button class="software-btn active" onclick="setSoftware('dentrix')">Dentrix</button>
-    <button class="software-btn" onclick="setSoftware('eaglesoft')">Eaglesoft</button>
-    <button class="software-btn" onclick="setSoftware('opendental')">Open Dental</button>
+    <button class="software-btn active" onclick="setSoftware('dentrix', this)">Dentrix</button>
+    <button class="software-btn" onclick="setSoftware('eaglesoft', this)">Eaglesoft</button>
+    <button class="software-btn" onclick="setSoftware('opendental', this)">Open Dental</button>
   </div>
 
   <!-- PRACTICE NAME -->
@@ -644,7 +663,7 @@
         <ol>
           <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Management</span> → <span class="path">Practice Analysis Reports...</span></li>
           <li>Set your date range to the last <strong>24 complete months</strong>:<br>
-            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+            <div class="date-flex">
               <div class="date-badge"><span class="label">From</span> <span id="date24from">—</span></div>
               <div class="date-badge"><span class="label">To</span> <span id="date24to">—</span></div>
             </div>
@@ -703,7 +722,7 @@
         <ol>
           <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Management</span> → <span class="path">Analysis Summary...</span></li>
           <li>Set your date range to the same <strong>24 complete months</strong>:<br>
-            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+            <div class="date-flex">
               <div class="date-badge"><span class="label">From</span> <span id="date24from2">—</span></div>
               <div class="date-badge"><span class="label">To</span> <span id="date24to2">—</span></div>
             </div>
@@ -751,7 +770,7 @@
         <ol>
           <li>This comes from <strong>QuickBooks</strong> or your accountant — not from Dentrix</li>
           <li>Request a <strong>Profit &amp; Loss report</strong> for the last complete 12 months:<br>
-            <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+            <div class="date-flex">
               <div class="date-badge"><span class="label">From</span> <span id="date12from">—</span></div>
               <div class="date-badge"><span class="label">To</span> <span id="date12to">—</span></div>
             </div>
@@ -776,7 +795,7 @@
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(3)">← Back</button>
         <div>
-          <button class="skip-link" onclick="skipStep(3)" style="margin-right:16px;">Skip for now</button>
+          <button class="skip-link" onclick="skipStep(3)"">Skip for now</button>
           <button class="btn btn-primary" id="next3" onclick="nextStep(3)" disabled>Continue →</button>
         </div>
       </div>
@@ -834,7 +853,7 @@
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(4)">← Back</button>
         <div>
-          <button class="skip-link" onclick="skipStep(4)" style="margin-right:16px;">Skip for now</button>
+          <button class="skip-link" onclick="skipStep(4)"">Skip for now</button>
           <button class="btn btn-primary" id="next4" onclick="nextStep(4)" disabled>Continue →</button>
         </div>
       </div>
@@ -902,7 +921,7 @@
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(5)">← Back</button>
         <div>
-          <button class="skip-link" onclick="skipStep(5)" style="margin-right:16px;">Skip for now</button>
+          <button class="skip-link" onclick="skipStep(5)"">Skip for now</button>
           <button class="btn btn-primary" id="next5" onclick="nextStep(5)" disabled>Continue →</button>
         </div>
       </div>
@@ -919,6 +938,12 @@
       </div>
     </div>
     <div class="step-body">
+      <div style="margin-bottom:20px;">
+        <a href="/public/Employee_Costs_Worksheet.pdf" download class="download-link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V2h3v6H12L8 12zm-6 2h12v1.5H2V14z"/></svg>
+          Download Printable Worksheet (PDF)
+        </a>
+      </div>
       <div class="form-section-label">Front Office &amp; Back Office Staff</div>
       <table class="form-table" id="staffTable">
         <thead><tr><th>Position</th><th>Name</th><th>Hourly Rate</th><th>Hours / Month</th></tr></thead>
@@ -936,14 +961,14 @@
           <tr><td class="pos-label">Back 4</td><td><input type="text" id="ec_name_b4" placeholder="Name"></td><td><input type="number" id="ec_rate_b4" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_b4" placeholder="0"></td></tr>
         </tbody>
       </table>
-      <div style="display:flex;gap:24px;margin-bottom:20px;">
-        <div style="flex:1;">
-          <label style="font-size:0.85rem;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Staff Benefits (monthly avg)</label>
-          <input type="number" id="ec_staff_benefits" placeholder="0.00" step="0.01" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.9rem;">
+      <div class="flex-row">
+        <div>
+          <label>Staff Benefits (monthly avg)</label>
+          <input type="number" id="ec_staff_benefits" placeholder="0.00" step="0.01">
         </div>
-        <div style="flex:1;">
-          <label style="font-size:0.85rem;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Staff Employment Cost %</label>
-          <input type="number" id="ec_staff_empcost" placeholder="10" step="1" value="10" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.9rem;">
+        <div>
+          <label>Staff Employment Cost %</label>
+          <input type="number" id="ec_staff_empcost" placeholder="10" step="1" value="10">
         </div>
       </div>
 
@@ -956,14 +981,14 @@
           <tr><td class="pos-label">RDH 3</td><td><input type="text" id="ec_name_h3" placeholder="Name"></td><td><input type="number" id="ec_rate_h3" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_h3" placeholder="0"></td></tr>
         </tbody>
       </table>
-      <div style="display:flex;gap:24px;margin-bottom:20px;">
-        <div style="flex:1;">
-          <label style="font-size:0.85rem;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Hygiene Benefits (monthly avg)</label>
-          <input type="number" id="ec_hyg_benefits" placeholder="0.00" step="0.01" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.9rem;">
+      <div class="flex-row">
+        <div>
+          <label>Hygiene Benefits (monthly avg)</label>
+          <input type="number" id="ec_hyg_benefits" placeholder="0.00" step="0.01">
         </div>
-        <div style="flex:1;">
-          <label style="font-size:0.85rem;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Hygiene Employment Cost %</label>
-          <input type="number" id="ec_hyg_empcost" placeholder="10" step="1" value="10" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.9rem;">
+        <div>
+          <label>Hygiene Employment Cost %</label>
+          <input type="number" id="ec_hyg_empcost" placeholder="10" step="1" value="10">
         </div>
       </div>
 
@@ -982,7 +1007,7 @@
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
         <div>
-          <button class="skip-link" onclick="skipStep(6)" style="margin-right:16px;">Skip for now</button>
+          <button class="skip-link" onclick="skipStep(6)"">Skip for now</button>
           <button class="btn btn-primary" onclick="nextStep(6)">Continue →</button>
         </div>
       </div>
@@ -1001,7 +1026,7 @@
     <div class="step-body">
 
       <div style="margin-bottom:20px;">
-        <a href="/public/Hygiene_Schedule_Worksheet.pdf" download class="hs-download-link">
+        <a href="/public/Hygiene_Schedule_Worksheet.pdf" download class="download-link">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V2h3v6H12L8 12zm-6 2h12v1.5H2V14z"/></svg>
           Download Printable Worksheet (PDF)
         </a>
@@ -1145,7 +1170,7 @@
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(7)">← Back</button>
         <div>
-          <button class="skip-link" onclick="skipStep(7)" style="margin-right:16px;">Skip for now</button>
+          <button class="skip-link" onclick="skipStep(7)"">Skip for now</button>
           <button class="btn btn-primary" onclick="nextStep(7)">Continue →</button>
         </div>
       </div>
@@ -1227,10 +1252,10 @@ function populateDates() {
   if (t12) t12.textContent = d.to;
 }
 
-function setSoftware(sw) {
+function setSoftware(sw, btn) {
   software = sw;
   document.querySelectorAll('.software-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (btn) btn.classList.add('active');
   updateSubtitles();
 }
 
@@ -1271,8 +1296,6 @@ document.querySelectorAll('.upload-zone').forEach(zone => {
   });
 });
 
-function checkManualEntry() { document.getElementById('next4').disabled = !files[4]; }
-function checkInsuranceEntry() { document.getElementById('next5').disabled = !files[5]; }
 function parseAmount(str) { if (!str) return 0; return parseFloat(str.replace(/[$,]/g, '')) || 0; }
 
 function goToStep(n) {
@@ -1447,7 +1470,7 @@ function buildReview() {
       status = s.file ? `✅ ${s.file.name}` : (skipped[s.num] ? '⏭ Skipped' : '⚠️ Not uploaded');
       color = s.file ? 'var(--success)' : (skipped[s.num] ? 'var(--text-muted)' : 'var(--warning)');
     }
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:8px;background:#f5f7fb;margin-bottom:8px;"><div style="font-weight:600;font-size:0.92rem;">${s.label}</div><div style="font-size:0.82rem;color:${color};font-weight:600;">${status}</div></div>`;
+    return `<div class="review-item"><div class="label">${s.label}</div><div class="status" style="color:${color};">${status}</div></div>`;
   }).join('');
   document.getElementById('review-list').innerHTML = html;
   document.getElementById('generateBtn').disabled = !(files[1] && files[2]);
