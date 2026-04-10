@@ -281,12 +281,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsAC, 'E'+r, c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0);
     sv(wsAC, 'F'+r, totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0);
 
-    const isUsed = usedInPW.has(c.code);
-    /* Set a CLEAN font object — do NOT spread from template.
-       This guarantees no inherited strikethrough leaks through. */
-    const cleanFont = { name: 'Calibri', size: 11, bold: false, italic: false, strike: isUsed, color: { argb: 'FF000000' } };
-    const usedFont  = { name: 'Calibri', size: 11, bold: false, italic: false, strike: true,   color: { argb: 'FF999999' } };
-    const font = isUsed ? usedFont : cleanFont;
+    /* Check mappings DIRECTLY — bypass usedInPW Set entirely */
+    const bc = baseCode(c.code);
+    const isUsed = LEFT.hasOwnProperty(bc) || SRP_CODES.includes(bc) || RIGHT.hasOwnProperty(bc);
+    const font = isUsed
+      ? { name: 'Calibri', size: 11, bold: false, italic: false, strike: true,  color: { argb: 'FF999999' } }
+      : { name: 'Calibri', size: 11, bold: false, italic: false, strike: false, color: { argb: 'FF000000' } };
     ['A','B','C','D','E','F'].forEach(col => {
       try { wsAC.getCell(col+r).font = font; } catch(e) {}
     });
@@ -298,7 +298,18 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     try { wsAC.getCell('F'+r).numFmt = '0.00%'; } catch(e) {}
   });
 
-  console.log('All Codes: ' + allCodes.length + ' total, ' + usedInPW.size + ' struck through, ' + (allCodes.length - usedInPW.size) + ' clean');
+  /* Count how many codes matched directly for debugging */
+  let directMatchCount = 0;
+  const sampleUnmatched = [];
+  for (const c of allCodes) {
+    const bc2 = baseCode(c.code);
+    if (LEFT.hasOwnProperty(bc2) || SRP_CODES.includes(bc2) || RIGHT.hasOwnProperty(bc2)) {
+      directMatchCount++;
+    } else if (sampleUnmatched.length < 5) {
+      sampleUnmatched.push(c.code);
+    }
+  }
+  console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched mappings (usedInPW had ' + usedInPW.size + '), unmatched sample: ' + sampleUnmatched.join(','));
 
   /* ═══ FINANCIAL OVERVIEW ═══ */
   sv(wsFO, 'D4', practiceName);
@@ -469,7 +480,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       netCollections: collData?.payments || plData?.totalIncome || null,
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
-      arInsuranceTotal: arInsurance?.total || null
+      arInsuranceTotal: arInsurance?.total || null,
+      _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched }
     }
   };
 }
