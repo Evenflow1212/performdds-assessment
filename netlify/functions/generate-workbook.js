@@ -438,12 +438,43 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   [36, 37, 38].forEach(r => { try { wsFO.getRow(r).height = 19.5; } catch(e) {} });
 
   /* ═══ P&L INPUT ═══ */
-  /* Fix any yellow theme cells on P&L Input */
-  try { wsPI.getCell('K2').style = { font: { name: 'Verdana', size: 9 } }; } catch(e) {}
   /* P&L Input row heights (template uses 28.5 for all rows) */
   for (let r = 1; r <= 46; r++) {
     try { wsPI.getRow(r).height = 28.5; } catch(e) {}
   }
+
+  /* P&L Input color fixes — ExcelJS loses theme colors from template.
+     Must use cell.style={} to override shared style references. */
+  const piLightBlue = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+  const piDarkNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
+  const piNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E4B7A' } };
+  const piWhiteFont = { name: 'Verdana', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+  const piBlackFont = { name: 'Verdana', size: 9 };
+
+  /* Row 2: light blue highlight on B2, H2, N2 */
+  ['B2','H2','N2'].forEach(addr => {
+    try { const c = wsPI.getCell(addr); const v = c.value; c.style = { fill: piLightBlue, font: { name: 'Verdana', size: 10, bold: true } }; c.value = v; } catch(e) {}
+  });
+  /* Row 5: dark navy header (A5-O5) with white text */
+  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+    try { const c = wsPI.getCell(col+'5'); const v = c.value; c.style = { fill: piDarkNavy, font: piWhiteFont, alignment: { horizontal: 'center', wrapText: true } }; c.value = v; } catch(e) {}
+  });
+  /* Row 33: totals row (navy fill, white text) */
+  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+    try { const c = wsPI.getCell(col+'33'); c.style = { fill: piNavy, font: piWhiteFont, numFmt: '$#,##0.00' }; } catch(e) {}
+  });
+  /* Row 34: monthly average (light blue) */
+  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+    try { const c = wsPI.getCell(col+'34'); c.style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
+  });
+  /* Row 35: adj figure (light blue) */
+  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+    try { const c = wsPI.getCell(col+'35'); c.style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
+  });
+  /* Row 36: P&L $$'s (navy fill, white text) */
+  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+    try { const c = wsPI.getCell(col+'36'); c.style = { fill: piNavy, font: piWhiteFont, numFmt: '$#,##0.00' }; } catch(e) {}
+  });
 
   if (plData && plData.items && plData.items.length > 0) {
     sv(wsPI, 'B2', 12);
