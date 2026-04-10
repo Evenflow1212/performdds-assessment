@@ -438,9 +438,6 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       if (cat === null) {
         sv(wsRaw, 'C'+rr, 'EXCLUDED');
         sv(wsRaw, 'D'+rr, 'Non-cash — excluded');
-        ['A','B','C','D'].forEach(col => {
-          try { wsRaw.getCell(col+rr).font = { ...(wsRaw.getCell(col+rr).font||{}), strike: true }; } catch(e) {}
-        });
       } else if (cat === 'O') {
         sv(wsRaw, 'C'+rr, 'Add-Back');
         sv(wsRaw, 'D'+rr, 'Owner — add-back');
@@ -448,6 +445,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         const catNames = {F:'Dental Supplies',H:'Staff Costs',J:'Rent & Parking',K:'Marketing',L:'Office Supplies',M:'Other'};
         sv(wsRaw, 'C'+rr, catNames[cat] || 'Other');
       }
+      /* Strikethrough ALL expense items that are ported to P&L Input
+         (every item with a category, whether it's EXCLUDED, Add-Back, or a regular category) */
+      ['A','B','C','D'].forEach(col => {
+        try {
+          wsRaw.getCell(col+rr).font = { name: 'Calibri', size: 11, strike: true, color: { argb: 'FF888888' } };
+        } catch(e) {}
+      });
       rr++;
     }
     rr++;
