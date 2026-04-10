@@ -285,9 +285,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     const cell = wsAC.getCell(1, i + 1);
     cell.value = h;
     cell.style = {
-      font: { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2B4A' } },
-      alignment: { horizontal: i >= 2 ? 'right' : 'left' }
+      font: { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } },
+      alignment: { horizontal: 'center', vertical: 'center' }
     };
   });
   wsAC.getColumn('A').width = 12;
@@ -314,10 +314,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     else if (sampleUnmatched.length < 5) sampleUnmatched.push(c.code);
 
     const usedStyle = {
-      font: { name: 'Verdana', size: 10, strike: true, color: { argb: 'FF999999' } }
+      font: { name: 'Verdana', size: 10, strike: true },
+      alignment: { vertical: 'center' }
     };
     const cleanStyle = {
-      font: { name: 'Verdana', size: 10, strike: false, color: { argb: 'FF000000' } }
+      font: { name: 'Verdana', size: 10, strike: false },
+      alignment: { vertical: 'center' }
     };
     const baseStyle = isUsed ? usedStyle : cleanStyle;
 
@@ -326,18 +328,18 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     wsAC.getCell('B'+r).value = c.desc;
     wsAC.getCell('B'+r).style = baseStyle;
     wsAC.getCell('C'+r).value = c.qty;
-    wsAC.getCell('C'+r).style = { ...baseStyle, numFmt: '#,##0', alignment: { horizontal: 'right' } };
+    wsAC.getCell('C'+r).style = { ...baseStyle, numFmt: '#,##0', alignment: { horizontal: 'right', vertical: 'center' } };
     wsAC.getCell('D'+r).value = Math.round(c.total*100)/100;
-    wsAC.getCell('D'+r).style = { ...baseStyle, numFmt: '$#,##0.00', alignment: { horizontal: 'right' } };
+    wsAC.getCell('D'+r).style = { ...baseStyle, numFmt: '$#,##0.00', alignment: { horizontal: 'right', vertical: 'center' } };
     wsAC.getCell('E'+r).value = c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0;
-    wsAC.getCell('E'+r).style = { ...baseStyle, numFmt: '$#,##0.00', alignment: { horizontal: 'right' } };
+    wsAC.getCell('E'+r).style = { ...baseStyle, numFmt: '$#,##0.00', alignment: { horizontal: 'right', vertical: 'center' } };
     wsAC.getCell('F'+r).value = totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0;
-    wsAC.getCell('F'+r).style = { ...baseStyle, numFmt: '0.00%', alignment: { horizontal: 'right' } };
+    wsAC.getCell('F'+r).style = { ...baseStyle, numFmt: '0.00%', alignment: { horizontal: 'right', vertical: 'center' } };
   });
 
-  /* Set data row heights for All Codes */
+  /* Set data row heights for All Codes (master template uses 15.0) */
   for (let r = 2; r <= allCodes.length + 1; r++) {
-    try { wsAC.getRow(r).height = 12.75; } catch(e) {}
+    try { wsAC.getRow(r).height = 15.0; } catch(e) {}
   }
 
   console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched, ' + sampleUnmatched.length + ' unmatched sample: ' + sampleUnmatched.join(','));
@@ -385,11 +387,11 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
      and defaults to yellow (FFFFFF00). MUST use cell.style={...} to completely
      replace the shared style reference. cell.fill/cell.font alone do NOT work. */
   const navyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E4B7A' } };
-  const navyFont = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+  const navyFont = { name: 'Verdana', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
   const lightBlueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF3FA' } };
   const medBlueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
   const darkNavyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
-  const lightBlueDarkFont = { name: 'Calibri', size: 10, color: { argb: 'FF2E4B7A' } };
+  const lightBlueDarkFont = { name: 'Verdana', size: 10, color: { argb: 'FF2E4B7A' } };
   const grayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7F7F7F' } };
   const lightGrayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E5E5' } };
 
@@ -397,16 +399,16 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   ['B2','C2','D2','E2','F2','G2','H2','I2'].forEach(addr => {
     try {
       const c = wsFO.getCell(addr);
-      c.style = { fill: grayFill, font: { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF000000' } } };
+      c.style = { fill: grayFill, font: { name: 'Verdana', size: 10, bold: true, color: { argb: 'FF000000' } } };
     } catch(e) {}
   });
   /* Row 32: light gray AR data cells */
   ['E32','F32','G32','H32'].forEach(addr => {
-    try { const c = wsFO.getCell(addr); c.style = { fill: lightGrayFill, font: { name: 'Calibri', size: 10 }, numFmt: '$#,##0.00' }; } catch(e) {}
+    try { const c = wsFO.getCell(addr); c.style = { fill: lightGrayFill, font: { name: 'Verdana', size: 10 }, numFmt: '$#,##0.00' }; } catch(e) {}
   });
   /* F36, G36, H36: dark navy header cells */
   ['F36','G36','H36'].forEach(addr => {
-    try { const c = wsFO.getCell(addr); c.style = { fill: darkNavyFill, font: { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } } }; } catch(e) {}
+    try { const c = wsFO.getCell(addr); c.style = { fill: darkNavyFill, font: { name: 'Verdana', size: 10, bold: true, color: { argb: 'FFFFFFFF' } } }; } catch(e) {}
   });
   /* Row 42: header labels (navy blue, white text) — MUST use cell.style */
   ['B42','C42','D42','E42','F42','G42','H42','I42'].forEach(addr => {
@@ -438,43 +440,67 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   [36, 37, 38].forEach(r => { try { wsFO.getRow(r).height = 19.5; } catch(e) {} });
 
   /* ═══ P&L INPUT ═══ */
-  /* P&L Input row heights (template uses 28.5 for all rows) */
-  for (let r = 1; r <= 46; r++) {
+  /* P&L Input row heights (template uses 28.5 for all rows, 30.0 for row 2) */
+  for (let r = 1; r <= 59; r++) {
     try { wsPI.getRow(r).height = 28.5; } catch(e) {}
   }
+  try { wsPI.getRow(2).height = 30.0; } catch(e) {}
+
+  /* P&L Input column widths (match master template exactly) */
+  try { wsPI.getColumn('H').width = 24.0; } catch(e) {}
+  try { wsPI.getColumn('P').width = 21.0; } catch(e) {}
 
   /* P&L Input color fixes — ExcelJS loses theme colors from template.
      Must use cell.style={} to override shared style references. */
   const piLightBlue = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
   const piDarkNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
   const piNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E4B7A' } };
+  const piGray = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+  const piWhiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
   const piWhiteFont = { name: 'Verdana', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-  const piBlackFont = { name: 'Verdana', size: 9 };
+  const piBlackFont = { name: 'Verdana', size: 10 };
+  const piCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'];
 
   /* Row 2: light blue highlight on B2, H2, N2 */
   ['B2','H2','N2'].forEach(addr => {
     try { const c = wsPI.getCell(addr); const v = c.value; c.style = { fill: piLightBlue, font: { name: 'Verdana', size: 10, bold: true } }; c.value = v; } catch(e) {}
   });
-  /* Row 5: dark navy header (A5-O5) with white text */
-  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+  /* Row 5: dark navy header (A5-P5) with white text */
+  piCols.forEach(col => {
     try { const c = wsPI.getCell(col+'5'); const v = c.value; c.style = { fill: piDarkNavy, font: piWhiteFont, alignment: { horizontal: 'center', wrapText: true } }; c.value = v; } catch(e) {}
   });
-  /* Row 33: totals row (navy fill, white text) */
-  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+  /* Rows 6-32: alternating gray/white fills with light blue on col P */
+  for (let r = 6; r <= 32; r++) {
+    const isEvenRow = (r % 2 === 0); /* even rows = gray, odd rows = white */
+    const rowFill = isEvenRow ? piGray : piWhiteFill;
+    ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+      try { const c = wsPI.getCell(col+r); c.style = { fill: rowFill, font: piBlackFont, numFmt: col === 'A' ? '@' : '$#,##0.00' }; } catch(e) {}
+    });
+    /* Col P always light blue */
+    try { wsPI.getCell('P'+r).style = { fill: piLightBlue, font: piBlackFont }; } catch(e) {}
+  }
+  /* Row 33: totals row (navy fill, white text) A-O */
+  piCols.slice(0, 15).forEach(col => {
     try { const c = wsPI.getCell(col+'33'); c.style = { fill: piNavy, font: piWhiteFont, numFmt: '$#,##0.00' }; } catch(e) {}
   });
-  /* Row 34: monthly average (light blue) */
-  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+  /* Row 34: monthly average (light blue) A-O */
+  piCols.slice(0, 15).forEach(col => {
     try { const c = wsPI.getCell(col+'34'); c.style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
   });
-  /* Row 35: adj figure (light blue) */
-  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+  /* Row 35: adj figure (light blue) A-O */
+  piCols.slice(0, 15).forEach(col => {
     try { const c = wsPI.getCell(col+'35'); c.style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
   });
-  /* Row 36: P&L $$'s (navy fill, white text) */
-  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+  /* Row 36: P&L $$'s (navy fill, white text) A-O */
+  piCols.slice(0, 15).forEach(col => {
     try { const c = wsPI.getCell(col+'36'); c.style = { fill: piNavy, font: piWhiteFont, numFmt: '$#,##0.00' }; } catch(e) {}
   });
+  /* Rows 39-41: N column navy */
+  [39,40,41].forEach(r => {
+    try { wsPI.getCell('N'+r).style = { fill: piNavy, font: piWhiteFont }; } catch(e) {}
+  });
+  /* Row 39: P column light blue */
+  try { wsPI.getCell('P39').style = { fill: piLightBlue, font: piBlackFont }; } catch(e) {}
 
   if (plData && plData.items && plData.items.length > 0) {
     sv(wsPI, 'B2', 12);
@@ -490,10 +516,10 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       const col = plCategory(item.item);
       if (col === null) continue;
       sv(wsPI, 'A'+row, item.item);
-      /* Fix font — template has Rockwell 23pt which causes overlap */
-      try { wsPI.getCell('A'+row).font = { name: 'Verdana', size: 9 }; } catch(e) {}
+      /* Font already set by alternating fill sweep above — just ensure it's Verdana 10 */
+      try { wsPI.getCell('A'+row).font = { name: 'Verdana', size: 10 }; } catch(e) {}
       sv(wsPI, col+row, item.amount);
-      try { wsPI.getCell(col+row).font = { name: 'Verdana', size: 9 }; } catch(e) {}
+      try { wsPI.getCell(col+row).font = { name: 'Verdana', size: 10 }; } catch(e) {}
       try { wsPI.getCell(col+row).numFmt = '$#,##0.00'; } catch(e) {}
       row++;
     }
@@ -553,7 +579,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       ['A','B','C','D'].forEach(col => {
         try {
           const c = wsRaw.getCell(col+rr);
-          c.style = { font: { name: 'Calibri', size: 11, strike: true, color: { argb: 'FF888888' } } };
+          c.style = { font: { name: 'Verdana', size: 10, strike: true, color: { argb: 'FF888888' } } };
         } catch(e) {}
       });
       rr++;
@@ -563,11 +589,35 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     rr++;
     if (plData.netIncome != null) { sv(wsRaw, 'A'+rr, 'NET INCOME'); sv(wsRaw, 'B'+rr, plData.netIncome); sv(wsRaw, 'D'+rr, 'Per P&L'); }
 
-    /* Set column widths to prevent #### display */
+    /* Set column widths to match master template */
     wsRaw.getColumn('A').width = 35;
-    wsRaw.getColumn('B').width = 18;
+    wsRaw.getColumn('B').width = 15;
     wsRaw.getColumn('C').width = 18;
-    wsRaw.getColumn('D').width = 22;
+    wsRaw.getColumn('D').width = 30;
+
+    /* Set row heights to 12.75 (master template value) */
+    for (let rh = 1; rh <= rr + 5; rh++) {
+      try { wsRaw.getRow(rh).height = 12.75; } catch(e) {}
+    }
+
+    /* Fix fonts on ALL P&L Raw Import cells — must be Verdana 10 */
+    for (let fr = 1; fr <= rr + 5; fr++) {
+      ['A','B','C','D'].forEach(col => {
+        try {
+          const c = wsRaw.getCell(col+fr);
+          if (c.value != null) {
+            const existingFont = c.font || {};
+            /* Preserve strike-through but fix name/size */
+            c.font = { name: 'Verdana', size: 10, bold: existingFont.bold || false, strike: existingFont.strike || false, color: existingFont.color };
+          }
+        } catch(e) {}
+      });
+    }
+
+    /* Bold header cells */
+    ['A1','A3','B3','C3','D3'].forEach(addr => {
+      try { wsRaw.getCell(addr).font = { name: 'Verdana', size: 10, bold: true }; } catch(e) {}
+    });
   }
 
   /* ═══ P&L IMAGE (placeholder — actual image embedded client-side via JSZip) ═══ */
@@ -628,6 +678,25 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
           try {
             if (cell.fill && cell.fill.fgColor && cell.fill.fgColor.argb === 'FFFFFF00') {
               cell.fill = whiteFill;
+            }
+          } catch(e) {}
+        });
+      });
+    } catch(e) {}
+  }
+
+  /* ═══ GLOBAL FONT FIX: Calibri 11 → Verdana 10 ═══ */
+  /* ExcelJS corrupts theme fonts when loading xlsx templates, resetting them
+     to the ExcelJS default (Calibri 11). The master template uses Verdana 10
+     as its default font. Sweep ALL sheets and fix any corrupted defaults. */
+  for (const ws of wb.worksheets) {
+    try {
+      ws.eachRow({ includeEmpty: true }, (row, rowNum) => {
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          try {
+            const f = cell.font;
+            if (f && f.name === 'Calibri' && f.size === 11 && !f.bold && !f.strike && !f.italic) {
+              cell.font = { name: 'Verdana', size: 10 };
             }
           } catch(e) {}
         });
