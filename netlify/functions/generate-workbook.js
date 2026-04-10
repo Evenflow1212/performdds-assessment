@@ -151,7 +151,7 @@ R(['D7310','D7311','D7320','D7321','D7410','D7411','D7412','D7440','D7450','D745
 function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 
 /* ─── Build the workbook from pre-parsed text ─── */
-async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance) {
+async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, plImageB64) {
   /* Parse the Claude output text into structured data */
   const prodData = parseProduction(prodText || '');
   const collData = collText ? parseCollections(collText) : null;
@@ -222,22 +222,33 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     }
   }
 
-  /* Write aggregated LEFT table values */
+  /* Write aggregated LEFT table values with explicit number formats */
   for (const [row, agg] of Object.entries(leftAgg)) {
     sv(wsPW, 'D'+row, agg.qty);
     sv(wsPW, 'F'+row, agg.qty > 0 ? Math.round(agg.total/agg.qty*100)/100 : 0);
+    try { wsPW.getCell('D'+row).numFmt = '#,##0'; } catch(e) {}
+    try { wsPW.getCell('F'+row).numFmt = '$#,##0.00'; } catch(e) {}
   }
 
   if (srpAgg.qty > 0) {
     sv(wsPW, 'D24', srpAgg.qty);
     sv(wsPW, 'F24', Math.round(srpAgg.total/srpAgg.qty*100)/100);
+    try { wsPW.getCell('D24').numFmt = '#,##0'; } catch(e) {}
+    try { wsPW.getCell('F24').numFmt = '$#,##0.00'; } catch(e) {}
   }
 
   for (const [row, agg] of Object.entries(rightAgg)) {
     sv(wsPW, 'L'+row, agg.qty);
     sv(wsPW, 'M'+row, Math.round(agg.total*100)/100);
     sv(wsPW, 'N'+row, agg.qty > 0 ? Math.round(agg.total/agg.qty*100)/100 : 0);
+    try { wsPW.getCell('L'+row).numFmt = '#,##0'; } catch(e) {}
+    try { wsPW.getCell('M'+row).numFmt = '$#,##0.00'; } catch(e) {}
+    try { wsPW.getCell('N'+row).numFmt = '$#,##0.00'; } catch(e) {}
   }
+
+  /* Preserve number formatting on Production Worksheet key cells */
+  try { wsPW.getCell('G5').numFmt = '$#,##0.00'; } catch(e) {}
+  try { wsPW.getCell('D5').numFmt = '#,##0'; } catch(e) {}
 
   /* ═══ ALL CODES - PRODUCTION REPORT ═══ */
   const nonZero = codes.filter(c => c.total > 0);
@@ -254,14 +265,21 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsAC, 'E'+r, c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0);
     sv(wsAC, 'F'+r, totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0);
 
-    if (usedInPW.has(c.code)) {
-      ['A','B','C','D','E','F'].forEach(col => {
-        try {
-          const cell = wsAC.getCell(col+r);
-          cell.font = { ...(cell.font||{}), strike: true };
-        } catch(e) {}
-      });
-    }
+    const isUsed = usedInPW.has(c.code);
+    ['A','B','C','D','E','F'].forEach(col => {
+      try {
+        const cell = wsAC.getCell(col+r);
+        /* Explicitly set strike: true for used codes, false for unused —
+           this overrides any inherited template formatting */
+        cell.font = { ...(cell.font||{}), strike: isUsed };
+      } catch(e) {}
+    });
+
+    /* Number formats for data columns */
+    try { wsAC.getCell('C'+r).numFmt = '#,##0'; } catch(e) {}
+    try { wsAC.getCell('D'+r).numFmt = '$#,##0.00'; } catch(e) {}
+    try { wsAC.getCell('E'+r).numFmt = '$#,##0.00'; } catch(e) {}
+    try { wsAC.getCell('F'+r).numFmt = '0.00%'; } catch(e) {}
   });
 
   /* ═══ FINANCIAL OVERVIEW ═══ */
@@ -269,18 +287,22 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const primaryYear = years.length >= 2 ? years[1] : years[0] || new Date().getFullYear();
   sv(wsFO, 'E6', primaryYear);
   sv(wsFO, 'E20', Math.round(totalProd*100)/100);
+  try { wsFO.getCell('E20').numFmt = '$#,##0'; } catch(e) {}
   sv(wsFO, 'E21', prodMonths);
 
   if (collData && collData.payments) {
     sv(wsFO, 'F20', Math.round(collData.payments*100)/100);
+    try { wsFO.getCell('F20').numFmt = '$#,##0'; } catch(e) {}
     sv(wsFO, 'F21', collData.months || prodMonths);
   }
 
   if (plData && plData.totalIncome) {
     sv(wsFO, 'D25', Math.round(plData.totalIncome/12*100)/100);
+    try { wsFO.getCell('D25').numFmt = '$#,##0'; } catch(e) {}
   }
   if (totalProd > 0 && prodMonths > 0) {
     sv(wsFO, 'D27', Math.round(totalProd/prodMonths*100)/100);
+    try { wsFO.getCell('D27').numFmt = '$#,##0'; } catch(e) {}
   }
 
   if (arPatient && arPatient.total) {
@@ -314,7 +336,11 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       const col = plCategory(item.item);
       if (col === null) continue;
       sv(wsPI, 'A'+row, item.item);
+      /* Fix font — template has Rockwell 23pt which causes overlap */
+      try { wsPI.getCell('A'+row).font = { name: 'Verdana', size: 9 }; } catch(e) {}
       sv(wsPI, col+row, item.amount);
+      try { wsPI.getCell(col+row).font = { name: 'Verdana', size: 9 }; } catch(e) {}
+      try { wsPI.getCell(col+row).numFmt = '$#,##0.00'; } catch(e) {}
       row++;
     }
 
@@ -386,10 +412,32 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     wsRaw.getColumn('D').width = 22;
   }
 
-  /* ═══ P&L IMAGE (placeholder) ═══ */
-  if (!wb.getWorksheet('P&L Image')) {
-    const wsImg = wb.addWorksheet('P&L Image');
-    sv(wsImg, 'A1', 'P&L Image — paste screenshot of P&L PDF here');
+  /* ═══ P&L IMAGE ═══ */
+  {
+    let wsImg = wb.getWorksheet('P&L Image');
+    if (!wsImg) wsImg = wb.addWorksheet('P&L Image');
+    if (plImageB64) {
+      try {
+        /* Detect if JPEG (starts with /9j/) or PNG */
+        const imgExt = plImageB64.startsWith('/9j/') ? 'jpeg' : 'png';
+        const imageId = wb.addImage({
+          base64: plImageB64,
+          extension: imgExt,
+        });
+        /* Place image starting at A1, sized to roughly fill the visible area */
+        wsImg.addImage(imageId, {
+          tl: { col: 0, row: 0 },
+          ext: { width: 750, height: 970 }
+        });
+        sv(wsImg, 'A1', '');  /* Clear any placeholder text */
+        console.log('P&L image embedded successfully');
+      } catch(imgErr) {
+        console.warn('Could not embed P&L image:', imgErr.message);
+        sv(wsImg, 'A1', 'P&L Image — could not embed (error: ' + imgErr.message + ')');
+      }
+    } else {
+      sv(wsImg, 'A1', 'P&L Image — no image data provided');
+    }
   }
 
   const buf = await wb.xlsx.writeBuffer();
@@ -416,12 +464,12 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); } catch(e) { return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'Invalid JSON'})}; }
 
-  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={} } = body;
+  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, plImageB64=null } = body;
   if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
     console.log('Building workbook from pre-parsed data...');
-    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance);
+    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, plImageB64);
 
     return {
       statusCode: 200,

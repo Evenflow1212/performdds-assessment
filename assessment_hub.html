@@ -1322,12 +1322,59 @@ async function generate() {
     console.log('AR Patient:', JSON.stringify(arPatient));
     console.log('AR Insurance:', JSON.stringify(arInsurance));
 
+    /* Step 1b: Render P&L PDF pages to images for the P&L Image tab */
+    let plImageB64 = null;
+    if (files[3]) {
+      try {
+        console.log('Rendering P&L PDF to image...');
+        const plArrayBuf = await files[3].arrayBuffer();
+        const plPdfDoc = await pdfjsLib.getDocument({ data: plArrayBuf }).promise;
+        const numPages = plPdfDoc.numPages;
+        /* Render each page at 1.5x scale then stitch vertically */
+        const pageCanvases = [];
+        let totalHeight = 0, maxWidth = 0;
+        for (let p = 1; p <= numPages; p++) {
+          const page = await plPdfDoc.getPage(p);
+          const scale = 1.5;
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          pageCanvases.push(canvas);
+          totalHeight += viewport.height;
+          if (viewport.width > maxWidth) maxWidth = viewport.width;
+        }
+        /* Stitch into one tall image */
+        const stitched = document.createElement('canvas');
+        stitched.width = maxWidth;
+        stitched.height = totalHeight;
+        const sCtx = stitched.getContext('2d');
+        let yOff = 0;
+        for (const pc of pageCanvases) {
+          sCtx.drawImage(pc, 0, yOff);
+          yOff += pc.height;
+        }
+        plImageB64 = stitched.toDataURL('image/png').split(',')[1];
+        console.log('P&L image rendered:', Math.round(plImageB64.length/1024), 'KB');
+        /* If image is too large for Netlify payload (>4MB base64), re-render at lower quality */
+        if (plImageB64.length > 4 * 1024 * 1024) {
+          console.log('P&L image too large, compressing as JPEG...');
+          plImageB64 = stitched.toDataURL('image/jpeg', 0.7).split(',')[1];
+          console.log('Compressed to:', Math.round(plImageB64.length/1024), 'KB');
+        }
+      } catch(imgErr) {
+        console.warn('Could not render P&L to image:', imgErr.message);
+      }
+    }
+
     /* Step 2: Build workbook from parsed data (fast, no Claude) */
     console.log('Step 2: Building workbook from parsed data...');
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prodText, collText, plText, practiceName, arPatient, arInsurance })
+      body: JSON.stringify({ prodText, collText, plText, practiceName, arPatient, arInsurance, plImageB64 })
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Generation failed');
