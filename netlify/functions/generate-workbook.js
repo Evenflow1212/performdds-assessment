@@ -647,22 +647,6 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsPI, 'K41', 'Diff');
     try { wsPI.getCell('N41').value = { formula: 'N40-N39' }; } catch(e) {}
 
-    /* Clean up rows 37-56: clear old template remnants (duplicate totals at 48-51, 54-56)
-       but preserve our summary at rows 39-41.
-       Must clear BOTH value AND style — old template has navy/blue fills on those rows. */
-    for (let r = 37; r <= 56; r++) {
-      if (r >= 39 && r <= 41) continue; /* skip our summary rows */
-      piCols.forEach(col => {
-        try {
-          const c = wsPI.getCell(col+r);
-          c.value = null;
-          c.style = { fill: piWhiteFill, font: piBlackFont };
-        } catch(e) {}
-      });
-    }
-
-    /* Fix column M ("Other") width — template has it too narrow */
-    try { wsPI.getColumn('M').width = 18; } catch(e) {}
   }
 
   /* ═══ P&L RAW IMPORT (new sheet) ═══ */
