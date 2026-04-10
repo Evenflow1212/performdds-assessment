@@ -1004,6 +1004,35 @@
         Download Printable Worksheet (PDF)
       </a>
 
+      <!-- HYGIENIST STAFFING -->
+      <div class="form-section-label">Hygiene Staffing</div>
+      <p style="font-size:0.85rem;color:var(--text-muted);margin:-4px 0 10px;">How many hygienists work each day, and average patients per hygienist</p>
+      <table class="hs-grid" style="max-width:620px;">
+        <thead>
+          <tr>
+            <th class="day-group">Mon</th>
+            <th class="day-group">Tue</th>
+            <th class="day-group">Wed</th>
+            <th class="day-group">Thu</th>
+            <th class="day-group">Fri</th>
+            <th class="day-group">Sat</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="day-group"><input type="number" id="hs_rdh_mon" min="0" placeholder="1" step="1"></td>
+            <td class="day-group"><input type="number" id="hs_rdh_tue" min="0" placeholder="1" step="1"></td>
+            <td class="day-group"><input type="number" id="hs_rdh_wed" min="0" placeholder="1" step="1"></td>
+            <td class="day-group"><input type="number" id="hs_rdh_thu" min="0" placeholder="1" step="1"></td>
+            <td class="day-group"><input type="number" id="hs_rdh_fri" min="0" placeholder="0" step="1"></td>
+            <td class="day-group"><input type="number" id="hs_rdh_sat" min="0" placeholder="0" step="1"></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="benefits-grid" style="grid-template-columns: 220px 80px; margin-bottom: 20px;">
+        <label>Avg patients per hygienist/day:</label><input type="number" id="hs_pts_per_hyg" placeholder="e.g. 8" step="1" min="1">
+      </div>
+
       <!-- RECENT PAST -->
       <div class="form-section-label">Recent Past</div>
       <p style="font-size:0.85rem;color:var(--text-muted);margin:-4px 0 10px;">Appointments available vs appointments filled</p>
@@ -1112,27 +1141,7 @@
         <tbody id="hsFutureFutureBody"></tbody>
       </table>
 
-      <!-- PATIENT ESTIMATES & CAPACITY -->
-      <div class="form-section-label">Patient Estimates &amp; Capacity</div>
-      <div class="benefits-grid">
-        <label>Active Patients:</label><input type="number" id="hs_active_patients" placeholder="e.g. 1400">
-        <label>New Patients / Mo:</label><input type="number" id="hs_new_patients" placeholder="e.g. 18">
-        <label>Perio Disease %:</label><input type="number" id="hs_perio_pct" placeholder="e.g. 30" step="1" min="0" max="100">
-        <label>Perio Positive %:</label><input type="number" id="hs_perio_pos_pct" placeholder="e.g. 10" step="1" min="0" max="100">
-        <label>Patients / Hyg Day:</label><input type="number" id="hs_pts_per_day" placeholder="e.g. 8" step="1">
-        <label>Patient Flow (2yr):</label><input type="number" id="hs_patient_flow" placeholder="e.g. 1200">
-        <label>% Under Age 19:</label><input type="number" id="hs_pct_under19" placeholder="e.g. 25" step="1" min="0" max="100">
-        <label>Days Sched / Wk:</label><input type="number" id="hs_days_scheduled" placeholder="e.g. 5" step="1" min="1" max="6">
-      </div>
-
-      <!-- HYGIENIST SCHEDULE -->
-      <div class="form-section-label">Hygienist Schedule</div>
-      <div class="benefits-grid" style="grid-template-columns: 140px 80px;">
-        <label>RDH Mon:</label><input type="number" id="hs_rdh_mon" placeholder="e.g. 2" step="1" min="0">
-        <label>RDH Tue:</label><input type="number" id="hs_rdh_tue" placeholder="e.g. 2" step="1" min="0">
-        <label>RDH Wed:</label><input type="number" id="hs_rdh_wed" placeholder="e.g. 2" step="1" min="0">
-        <label>RDH Thu:</label><input type="number" id="hs_rdh_thu" placeholder="e.g. 2" step="1" min="0">
-      </div>
+      <!-- HYGIENIST SCHEDULE (kept minimal — Patient Estimates are part of the delivered assessment) -->
 
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(7)">← Back</button>
@@ -1407,20 +1416,19 @@ function collectHygieneSchedule() {
   /* Next 7 days: single row with schd/conf paired per day (same structure as other grids) */
   const n7Rows = [collectGrid('n7', 1)[0]];
 
+  /* Count days with hygienists scheduled */
+  const rdhVals = [gn('hs_rdh_mon'), gn('hs_rdh_tue'), gn('hs_rdh_wed'), gn('hs_rdh_thu'), gn('hs_rdh_fri'), gn('hs_rdh_sat')];
+  const daysScheduled = rdhVals.filter(v => v > 0).length;
+  const ptsPerHyg = gn('hs_pts_per_hyg');
+
   return {
     recentPast: collectGrid('rp', 3),
     next7Days: n7Rows,
     nearFuture: collectGrid('nf', 3),
     futureFuture: collectGrid('ff', 2),
-    activePatients: gn('hs_active_patients'),
-    newPatientsPerMonth: gn('hs_new_patients'),
-    perioPct: gn('hs_perio_pct') / 100,
-    perioPosPct: gn('hs_perio_pos_pct') / 100,
-    ptsPerHygDay: gn('hs_pts_per_day'),
-    patientFlow: gn('hs_patient_flow'),
-    pctUnder19: gn('hs_pct_under19') / 100,
-    daysScheduled: gn('hs_days_scheduled'),
-    rdhPerDay: [gn('hs_rdh_mon'), gn('hs_rdh_tue'), gn('hs_rdh_wed'), gn('hs_rdh_thu')]
+    ptsPerHygDay: ptsPerHyg,
+    daysScheduled: daysScheduled,
+    rdhPerDay: rdhVals.slice(0, 4)
   };
 }
 
@@ -2062,8 +2070,7 @@ function resetAll() {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   /* Reset hygiene schedule fields */
-  ['hs_active_patients','hs_new_patients','hs_perio_pct','hs_perio_pos_pct','hs_pts_per_day',
-   'hs_patient_flow','hs_pct_under19','hs_days_scheduled','hs_rdh_mon','hs_rdh_tue','hs_rdh_wed','hs_rdh_thu'].forEach(id => {
+  ['hs_rdh_mon','hs_rdh_tue','hs_rdh_wed','hs_rdh_thu','hs_rdh_fri','hs_rdh_sat','hs_pts_per_hyg'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   document.querySelectorAll('.hs-grid input[type="number"]').forEach(el => { el.value = ''; });
