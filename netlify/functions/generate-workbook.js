@@ -259,6 +259,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   /* G6 per-month production */
   try { wsPW.getCell('G6').numFmt = '$#,##0'; } catch(e) {}
 
+  /* Production Worksheet row heights */
+  try { wsPW.getRow(4).height = 30; } catch(e) {}
+
   /* ═══ ALL CODES - PRODUCTION REPORT ═══ */
   /* Wipe the existing sheet IN PLACE (preserves tab order) then write fresh.
      Use cell.style = {...} to completely replace all formatting. */
@@ -288,11 +291,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     };
   });
   wsAC.getColumn('A').width = 12;
-  wsAC.getColumn('B').width = 35;
-  wsAC.getColumn('C').width = 12;
+  wsAC.getColumn('B').width = 44;
+  wsAC.getColumn('C').width = 10;
   wsAC.getColumn('D').width = 14;
   wsAC.getColumn('E').width = 12;
-  wsAC.getColumn('F').width = 12;
+  wsAC.getColumn('F').width = 16;
+  /* Header row height */
+  try { wsAC.getRow(1).height = 19.5; } catch(e) {}
 
   const nonZero = codes.filter(c => c.total > 0);
   const zero = codes.filter(c => c.total === 0);
@@ -329,6 +334,11 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     wsAC.getCell('F'+r).value = totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0;
     wsAC.getCell('F'+r).style = { ...baseStyle, numFmt: '0.00%', alignment: { horizontal: 'right' } };
   });
+
+  /* Set data row heights for All Codes */
+  for (let r = 2; r <= allCodes.length + 1; r++) {
+    try { wsAC.getRow(r).height = 12.75; } catch(e) {}
+  }
 
   console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched, ' + sampleUnmatched.length + ' unmatched sample: ' + sampleUnmatched.join(','));
 
@@ -423,9 +433,17 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   /* I45: total % */
   try { const c = wsFO.getCell('I45'); c.style = { fill: medBlueFill, font: lightBlueDarkFont, numFmt: '0%', alignment: { horizontal: 'right' } }; } catch(e) {}
 
+  /* Financial Overview row heights (ExcelJS loses template heights) */
+  [5, 24, 30, 40].forEach(r => { try { wsFO.getRow(r).height = 24.75; } catch(e) {} });
+  [36, 37, 38].forEach(r => { try { wsFO.getRow(r).height = 19.5; } catch(e) {} });
+
   /* ═══ P&L INPUT ═══ */
   /* Fix any yellow theme cells on P&L Input */
   try { wsPI.getCell('K2').style = { font: { name: 'Verdana', size: 9 } }; } catch(e) {}
+  /* P&L Input row heights (template uses 28.5 for all rows) */
+  for (let r = 1; r <= 46; r++) {
+    try { wsPI.getRow(r).height = 28.5; } catch(e) {}
+  }
 
   if (plData && plData.items && plData.items.length > 0) {
     sv(wsPI, 'B2', 12);
@@ -551,12 +569,15 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     try { wsFO.getCell('J' + r).fill = whiteFill; } catch(e) {}
   }
 
-  /* Targets & Goal sheet — column F rows 5-33 */
+  /* Targets & Goal sheet — column F rows 5-33 + row heights */
   const wsTG = wb.getWorksheet('Targets & Goal');
   if (wsTG) {
     for (let r = 5; r <= 33; r++) {
       try { wsTG.getCell('F' + r).fill = whiteFill; } catch(e) {}
     }
+    try { wsTG.getRow(4).height = 30; } catch(e) {}
+    try { wsTG.getRow(6).height = 24.75; } catch(e) {}
+    try { wsTG.getRow(20).height = 24.75; } catch(e) {}
   }
 
   /* Budgetary P&L sheet — column K rows 2-33 */
