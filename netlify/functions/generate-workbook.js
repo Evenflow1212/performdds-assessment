@@ -443,6 +443,62 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   [5, 24, 30, 40].forEach(r => { try { wsFO.getRow(r).height = 24.75; } catch(e) {} });
   [36, 37, 38].forEach(r => { try { wsFO.getRow(r).height = 19.5; } catch(e) {} });
 
+  /* ═══ HYGIENE SCHEDULE ═══ */
+  /* Auto-populate week-commencing dates relative to today.
+     Sections: recent past (rows 10-13), next 7 days (rows 19-20),
+     near future (rows 25-28), future future (rows 34-35). */
+  {
+    const wsHS = wb.getWorksheet('Hygiene Schedule');
+    if (wsHS) {
+      const today = new Date();
+      /* Find the Monday of the current week */
+      const dayOfWeek = today.getDay(); /* 0=Sun, 1=Mon, ... */
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const thisMonday = new Date(today);
+      thisMonday.setDate(today.getDate() + mondayOffset);
+
+      /* Helper: get Monday N weeks from thisMonday */
+      function getMonday(weeksFromNow) {
+        const d = new Date(thisMonday);
+        d.setDate(thisMonday.getDate() + weeksFromNow * 7);
+        return d;
+      }
+      /* Helper: format a week as "M/D - M/D" (Mon to Fri) */
+      function fmtWeek(mon) {
+        const fri = new Date(mon);
+        fri.setDate(mon.getDate() + 4);
+        const m1 = mon.getMonth() + 1, d1 = mon.getDate();
+        const m2 = fri.getMonth() + 1, d2 = fri.getDate();
+        return m1 + '/' + d1 + ' - ' + m2 + '/' + d2;
+      }
+
+      /* Recent past: 4 weeks back (rows 10-13) */
+      for (let i = 0; i < 4; i++) {
+        const mon = getMonday(-4 + i);
+        sv(wsHS, 'B' + (10 + i), fmtWeek(mon));
+      }
+
+      /* Next 7 days: current week (rows 19-20 label the day names,
+         but row 19 col B has "SCHEDULED vs" — just set the date context in B18 area) */
+      /* The "NEXT 7 DAYS" header already exists. Add this week's date range to help. */
+      sv(wsHS, 'E18', fmtWeek(thisMonday));
+
+      /* Near future: next 4 weeks (rows 25-28) */
+      for (let i = 0; i < 4; i++) {
+        const mon = getMonday(1 + i);
+        sv(wsHS, 'B' + (25 + i), fmtWeek(mon));
+      }
+
+      /* Future future: 2 weeks further out (rows 34-35) */
+      for (let i = 0; i < 2; i++) {
+        const mon = getMonday(5 + i);
+        sv(wsHS, 'B' + (34 + i), fmtWeek(mon));
+      }
+
+      console.log('Hygiene Schedule: populated week dates relative to', thisMonday.toISOString().slice(0,10));
+    }
+  }
+
   /* ═══ P&L INPUT ═══ */
   /* P&L Input row heights (template uses 28.5 for all rows, 30.0 for row 2) */
   for (let r = 1; r <= 200; r++) {
@@ -507,28 +563,85 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   try { wsPI.getCell('P39').style = { fill: piLightBlue, font: piBlackFont }; } catch(e) {}
 
   if (plData && plData.items && plData.items.length > 0) {
-    sv(wsPI, 'B2', 12);
+    sv(wsPI, 'B2', prodMonths || 12);
     if (plData.totalIncome) sv(wsPI, 'H2', plData.totalIncome);
+    /* Monthly ave = totalIncome / months */
+    if (plData.totalIncome && prodMonths) {
+      sv(wsPI, 'N2', Math.round(plData.totalIncome / prodMonths * 100) / 100);
+    }
 
-    /* ONLY expense items go into the expense grid — exclude Income and COGS */
-    const expenseOnly = plData.items.filter(i => i.section !== 'Income' && i.section !== 'COGS');
+    /* ONLY expense items go into the expense grid — exclude Income, COGS, and depreciation */
+    let expenseOnly = plData.items.filter(i => i.section !== 'Income' && i.section !== 'COGS');
+    expenseOnly = expenseOnly.filter(i => plCategory(i.item) !== null); /* exclude depreciation */
     console.log('P&L Input: ' + expenseOnly.length + ' expense items (filtered from ' + plData.items.length + ' total)');
+
+    /* Template supports max 27 rows (6-32). If more items, combine smallest into "Other Expenses" */
+    const MAX_ROWS = 27;
+    if (expenseOnly.length > MAX_ROWS) {
+      /* Sort by amount descending, keep top (MAX_ROWS-1), combine rest */
+      expenseOnly.sort((a, b) => b.amount - a.amount);
+      const keep = expenseOnly.slice(0, MAX_ROWS - 1);
+      const combine = expenseOnly.slice(MAX_ROWS - 1);
+      const combinedAmt = combine.reduce((s, i) => s + i.amount, 0);
+      keep.push({ item: 'Other Expenses (combined)', amount: combinedAmt, section: 'Expense' });
+      expenseOnly = keep;
+      console.log('P&L Input: combined ' + combine.length + ' small items into Other ($' + combinedAmt.toFixed(2) + ')');
+    }
 
     let row = 6;
     for (const item of expenseOnly) {
-      if (row > 46) break;
+      if (row > 32) break; /* NEVER write past row 32 — rows 33-36 are summary formulas */
       const col = plCategory(item.item);
       if (col === null) continue;
       sv(wsPI, 'A'+row, item.item);
-      /* Font already set by alternating fill sweep above — just ensure it's Verdana 10 */
       try { wsPI.getCell('A'+row).font = { name: 'Verdana', size: 10 }; } catch(e) {}
       sv(wsPI, col+row, item.amount);
       try { wsPI.getCell(col+row).font = { name: 'Verdana', size: 10 }; } catch(e) {}
       try { wsPI.getCell(col+row).numFmt = '$#,##0.00'; } catch(e) {}
+      /* Column P: row total formula */
+      try { wsPI.getCell('P'+row).value = { formula: 'SUM(B'+row+':O'+row+')' }; } catch(e) {}
+      try { wsPI.getCell('P'+row).style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
       row++;
     }
+    /* Clear any unused data rows (between last item and row 32) */
+    for (let r = row; r <= 32; r++) {
+      sv(wsPI, 'A'+r, null);
+      ['B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
+        sv(wsPI, col+r, null);
+      });
+      try { wsPI.getCell('P'+r).value = { formula: 'SUM(B'+r+':O'+r+')' }; } catch(e) {}
+    }
 
-    if (plData.totalExpense) sv(wsPI, 'N55', plData.totalExpense);
+    /* Restore rows 33-36 summary formulas (template has these but data writes may have clobbered them) */
+    /* Row 33: Totals = SUM of each column rows 6-32 */
+    sv(wsPI, 'A33', 'Totals');
+    'BCDEFGHIJKLMNO'.split('').forEach(col => {
+      try { wsPI.getCell(col+'33').value = { formula: 'SUM('+col+'6:'+col+'32)' }; } catch(e) {}
+    });
+    /* Row 34: Monthly Ave = Totals / months */
+    sv(wsPI, 'A34', 'Monthly Ave');
+    'BCDEFGHIJKLMNO'.split('').forEach(col => {
+      try { wsPI.getCell(col+'34').value = { formula: 'IFERROR('+col+'33/B2,0)' }; } catch(e) {}
+    });
+    /* Row 35: Adj. Figure (zeros — consultant fills in) */
+    sv(wsPI, 'A35', 'Adj. Figure');
+    'BCDEFGHIJKLMNO'.split('').forEach(col => {
+      sv(wsPI, col+'35', 0);
+    });
+    /* Row 36: P&L $$'s = Monthly Ave (or adjusted) */
+    sv(wsPI, 'A36', "P&L $$'s");
+    'BCDEFGHIJKLMNO'.split('').forEach(col => {
+      try { wsPI.getCell(col+'36').value = { formula: col+'34' }; } catch(e) {}
+    });
+
+    /* Row 39-41 summary: spreadsheet total, P&L total, diff */
+    sv(wsPI, 'K39', 'Spreadsheet Total');
+    try { wsPI.getCell('N39').value = { formula: 'SUM(B33:O33)' }; } catch(e) {}
+    try { wsPI.getCell('P39').value = { formula: 'SUM(P6:P32)' }; } catch(e) {}
+    sv(wsPI, 'K40', 'Total Cost from P&L');
+    if (plData.totalExpense) sv(wsPI, 'N40', plData.totalExpense);
+    sv(wsPI, 'K41', 'Diff');
+    try { wsPI.getCell('N41').value = { formula: 'N40-N39' }; } catch(e) {}
 
     /* Fix column M ("Other") width — template has it too narrow */
     try { wsPI.getColumn('M').width = 18; } catch(e) {}
