@@ -999,10 +999,12 @@
     </div>
     <div class="step-body">
 
-      <a href="/public/Hygiene_Schedule_Worksheet.pdf" download class="hs-download-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V2h3v6H12L8 12zm-6 2h12v1.5H2V14z"/></svg>
-        Download Printable Worksheet (PDF)
-      </a>
+      <div style="margin-bottom:20px;">
+        <a href="/public/Hygiene_Schedule_Worksheet.pdf" download class="hs-download-link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V2h3v6H12L8 12zm-6 2h12v1.5H2V14z"/></svg>
+          Download Printable Worksheet (PDF)
+        </a>
+      </div>
 
       <!-- HYGIENIST STAFFING -->
       <div class="form-section-label">Hygiene Staffing</div>
@@ -1034,8 +1036,7 @@
       </div>
 
       <!-- RECENT PAST -->
-      <div class="form-section-label">Recent Past</div>
-      <p style="font-size:0.85rem;color:var(--text-muted);margin:-4px 0 10px;">Appointments available vs appointments filled</p>
+      <div class="form-section-label">Recent Past — Appointments Available vs Appointments Filled</div>
       <table class="hs-grid" id="hsRecentPast">
         <thead>
           <tr>
@@ -1061,8 +1062,7 @@
       </table>
 
       <!-- NEXT 7 DAYS -->
-      <div class="form-section-label">Next Seven Days (<span id="hsNext7Label"></span>) — Scheduled vs Confirmed</div>
-      <p style="font-size:0.85rem;color:var(--text-muted);margin:-4px 0 10px;">Total available visits vs confirmed</p>
+      <div class="form-section-label">Next Seven Days (<span id="hsNext7Label"></span>) — Patients on the Schedule vs Patients Confirmed</div>
       <table class="hs-grid" id="hsNext7">
         <thead>
           <tr>
@@ -1088,8 +1088,7 @@
       </table>
 
       <!-- NEAR FUTURE -->
-      <div class="form-section-label">Near Future</div>
-      <p style="font-size:0.85rem;color:var(--text-muted);margin:-4px 0 10px;">Total available visits vs confirmed</p>
+      <div class="form-section-label">Near Future — Total Available Visits vs Appointments Filled</div>
       <table class="hs-grid" id="hsNearFuture">
         <thead>
           <tr>
@@ -1115,8 +1114,7 @@
       </table>
 
       <!-- FUTURE FUTURE -->
-      <div class="form-section-label">Future Future</div>
-      <p style="font-size:0.85rem;color:var(--text-muted);margin:-4px 0 10px;">Total available visits vs confirmed</p>
+      <div class="form-section-label">Future Future — Total Available Visits vs Appointments Filled</div>
       <table class="hs-grid" id="hsFutureFuture">
         <thead>
           <tr>
