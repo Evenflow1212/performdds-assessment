@@ -585,8 +585,10 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
           const r = staffRowMap[p.key] || p.row;
           if (r) {
             if (p.name) sv(wsEC, 'D' + r, p.name);
-            if (p.rate) sv(wsEC, 'E' + r, p.rate);
-            if (p.hours) sv(wsEC, 'F' + r, p.hours);
+            if (p.rate) { sv(wsEC, 'E' + r, p.rate); try { wsEC.getCell('E' + r).numFmt = '#,##0.00'; } catch(e) {} }
+            if (p.hours) { sv(wsEC, 'F' + r, p.hours); try { wsEC.getCell('F' + r).numFmt = '#,##0'; } catch(e) {} }
+            /* Ensure monthly cost formula exists */
+            try { wsEC.getCell('G' + r).value = { formula: 'E' + r + '*F' + r }; wsEC.getCell('G' + r).numFmt = '#,##0.00'; } catch(e) {}
           }
         });
       }
@@ -634,8 +636,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
           const r = hygBaseMap[p.key] || p.row;
           if (r) {
             if (p.name) sv(wsEC, 'D' + r, p.name);
-            if (p.rate) sv(wsEC, 'E' + r, p.rate);
-            if (p.hours) sv(wsEC, 'F' + r, p.hours);
+            if (p.rate) { sv(wsEC, 'E' + r, p.rate); try { wsEC.getCell('E' + r).numFmt = '#,##0.00'; } catch(e) {} }
+            if (p.hours) { sv(wsEC, 'F' + r, p.hours); try { wsEC.getCell('F' + r).numFmt = '#,##0'; } catch(e) {} }
+            try { wsEC.getCell('G' + r).value = { formula: 'E' + r + '*F' + r }; wsEC.getCell('G' + r).numFmt = '#,##0.00'; } catch(e) {}
           }
         });
       }
