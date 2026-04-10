@@ -597,11 +597,41 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         try { wsEC.getCell('G21').value = { formula: 'G20*' + employeeCosts.staffEmpCostPct }; } catch(e) {}
       }
 
-      /* Hygiene positions: name→D, rate→E, hours→F */
-      const hygRowMap = { h1: 27, h2: 28, h3: 29 };
+      /* Hygiene positions: name→D, rate→E, hours→F
+         Template has RDH 1-3 at rows 27-29. If h4/h5 have data,
+         insert rows after 29 and adjust summary formulas. */
+      const extraHyg = (employeeCosts.hygiene || []).filter(p => p.key === 'h4' || p.key === 'h5');
+      const extraCount = extraHyg.length;
+      if (extraCount > 0) {
+        /* Insert rows after row 29 for extra RDH positions */
+        try { wsEC.spliceRows(30, 0, ...Array(extraCount).fill([])); } catch(e) {
+          console.warn('spliceRows failed, inserting manually');
+          for (let i = 0; i < extraCount; i++) {
+            try { wsEC.insertRow(30 + i, []); } catch(e2) {}
+          }
+        }
+        /* Write extra RDH labels and formulas */
+        extraHyg.forEach((p, i) => {
+          const r = 30 + i;
+          sv(wsEC, 'C' + r, p.label || ('rdh ' + (4 + i)));
+          try { wsEC.getCell('G' + r).value = { formula: 'E' + r + '*F' + r }; } catch(e) {}
+        });
+        /* Fix summary formulas shifted down by extraCount */
+        const wRow = 30 + extraCount;      // wages row
+        const eRow = wRow + 1;              // employment costs row
+        const bRow = wRow + 2;              // benefits row
+        const tRow = wRow + 3;              // hygiene total row
+        try { wsEC.getCell('G' + wRow).value = { formula: 'SUM(G27:G' + (29 + extraCount) + ')' }; } catch(e) {}
+        try { wsEC.getCell('G' + eRow).value = { formula: 'G' + wRow + '*0.1' }; } catch(e) {}
+        /* benefits value at bRow, total at tRow */
+        try { wsEC.getCell('G' + tRow).value = { formula: 'G' + wRow + '+G' + eRow + '+G' + bRow }; } catch(e) {}
+      }
+
+      /* Write all hygiene position data (h1-h5) */
+      const hygBaseMap = { h1: 27, h2: 28, h3: 29, h4: 30, h5: 31 };
       if (employeeCosts.hygiene) {
         employeeCosts.hygiene.forEach(p => {
-          const r = hygRowMap[p.key] || p.row;
+          const r = hygBaseMap[p.key] || p.row;
           if (r) {
             if (p.name) sv(wsEC, 'D' + r, p.name);
             if (p.rate) sv(wsEC, 'E' + r, p.rate);
@@ -609,15 +639,19 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
           }
         });
       }
-      /* Hygiene benefits & employment cost % */
-      if (employeeCosts.hygBenefits) sv(wsEC, 'G32', employeeCosts.hygBenefits);
+
+      /* Hygiene benefits & employment cost % (row shifts if extra RDH added) */
+      const hygBenRow = 32 + extraCount;
+      const hygEmpRow = 31 + extraCount;
+      if (employeeCosts.hygBenefits) sv(wsEC, 'G' + hygBenRow, employeeCosts.hygBenefits);
       if (employeeCosts.hygEmpCostPct && employeeCosts.hygEmpCostPct !== 0.10) {
-        try { wsEC.getCell('G31').value = { formula: 'G30*' + employeeCosts.hygEmpCostPct }; } catch(e) {}
+        try { wsEC.getCell('G' + hygEmpRow).value = { formula: 'G' + (30 + extraCount) + '*' + employeeCosts.hygEmpCostPct }; } catch(e) {}
       }
 
-      /* Benefits policy notes: D35-D42 */
+      /* Benefits policy notes (rows shift if extra RDH added) */
+      const benOffset = extraCount;
       if (employeeCosts.benefits) {
-        const benMap = { sick: 35, holidays: 36, vacation: 37, bonus: 38, k401: 39, medical: 40, dental: 41, other: 42 };
+        const benMap = { sick: 35 + benOffset, holidays: 36 + benOffset, vacation: 37 + benOffset, bonus: 38 + benOffset, k401: 39 + benOffset, medical: 40 + benOffset, dental: 41 + benOffset, other: 42 + benOffset };
         Object.entries(employeeCosts.benefits).forEach(([key, val]) => {
           if (val && benMap[key]) sv(wsEC, 'D' + benMap[key], val);
         });
