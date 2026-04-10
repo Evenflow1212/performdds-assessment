@@ -539,22 +539,26 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     /* Col P always light blue */
     try { wsPI.getCell('P'+r).style = { fill: piLightBlue, font: piBlackFont }; } catch(e) {}
   }
-  /* Row 33: totals row (navy fill, white text) A-O */
+  /* Row 33: totals row (navy fill, white text) A-P */
   piCols.slice(0, 15).forEach(col => {
     try { const c = wsPI.getCell(col+'33'); c.style = { fill: piNavy, font: piWhiteFont, numFmt: '$#,##0.00' }; } catch(e) {}
   });
-  /* Row 34: monthly average (light blue) A-O */
+  try { wsPI.getCell('P33').style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
+  /* Row 34: monthly average (light blue) A-P */
   piCols.slice(0, 15).forEach(col => {
     try { const c = wsPI.getCell(col+'34'); c.style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
   });
-  /* Row 35: adj figure (light blue) A-O */
+  try { wsPI.getCell('P34').style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
+  /* Row 35: adj figure (light blue) A-P */
   piCols.slice(0, 15).forEach(col => {
     try { const c = wsPI.getCell(col+'35'); c.style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
   });
-  /* Row 36: P&L $$'s (navy fill, white text) A-O */
+  try { wsPI.getCell('P35').style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
+  /* Row 36: P&L $$'s (navy fill, white text) A-P */
   piCols.slice(0, 15).forEach(col => {
     try { const c = wsPI.getCell(col+'36'); c.style = { fill: piNavy, font: piWhiteFont, numFmt: '$#,##0.00' }; } catch(e) {}
   });
+  try { wsPI.getCell('P36').style = { fill: piLightBlue, font: piBlackFont, numFmt: '$#,##0.00' }; } catch(e) {}
   /* Rows 39-41: N column navy */
   [39,40,41].forEach(r => {
     try { wsPI.getCell('N'+r).style = { fill: piNavy, font: piWhiteFont }; } catch(e) {}
@@ -642,6 +646,20 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     if (plData.totalExpense) sv(wsPI, 'N40', plData.totalExpense);
     sv(wsPI, 'K41', 'Diff');
     try { wsPI.getCell('N41').value = { formula: 'N40-N39' }; } catch(e) {}
+
+    /* Clean up rows 37-56: clear old template remnants (duplicate totals at 48-51, 54-56)
+       but preserve our summary at rows 39-41.
+       Must clear BOTH value AND style — old template has navy/blue fills on those rows. */
+    for (let r = 37; r <= 56; r++) {
+      if (r >= 39 && r <= 41) continue; /* skip our summary rows */
+      piCols.forEach(col => {
+        try {
+          const c = wsPI.getCell(col+r);
+          c.value = null;
+          c.style = { fill: {}, font: piBlackFont };
+        } catch(e) {}
+      });
+    }
 
     /* Fix column M ("Other") width — template has it too narrow */
     try { wsPI.getColumn('M').width = 18; } catch(e) {}
