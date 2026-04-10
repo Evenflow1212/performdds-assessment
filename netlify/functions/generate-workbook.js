@@ -192,15 +192,18 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   sv(wsPW, 'G5', totalProd);
 
   const rightAgg = {};
+  const leftAgg = {};
   const srpAgg = {qty: 0, total: 0};
   const usedInPW = new Set();
 
   for (const c of codes) {
     const bc = baseCode(c.code);
     if (LEFT[bc]) {
+      /* Aggregate codes that share the same baseCode (e.g. D1110 + D1110.1) */
       const row = LEFT[bc];
-      sv(wsPW, 'D'+row, c.qty);
-      sv(wsPW, 'F'+row, c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0);
+      if (!leftAgg[row]) leftAgg[row] = {qty:0, total:0};
+      leftAgg[row].qty += c.qty;
+      leftAgg[row].total += c.total;
       usedInPW.add(c.code);
       continue;
     }
@@ -217,6 +220,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       rightAgg[rRow].total += c.total;
       usedInPW.add(c.code);
     }
+  }
+
+  /* Write aggregated LEFT table values */
+  for (const [row, agg] of Object.entries(leftAgg)) {
+    sv(wsPW, 'D'+row, agg.qty);
+    sv(wsPW, 'F'+row, agg.qty > 0 ? Math.round(agg.total/agg.qty*100)/100 : 0);
   }
 
   if (srpAgg.qty > 0) {
