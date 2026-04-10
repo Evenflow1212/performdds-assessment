@@ -1330,12 +1330,13 @@ async function generate() {
         const plArrayBuf = await files[3].arrayBuffer();
         const plPdfDoc = await pdfjsLib.getDocument({ data: plArrayBuf }).promise;
         const numPages = plPdfDoc.numPages;
-        /* Render each page at 1.5x scale then stitch vertically */
+        console.log('P&L PDF has', numPages, 'pages');
+        /* Render each page at 1.0x scale (keep small for Netlify payload limit) */
         const pageCanvases = [];
         let totalHeight = 0, maxWidth = 0;
         for (let p = 1; p <= numPages; p++) {
           const page = await plPdfDoc.getPage(p);
-          const scale = 1.5;
+          const scale = 1.0;
           const viewport = page.getViewport({ scale });
           const canvas = document.createElement('canvas');
           canvas.width = viewport.width;
@@ -1351,18 +1352,26 @@ async function generate() {
         stitched.width = maxWidth;
         stitched.height = totalHeight;
         const sCtx = stitched.getContext('2d');
+        sCtx.fillStyle = '#FFFFFF';
+        sCtx.fillRect(0, 0, maxWidth, totalHeight);
         let yOff = 0;
         for (const pc of pageCanvases) {
           sCtx.drawImage(pc, 0, yOff);
           yOff += pc.height;
         }
-        plImageB64 = stitched.toDataURL('image/png').split(',')[1];
-        console.log('P&L image rendered:', Math.round(plImageB64.length/1024), 'KB');
-        /* If image is too large for Netlify payload (>4MB base64), re-render at lower quality */
+        /* Always use JPEG to keep payload under Netlify's 6MB limit */
+        plImageB64 = stitched.toDataURL('image/jpeg', 0.8).split(',')[1];
+        console.log('P&L image rendered as JPEG:', Math.round(plImageB64.length/1024), 'KB');
+        /* If still too large, lower quality further */
+        if (plImageB64.length > 3 * 1024 * 1024) {
+          console.log('Still too large, reducing quality...');
+          plImageB64 = stitched.toDataURL('image/jpeg', 0.5).split(',')[1];
+          console.log('Reduced to:', Math.round(plImageB64.length/1024), 'KB');
+        }
+        /* If STILL too large, skip it */
         if (plImageB64.length > 4 * 1024 * 1024) {
-          console.log('P&L image too large, compressing as JPEG...');
-          plImageB64 = stitched.toDataURL('image/jpeg', 0.7).split(',')[1];
-          console.log('Compressed to:', Math.round(plImageB64.length/1024), 'KB');
+          console.warn('P&L image too large even after compression, skipping');
+          plImageB64 = null;
         }
       } catch(imgErr) {
         console.warn('Could not render P&L to image:', imgErr.message);

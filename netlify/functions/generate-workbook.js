@@ -448,10 +448,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   {
     let wsImg = wb.getWorksheet('P&L Image');
     if (!wsImg) wsImg = wb.addWorksheet('P&L Image');
+    console.log('P&L image data received:', plImageB64 ? (Math.round(plImageB64.length/1024) + 'KB') : 'NONE');
     if (plImageB64) {
       try {
         /* Detect if JPEG (starts with /9j/) or PNG */
-        const imgExt = plImageB64.startsWith('/9j/') ? 'jpeg' : 'png';
+        const imgExt = (plImageB64.startsWith('/9j/') || plImageB64.startsWith('/9j')) ? 'jpeg' : 'png';
+        console.log('P&L image format:', imgExt, 'length:', Math.round(plImageB64.length/1024), 'KB');
         const imageId = wb.addImage({
           base64: plImageB64,
           extension: imgExt,
@@ -472,6 +474,34 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     }
   }
 
+  /* ═══ FIX TAB ORDER ═══ */
+  /* When we delete+recreate All Codes, it gets a new id and goes to the end.
+     Rebuild the internal _worksheets array to enforce the correct tab order. */
+  const desiredOrder = [
+    'Production Worksheet', 'All Codes - Production Report', 'Hygiene Schedule',
+    'Financial Overview', 'Targets & Goal', 'Employee Costs', 'Budgetary P&L',
+    'P&L Input', 'P&L Raw Import', 'P&L Image'
+  ];
+  try {
+    const ordered = [];
+    for (const name of desiredOrder) {
+      const ws = wb.getWorksheet(name);
+      if (ws) ordered.push(ws);
+    }
+    /* Add any sheets not in the desired list */
+    for (const ws of wb.worksheets) {
+      if (!ordered.find(s => s.id === ws.id)) ordered.push(ws);
+    }
+    /* Rebuild _worksheets with ascending ids to enforce order */
+    wb._worksheets = [undefined];
+    ordered.forEach((ws, i) => {
+      const newId = i + 1;
+      ws.id = newId;
+      wb._worksheets[newId] = ws;
+    });
+    console.log('Tab order fixed:', ordered.map(s => s.name).join(', '));
+  } catch(e) { console.warn('Could not fix tab order:', e.message); }
+
   const buf = await wb.xlsx.writeBuffer();
   return {
     xlsxB64: Buffer.from(buf).toString('base64'),
@@ -484,6 +514,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
+      plImageSize: plImageB64 ? Math.round(plImageB64.length / 1024) + 'KB' : 'none',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched }
     }
   };
