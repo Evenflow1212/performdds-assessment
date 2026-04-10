@@ -656,7 +656,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         try {
           const c = wsPI.getCell(col+r);
           c.value = null;
-          c.style = { fill: {}, font: piBlackFont };
+          c.style = { fill: piWhiteFill, font: piBlackFont };
         } catch(e) {}
       });
     }
