@@ -2026,12 +2026,16 @@ async function generate() {
     const hygieneData = skipped[7] ? null : collectHygieneSchedule();
     console.log('Hygiene data:', hygieneData ? 'collected' : 'skipped');
 
+    /* Collect employee costs form data (null if skipped) */
+    const employeeCosts = skipped[6] ? null : collectEmployeeCosts();
+    console.log('Employee costs:', employeeCosts ? 'collected' : 'skipped');
+
     /* Step 2: Build workbook from parsed data (fast, no Claude) — do NOT send image to server */
     console.log('Step 2: Building workbook from parsed data...');
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData })
+      body: JSON.stringify({ prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts })
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Generation failed');

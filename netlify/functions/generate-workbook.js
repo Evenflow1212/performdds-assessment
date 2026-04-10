@@ -151,7 +151,7 @@ R(['D7310','D7311','D7320','D7321','D7410','D7411','D7412','D7440','D7450','D745
 function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 
 /* ─── Build the workbook from pre-parsed text ─── */
-async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData) {
+async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts) {
   /* Parse the Claude output text into structured data */
   const prodData = parseProduction(prodText || '');
   const collData = collText ? parseCollections(collText) : null;
@@ -568,6 +568,60 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       }
 
       console.log('Hygiene Schedule: populated week dates relative to', thisMonday.toISOString().slice(0,10));
+    }
+  }
+
+  /* ═══ EMPLOYEE COSTS ═══ */
+  if (employeeCosts) {
+    const wsEC = wb.getWorksheet('Employee Costs');
+    if (wsEC) {
+      console.log('Writing Employee Costs data...');
+      /* Staff positions: name→D, rate→E, hours→F (G has formulas for monthly cost) */
+      const staffRowMap = { om: 7, f1: 9, f2: 10, f3: 11, f4: 12, f5: 13, f6: 14, b1: 16, b2: 17, b3: 18, b4: 19 };
+      if (employeeCosts.staff) {
+        employeeCosts.staff.forEach(p => {
+          const r = staffRowMap[p.key] || p.row;
+          if (r) {
+            if (p.name) sv(wsEC, 'D' + r, p.name);
+            if (p.rate) sv(wsEC, 'E' + r, p.rate);
+            if (p.hours) sv(wsEC, 'F' + r, p.hours);
+          }
+        });
+      }
+      /* Staff benefits & employment cost % */
+      if (employeeCosts.staffBenefits) sv(wsEC, 'G22', employeeCosts.staffBenefits);
+      if (employeeCosts.staffEmpCostPct && employeeCosts.staffEmpCostPct !== 0.10) {
+        /* Update formula with custom % instead of default 10% */
+        try { wsEC.getCell('G21').value = { formula: 'G20*' + employeeCosts.staffEmpCostPct }; } catch(e) {}
+      }
+
+      /* Hygiene positions: name→D, rate→E, hours→F */
+      const hygRowMap = { h1: 27, h2: 28, h3: 29 };
+      if (employeeCosts.hygiene) {
+        employeeCosts.hygiene.forEach(p => {
+          const r = hygRowMap[p.key] || p.row;
+          if (r) {
+            if (p.name) sv(wsEC, 'D' + r, p.name);
+            if (p.rate) sv(wsEC, 'E' + r, p.rate);
+            if (p.hours) sv(wsEC, 'F' + r, p.hours);
+          }
+        });
+      }
+      /* Hygiene benefits & employment cost % */
+      if (employeeCosts.hygBenefits) sv(wsEC, 'G32', employeeCosts.hygBenefits);
+      if (employeeCosts.hygEmpCostPct && employeeCosts.hygEmpCostPct !== 0.10) {
+        try { wsEC.getCell('G31').value = { formula: 'G30*' + employeeCosts.hygEmpCostPct }; } catch(e) {}
+      }
+
+      /* Benefits policy notes: D35-D42 */
+      if (employeeCosts.benefits) {
+        const benMap = { sick: 35, holidays: 36, vacation: 37, bonus: 38, k401: 39, medical: 40, dental: 41, other: 42 };
+        Object.entries(employeeCosts.benefits).forEach(([key, val]) => {
+          if (val && benMap[key]) sv(wsEC, 'D' + benMap[key], val);
+        });
+      }
+
+      console.log('Employee Costs: done');
     }
   }
 
@@ -1002,12 +1056,12 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); } catch(e) { return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'Invalid JSON'})}; }
 
-  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, hygieneData=null } = body;
+  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, hygieneData=null, employeeCosts=null } = body;
   if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
     console.log('Building workbook from pre-parsed data...');
-    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData);
+    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts);
 
     return {
       statusCode: 200,
