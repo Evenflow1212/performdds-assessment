@@ -151,7 +151,7 @@ R(['D7310','D7311','D7320','D7321','D7410','D7411','D7412','D7440','D7450','D745
 function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 
 /* ─── Build the workbook from pre-parsed text ─── */
-async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, plImageB64) {
+async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance) {
   /* Parse the Claude output text into structured data */
   const prodData = parseProduction(prodText || '');
   const collData = collText ? parseCollections(collText) : null;
@@ -400,8 +400,25 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       wsFO.getCell(col+'45').numFmt = '0%';
     } catch(e) {}
   });
-  /* F36: Estimated Value of AR header (dark navy) */
-  try { wsFO.getCell('F36').fill = darkNavyFill; wsFO.getCell('F36').font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; } catch(e) {}
+  /* Row 2: gray header bar */
+  const grayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7F7F7F' } };
+  const grayHeaderFont = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF000000' } };
+  ['B2','C2','D2','E2','F2','G2','H2','I2'].forEach(addr => {
+    try { wsFO.getCell(addr).fill = grayFill; wsFO.getCell(addr).font = grayHeaderFont; } catch(e) {}
+  });
+  /* Row 32: light gray AR data cells */
+  const lightGrayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E5E5' } };
+  ['E32','F32','G32','H32'].forEach(addr => {
+    try { wsFO.getCell(addr).fill = lightGrayFill; } catch(e) {}
+  });
+  /* F36, G36, H36: dark navy header cells */
+  ['F36','G36','H36'].forEach(addr => {
+    try { wsFO.getCell(addr).fill = darkNavyFill; wsFO.getCell(addr).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; } catch(e) {}
+  });
+  /* I43: navy (was missed — same style as row 42) */
+  try { wsFO.getCell('I43').fill = navyFill; wsFO.getCell('I43').font = navyFont; } catch(e) {}
+  /* I45: medium blue (total % cell) */
+  try { wsFO.getCell('I45').fill = medBlueFill; wsFO.getCell('I45').numFmt = '0%'; } catch(e) {}
 
   /* ═══ P&L INPUT ═══ */
   if (plData && plData.items && plData.items.length > 0) {
@@ -498,34 +515,66 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     wsRaw.getColumn('D').width = 22;
   }
 
-  /* ═══ P&L IMAGE ═══ */
+  /* ═══ P&L IMAGE (placeholder — actual image embedded client-side via JSZip) ═══ */
   {
     let wsImg = wb.getWorksheet('P&L Image');
     if (!wsImg) wsImg = wb.addWorksheet('P&L Image');
-    console.log('P&L image data received:', plImageB64 ? (Math.round(plImageB64.length/1024) + 'KB') : 'NONE');
-    if (plImageB64) {
-      try {
-        /* Detect if JPEG (starts with /9j/) or PNG */
-        const imgExt = (plImageB64.startsWith('/9j/') || plImageB64.startsWith('/9j')) ? 'jpeg' : 'png';
-        console.log('P&L image format:', imgExt, 'length:', Math.round(plImageB64.length/1024), 'KB');
-        const imageId = wb.addImage({
-          base64: plImageB64,
-          extension: imgExt,
-        });
-        /* Place image starting at A1, sized to roughly fill the visible area */
-        wsImg.addImage(imageId, {
-          tl: { col: 0, row: 0 },
-          ext: { width: 750, height: 970 }
-        });
-        sv(wsImg, 'A1', '');  /* Clear any placeholder text */
-        console.log('P&L image embedded successfully');
-      } catch(imgErr) {
-        console.warn('Could not embed P&L image:', imgErr.message);
-        sv(wsImg, 'A1', 'P&L Image — could not embed (error: ' + imgErr.message + ')');
-      }
-    } else {
-      sv(wsImg, 'A1', 'P&L Image — no image data provided');
+    sv(wsImg, 'A1', '');  /* Placeholder — image will be embedded client-side */
+  }
+
+  /* ═══ FIX THEME COLORS ACROSS ALL SHEETS ═══ */
+  /* ExcelJS loses theme-based colors from templates, converting them to yellow (FFFFFF00).
+     Theme 1 (Light 1) = white in this template. We must explicitly set these to white.
+     Affected: Production Worksheet col H (rows 2-44) + J48:N48,
+               Financial Overview col J (rows 2-46),
+               Targets & Goal col F (rows 5-33),
+               Budgetary P&L col K (rows 2-33) */
+  const whiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+
+  /* Production Worksheet — column H rows 2-44 (notes column, theme white bg) */
+  for (let r = 2; r <= 44; r++) {
+    try { wsPW.getCell('H' + r).fill = whiteFill; } catch(e) {}
+  }
+  /* Production Worksheet — J48:N48 */
+  ['J','K','L','M','N'].forEach(col => {
+    try { wsPW.getCell(col + '48').fill = whiteFill; } catch(e) {}
+  });
+
+  /* Financial Overview — column J rows 2-46 (notes column, theme white bg) */
+  for (let r = 2; r <= 46; r++) {
+    try { wsFO.getCell('J' + r).fill = whiteFill; } catch(e) {}
+  }
+
+  /* Targets & Goal sheet — column F rows 5-33 */
+  const wsTG = wb.getWorksheet('Targets & Goal');
+  if (wsTG) {
+    for (let r = 5; r <= 33; r++) {
+      try { wsTG.getCell('F' + r).fill = whiteFill; } catch(e) {}
     }
+  }
+
+  /* Budgetary P&L sheet — column K rows 2-33 */
+  const wsBP = wb.getWorksheet('Budgetary P&L');
+  if (wsBP) {
+    for (let r = 2; r <= 33; r++) {
+      try { wsBP.getCell('K' + r).fill = whiteFill; } catch(e) {}
+    }
+  }
+
+  /* GLOBAL yellow-to-white sweep: scan ALL sheets for any remaining FFFFFF00 fills
+     and replace with white. This catches any cells we didn't explicitly handle above. */
+  for (const ws of wb.worksheets) {
+    try {
+      ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
+        row.eachCell({ includeEmpty: false }, (cell) => {
+          try {
+            if (cell.fill && cell.fill.fgColor && cell.fill.fgColor.argb === 'FFFFFF00') {
+              cell.fill = whiteFill;
+            }
+          } catch(e) {}
+        });
+      });
+    } catch(e) {}
   }
 
   const buf = await wb.xlsx.writeBuffer();
@@ -540,7 +589,6 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      plImageSize: plImageB64 ? Math.round(plImageB64.length / 1024) + 'KB' : 'none',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched }
     }
   };
@@ -554,12 +602,12 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); } catch(e) { return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'Invalid JSON'})}; }
 
-  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, plImageB64=null } = body;
+  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={} } = body;
   if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
     console.log('Building workbook from pre-parsed data...');
-    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, plImageB64);
+    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance);
 
     return {
       statusCode: 200,
