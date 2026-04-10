@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.6 – Fix Next 7 Days sub-header overflow -->
+<!-- v2.7 – Grid separators, Required Dates header, remove N7 date -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -239,10 +239,11 @@
   }
   .hs-grid th.week-col { width: 100px; text-align: left; padding-left: 8px; }
   .hs-grid th.day-group { border-left: 2px solid rgba(255,255,255,0.3); }
-  .hs-grid th.sub { background: #3a5a8c; font-size: 0.68rem; font-weight: 500; text-transform: uppercase; }
+  .hs-grid th.sub { background: #3a5a8c; font-size: 0.68rem; font-weight: 500; text-transform: uppercase; border-left: 1px solid rgba(255,255,255,0.15); }
   .hs-grid td { padding: 4px 3px; border-bottom: 1px solid var(--border); text-align: center; }
-  .hs-grid td.week-label { text-align: left; padding-left: 8px; font-weight: 600; font-size: 0.82rem; color: var(--navy); white-space: nowrap; }
+  .hs-grid td.week-label { text-align: center; font-weight: 600; font-size: 0.82rem; color: var(--navy); white-space: nowrap; }
   .hs-grid td.day-group { border-left: 2px solid var(--border); }
+  .hs-grid td.sub-sep { border-left: 1px solid #d0d6e0; }
   .hs-grid input[type="number"] {
     width: 42px; border: 1.5px solid var(--border); border-radius: 4px; padding: 4px 2px;
     font-size: 0.8rem; text-align: center; font-family: inherit;
@@ -1066,7 +1067,7 @@
       <table class="hs-grid" id="hsRecentPast">
         <thead>
           <tr>
-            <th class="week-col">Week</th>
+            <th class="week-col" style="text-align:center;">Required Dates</th>
             <th colspan="2" class="day-group">Monday</th>
             <th colspan="2" class="day-group">Tuesday</th>
             <th colspan="2" class="day-group">Wednesday</th>
@@ -1088,11 +1089,11 @@
       </table>
 
       <!-- NEXT 7 DAYS -->
-      <div class="form-section-label">Next Seven Days (<span id="hsNext7Label"></span>) — Patients on the Schedule vs Patients Confirmed</div>
+      <div class="form-section-label">Next Seven Days — Patients on the Schedule vs Patients Confirmed</div>
       <table class="hs-grid" id="hsNext7">
         <thead>
           <tr>
-            <th class="week-col">Week</th>
+            <th class="week-col" style="text-align:center;">Required Dates</th>
             <th colspan="2" class="day-group">Monday</th>
             <th colspan="2" class="day-group">Tuesday</th>
             <th colspan="2" class="day-group">Wednesday</th>
@@ -1118,7 +1119,7 @@
       <table class="hs-grid" id="hsNearFuture">
         <thead>
           <tr>
-            <th class="week-col">Week</th>
+            <th class="week-col" style="text-align:center;">Required Dates</th>
             <th colspan="2" class="day-group">Monday</th>
             <th colspan="2" class="day-group">Tuesday</th>
             <th colspan="2" class="day-group">Wednesday</th>
@@ -1144,7 +1145,7 @@
       <table class="hs-grid" id="hsFutureFuture">
         <thead>
           <tr>
-            <th class="week-col">Week</th>
+            <th class="week-col" style="text-align:center;">Required Dates</th>
             <th colspan="2" class="day-group">Monday</th>
             <th colspan="2" class="day-group">Tuesday</th>
             <th colspan="2" class="day-group">Wednesday</th>
@@ -1382,9 +1383,9 @@ function populateHygieneDates() {
     const days = ['mon','tue','wed','thu','fri','sat'];
     const tr = document.createElement('tr');
     tr.innerHTML = '<td class="week-label">' + weekLabel + '</td>' +
-      days.map((d, i) =>
-        '<td' + (i === 0 ? ' class="day-group"' : '') + '><input type="number" id="hs_' + section + '_' + weekIndex + '_' + d + '_a" min="0"></td>' +
-        '<td><input type="number" id="hs_' + section + '_' + weekIndex + '_' + d + '_b" min="0"></td>'
+      days.map((d) =>
+        '<td class="day-group"><input type="number" id="hs_' + section + '_' + weekIndex + '_' + d + '_a" min="0"></td>' +
+        '<td class="sub-sep"><input type="number" id="hs_' + section + '_' + weekIndex + '_' + d + '_b" min="0"></td>'
       ).join('');
     return tr;
   }
@@ -1396,8 +1397,7 @@ function populateHygieneDates() {
     rpBody.appendChild(makeRow('rp', i, fmtWeek(getMonday(-3 + i))));
   }
 
-  /* Next 7 Days: single row with date */
-  document.getElementById('hsNext7Label').textContent = fmtWeek(thisMonday);
+  /* Next 7 Days: single row */
   const n7Body = document.getElementById('hsNext7Body');
   n7Body.innerHTML = '';
   n7Body.appendChild(makeRow('n7', 0, fmtWeek(thisMonday)));
