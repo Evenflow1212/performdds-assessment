@@ -577,7 +577,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     if (wsEC) {
       console.log('Writing Employee Costs data...');
       /* Staff positions: name→D, rate→E, hours→F (G has formulas for monthly cost) */
-      const staffRowMap = { om: 7, f1: 9, f2: 10, f3: 11, f4: 12, f5: 13, f6: 14, b1: 16, b2: 17, b3: 18, b4: 19 };
+      const staffRowMap = { om: 7, f1: 9, f2: 10, f3: 11, f4: 12, f5: 13, b1: 16, b2: 17, b3: 18, b4: 19, b5: 14 };
+      /* Relabel row 14 from "front6" to "back 5" */
+      sv(wsEC, 'C14', 'back 5');
       if (employeeCosts.staff) {
         employeeCosts.staff.forEach(p => {
           const r = staffRowMap[p.key] || p.row;
