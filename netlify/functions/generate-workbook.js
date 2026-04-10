@@ -372,55 +372,61 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   }
 
   /* Fix Financial Overview theme colors — ExcelJS loses theme-based fills
-     and defaults to yellow (FFFFFF00). Replace with correct RGB values. */
+     and defaults to yellow (FFFFFF00). MUST use cell.style={...} to completely
+     replace the shared style reference. cell.fill/cell.font alone do NOT work. */
   const navyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E4B7A' } };
   const navyFont = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
   const lightBlueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF3FA' } };
   const medBlueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
   const darkNavyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
+  const lightBlueDarkFont = { name: 'Calibri', size: 10, color: { argb: 'FF2E4B7A' } };
+  const grayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7F7F7F' } };
+  const lightGrayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E5E5' } };
 
-  /* Row 42: header labels (navy blue background, white text) */
-  ['B42','C42','D42','E42','F42','G42','H42','I42'].forEach(addr => {
-    try { wsFO.getCell(addr).fill = navyFill; wsFO.getCell(addr).font = navyFont; } catch(e) {}
-  });
-  /* Row 43: sub-header labels */
-  ['B43','C43','D43','E43'].forEach(addr => {
-    try { wsFO.getCell(addr).fill = navyFill; wsFO.getCell(addr).font = navyFont; } catch(e) {}
-  });
-  /* Row 44: data values (light blue) */
-  ['B44','C44','D44','E44','F44','G44','H44'].forEach(addr => {
-    try { wsFO.getCell(addr).fill = lightBlueFill; wsFO.getCell(addr).numFmt = '$#,##0'; } catch(e) {}
-  });
-  try { wsFO.getCell('I44').fill = medBlueFill; wsFO.getCell('I44').numFmt = '$#,##0'; } catch(e) {}
-  /* Row 45: percentage formulas (light blue) — fix IFERROR wrappers */
-  ['B','C','D','E','F','G','H'].forEach(col => {
+  /* Row 2: gray header bar */
+  ['B2','C2','D2','E2','F2','G2','H2','I2'].forEach(addr => {
     try {
-      wsFO.getCell(col+'45').value = { formula: 'IFERROR('+col+'44/I44,0)' };
-      wsFO.getCell(col+'45').fill = lightBlueFill;
-      wsFO.getCell(col+'45').numFmt = '0%';
+      const c = wsFO.getCell(addr);
+      c.style = { fill: grayFill, font: { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF000000' } } };
     } catch(e) {}
   });
-  /* Row 2: gray header bar */
-  const grayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7F7F7F' } };
-  const grayHeaderFont = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF000000' } };
-  ['B2','C2','D2','E2','F2','G2','H2','I2'].forEach(addr => {
-    try { wsFO.getCell(addr).fill = grayFill; wsFO.getCell(addr).font = grayHeaderFont; } catch(e) {}
-  });
   /* Row 32: light gray AR data cells */
-  const lightGrayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E5E5' } };
   ['E32','F32','G32','H32'].forEach(addr => {
-    try { wsFO.getCell(addr).fill = lightGrayFill; } catch(e) {}
+    try { const c = wsFO.getCell(addr); c.style = { fill: lightGrayFill, font: { name: 'Calibri', size: 10 }, numFmt: '$#,##0.00' }; } catch(e) {}
   });
   /* F36, G36, H36: dark navy header cells */
   ['F36','G36','H36'].forEach(addr => {
-    try { wsFO.getCell(addr).fill = darkNavyFill; wsFO.getCell(addr).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; } catch(e) {}
+    try { const c = wsFO.getCell(addr); c.style = { fill: darkNavyFill, font: { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } } }; } catch(e) {}
   });
-  /* I43: navy (was missed — same style as row 42) */
-  try { wsFO.getCell('I43').fill = navyFill; wsFO.getCell('I43').font = navyFont; } catch(e) {}
-  /* I45: medium blue (total % cell) */
-  try { wsFO.getCell('I45').fill = medBlueFill; wsFO.getCell('I45').numFmt = '0%'; } catch(e) {}
+  /* Row 42: header labels (navy blue, white text) — MUST use cell.style */
+  ['B42','C42','D42','E42','F42','G42','H42','I42'].forEach(addr => {
+    try { const c = wsFO.getCell(addr); c.style = { fill: navyFill, font: navyFont, alignment: { horizontal: 'center' } }; } catch(e) {}
+  });
+  /* Row 43: sub-header labels (navy) */
+  ['B43','C43','D43','E43','I43'].forEach(addr => {
+    try { const c = wsFO.getCell(addr); c.style = { fill: navyFill, font: navyFont, alignment: { horizontal: 'center' } }; } catch(e) {}
+  });
+  /* Row 44: data values (light blue) */
+  ['B44','C44','D44','E44','F44','G44','H44'].forEach(addr => {
+    try { const c = wsFO.getCell(addr); c.style = { fill: lightBlueFill, font: lightBlueDarkFont, numFmt: '$#,##0', alignment: { horizontal: 'right' } }; } catch(e) {}
+  });
+  /* I44: medium blue total */
+  try { const c = wsFO.getCell('I44'); c.style = { fill: medBlueFill, font: lightBlueDarkFont, numFmt: '$#,##0', alignment: { horizontal: 'right' } }; } catch(e) {}
+  /* Row 45: percentage formulas (light blue) */
+  ['B','C','D','E','F','G','H'].forEach(col => {
+    try {
+      const c = wsFO.getCell(col+'45');
+      c.value = { formula: 'IFERROR('+col+'44/I44,0)' };
+      c.style = { fill: lightBlueFill, font: lightBlueDarkFont, numFmt: '0%', alignment: { horizontal: 'right' } };
+    } catch(e) {}
+  });
+  /* I45: total % */
+  try { const c = wsFO.getCell('I45'); c.style = { fill: medBlueFill, font: lightBlueDarkFont, numFmt: '0%', alignment: { horizontal: 'right' } }; } catch(e) {}
 
   /* ═══ P&L INPUT ═══ */
+  /* Fix any yellow theme cells on P&L Input */
+  try { wsPI.getCell('K2').style = { font: { name: 'Verdana', size: 9 } }; } catch(e) {}
+
   if (plData && plData.items && plData.items.length > 0) {
     sv(wsPI, 'B2', 12);
     if (plData.totalIncome) sv(wsPI, 'H2', plData.totalIncome);
@@ -494,11 +500,11 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         const catNames = {F:'Dental Supplies',H:'Staff Costs',J:'Rent & Parking',K:'Marketing',L:'Office Supplies',M:'Other'};
         sv(wsRaw, 'C'+rr, catNames[cat] || 'Other');
       }
-      /* Strikethrough ALL expense items that are ported to P&L Input
-         (every item with a category, whether it's EXCLUDED, Add-Back, or a regular category) */
+      /* Strikethrough ALL expense items — MUST use cell.style to override template styles */
       ['A','B','C','D'].forEach(col => {
         try {
-          wsRaw.getCell(col+rr).font = { name: 'Calibri', size: 11, strike: true, color: { argb: 'FF888888' } };
+          const c = wsRaw.getCell(col+rr);
+          c.style = { font: { name: 'Calibri', size: 11, strike: true, color: { argb: 'FF888888' } } };
         } catch(e) {}
       });
       rr++;
@@ -576,6 +582,39 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       });
     } catch(e) {}
   }
+
+  /* ═══ FIX TAB ORDER ═══ */
+  /* ExcelJS may reorder sheets. Force the correct order by rebuilding _worksheets.
+     The _worksheets array is 1-based (index 0 = undefined). */
+  const desiredOrder = [
+    'Production Worksheet',
+    'All Codes - Production Report',
+    'Hygiene Schedule',
+    'Financial Overview',
+    'Targets & Goal',
+    'Employee Costs',
+    'Budgetary P&L',
+    'P&L Input',
+    'P&L Raw Import',
+    'P&L Image'
+  ];
+  const ordered = [];
+  for (const name of desiredOrder) {
+    const ws = wb.getWorksheet(name);
+    if (ws) ordered.push(ws);
+  }
+  /* Include any extra sheets not in the desired list */
+  for (const ws of wb.worksheets) {
+    if (!ordered.includes(ws)) ordered.push(ws);
+  }
+  /* Rebuild the internal array and reassign IDs */
+  wb._worksheets = [undefined];
+  ordered.forEach((ws, i) => {
+    ws.id = i + 1;
+    ws.orderNo = i;
+    wb._worksheets.push(ws);
+  });
+  console.log('Tab order fixed:', wb.worksheets.map(s=>s.name).join(', '));
 
   const buf = await wb.xlsx.writeBuffer();
   return {

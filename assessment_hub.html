@@ -1296,12 +1296,14 @@ async function extractProductionFromPdf(file) {
 
 /* ─── Client-side P&L image embedding using JSZip ─── */
 async function embedPlImageClientSide(xlsxB64, imageB64) {
+  console.log('embedPlImageClientSide: starting, image size:', Math.round(imageB64.length/1024), 'KB');
+
   /* Decode the xlsx into a zip */
   const rawBin = atob(xlsxB64);
   const uint8 = new Uint8Array(rawBin.length);
   for (let i = 0; i < rawBin.length; i++) uint8[i] = rawBin.charCodeAt(i);
-
   const zip = await JSZip.loadAsync(uint8);
+  console.log('embedPlImageClientSide: zip loaded, files:', Object.keys(zip.files).length);
 
   /* Determine image type */
   const isJpeg = imageB64.startsWith('/9j/') || imageB64.startsWith('/9j');
@@ -1313,35 +1315,72 @@ async function embedPlImageClientSide(xlsxB64, imageB64) {
   const imgUint8 = new Uint8Array(imgBin.length);
   for (let i = 0; i < imgBin.length; i++) imgUint8[i] = imgBin.charCodeAt(i);
   zip.file('xl/media/plimage1.' + imgExt, imgUint8);
+  console.log('embedPlImageClientSide: image added to xl/media/, size:', imgUint8.length, 'bytes');
 
-  /* Find the P&L Image sheet in workbook.xml */
+  /* ── Find the P&L Image sheet in workbook.xml ── */
   const wbXml = await zip.file('xl/workbook.xml').async('string');
-  /* Parse sheet names and their rIds */
-  const sheetMatch = wbXml.match(/<sheet[^>]*name="P&amp;L Image"[^>]*r:id="(rId\d+)"[^>]*sheetId="(\d+)"/);
-  if (!sheetMatch) {
-    console.warn('P&L Image sheet not found in workbook.xml');
+  console.log('embedPlImageClientSide: workbook.xml length:', wbXml.length);
+
+  /* Flexible regex: find <sheet> with name="P&L Image" (XML-encoded as P&amp;L Image)
+     Attributes can appear in any order. Extract r:id separately. */
+  const sheetTag = wbXml.match(/<sheet\b[^/]*?name="P&amp;L Image"[^/]*?\/?>/);
+  if (!sheetTag) {
+    /* Try alternate encoding */
+    const alt = wbXml.match(/<sheet\b[^/]*?name="P&amp;amp;L Image"[^/]*?\/?>/);
+    if (!alt) {
+      console.warn('embedPlImageClientSide: P&L Image sheet NOT FOUND. Sheets in XML:', wbXml.match(/name="[^"]+"/g));
+      return xlsxB64;
+    }
+  }
+  const tagStr = sheetTag ? sheetTag[0] : '';
+  /* Extract r:id from the matched tag (attribute order varies) */
+  const ridMatch = tagStr.match(/r:id="(rId\d+)"/);
+  if (!ridMatch) {
+    console.warn('embedPlImageClientSide: r:id not found in sheet tag:', tagStr);
     return xlsxB64;
   }
-  const sheetRId = sheetMatch[1];
+  const sheetRId = ridMatch[1];
+  console.log('embedPlImageClientSide: P&L Image sheet rId:', sheetRId);
 
-  /* Find the sheet file path from workbook.xml.rels */
+  /* ── Find the sheet file path from workbook.xml.rels ── */
   const wbRelsXml = await zip.file('xl/_rels/workbook.xml.rels').async('string');
-  const relMatch = wbRelsXml.match(new RegExp('Id="' + sheetRId + '"[^>]*Target="([^"]+)"'));
-  if (!relMatch) {
-    console.warn('Could not find sheet file for', sheetRId);
+  /* Attributes can be in any order: find the Relationship with matching Id */
+  const allRels = wbRelsXml.match(/<Relationship\b[^>]*?>/g) || [];
+  let sheetTarget = null;
+  for (const rel of allRels) {
+    if (rel.includes('Id="' + sheetRId + '"')) {
+      const tMatch = rel.match(/Target="([^"]+)"/);
+      if (tMatch) sheetTarget = tMatch[1];
+    }
+  }
+  if (!sheetTarget) {
+    console.warn('embedPlImageClientSide: target not found for', sheetRId, 'in rels');
     return xlsxB64;
   }
-  const sheetPath = 'xl/' + relMatch[1]; /* e.g. xl/worksheets/sheet10.xml */
-  console.log('P&L Image sheet file:', sheetPath);
 
-  /* Determine a unique drawing number */
+  /* Normalize the path — Target can be "worksheets/sheet10.xml" or "/xl/worksheets/sheet10.xml" */
+  let sheetPath = sheetTarget;
+  if (sheetPath.startsWith('/')) sheetPath = sheetPath.substring(1); /* remove leading / */
+  if (!sheetPath.startsWith('xl/')) sheetPath = 'xl/' + sheetPath;
+  console.log('embedPlImageClientSide: sheet path:', sheetPath);
+
+  if (!zip.file(sheetPath)) {
+    console.warn('embedPlImageClientSide: sheet file not found at', sheetPath);
+    /* Try listing worksheet files to find it */
+    const wsFiles = Object.keys(zip.files).filter(f => f.includes('worksheets/'));
+    console.log('Available worksheet files:', wsFiles);
+    return xlsxB64;
+  }
+
+  /* ── Determine a unique drawing number ── */
   let drawingNum = 1;
   while (zip.file('xl/drawings/drawing' + drawingNum + '.xml')) drawingNum++;
   const drawingFile = 'xl/drawings/drawing' + drawingNum + '.xml';
   const drawingRelsFile = 'xl/drawings/_rels/drawing' + drawingNum + '.xml.rels';
+  console.log('embedPlImageClientSide: using drawing number:', drawingNum);
 
-  /* Create the drawing XML */
-  const drawingXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+  /* ── Create the drawing XML ── */
+  const drawingXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" ' +
     'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
@@ -1350,69 +1389,83 @@ async function embedPlImageClientSide(xlsxB64, imageB64) {
     '<xdr:to><xdr:col>10</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>50</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>' +
     '<xdr:pic>' +
     '<xdr:nvPicPr><xdr:cNvPr id="2" name="PL Image"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>' +
-    '<xdr:blipFill><a:blip xmlns:r2="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/>' +
-    '<a:stretch><a:fillRect/></a:stretch></xdr:blipFill>' +
+    '<xdr:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>' +
     '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="7143750" cy="9239250"/></a:xfrm>' +
     '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>' +
     '</xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>';
-
   zip.file(drawingFile, drawingXml);
 
-  /* Create drawing rels file (links drawing to image) */
-  const drawingRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+  /* ── Create drawing rels (links drawing → image) ── */
+  const drawingRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" ' +
     'Target="../media/plimage1.' + imgExt + '"/></Relationships>';
   zip.file(drawingRelsFile, drawingRelsXml);
 
-  /* Add drawing reference to the sheet XML */
+  /* ── Modify the sheet XML: add drawing reference ── */
   let sheetXml = await zip.file(sheetPath).async('string');
-  /* Remove placeholder text (the "no image data" message from server) */
+  console.log('embedPlImageClientSide: sheet XML length:', sheetXml.length);
+
+  /* Clear placeholder data */
   sheetXml = sheetXml.replace(/<sheetData>[\s\S]*?<\/sheetData>/, '<sheetData/>');
-  /* Insert drawing reference before </worksheet> */
+
+  /* Ensure xmlns:r namespace is declared on <worksheet> for r:id to work */
+  const rNs = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  if (!sheetXml.includes('xmlns:r=')) {
+    sheetXml = sheetXml.replace('<worksheet', '<worksheet ' + rNs);
+  }
+
+  /* Insert <drawing r:id="rId1"/> before </worksheet> (after pageMargins per OOXML spec) */
   if (!sheetXml.includes('<drawing')) {
-    sheetXml = sheetXml.replace('</worksheet>',
-      '<drawing r:id="rId1"/></worksheet>');
+    sheetXml = sheetXml.replace('</worksheet>', '<drawing r:id="rId1"/></worksheet>');
   }
   zip.file(sheetPath, sheetXml);
+  console.log('embedPlImageClientSide: sheet XML updated, new length:', sheetXml.length);
 
-  /* Create/update sheet rels to link sheet to drawing */
+  /* ── Create/update sheet rels (links sheet → drawing) ── */
   const sheetDir = sheetPath.substring(0, sheetPath.lastIndexOf('/'));
   const sheetFilename = sheetPath.substring(sheetPath.lastIndexOf('/') + 1);
   const sheetRelsPath = sheetDir + '/_rels/' + sheetFilename + '.rels';
-  let sheetRelsXml;
+
+  /* Find next available rId in sheet rels */
+  let drawingRId = 'rId1';
   if (zip.file(sheetRelsPath)) {
-    sheetRelsXml = await zip.file(sheetRelsPath).async('string');
-    /* Add drawing relationship */
-    sheetRelsXml = sheetRelsXml.replace('</Relationships>',
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" ' +
+    let existingRels = await zip.file(sheetRelsPath).async('string');
+    const usedIds = (existingRels.match(/Id="rId(\d+)"/g) || []).map(m => parseInt(m.match(/\d+/)[0]));
+    const nextId = usedIds.length > 0 ? Math.max(...usedIds) + 1 : 1;
+    drawingRId = 'rId' + nextId;
+    existingRels = existingRels.replace('</Relationships>',
+      '<Relationship Id="' + drawingRId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" ' +
       'Target="../drawings/drawing' + drawingNum + '.xml"/></Relationships>');
+    zip.file(sheetRelsPath, existingRels);
+    /* Update the drawing reference in sheet XML to use correct rId */
+    sheetXml = sheetXml.replace('r:id="rId1"', 'r:id="' + drawingRId + '"');
+    zip.file(sheetPath, sheetXml);
   } else {
-    sheetRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+    const newRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
       '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" ' +
       'Target="../drawings/drawing' + drawingNum + '.xml"/></Relationships>';
+    zip.file(sheetRelsPath, newRels);
   }
-  zip.file(sheetRelsPath, sheetRelsXml);
+  console.log('embedPlImageClientSide: sheet rels created/updated, drawing rId:', drawingRId);
 
-  /* Update [Content_Types].xml */
+  /* ── Update [Content_Types].xml ── */
   let ctXml = await zip.file('[Content_Types].xml').async('string');
-  /* Add image content type if not present */
   if (!ctXml.includes('Extension="' + imgExt + '"')) {
-    ctXml = ctXml.replace('<Types ',
-      '<Types ').replace('</Types>',
+    ctXml = ctXml.replace('</Types>',
       '<Default Extension="' + imgExt + '" ContentType="' + imgContentType + '"/></Types>');
   }
-  /* Add drawing content type override */
-  if (!ctXml.includes(drawingFile.replace('xl/', '/xl/'))) {
+  if (!ctXml.includes('/' + drawingFile)) {
     ctXml = ctXml.replace('</Types>',
       '<Override PartName="/' + drawingFile + '" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
   }
   zip.file('[Content_Types].xml', ctXml);
+  console.log('embedPlImageClientSide: Content_Types updated');
 
-  /* Generate the modified xlsx as base64 */
+  /* ── Generate the modified xlsx as base64 ── */
   const outBase64 = await zip.generateAsync({ type: 'base64' });
-  console.log('JSZip image embedding complete, output size:', Math.round(outBase64.length / 1024), 'KB');
+  console.log('embedPlImageClientSide: DONE, output size:', Math.round(outBase64.length / 1024), 'KB');
   return outBase64;
 }
 
@@ -1513,16 +1566,17 @@ async function generate() {
     generatedWorkbook = data.xlsxB64;
 
     /* Step 3: Embed P&L image client-side using JSZip (avoids Netlify payload limits) */
+    console.log('Step 3 check: plImageB64=' + (plImageB64 ? Math.round(plImageB64.length/1024)+'KB' : 'NULL') + ', JSZip=' + typeof JSZip);
     if (plImageB64 && typeof JSZip !== 'undefined') {
       try {
         console.log('Step 3: Embedding P&L image client-side via JSZip...');
         generatedWorkbook = await embedPlImageClientSide(generatedWorkbook, plImageB64);
-        console.log('P&L image embedded successfully client-side');
+        console.log('Step 3: P&L image embedded successfully!');
       } catch(embedErr) {
-        console.warn('Client-side image embedding failed:', embedErr.message);
+        console.error('Step 3 FAILED:', embedErr.message, embedErr.stack);
       }
     } else {
-      console.log('No P&L image to embed (plImageB64:', plImageB64 ? 'exists' : 'null', ', JSZip:', typeof JSZip, ')');
+      console.warn('Step 3 SKIPPED: plImageB64=' + (plImageB64 ? 'exists' : 'null') + ', JSZip=' + typeof JSZip + ', files[3]=' + (files[3] ? files[3].name : 'null'));
     }
 
     document.getElementById('generatingState').classList.remove('visible');
