@@ -1310,6 +1310,7 @@ function goToStep(n) {
     if (i + 1 < n) s.classList.add('done'); else if (i + 1 === n) s.classList.add('active');
   });
   currentStep = n;
+  window.location.hash = 'step=' + n;
   if (n === 8) buildReview();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -2113,6 +2114,12 @@ function resetAll() {
 populateDates();
 updateSubtitles();
 populateHygieneDates();
+
+/* Restore step from URL hash on refresh */
+(function() {
+  const m = window.location.hash.match(/step=(\d+)/);
+  if (m) goToStep(parseInt(m[1], 10));
+})();
 </script>
 </body>
 </html>
