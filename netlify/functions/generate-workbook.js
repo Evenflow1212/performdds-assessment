@@ -531,6 +531,15 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   ['B2','H2','N2'].forEach(addr => {
     try { const c = wsPI.getCell(addr); const v = c.value; c.style = { fill: piLightBlue, font: { name: 'Verdana', size: 10, bold: true }, border: { left: thinBorder, top: thinBorder, bottom: thinBorder }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } }; c.value = v; } catch(e) {}
   });
+  /* Fix K2 yellow theme-color corruption — master has no fill here */
+  try { const k2 = wsPI.getCell('K2'); const k2v = k2.value; k2.style = { font: { name: 'Arial', size: 18, bold: true }, numFmt: piCurrFmt, alignment: { horizontal: 'right', vertical: 'bottom' }, border: { top: thinBorder } }; k2.value = k2v; } catch(e) {}
+  /* Fix Calibri leaking into merged header cells (rows 2, 4) */
+  ['A2','C2','D2','E2','F2','G2','I2','J2','L2','M2','O2','P2'].forEach(addr => {
+    try { wsPI.getCell(addr).font = { name: 'Candara', size: 20, bold: wsPI.getCell(addr).font?.bold || false }; } catch(e) {}
+  });
+  ['A4','C4','D4','E4','F4','G4','I4','J4','K4','L4','M4','O4'].forEach(addr => {
+    try { wsPI.getCell(addr).font = { name: 'Verdana', size: 10 }; } catch(e) {}
+  });
   /* Row 5: dark navy header (A5-P5) with white text */
   piCols.forEach(col => {
     try { const c = wsPI.getCell(col+'5'); const v = c.value; c.style = { fill: piDarkNavy, font: piWhiteFont, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: piAllBorders }; c.value = v; } catch(e) {}
