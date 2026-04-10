@@ -251,65 +251,68 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   try { wsPW.getCell('D5').numFmt = '#,##0'; } catch(e) {}
 
   /* ═══ ALL CODES - PRODUCTION REPORT ═══ */
+  /* NUCLEAR OPTION: Delete the template sheet and rebuild from scratch.
+     This eliminates ALL inherited formatting (row styles, column styles,
+     conditional formatting, themes) that might force strikethrough. */
+  const acIndex = wb.worksheets.findIndex(s => s.name === 'All Codes - Production Report');
+  if (acIndex >= 0) wb.removeWorksheet(wsAC.id);
+  const wsAC2 = wb.addWorksheet('All Codes - Production Report');
+  /* Move it to the original position */
+  try { wb.moveWorksheet(wsAC2.id, acIndex); } catch(e) {}
+
+  /* Header row */
+  const acHeaders = ['Code', 'Description', 'Quantity', 'Total $', 'Avg Fee', '% of Prod'];
+  acHeaders.forEach((h, i) => {
+    const cell = wsAC2.getCell(1, i + 1);
+    cell.value = h;
+    cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2B4A' } };
+    cell.alignment = { horizontal: i >= 2 ? 'right' : 'left' };
+  });
+  wsAC2.getColumn('A').width = 12;
+  wsAC2.getColumn('B').width = 35;
+  wsAC2.getColumn('C').width = 12;
+  wsAC2.getColumn('D').width = 14;
+  wsAC2.getColumn('E').width = 12;
+  wsAC2.getColumn('F').width = 12;
+
   const nonZero = codes.filter(c => c.total > 0);
   const zero = codes.filter(c => c.total === 0);
   const allCodes = [...nonZero, ...zero];
 
-  /* Clear any row-level or column-level strikethrough inherited from the template */
-  try {
-    for (let r = 1; r <= allCodes.length + 5; r++) {
-      const row = wsAC.getRow(r);
-      if (row.font) row.font = { ...row.font, strike: false };
-      if (row.style && row.style.font) row.style = { ...row.style, font: { ...row.style.font, strike: false } };
-    }
-    ['A','B','C','D','E','F'].forEach(col => {
-      try {
-        const column = wsAC.getColumn(col);
-        if (column.font) column.font = { ...column.font, strike: false };
-        if (column.style && column.style.font) column.style = { ...column.style, font: { ...column.style.font, strike: false } };
-      } catch(e) {}
-    });
-  } catch(e) { console.warn('Could not clear AC default styles:', e.message); }
+  let directMatchCount = 0;
+  const sampleUnmatched = [];
 
   allCodes.forEach((c, i) => {
     const r = i + 2;
-    const displayCode = c.code;
-    sv(wsAC, 'A'+r, displayCode);
-    sv(wsAC, 'B'+r, c.desc);
-    sv(wsAC, 'C'+r, c.qty);
-    sv(wsAC, 'D'+r, Math.round(c.total*100)/100);
-    sv(wsAC, 'E'+r, c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0);
-    sv(wsAC, 'F'+r, totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0);
-
-    /* Check mappings DIRECTLY — bypass usedInPW Set entirely */
     const bc = baseCode(c.code);
     const isUsed = LEFT.hasOwnProperty(bc) || SRP_CODES.includes(bc) || RIGHT.hasOwnProperty(bc);
-    const font = isUsed
-      ? { name: 'Calibri', size: 11, bold: false, italic: false, strike: true,  color: { argb: 'FF999999' } }
-      : { name: 'Calibri', size: 11, bold: false, italic: false, strike: false, color: { argb: 'FF000000' } };
-    ['A','B','C','D','E','F'].forEach(col => {
-      try { wsAC.getCell(col+r).font = font; } catch(e) {}
-    });
+    if (isUsed) directMatchCount++;
+    else if (sampleUnmatched.length < 5) sampleUnmatched.push(c.code);
 
-    /* Number formats for data columns */
-    try { wsAC.getCell('C'+r).numFmt = '#,##0'; } catch(e) {}
-    try { wsAC.getCell('D'+r).numFmt = '$#,##0.00'; } catch(e) {}
-    try { wsAC.getCell('E'+r).numFmt = '$#,##0.00'; } catch(e) {}
-    try { wsAC.getCell('F'+r).numFmt = '0.00%'; } catch(e) {}
+    const font = isUsed
+      ? { name: 'Verdana', size: 10, strike: true,  color: { argb: 'FF999999' } }
+      : { name: 'Verdana', size: 10, strike: false, color: { argb: 'FF000000' } };
+
+    wsAC2.getCell('A'+r).value = c.code;
+    wsAC2.getCell('B'+r).value = c.desc;
+    wsAC2.getCell('C'+r).value = c.qty;
+    wsAC2.getCell('D'+r).value = Math.round(c.total*100)/100;
+    wsAC2.getCell('E'+r).value = c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0;
+    wsAC2.getCell('F'+r).value = totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0;
+
+    ['A','B','C','D','E','F'].forEach(col => { wsAC2.getCell(col+r).font = font; });
+    wsAC2.getCell('C'+r).numFmt = '#,##0';
+    wsAC2.getCell('D'+r).numFmt = '$#,##0.00';
+    wsAC2.getCell('E'+r).numFmt = '$#,##0.00';
+    wsAC2.getCell('F'+r).numFmt = '0.00%';
+    wsAC2.getCell('C'+r).alignment = { horizontal: 'right' };
+    wsAC2.getCell('D'+r).alignment = { horizontal: 'right' };
+    wsAC2.getCell('E'+r).alignment = { horizontal: 'right' };
+    wsAC2.getCell('F'+r).alignment = { horizontal: 'right' };
   });
 
-  /* Count how many codes matched directly for debugging */
-  let directMatchCount = 0;
-  const sampleUnmatched = [];
-  for (const c of allCodes) {
-    const bc2 = baseCode(c.code);
-    if (LEFT.hasOwnProperty(bc2) || SRP_CODES.includes(bc2) || RIGHT.hasOwnProperty(bc2)) {
-      directMatchCount++;
-    } else if (sampleUnmatched.length < 5) {
-      sampleUnmatched.push(c.code);
-    }
-  }
-  console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched mappings (usedInPW had ' + usedInPW.size + '), unmatched sample: ' + sampleUnmatched.join(','));
+  console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched, ' + sampleUnmatched.length + ' unmatched sample: ' + sampleUnmatched.join(','));
 
   /* ═══ FINANCIAL OVERVIEW ═══ */
   sv(wsFO, 'D4', practiceName);
