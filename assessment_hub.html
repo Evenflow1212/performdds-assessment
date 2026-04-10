@@ -231,7 +231,7 @@
   .benefits-grid input:focus { border-color: var(--navy); outline: none; }
 
   /* HYGIENE SCHEDULE GRID */
-  .hs-grid { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 0.78rem; }
+  .hs-grid { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 0.78rem; table-layout: fixed; }
   .hs-grid th {
     background: var(--navy); color: white; font-weight: 600; padding: 6px 4px;
     text-align: center; letter-spacing: 0.03em; text-transform: uppercase; font-size: 0.72rem;
@@ -1030,8 +1030,9 @@
           </tr>
         </tbody>
       </table>
-      <div class="benefits-grid" style="grid-template-columns: 220px 80px; margin-bottom: 20px;">
-        <label>Avg patients per hygienist/day:</label><input type="number" id="hs_pts_per_hyg" placeholder="e.g. 8" step="1" min="1">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+        <div class="form-section-label" style="margin:0;">Avg Patients per Hygienist / Day</div>
+        <input type="number" id="hs_pts_per_hyg" placeholder="e.g. 8" step="1" min="1" style="width:80px; border:1.5px solid var(--border); border-radius:6px; padding:7px 10px; font-size:0.88rem; font-family:inherit; text-align:center;">
       </div>
 
       <!-- RECENT PAST -->
@@ -1049,12 +1050,12 @@
           </tr>
           <tr>
             <th class="week-col"></th>
-            <th class="sub day-group">appt</th><th class="sub">seen</th>
-            <th class="sub day-group">appt</th><th class="sub">seen</th>
-            <th class="sub day-group">appt</th><th class="sub">seen</th>
-            <th class="sub day-group">appt</th><th class="sub">seen</th>
-            <th class="sub day-group">appt</th><th class="sub">seen</th>
-            <th class="sub day-group">appt</th><th class="sub">seen</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">pat<br>seen</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">pat<br>seen</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">pat<br>seen</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">pat<br>seen</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">pat<br>seen</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">pat<br>seen</th>
           </tr>
         </thead>
         <tbody id="hsRecentPastBody"></tbody>
@@ -1075,12 +1076,12 @@
           </tr>
           <tr>
             <th class="week-col"></th>
-            <th class="sub day-group">schd.</th><th class="sub">conf</th>
-            <th class="sub day-group">schd.</th><th class="sub">conf</th>
-            <th class="sub day-group">schd.</th><th class="sub">conf</th>
-            <th class="sub day-group">schd.</th><th class="sub">conf</th>
-            <th class="sub day-group">schd.</th><th class="sub">conf</th>
-            <th class="sub day-group">schd.</th><th class="sub">conf</th>
+            <th class="sub day-group">patients<br>scheduled</th><th class="sub">patients<br>confirmed</th>
+            <th class="sub day-group">patients<br>scheduled</th><th class="sub">patients<br>confirmed</th>
+            <th class="sub day-group">patients<br>scheduled</th><th class="sub">patients<br>confirmed</th>
+            <th class="sub day-group">patients<br>scheduled</th><th class="sub">patients<br>confirmed</th>
+            <th class="sub day-group">patients<br>scheduled</th><th class="sub">patients<br>confirmed</th>
+            <th class="sub day-group">patients<br>scheduled</th><th class="sub">patients<br>confirmed</th>
           </tr>
         </thead>
         <tbody id="hsNext7Body"></tbody>
@@ -1101,12 +1102,12 @@
           </tr>
           <tr>
             <th class="week-col"></th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
           </tr>
         </thead>
         <tbody id="hsNearFutureBody"></tbody>
@@ -1127,12 +1128,12 @@
           </tr>
           <tr>
             <th class="week-col"></th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
-            <th class="sub day-group">appt</th><th class="sub">filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
+            <th class="sub day-group">total<br>appt</th><th class="sub">appt<br>filled</th>
           </tr>
         </thead>
         <tbody id="hsFutureFutureBody"></tbody>
