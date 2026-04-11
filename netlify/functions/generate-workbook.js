@@ -266,8 +266,11 @@ function parseSharedStrings(ssXml) {
  * Returns a clean xlsx Buffer with template styles preserved.
  */
 async function postProcessWorkbook(templateBuf, excelJsBuf, plImageB64) {
+  const t0 = Date.now();
   const tmplZip = await JSZip.loadAsync(templateBuf);
+  console.log('PP: template zip loaded in', Date.now() - t0, 'ms');
   const ejsZip  = await JSZip.loadAsync(excelJsBuf);
+  console.log('PP: exceljs zip loaded in', Date.now() - t0, 'ms');
 
   /* Parse ExcelJS shared strings */
   const ssFile = ejsZip.file('xl/sharedStrings.xml');
@@ -282,6 +285,7 @@ async function postProcessWorkbook(templateBuf, excelJsBuf, plImageB64) {
     if (file.dir) continue;
     outZip.file(path, await file.async('nodebuffer'));
   }
+  console.log('PP: template files copied in', Date.now() - t0, 'ms');
 
   /* For each template sheet (1-8), overlay ExcelJS cell values */
   const templateSheetCount = 8; /* Template has sheets 1-8 */
@@ -353,8 +357,9 @@ async function postProcessWorkbook(templateBuf, excelJsBuf, plImageB64) {
   ctXml = ctXml.replace('</Types>', newCt + '</Types>');
   outZip.file('[Content_Types].xml', ctXml);
 
+  console.log('PP: all modifications done in', Date.now() - t0, 'ms, generating final zip...');
   const finalBuf = await outZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-  console.log('Post-process complete, output size:', finalBuf.length);
+  console.log('PP: complete, output size:', finalBuf.length, 'total:', Date.now() - t0, 'ms');
   return finalBuf;
 }
 
@@ -1298,11 +1303,14 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   /* Post-process: merge ExcelJS values into original template to preserve styles */
   let finalBuf;
+  const ppStart = Date.now();
+  console.log('JSZip type:', typeof JSZip, 'version:', JSZip.version || 'unknown');
+  console.log('templateBuf size:', templateBuf ? templateBuf.length : 'null', 'excelJsBuf size:', excelJsBuf.length);
   try {
     finalBuf = await postProcessWorkbook(templateBuf, Buffer.from(excelJsBuf), plImageB64);
-    console.log('Post-processing succeeded, using template-based output');
+    console.log('Post-processing succeeded in', Date.now() - ppStart, 'ms');
   } catch (ppErr) {
-    console.warn('Post-processing failed, falling back to ExcelJS output:', ppErr.message);
+    console.warn('Post-processing failed in', Date.now() - ppStart, 'ms:', ppErr.message);
     finalBuf = Buffer.from(excelJsBuf);
   }
 
@@ -1334,13 +1342,18 @@ exports.handler = async function(event) {
   if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
-    console.log('Building workbook from pre-parsed data...');
+    const handlerStart = Date.now();
+    console.log('Building workbook from pre-parsed data... start:', new Date().toISOString());
     const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64);
+    console.log('buildXlsx completed in', Date.now() - handlerStart, 'ms');
+
+    const responseBody = JSON.stringify({ success: true, xlsxB64: result.xlsxB64, summary: result.summary });
+    console.log('Response size:', responseBody.length, 'bytes, total time:', Date.now() - handlerStart, 'ms');
 
     return {
       statusCode: 200,
       headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
-      body: JSON.stringify({ success: true, xlsxB64: result.xlsxB64, summary: result.summary })
+      body: responseBody
     };
   } catch(err) {
     console.error('Error:', err.message, err.stack?.slice(0,500));
