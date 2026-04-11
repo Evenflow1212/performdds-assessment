@@ -223,14 +223,18 @@ async function postProcessServerSide(excelJsBuf, templateBuf) {
 
   /* Process template sheets (1-8) and inject values — SINGLE-PASS approach.
      Instead of running one regex per ExcelJS cell (O(n*m) on huge XML), we do
-     ONE global regex pass through the template XML, replacing cells in-place. */
+     ONE global regex pass through the template XML, replacing cells in-place.
+     OPTIMIZATION: Only load & process template sheets that have ExcelJS data. */
   for (let sheetNum = 1; sheetNum <= 8; sheetNum++) {
+    const sheetCells = excelJsCells[sheetNum] || {};
+    if (Object.keys(sheetCells).length === 0) {
+      console.log(`Sheet ${sheetNum}: no ExcelJS data, skipping`);
+      continue;
+    }
+
     const xmlPath = `xl/worksheets/sheet${sheetNum}.xml`;
     let xml = await templateZip.file(xmlPath)?.async('string');
     if (!xml) continue;
-
-    const sheetCells = excelJsCells[sheetNum] || {};
-    if (Object.keys(sheetCells).length === 0) continue;
 
     /* Track which ExcelJS cells were matched (for inserting unmatched ones later) */
     const matched = new Set();
@@ -449,7 +453,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   if (collData) console.log('Collections:', collData.payments, 'over', collData.months, 'months');
   if (plData) console.log('P&L:', plData.items.length, 'items, income:', plData.totalIncome);
 
-  /* Load template — from local bundled file (fast) or module cache (instant on warm) */
+  /* Load template buffer for post-processor (reads from local bundle or HTTP) */
   let wb, templateBuf;
   const t0 = Date.now();
   try {
@@ -457,7 +461,6 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       templateBuf = _cachedTemplateBuf;
       console.log('Template from cache:', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
     } else {
-      /* Try local file first (bundled via included_files), then HTTP fallback */
       const localPath = path.resolve(__dirname, '..', '..', 'Blank_Assessment_Template.xlsx');
       const localPath2 = path.resolve(__dirname, 'Blank_Assessment_Template.xlsx');
       const localPath3 = path.resolve(process.cwd(), 'Blank_Assessment_Template.xlsx');
@@ -478,25 +481,28 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         templateBuf = await tr.buffer();
         console.log('Template fetched via HTTP:', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
       }
-      _cachedTemplateBuf = templateBuf;  /* Cache for warm invocations */
+      _cachedTemplateBuf = templateBuf;
     }
-    const t1 = Date.now();
-    wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(Buffer.from(templateBuf));
-    console.log('ExcelJS loaded in', Date.now()-t1, 'ms, sheets:', wb.worksheets.map(s=>s.name).join(', '));
   } catch(e) {
     console.error('Template load failed:', e.message);
     throw new Error('Could not load assessment template: ' + e.message);
   }
 
-  const wsPW = wb.getWorksheet('Production Worksheet');
-  const wsAC = wb.getWorksheet('All Codes - Production Report');
-  const wsFO = wb.getWorksheet('Financial Overview');
-  const wsPI = wb.getWorksheet('P&L Input');
-
-  if (!wsPW || !wsAC || !wsFO || !wsPI) {
-    throw new Error('Template missing required sheets. Found: ' + wb.worksheets.map(s=>s.name).join(', '));
-  }
+  /* Create a BLANK workbook — do NOT load the template into ExcelJS.
+     Loading the template (200K+ cells) takes 10-15 seconds alone.
+     We only need ExcelJS to hold our computed values; the post-processor
+     merges them into the pristine template XML preserving all styles. */
+  const t1 = Date.now();
+  wb = new ExcelJS.Workbook();
+  const wsPW = wb.addWorksheet('Production Worksheet');
+  const wsAC = wb.addWorksheet('All Codes - Production Report');
+  const wsHS_placeholder = wb.addWorksheet('Hygiene Schedule');
+  const wsFO = wb.addWorksheet('Financial Overview');
+  const wsTG = wb.addWorksheet('Targets & Goal');
+  const wsEC_placeholder = wb.addWorksheet('Employee Costs');
+  const wsBPL = wb.addWorksheet('Budgetary P&L');
+  const wsPI = wb.addWorksheet('P&L Input');
+  console.log('Blank workbook created in', Date.now()-t1, 'ms');
 
   /* ═══ PRODUCTION WORKSHEET ═══ */
   sv(wsPW, 'D4', practiceName);
