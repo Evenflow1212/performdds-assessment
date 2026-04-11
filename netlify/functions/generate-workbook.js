@@ -1194,7 +1194,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched }
+      _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
+      _cellMapDebug: Object.fromEntries(Object.entries(cellMap).map(([k,v]) => [k, { count: Object.keys(v).length, sample: Object.entries(v).slice(0,3).map(([ref,d]) => `${ref}=${d.value}`) }]))
     }
   };
 }
