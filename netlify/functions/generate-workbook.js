@@ -11,6 +11,10 @@ let _cachedTemplateBuf = null;
 /* Cell collector for sheets 1-8: maps sheet name → cell address → value */
 let _cellCollector = {};
 
+/* Strikethrough tracking — module-level so injectValuesIntoTemplate can access */
+let _acStrikeRows = [];          // All Codes rows used in Production Worksheet
+let _plInputExpenseNames = new Set();  // P&L expenses written to P&L Input sheet
+
 /**
  * Collect cell values without writing to ExcelJS.
  * Signature stays the same so all existing sv() calls work unchanged.
@@ -299,6 +303,39 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
 
+    /* ── All Codes (sheet 2): apply strikethrough to rows used in Production Worksheet ── */
+    if (sheetNum === 2 && _acStrikeRows.length > 0) {
+      /* Change style 462→752, 463→753, 464→754, 465→755 for matched rows.
+         New styles 752-755 are added in post-processing (copies of 462-465 with strikethrough font). */
+      const strikeMap = {'462':'752','463':'753','464':'754','465':'755'};
+      const strikeRowSet = new Set(_acStrikeRows.map(String));
+      xml = xml.replace(/<c\s([^>]*?)r="([A-Z]+)(\d+)"([^>]*?)s="(462|463|464|465)"([^>]*?)(?:\/?>(?:[\s\S]*?<\/c>)?)/g,
+        (full, pre, col, rowNum, mid, styleId, post) => {
+          if (strikeRowSet.has(rowNum)) {
+            return full.replace(`s="${styleId}"`, `s="${strikeMap[styleId]}"`);
+          }
+          return full;
+        });
+      console.log('All Codes: applied strikethrough styles to ' + _acStrikeRows.length + ' rows');
+    }
+
+    /* ── Financial Overview (sheet 4): fix #DIV/0! and column widths ── */
+    if (sheetNum === 4) {
+      /* Wrap row 45 percentage formulas in IFERROR */
+      ['B','C','D','E','F','G','H'].forEach(c => {
+        xml = xml.replace(
+          new RegExp(`<f>${c}44/I44</f>`),
+          `<f>IFERROR(${c}44/I44,0)</f>`
+        );
+      });
+      /* Widen columns that show ##### — increase D,E columns */
+      xml = xml.replace(/<col min="4" max="4"[^>]*\/>/,
+        '<col min="4" max="4" width="14" customWidth="1"/>');
+      xml = xml.replace(/<col min="8" max="8"[^>]*\/>/,
+        '<col min="8" max="8" width="13" customWidth="1"/>');
+      console.log('Financial Overview: fixed IFERROR and column widths');
+    }
+
     console.log(`Sheet ${sheetNum}: matched=${_regexMatches} hits=${_dataHits} replaced=${matched.size} formulaSkip=${_formulaSkip} newCells=${Object.values(newCellsByRow).flat().length}`);
     templateZip.file(xmlPath, xml);
   }
@@ -356,6 +393,26 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
           }
           return full;
         });
+        /* ── P&L Raw Import (sheet 9): strikethrough expenses used in P&L Input ── */
+        if (targetNum === 9 && _plInputExpenseNames.size > 0) {
+          let strikeCount = 0;
+          xml = xml.replace(
+            /<c\s([^>]*?)r="A(\d+)"([^>]*?)>\s*<is>\s*<t>([^<]*)<\/t>\s*<\/is>\s*<\/c>/g,
+            (full, pre, rowNum, post, text) => {
+              if (!full.includes('t="inlineStr"')) return full;
+              const attrs = pre + 'r="A' + rowNum + '"' + post;
+              /* Decode XML entities for comparison */
+              const decoded = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").toLowerCase().trim();
+              if (_plInputExpenseNames.has(decoded)) {
+                strikeCount++;
+                return `<c ${attrs}><is><r><rPr><strike/></rPr><t>${text}</t></r></is></c>`;
+              }
+              return full;
+            }
+          );
+          console.log('P&L Raw Import: applied strikethrough to', strikeCount, 'expense rows (of', _plInputExpenseNames.size, 'tracked)');
+        }
+
         templateZip.file(targetPath, xml);
         if (targetNum === 9) hasSheet9 = true;
         if (targetNum === 10) hasSheet10 = true;
@@ -451,8 +508,61 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
       return fullFont;
     });
+    /* === Add strikethrough font (index 66) for All Codes used-code rows === */
+    /* Font 66: copy of font 31 (Arial 10pt black) but WITH strikethrough */
+    const fontsMatch = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
+    if (fontsMatch) {
+      const fontCount = parseInt(fontsMatch[1]);
+      const fontsContent = fontsMatch[2];
+      /* Extract individual <font>...</font> entries */
+      const fontEntries = [];
+      const fontRe = /<font>([\s\S]*?)<\/font>/g;
+      let fm;
+      while ((fm = fontRe.exec(fontsContent)) !== null) fontEntries.push(fm[0]);
+      if (fontEntries.length >= 32) {
+        /* Font 31 after our fix is Arial 10pt black (no strike). Add strike back for the new font. */
+        let newFont = fontEntries[31].replace('<font>', '<font><strike/>');
+        /* Append new font 66 */
+        const newFontsContent = fontsContent + newFont;
+        stylesXml = stylesXml.replace(fontsMatch[0],
+          `<fonts count="${fontCount + 1}">${newFontsContent}</fonts>`);
+        console.log('Pass 2: added strikethrough font at index', fontCount, '(new count', fontCount + 1, ')');
+      }
+    }
+
+    /* === Add cellXfs 752-755: copies of 462-465 with fontId="66" === */
+    const xfsMatch = stylesXml.match(/<cellXfs[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
+    if (xfsMatch) {
+      const xfCount = parseInt(xfsMatch[1]);
+      const xfsContent = xfsMatch[2];
+      /* Extract individual <xf .../> or <xf ...>...</xf> entries */
+      const xfEntries = [];
+      const xfRe = /<xf\s[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g;
+      let xm;
+      while ((xm = xfRe.exec(xfsContent)) !== null) xfEntries.push(xm[0]);
+      if (xfEntries.length >= 466) {
+        /* Create copies of indices 462-465 with fontId swapped to 66 */
+        let newXfs = '';
+        for (let i = 462; i <= 465; i++) {
+          newXfs += xfEntries[i].replace(/fontId="\d+"/, 'fontId="66"');
+        }
+        const newXfsContent = xfsContent + newXfs;
+        stylesXml = stylesXml.replace(xfsMatch[0],
+          `<cellXfs count="${xfCount + 4}">${newXfsContent}</cellXfs>`);
+        console.log('Pass 2: added cellXfs 752-755 (strikethrough copies of 462-465), new count', xfCount + 4);
+      }
+    }
+
+    /* === Change yellow fill (FFFFFF00) to blue on Financial Overview payment category cells === */
+    /* Fill 11 uses FFFFFF00 (yellow) — change to blue FF4472C4 */
+    stylesXml = stylesXml.replace(
+      /(<fill>[\s\S]*?<fgColor rgb=")FFFFFF00("[\s\S]*?<\/fill>)/g,
+      (full, pre, post) => pre + 'FF4472C4' + post
+    );
+    console.log('Pass 2: changed yellow fills (FFFFFF00) to blue (FF4472C4)');
+
     fixZip.file('xl/styles.xml', stylesXml);
-    console.log('Pass 2: restored styles.xml:', stylesXml.length, 'chars (original 752 cellXfs)');
+    console.log('Pass 2: restored styles.xml:', stylesXml.length, 'chars');
   }
 
   /* Restore template Content_Types and append additions for sheets 9-10 */
@@ -517,8 +627,10 @@ function escapeRegex(str) {
 
 /* ─── Build the workbook from pre-parsed text ─── */
 async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64) {
-  /* Reset cell collector for this invocation */
+  /* Reset collectors for this invocation */
   _cellCollector = {};
+  _acStrikeRows = [];
+  _plInputExpenseNames = new Set();
 
   /* Sheet name → sheet number mapping */
   const sheetNameMap = {
@@ -670,12 +782,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   let directMatchCount = 0;
   const sampleUnmatched = [];
 
-  /* Collect data rows */
+  /* Collect data rows — track which rows need strikethrough (codes used in Production Worksheet) */
+  _acStrikeRows = [];
   allCodes.forEach((c, i) => {
     const r = i + 2;
     const bc = baseCode(c.code);
     const isUsed = LEFT.hasOwnProperty(bc) || SRP_CODES.includes(bc) || RIGHT.hasOwnProperty(bc);
-    if (isUsed) directMatchCount++;
+    if (isUsed) { directMatchCount++; _acStrikeRows.push(r); }
     else if (sampleUnmatched.length < 5) sampleUnmatched.push(c.code);
 
     sv(wsAC, 'A'+r, c.code);
@@ -686,7 +799,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsAC, 'F'+r, totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0);
   });
 
-  console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched, ' + sampleUnmatched.length + ' unmatched sample: ' + sampleUnmatched.join(','));
+  console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched (' + _acStrikeRows.length + ' strike rows)');
 
   /* ═══ FINANCIAL OVERVIEW ═══ */
   sv(wsFO, 'D4', practiceName);
@@ -702,6 +815,28 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   if (plData && plData.totalIncome) {
     sv(wsFO, 'D25', Math.round(plData.totalIncome/12*100)/100);
+  }
+
+  /* ── Collections by Payment/Payor Type (row 44) from P&L income items ── */
+  if (plData && plData.items) {
+    const incItems = plData.items.filter(i => i.section === 'Income');
+    let ccTotal = 0, checkTotal = 0, cashTotal = 0, insurTotal = 0, thirdParty = 0;
+    for (const it of incItems) {
+      const l = it.item.toLowerCase();
+      if (/cc\s*payment|credit\s*card/i.test(l)) ccTotal += it.amount;
+      else if (/check\s*payment/i.test(l)) checkTotal += it.amount;
+      else if (/cash\s*payment/i.test(l)) cashTotal += it.amount;
+      else if (/care\s*credit|lending\s*club|3rd\s*party|carecredit/i.test(l)) thirdParty += it.amount;
+      else if (/sales|insurance|patient\s*payment|refund/i.test(l)) insurTotal += it.amount;
+    }
+    /* B44=credit card, C44=patient check, D44=cash, E44=insurance, F44=capitation, G44=3rd party, H44=dentical */
+    if (ccTotal) sv(wsFO, 'B44', Math.round(ccTotal*100)/100);
+    if (checkTotal) sv(wsFO, 'C44', Math.round(checkTotal*100)/100);
+    if (cashTotal) sv(wsFO, 'D44', Math.round(cashTotal*100)/100);
+    if (insurTotal) sv(wsFO, 'E44', Math.round(insurTotal*100)/100);
+    if (thirdParty) sv(wsFO, 'G44', Math.round(thirdParty*100)/100);
+    /* I44=total — use SUM formula, don't hardcode */
+    console.log('Financial Overview: payment type data written (CC=' + ccTotal + ' Check=' + checkTotal + ' Cash=' + cashTotal + ' Insur=' + insurTotal + ' 3rdParty=' + thirdParty + ')');
   }
   if (totalProd > 0 && prodMonths > 0) {
     sv(wsFO, 'D27', Math.round(totalProd/prodMonths*100)/100);
@@ -929,6 +1064,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       console.log('P&L Input: combined ' + combine.length + ' small items into Other ($' + combinedAmt.toFixed(2) + ')');
     }
 
+    _plInputExpenseNames = new Set();
     let row = 6;
     for (const item of expenseOnly) {
       if (row > 47) break; /* NEVER write past row 47 — row 48+ are summary formulas */
@@ -936,6 +1072,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       if (col === null) continue;
       sv(wsPI, 'A'+row, item.item);
       sv(wsPI, col+row, item.amount);
+      _plInputExpenseNames.add(item.item.toLowerCase().trim());
       row++;
     }
     /* Clear any unused data rows (between last item and row 47) */
