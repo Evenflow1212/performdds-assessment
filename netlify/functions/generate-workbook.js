@@ -446,13 +446,16 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   /* Load template */
   let wb, templateBuf;
+  const t0 = Date.now();
   try {
     const tr = await fetch('https://dentalpracticeassessments.com/Blank_Assessment_Template.xlsx');
     if (!tr.ok) throw new Error('Template HTTP ' + tr.status);
     templateBuf = await tr.buffer();
+    console.log('Template fetched:', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
+    const t1 = Date.now();
     wb = new ExcelJS.Workbook();
     await wb.xlsx.load(Buffer.from(templateBuf));
-    console.log('Template loaded, sheets:', wb.worksheets.map(s=>s.name).join(', '));
+    console.log('ExcelJS loaded in', Date.now()-t1, 'ms, sheets:', wb.worksheets.map(s=>s.name).join(', '));
   } catch(e) {
     console.error('Template load failed:', e.message);
     throw new Error('Could not load assessment template: ' + e.message);
@@ -1097,9 +1100,28 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   console.log('Tab order fixed:', wb.worksheets.map(s=>s.name).join(', '));
 
   const excelJsBuf = await wb.xlsx.writeBuffer();
+  console.log('ExcelJS buffer written:', excelJsBuf.byteLength, 'bytes');
 
-  /* Post-process: surgically inject ExcelJS values into original template to preserve styles */
-  const finalBuf = await postProcessServerSide(Buffer.from(excelJsBuf), templateBuf);
+  /* Post-process: surgically inject ExcelJS values into original template to preserve styles.
+     Skip if template is not available (e.g. fetch failed) or if env var disables it. */
+  let finalBuf;
+  const ppStart = Date.now();
+  const elapsed = ppStart - t0;
+  console.log('Time before post-processing:', elapsed, 'ms');
+
+  /* If we've used more than 18s already, skip post-processing to avoid timeout */
+  if (elapsed > 18000) {
+    console.warn('Skipping post-processing — already at', elapsed, 'ms');
+    finalBuf = Buffer.from(excelJsBuf);
+  } else {
+    try {
+      finalBuf = await postProcessServerSide(Buffer.from(excelJsBuf), templateBuf);
+      console.log('Post-processing complete in', Date.now()-ppStart, 'ms,', finalBuf.length, 'bytes');
+    } catch (ppErr) {
+      console.error('Post-processing failed, using ExcelJS output:', ppErr.message);
+      finalBuf = Buffer.from(excelJsBuf);
+    }
+  }
 
   return {
     xlsxB64: finalBuf.toString('base64'),
