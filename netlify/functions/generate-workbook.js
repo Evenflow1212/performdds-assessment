@@ -216,89 +216,86 @@ async function postProcessServerSide(excelJsBuf, templateBuf) {
     }
   }
 
-  /* Process template sheets (1-8) and inject values */
+  /* Process template sheets (1-8) and inject values — SINGLE-PASS approach.
+     Instead of running one regex per ExcelJS cell (O(n*m) on huge XML), we do
+     ONE global regex pass through the template XML, replacing cells in-place. */
   for (let sheetNum = 1; sheetNum <= 8; sheetNum++) {
     const xmlPath = `xl/worksheets/sheet${sheetNum}.xml`;
     let xml = await templateZip.file(xmlPath)?.async('string');
     if (!xml) continue;
 
     const sheetCells = excelJsCells[sheetNum] || {};
+    if (Object.keys(sheetCells).length === 0) continue;
 
-    /* Inject or update cells from ExcelJS output into template */
+    /* Track which ExcelJS cells were matched (for inserting unmatched ones later) */
+    const matched = new Set();
+
+    /* Single-pass: find every <c> tag in the template and replace if we have data */
+    xml = xml.replace(/<c\s[^>]*?r="([^"]+)"[^/>]*(?:\/?>(?:[^]*?<\/c>)?)/gs, (fullMatch, cellRef) => {
+      const cellData = sheetCells[cellRef];
+      if (!cellData || cellData.value === null || cellData.value === undefined) return fullMatch;
+
+      const { value, isFormula, isInlineStr } = cellData;
+      const templateHasFormula = fullMatch.includes('<f>') || fullMatch.includes('<f ');
+
+      /* CRITICAL: Never overwrite a template formula with a plain value */
+      if (templateHasFormula && !isFormula) return fullMatch;
+
+      /* Skip if template has same inline string label */
+      if (fullMatch.includes('<is>') && isInlineStr) {
+        const tMatch = fullMatch.match(/<t[^>]*>([^<]*)<\/t>/);
+        if (tMatch && tMatch[1] === value) return fullMatch;
+      }
+
+      matched.add(cellRef);
+
+      /* Preserve the template's style attribute */
+      const styleMatch = fullMatch.match(/\ss="(\d+)"/);
+      const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
+
+      if (isFormula) {
+        return `<c r="${cellRef}"${styleAttr}><f>${escapeXml(value)}</f></c>`;
+      } else if (typeof value === 'string' || isInlineStr) {
+        return `<c r="${cellRef}"${styleAttr} t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+      } else {
+        return `<c r="${cellRef}"${styleAttr} t="n"><v>${escapeXml(String(value))}</v></c>`;
+      }
+    });
+
+    /* Insert cells that weren't in the template (new cells from ExcelJS) */
+    const newCellsByRow = {};
     for (const [cellRef, cellData] of Object.entries(sheetCells)) {
+      if (matched.has(cellRef)) continue;
       if (cellData.value === null || cellData.value === undefined) continue;
 
       const { value, isFormula, isInlineStr } = cellData;
+      const rowNum = cellRef.match(/\d+$/)[0];
 
-      /* Build replacement cell XML */
       let cellXml;
       if (isFormula) {
-        /* Formula cell: keep template's style attribute, add formula element */
         cellXml = `<c r="${cellRef}" s="0"><f>${escapeXml(value)}</f></c>`;
       } else if (typeof value === 'string' || isInlineStr) {
-        /* String value: use inline string to avoid sharedStrings.xml */
         cellXml = `<c r="${cellRef}" s="0" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
       } else {
-        /* Numeric value */
         cellXml = `<c r="${cellRef}" s="0" t="n"><v>${escapeXml(String(value))}</v></c>`;
       }
 
-      /* Try to replace existing cell in template (handle any attribute order, self-closing or with content) */
-      const existingCellPattern = new RegExp(`<c\\s[^>]*?r="${escapeRegex(cellRef)}"[^/>]*(?:/>|>[^]*?</c>)`, 's');
-      const existingMatch = xml.match(existingCellPattern);
+      if (!newCellsByRow[rowNum]) newCellsByRow[rowNum] = [];
+      newCellsByRow[rowNum].push(cellXml);
+    }
 
-      if (existingMatch) {
-        /* Update existing cell while preserving its style */
-        const existingCell = existingMatch[0];
-        const templateHasFormula = existingCell.includes('<f>') || existingCell.includes('<f ');
-
-        /* CRITICAL: If template has a formula, ONLY replace with another formula.
-           Never overwrite a template formula with a plain value from ExcelJS
-           (ExcelJS may have dropped the formula and emitted a calculated value). */
-        if (templateHasFormula && !isFormula) {
-          continue;  /* Skip — preserve the template formula */
-        }
-
-        /* Also skip if template has an inline string label and ExcelJS is just echoing it back */
-        const templateHasInlineStr = existingCell.includes('<is>');
-        if (templateHasInlineStr && isInlineStr) {
-          const templateTextMatch = existingCell.match(/<t[^>]*>([^<]*)<\/t>/);
-          if (templateTextMatch && templateTextMatch[1] === value) {
-            continue;  /* Same label, no need to replace */
-          }
-        }
-
-        const styleMatch = existingCell.match(/s="(\d+)"/);
-        const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
-
-        let newCellXml;
-        if (isFormula) {
-          newCellXml = `<c r="${cellRef}"${styleAttr}><f>${escapeXml(value)}</f></c>`;
-        } else if (typeof value === 'string' || isInlineStr) {
-          newCellXml = `<c r="${cellRef}"${styleAttr} t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
-        } else {
-          newCellXml = `<c r="${cellRef}"${styleAttr} t="n"><v>${escapeXml(String(value))}</v></c>`;
-        }
-
-        xml = xml.replace(existingCellPattern, newCellXml);
+    /* Batch-insert new cells into their rows (single pass per row group) */
+    for (const [rowNum, cells] of Object.entries(newCellsByRow)) {
+      const rowPattern = new RegExp(`(<row\\s+r="${rowNum}"[^>]*>)`);
+      const rowMatch = xml.match(rowPattern);
+      if (rowMatch) {
+        xml = xml.replace(rowPattern, rowMatch[1] + cells.join(''));
       } else {
-        /* Insert new cell into appropriate row */
-        const rowNum = cellRef.match(/\d+$/)[0];
-        const rowPattern = new RegExp(`<row\\s+r="${rowNum}"[^>]*>`, 's');
-        const rowMatch = xml.match(rowPattern);
-
-        if (rowMatch) {
-          /* Insert at end of row */
-          xml = xml.replace(rowMatch[0], rowMatch[0] + cellXml);
-        } else {
-          /* Create new row if it doesn't exist */
-          const sheetDataEndPattern = /<\/sheetData>/;
-          const newRowXml = `<row r="${rowNum}">${cellXml}</row>`;
-          xml = xml.replace(sheetDataEndPattern, newRowXml + '</sheetData>');
-        }
+        xml = xml.replace(/<\/sheetData>/, `<row r="${rowNum}">${cells.join('')}</row></sheetData>`);
       }
     }
 
+    console.log(`Sheet ${sheetNum}: ${matched.size} cells replaced, ${Object.keys(newCellsByRow).length} rows with new cells`);
     templateZip.file(xmlPath, xml);
   }
 
