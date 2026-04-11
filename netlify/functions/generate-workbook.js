@@ -8,8 +8,21 @@ const path    = require('path');
 /* Module-level template cache — survives across warm invocations */
 let _cachedTemplateBuf = null;
 
-/* Helper: set cell value safely */
-function sv(ws, addr, val) { try { ws.getCell(addr).value = val; } catch(e) {} }
+/* Cell collector for sheets 1-8: maps sheet name → cell address → value */
+let _cellCollector = {};
+
+/**
+ * Collect cell values without writing to ExcelJS.
+ * Signature stays the same so all existing sv() calls work unchanged.
+ * Pass either a sheet object with .name or a string sheet name.
+ */
+function sv(sheetName, addr, val) {
+  const name = typeof sheetName === 'string' ? sheetName : (sheetName?.name || sheetName);
+  if (!_cellCollector[name]) _cellCollector[name] = {};
+  if (val !== null && val !== undefined) {
+    _cellCollector[name][addr] = val;
+  }
+}
 
 /* ─── Parsers (text from Claude → structured data) ─── */
 function parseProduction(text) {
@@ -157,51 +170,34 @@ R(['D7310','D7311','D7320','D7321','D7410','D7411','D7412','D7440','D7450','D745
 function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   POST-PROCESSING: Merge ExcelJS cell values into the original template ZIP.
-   ExcelJS corrupts template styles (drops 752→295 cellXfs), causing Excel
-   to show a repair dialog. This function surgically injects ExcelJS values
-   into the original template while preserving all XML structure and styling.
+   INJECT VALUES INTO TEMPLATE: Use JSZip to directly modify template XML.
+   For sheets 1-8: Use regex to find and replace existing cells.
+   For sheets 9-10: Convert ExcelJS shared strings to inline strings.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /**
- * Extract cell values from ExcelJS output and inject into original template.
- * Preserves template styles, merges, and all formatting.
+ * Inject collected cell values into template XML.
+ * For sheets 1-8: direct regex injection preserving styles.
+ * For sheets 9-10: resolve shared strings to inline strings.
  */
-async function postProcessServerSide(excelJsBuf, templateBuf, preBuiltCellMap) {
-  const excelJsZip = await JSZip.loadAsync(excelJsBuf);
+async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf) {
   const templateZip = await JSZip.loadAsync(templateBuf);
 
-  /* Build shared strings lookup from ExcelJS output (needed for sheets 9-10 copy). */
-  const sharedStrings = [];
-  const sstXml = await excelJsZip.file('xl/sharedStrings.xml')?.async('string');
-  if (sstXml) {
-    const siPattern = /<si>([\s\S]*?)<\/si>/g;
-    let siMatch;
-    while ((siMatch = siPattern.exec(sstXml)) !== null) {
-      const siContent = siMatch[1];
-      const texts = [];
-      const tPattern = /<t[^>]*>([^<]*)<\/t>/g;
-      let tMatch;
-      while ((tMatch = tPattern.exec(siContent)) !== null) {
-        texts.push(tMatch[1]);
-      }
-      sharedStrings.push(texts.join(''));
-    }
-    console.log('Shared strings resolved:', sharedStrings.length, 'entries');
-  }
-
-  /* Use pre-built cell map (extracted directly from ExcelJS objects, not XML).
-     This bypasses all XML parsing issues (shared strings, attribute order, etc.) */
-  const excelJsCells = preBuiltCellMap || {};
-
-  /* Process template sheets (1-8) and inject values — SINGLE-PASS approach.
-     Instead of running one regex per ExcelJS cell (O(n*m) on huge XML), we do
-     ONE global regex pass through the template XML, replacing cells in-place.
-     OPTIMIZATION: Only load & process template sheets that have ExcelJS data. */
+  /* Process template sheets (1-8) with collected values */
   for (let sheetNum = 1; sheetNum <= 8; sheetNum++) {
-    const sheetCells = excelJsCells[sheetNum] || {};
+    /* Get collected values for this sheet */
+    let sheetName = null;
+    for (const [name, num] of Object.entries(sheetNameMap)) {
+      if (num === sheetNum) {
+        sheetName = name;
+        break;
+      }
+    }
+    if (!sheetName) continue;
+
+    const sheetCells = _cellCollector[sheetName] || {};
     if (Object.keys(sheetCells).length === 0) {
-      console.log(`Sheet ${sheetNum}: no ExcelJS data, skipping`);
+      console.log(`Sheet ${sheetNum}: no collected data, skipping`);
       continue;
     }
 
@@ -209,64 +205,57 @@ async function postProcessServerSide(excelJsBuf, templateBuf, preBuiltCellMap) {
     let xml = await templateZip.file(xmlPath)?.async('string');
     if (!xml) continue;
 
-    /* Track which ExcelJS cells were matched (for inserting unmatched ones later) */
+    /* Track which cells were matched */
     const matched = new Set();
 
-    /* Single-pass: find every <c> tag in the template and replace if we have data */
+    /* Single regex pass to find and replace existing cells */
+    let _regexMatches = 0, _dataHits = 0, _replaced = 0, _formulaSkip = 0;
     xml = xml.replace(/<c\s[^>]*?r="([^"]+)"[^/>]*(?:\/?>(?:[^]*?<\/c>)?)/gs, (fullMatch, cellRef) => {
-      const cellData = sheetCells[cellRef];
-      if (!cellData || cellData.value === null || cellData.value === undefined) return fullMatch;
+      _regexMatches++;
+      const val = sheetCells[cellRef];
+      if (val === null || val === undefined) return fullMatch;
+      _dataHits++;
 
-      const { value, isFormula, isInlineStr } = cellData;
+      /* CRITICAL: Never overwrite template formulas */
       const templateHasFormula = fullMatch.includes('<f>') || fullMatch.includes('<f ');
-
-      /* CRITICAL: Never overwrite a template formula with a plain value */
-      if (templateHasFormula && !isFormula) return fullMatch;
-
-      /* Skip if template has same inline string label */
-      if (fullMatch.includes('<is>') && isInlineStr) {
-        const tMatch = fullMatch.match(/<t[^>]*>([^<]*)<\/t>/);
-        if (tMatch && tMatch[1] === value) return fullMatch;
+      if (templateHasFormula) {
+        _formulaSkip++;
+        return fullMatch;
       }
 
       matched.add(cellRef);
+      _replaced++;
 
-      /* Preserve the template's style attribute */
+      /* Preserve template style */
       const styleMatch = fullMatch.match(/\ss="(\d+)"/);
       const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
 
-      if (isFormula) {
-        return `<c r="${cellRef}"${styleAttr}><f>${escapeXml(value)}</f></c>`;
-      } else if (typeof value === 'string' || isInlineStr) {
-        return `<c r="${cellRef}"${styleAttr} t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+      if (typeof val === 'string') {
+        return `<c r="${cellRef}"${styleAttr} t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>`;
       } else {
-        return `<c r="${cellRef}"${styleAttr} t="n"><v>${escapeXml(String(value))}</v></c>`;
+        return `<c r="${cellRef}"${styleAttr} t="n"><v>${escapeXml(String(val))}</v></c>`;
       }
     });
 
-    /* Insert cells that weren't in the template (new cells from ExcelJS) */
+    /* Insert new cells that didn't exist in template */
     const newCellsByRow = {};
-    for (const [cellRef, cellData] of Object.entries(sheetCells)) {
+    for (const [cellRef, val] of Object.entries(sheetCells)) {
       if (matched.has(cellRef)) continue;
-      if (cellData.value === null || cellData.value === undefined) continue;
+      if (val === null || val === undefined) continue;
 
-      const { value, isFormula, isInlineStr } = cellData;
       const rowNum = cellRef.match(/\d+$/)[0];
-
       let cellXml;
-      if (isFormula) {
-        cellXml = `<c r="${cellRef}" s="0"><f>${escapeXml(value)}</f></c>`;
-      } else if (typeof value === 'string' || isInlineStr) {
-        cellXml = `<c r="${cellRef}" s="0" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+      if (typeof val === 'string') {
+        cellXml = `<c r="${cellRef}" s="0" t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>`;
       } else {
-        cellXml = `<c r="${cellRef}" s="0" t="n"><v>${escapeXml(String(value))}</v></c>`;
+        cellXml = `<c r="${cellRef}" s="0" t="n"><v>${escapeXml(String(val))}</v></c>`;
       }
 
       if (!newCellsByRow[rowNum]) newCellsByRow[rowNum] = [];
       newCellsByRow[rowNum].push(cellXml);
     }
 
-    /* Batch-insert new cells into their rows (single pass per row group) */
+    /* Batch-insert new cells */
     for (const [rowNum, cells] of Object.entries(newCellsByRow)) {
       const rowPattern = new RegExp(`(<row\\s+r="${rowNum}"[^>]*>)`);
       const rowMatch = xml.match(rowPattern);
@@ -277,44 +266,76 @@ async function postProcessServerSide(excelJsBuf, templateBuf, preBuiltCellMap) {
       }
     }
 
-    console.log(`Sheet ${sheetNum}: ${matched.size} cells replaced, ${Object.keys(newCellsByRow).length} rows with new cells`);
+    console.log(`Sheet ${sheetNum}: matched=${_regexMatches} hits=${_dataHits} replaced=${matched.size} formulaSkip=${_formulaSkip} newCells=${Object.values(newCellsByRow).flat().length}`);
     templateZip.file(xmlPath, xml);
   }
 
-  /* Copy sheets 9 and 10 from ExcelJS (P&L Raw Import and P&L Image).
-     Must resolve shared string references since template has no sharedStrings.xml. */
-  for (let sheetNum = 9; sheetNum <= 10; sheetNum++) {
-    const xmlPath = `xl/worksheets/sheet${sheetNum}.xml`;
-    let xml = await excelJsZip.file(xmlPath)?.async('string');
-    if (xml && sharedStrings.length > 0) {
-      /* Replace all t="s" cells with inline strings */
-      xml = xml.replace(/<c\s([^>]*?)t="s"([^>]*)>\s*<v>(\d+)<\/v>\s*<\/c>/g, (full, pre, post, idx) => {
-        const i = parseInt(idx, 10);
-        if (i < sharedStrings.length) {
-          const text = escapeXml(sharedStrings[i]);
-          return `<c ${pre}t="inlineStr"${post}><is><t>${text}</t></is></c>`;
+  /* Process sheets 9-10 from ExcelJS workbook (if present) */
+  if (sheets9to10Buf) {
+    const excelZip = await JSZip.loadAsync(sheets9to10Buf);
+
+    /* Resolve shared strings from ExcelJS */
+    const sharedStrings = [];
+    const sstXml = await excelZip.file('xl/sharedStrings.xml')?.async('string');
+    if (sstXml) {
+      const siPattern = /<si>([\s\S]*?)<\/si>/g;
+      let siMatch;
+      while ((siMatch = siPattern.exec(sstXml)) !== null) {
+        const siContent = siMatch[1];
+        const texts = [];
+        const tPattern = /<t[^>]*>([^<]*)<\/t>/g;
+        let tMatch;
+        while ((tMatch = tPattern.exec(siContent)) !== null) {
+          texts.push(tMatch[1]);
         }
-        return full;
-      });
-      templateZip.file(xmlPath, xml);
-    } else if (xml) {
-      templateZip.file(xmlPath, xml);
+        sharedStrings.push(texts.join(''));
+      }
+      console.log('ExcelJS shared strings resolved:', sharedStrings.length);
     }
-  }
 
-  /* Check for new sheets from ExcelJS */
-  const hasSheet9 = excelJsZip.file('xl/worksheets/sheet9.xml');
-  const hasSheet10 = excelJsZip.file('xl/worksheets/sheet10.xml');
+    /* Copy sheets 9-10, converting shared strings to inline strings */
+    for (let sheetNum = 9; sheetNum <= 10; sheetNum++) {
+      const xmlPath = `xl/worksheets/sheet${sheetNum}.xml`;
+      let xml = await excelZip.file(xmlPath)?.async('string');
+      if (xml) {
+        /* Replace all t="s" cells with inline strings */
+        xml = xml.replace(/<c\s([^>]*?)t="s"([^>]*)>\s*<v>(\d+)<\/v>\s*<\/c>/g, (full, pre, post, idx) => {
+          const i = parseInt(idx, 10);
+          if (i < sharedStrings.length) {
+            const text = escapeXml(sharedStrings[i]);
+            return `<c ${pre}t="inlineStr"${post}><is><t>${text}</t></is></c>`;
+          }
+          return full;
+        });
+        templateZip.file(xmlPath, xml);
+        console.log(`Sheet ${sheetNum}: converted shared strings to inline`);
+      }
+    }
 
-  /* Update workbook.xml to reference sheets 9 and 10 if they exist */
-  let workbookXml = await templateZip.file('xl/workbook.xml')?.async('string');
-  if (workbookXml) {
+    /* Copy sheet rels, images, and drawings */
+    for (const filePath of Object.keys(excelZip.files)) {
+      if (filePath.match(/xl\/worksheets\/_rels\/sheet(9|10)\.xml\.rels/)) {
+        const content = await excelZip.file(filePath)?.async('nodebuffer');
+        if (content) templateZip.file(filePath, content);
+      }
+      if (filePath.startsWith('xl/media/') && !templateZip.file(filePath)) {
+        const content = await excelZip.file(filePath)?.async('nodebuffer');
+        if (content) templateZip.file(filePath, content);
+      }
+      if (filePath.match(/xl\/drawings\/(drawing|_rels)/) && !templateZip.file(filePath)) {
+        const content = await excelZip.file(filePath)?.async('nodebuffer');
+        if (content) templateZip.file(filePath, content);
+      }
+    }
 
-    if (hasSheet9 || hasSheet10) {
-      /* Find the sheets element and its content */
+    /* Update workbook.xml, rels, and Content_Types for sheets 9-10 */
+    const hasSheet9 = excelZip.file('xl/worksheets/sheet9.xml');
+    const hasSheet10 = excelZip.file('xl/worksheets/sheet10.xml');
+
+    let workbookXml = await templateZip.file('xl/workbook.xml')?.async('string');
+    if (workbookXml && (hasSheet9 || hasSheet10)) {
       const sheetsPattern = /<sheets>([\s\S]*?)<\/sheets>/;
       const sheetsMatch = workbookXml.match(sheetsPattern);
-
       if (sheetsMatch) {
         let sheetsContent = sheetsMatch[1];
         const sheetIds = [];
@@ -325,85 +346,51 @@ async function postProcessServerSide(excelJsBuf, templateBuf, preBuiltCellMap) {
         }
         const maxId = sheetIds.length > 0 ? Math.max(...sheetIds) : 8;
 
-        if (hasSheet9) {
-          const sheet9Name = 'P&amp;L Raw Import';
-          if (!sheetsContent.includes('rId11')) {
-            sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="${sheet9Name}" sheetId="${maxId + 1}" state="visible" r:id="rId11"/>`;
-          }
+        if (hasSheet9 && !sheetsContent.includes('rId11')) {
+          sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Raw Import" sheetId="${maxId + 1}" state="visible" r:id="rId11"/>`;
         }
-
-        if (hasSheet10) {
-          const sheet10Name = 'P&amp;L Image';
-          if (!sheetsContent.includes('rId12')) {
-            sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="${sheet10Name}" sheetId="${maxId + 2}" state="visible" r:id="rId12"/>`;
-          }
+        if (hasSheet10 && !sheetsContent.includes('rId12')) {
+          sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Image" sheetId="${maxId + 2}" state="visible" r:id="rId12"/>`;
         }
 
         workbookXml = workbookXml.replace(sheetsPattern, `<sheets>${sheetsContent}</sheets>`);
         templateZip.file('xl/workbook.xml', workbookXml);
       }
     }
-  }
 
-  /* Update xl/_rels/workbook.xml.rels to add relationship entries for new sheets */
-  let wbRelsXml = await templateZip.file('xl/_rels/workbook.xml.rels')?.async('string');
-  if (wbRelsXml) {
-    if (hasSheet9 && !wbRelsXml.includes('sheet9.xml')) {
-      wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet9.xml" Id="rId11"/></Relationships>');
-    }
-    if (hasSheet10 && !wbRelsXml.includes('sheet10.xml')) {
-      wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet10.xml" Id="rId12"/></Relationships>');
-    }
-    templateZip.file('xl/_rels/workbook.xml.rels', wbRelsXml);
-  }
-
-  /* Copy any related files for new sheets (images, rels) from ExcelJS output */
-  for (const filePath of Object.keys(excelJsZip.files)) {
-    /* Copy sheet rels (e.g. xl/worksheets/_rels/sheet9.xml.rels, sheet10.xml.rels) */
-    if (filePath.match(/xl\/worksheets\/_rels\/sheet(9|10)\.xml\.rels/)) {
-      const content = await excelJsZip.file(filePath)?.async('nodebuffer');
-      if (content) templateZip.file(filePath, content);
-    }
-    /* Copy images from xl/media/ */
-    if (filePath.startsWith('xl/media/') && !templateZip.file(filePath)) {
-      const content = await excelJsZip.file(filePath)?.async('nodebuffer');
-      if (content) templateZip.file(filePath, content);
-    }
-    /* Copy drawing files referenced by new sheets */
-    if (filePath.match(/xl\/drawings\/(drawing|_rels)/) && !templateZip.file(filePath)) {
-      const content = await excelJsZip.file(filePath)?.async('nodebuffer');
-      if (content) templateZip.file(filePath, content);
-    }
-  }
-
-  /* Update [Content_Types].xml for new sheets and images */
-  let contentTypesXml = await templateZip.file('[Content_Types].xml')?.async('string');
-  if (contentTypesXml) {
-    if (hasSheet9 && !contentTypesXml.includes('sheet9.xml')) {
-      contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
-    }
-
-    if (hasSheet10 && !contentTypesXml.includes('sheet10.xml')) {
-      contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet10.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
-    }
-
-    /* Add image content type if not already present */
-    if (!contentTypesXml.includes('Extension="jpeg"') && !contentTypesXml.includes('Extension="jpg"')) {
-      contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
-    }
-    /* Add drawing Override entries for any drawings we copied */
-    for (const filePath of Object.keys(excelJsZip.files)) {
-      if (filePath.match(/^xl\/drawings\/drawing\d+\.xml$/) && !contentTypesXml.includes(filePath)) {
-        contentTypesXml = contentTypesXml.replace(/<\/Types>/, `<Override PartName="/${filePath}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`);
+    let wbRelsXml = await templateZip.file('xl/_rels/workbook.xml.rels')?.async('string');
+    if (wbRelsXml) {
+      if (hasSheet9 && !wbRelsXml.includes('sheet9.xml')) {
+        wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet9.xml" Id="rId11"/></Relationships>');
       }
+      if (hasSheet10 && !wbRelsXml.includes('sheet10.xml')) {
+        wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet10.xml" Id="rId12"/></Relationships>');
+      }
+      templateZip.file('xl/_rels/workbook.xml.rels', wbRelsXml);
     }
 
-    templateZip.file('[Content_Types].xml', contentTypesXml);
+    let contentTypesXml = await templateZip.file('[Content_Types].xml')?.async('string');
+    if (contentTypesXml) {
+      if (hasSheet9 && !contentTypesXml.includes('sheet9.xml')) {
+        contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+      }
+      if (hasSheet10 && !contentTypesXml.includes('sheet10.xml')) {
+        contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet10.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+      }
+      if (!contentTypesXml.includes('Extension="jpeg"') && !contentTypesXml.includes('Extension="jpg"')) {
+        contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
+      }
+      for (const filePath of Object.keys(excelZip.files)) {
+        if (filePath.match(/^xl\/drawings\/drawing\d+\.xml$/) && !contentTypesXml.includes(filePath)) {
+          contentTypesXml = contentTypesXml.replace(/<\/Types>/, `<Override PartName="/${filePath}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`);
+        }
+      }
+      templateZip.file('[Content_Types].xml', contentTypesXml);
+    }
   }
 
-  console.log('Post-processing: injected values into template, preserved styles');
+  console.log('Template injection complete');
 
-  /* Generate final buffer */
   const finalBuf = await templateZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   return finalBuf;
 }
@@ -426,6 +413,31 @@ function escapeRegex(str) {
 
 /* ─── Build the workbook from pre-parsed text ─── */
 async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64) {
+  /* Reset cell collector for this invocation */
+  _cellCollector = {};
+
+  /* Sheet name → sheet number mapping */
+  const sheetNameMap = {
+    'Production Worksheet': 1,
+    'All Codes - Production Report': 2,
+    'Hygiene Schedule': 3,
+    'Financial Overview': 4,
+    'Targets & Goal': 5,
+    'Employee Costs': 6,
+    'Budgetary P&L': 7,
+    'P&L Input': 8
+  };
+
+  /* Create simple sheet objects with .name property for sv() calls */
+  const wsPW = { name: 'Production Worksheet' };
+  const wsAC = { name: 'All Codes - Production Report' };
+  const wsHS = { name: 'Hygiene Schedule' };
+  const wsFO = { name: 'Financial Overview' };
+  const wsTG = { name: 'Targets & Goal' };
+  const wsEC = { name: 'Employee Costs' };
+  const wsBPL = { name: 'Budgetary P&L' };
+  const wsPI = { name: 'P&L Input' };
+
   /* Parse the Claude output text into structured data */
   const prodData = parseProduction(prodText || '');
   const collData = collText ? parseCollections(collText) : null;
@@ -473,21 +485,6 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     throw new Error('Could not load assessment template: ' + e.message);
   }
 
-  /* Create a BLANK workbook — do NOT load the template into ExcelJS.
-     Loading the template (200K+ cells) takes 10-15 seconds alone.
-     We only need ExcelJS to hold our computed values; the post-processor
-     merges them into the pristine template XML preserving all styles. */
-  const t1 = Date.now();
-  wb = new ExcelJS.Workbook();
-  const wsPW = wb.addWorksheet('Production Worksheet');
-  const wsAC = wb.addWorksheet('All Codes - Production Report');
-  const wsHS_placeholder = wb.addWorksheet('Hygiene Schedule');
-  const wsFO = wb.addWorksheet('Financial Overview');
-  const wsTG = wb.addWorksheet('Targets & Goal');
-  const wsEC_placeholder = wb.addWorksheet('Employee Costs');
-  const wsBPL = wb.addWorksheet('Budgetary P&L');
-  const wsPI = wb.addWorksheet('P&L Input');
-  console.log('Blank workbook created in', Date.now()-t1, 'ms');
 
   /* ═══ PRODUCTION WORKSHEET ═══ */
   sv(wsPW, 'D4', practiceName);
@@ -529,78 +526,38 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   for (const [row, agg] of Object.entries(leftAgg)) {
     sv(wsPW, 'D'+row, agg.qty);
     sv(wsPW, 'F'+row, agg.qty > 0 ? Math.round(agg.total/agg.qty*100)/100 : 0);
-    try { wsPW.getCell('D'+row).numFmt = '#,##0'; } catch(e) {}
-    try { wsPW.getCell('F'+row).numFmt = '$#,##0.00'; } catch(e) {}
   }
 
   if (srpAgg.qty > 0) {
     sv(wsPW, 'D24', srpAgg.qty);
     sv(wsPW, 'F24', Math.round(srpAgg.total/srpAgg.qty*100)/100);
-    try { wsPW.getCell('D24').numFmt = '#,##0'; } catch(e) {}
-    try { wsPW.getCell('F24').numFmt = '$#,##0.00'; } catch(e) {}
   }
 
   for (const [row, agg] of Object.entries(rightAgg)) {
     sv(wsPW, 'L'+row, agg.qty);
     sv(wsPW, 'M'+row, Math.round(agg.total*100)/100);
     sv(wsPW, 'N'+row, agg.qty > 0 ? Math.round(agg.total/agg.qty*100)/100 : 0);
-    try { wsPW.getCell('L'+row).numFmt = '#,##0'; } catch(e) {}
-    try { wsPW.getCell('M'+row).numFmt = '$#,##0.00'; } catch(e) {}
-    try { wsPW.getCell('N'+row).numFmt = '$#,##0.00'; } catch(e) {}
   }
 
   /* Preserve number formatting on Production Worksheet key cells */
-  try { wsPW.getCell('G5').numFmt = '$#,##0.00'; } catch(e) {}
-  try { wsPW.getCell('D5').numFmt = '#,##0'; } catch(e) {}
 
   /* Fix formula cells that have numFmt=General — they show raw decimals.
      E column = per-month qty (should be integer), N column = avg fee (should be $) */
   const pwIntCells = ['E10','E11','E12','E13','E16','E17','E18','E21','E22','E23','E24','E25','E26','E30','E31','E32','E34','E35','E36'];
-  pwIntCells.forEach(addr => { try { wsPW.getCell(addr).numFmt = '#,##0'; } catch(e) {} });
+  pwIntCells.forEach(addr => { });
   const pwDollarGeneral = ['N9','N18','N40','N47','N55','N68'];
-  pwDollarGeneral.forEach(addr => { try { wsPW.getCell(addr).numFmt = '$#,##0.00'; } catch(e) {} });
+  pwDollarGeneral.forEach(addr => { });
   /* G6 per-month production */
-  try { wsPW.getCell('G6').numFmt = '$#,##0'; } catch(e) {}
 
   /* Production Worksheet row heights */
-  try { wsPW.getRow(4).height = 30; } catch(e) {}
 
   /* ═══ ALL CODES - PRODUCTION REPORT ═══ */
-  /* Wipe the existing sheet IN PLACE (preserves tab order) then write fresh.
-     Use cell.style = {...} to completely replace all formatting. */
-  for (let r = 1; r <= 250; r++) {
-    ['A','B','C','D','E','F'].forEach(col => {
-      try {
-        const cell = wsAC.getCell(col + r);
-        cell.value = null;
-        cell.style = {};
-      } catch(e) {}
-    });
-    try { const row = wsAC.getRow(r); row.style = {}; row.font = undefined; } catch(e) {}
-  }
-  ['A','B','C','D','E','F'].forEach(col => {
-    try { wsAC.getColumn(col).style = {}; } catch(e) {}
-  });
-
-  /* Header row */
+  /* Collect header row data */
   const acHeaders = ['Code', 'Description', 'Quantity', 'Total $', 'Avg Fee', '% of Prod'];
   acHeaders.forEach((h, i) => {
-    const cell = wsAC.getCell(1, i + 1);
-    cell.value = h;
-    cell.style = {
-      font: { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } },
-      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } },
-      alignment: { horizontal: 'center', vertical: 'center' }
-    };
+    const col = String.fromCharCode(65 + i); // A, B, C, D, E, F
+    sv(wsAC, col + '1', h);
   });
-  wsAC.getColumn('A').width = 12;
-  wsAC.getColumn('B').width = 44;
-  wsAC.getColumn('C').width = 10;
-  wsAC.getColumn('D').width = 14;
-  wsAC.getColumn('E').width = 12;
-  wsAC.getColumn('F').width = 16;
-  /* Header row height */
-  try { wsAC.getRow(1).height = 19.5; } catch(e) {}
 
   const nonZero = codes.filter(c => c.total > 0);
   const zero = codes.filter(c => c.total === 0);
@@ -609,6 +566,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   let directMatchCount = 0;
   const sampleUnmatched = [];
 
+  /* Collect data rows */
   allCodes.forEach((c, i) => {
     const r = i + 2;
     const bc = baseCode(c.code);
@@ -616,38 +574,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     if (isUsed) directMatchCount++;
     else if (sampleUnmatched.length < 5) sampleUnmatched.push(c.code);
 
-    const usedStyle = {
-      font: { name: 'Verdana', size: 10, strike: true },
-      alignment: { vertical: 'center' }
-    };
-    const cleanStyle = {
-      font: { name: 'Verdana', size: 10, strike: false },
-      alignment: { vertical: 'center' }
-    };
-    const baseStyle = isUsed ? usedStyle : cleanStyle;
-
-    wsAC.getCell('A'+r).value = c.code;
-    wsAC.getCell('A'+r).style = baseStyle;
-    wsAC.getCell('B'+r).value = c.desc;
-    wsAC.getCell('B'+r).style = baseStyle;
-    wsAC.getCell('C'+r).value = c.qty;
-    wsAC.getCell('C'+r).style = { ...baseStyle, numFmt: '#,##0', alignment: { horizontal: 'right', vertical: 'center' } };
-    wsAC.getCell('D'+r).value = Math.round(c.total*100)/100;
-    wsAC.getCell('D'+r).style = { ...baseStyle, numFmt: '$#,##0.00', alignment: { horizontal: 'right', vertical: 'center' } };
-    wsAC.getCell('E'+r).value = c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0;
-    wsAC.getCell('E'+r).style = { ...baseStyle, numFmt: '$#,##0.00', alignment: { horizontal: 'right', vertical: 'center' } };
-    wsAC.getCell('F'+r).value = totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0;
-    wsAC.getCell('F'+r).style = { ...baseStyle, numFmt: '0.00%', alignment: { horizontal: 'right', vertical: 'center' } };
+    sv(wsAC, 'A'+r, c.code);
+    sv(wsAC, 'B'+r, c.desc);
+    sv(wsAC, 'C'+r, c.qty);
+    sv(wsAC, 'D'+r, Math.round(c.total*100)/100);
+    sv(wsAC, 'E'+r, c.qty > 0 ? Math.round(c.total/c.qty*100)/100 : 0);
+    sv(wsAC, 'F'+r, totalProd > 0 ? Math.round(c.total/totalProd*10000)/10000 : 0);
   });
-
-  /* Set data row heights for All Codes (master template uses 15.0) — only data rows */
-  for (let r = 2; r <= allCodes.length + 1; r++) {
-    try { wsAC.getRow(r).height = 15.0; } catch(e) {}
-  }
-  /* Reset trailing blank rows to default (12.75) */
-  for (let r = allCodes.length + 2; r <= 200; r++) {
-    try { wsAC.getRow(r).height = 12.75; } catch(e) {}
-  }
 
   console.log('All Codes: ' + allCodes.length + ' total, ' + directMatchCount + ' matched, ' + sampleUnmatched.length + ' unmatched sample: ' + sampleUnmatched.join(','));
 
@@ -656,22 +589,18 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const primaryYear = years.length >= 2 ? years[1] : years[0] || new Date().getFullYear();
   sv(wsFO, 'E6', primaryYear);
   sv(wsFO, 'E20', Math.round(totalProd*100)/100);
-  try { wsFO.getCell('E20').numFmt = '$#,##0'; } catch(e) {}
   sv(wsFO, 'E21', prodMonths);
 
   if (collData && collData.payments) {
     sv(wsFO, 'F20', Math.round(collData.payments*100)/100);
-    try { wsFO.getCell('F20').numFmt = '$#,##0'; } catch(e) {}
     sv(wsFO, 'F21', collData.months || prodMonths);
   }
 
   if (plData && plData.totalIncome) {
     sv(wsFO, 'D25', Math.round(plData.totalIncome/12*100)/100);
-    try { wsFO.getCell('D25').numFmt = '$#,##0'; } catch(e) {}
   }
   if (totalProd > 0 && prodMonths > 0) {
     sv(wsFO, 'D27', Math.round(totalProd/prodMonths*100)/100);
-    try { wsFO.getCell('D27').numFmt = '$#,##0'; } catch(e) {}
   }
 
   if (arPatient && arPatient.total) {
@@ -694,7 +623,6 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
      that don't have explicit values was causing corruption. Only format cells
      where we wrote data. Template already has correct styles for most cells. */
   ['D32','D33','E32','F32','G32','H32','E33','F33','G33','H33'].forEach(addr => {
-    try { wsFO.getCell(addr).numFmt = '$#,##0.00'; } catch(e) {}
   });
 
   /* ═══ HYGIENE SCHEDULE ═══ */
@@ -702,8 +630,6 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
      3 weeks near future (rows 25-27), 2 weeks future future (rows 34-35).
      All data rows get zeros. Dates pre-populated relative to today. */
   {
-    const wsHS = wb.getWorksheet('Hygiene Schedule');
-    if (wsHS) {
       const today = new Date();
       const dayOfWeek = today.getDay();
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -731,14 +657,14 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       /* Ensure all recent past data rows have zeros (C-N for rows 10-12) */
       const dataCols = ['C','D','E','F','G','H','I','J','K','L','M','N'];
       for (let r = 10; r <= 12; r++) {
-        dataCols.forEach(col => { if (!wsHS.getCell(col+r).value) sv(wsHS, col+r, 0); });
+        dataCols.forEach(col => { const addr = col+r; if (!(_cellCollector['Hygiene Schedule'] || {})[addr]) sv(wsHS, addr, 0); });
       }
 
       /* Next 7 days date context */
       sv(wsHS, 'E18', fmtWeek(thisMonday));
       /* Ensure next-7-days rows have zeros (rows 19-20, C-N) */
       for (let r = 19; r <= 20; r++) {
-        dataCols.forEach(col => { if (!wsHS.getCell(col+r).value) sv(wsHS, col+r, 0); });
+        dataCols.forEach(col => { const addr = col+r; if (!(_cellCollector['Hygiene Schedule'] || {})[addr]) sv(wsHS, addr, 0); });
       }
 
       /* Near future: 3 weeks forward (rows 25-27). Row 28 left blank (eliminated). */
@@ -747,7 +673,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         sv(wsHS, 'B' + (25 + i), fmtWeek(mon));
       }
       for (let r = 25; r <= 27; r++) {
-        dataCols.forEach(col => { if (!wsHS.getCell(col+r).value) sv(wsHS, col+r, 0); });
+        dataCols.forEach(col => { const addr = col+r; if (!(_cellCollector['Hygiene Schedule'] || {})[addr]) sv(wsHS, addr, 0); });
       }
 
       /* Future future: 2 weeks after near future (rows 34-35) */
@@ -756,7 +682,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         sv(wsHS, 'B' + (34 + i), fmtWeek(mon));
       }
       for (let r = 34; r <= 35; r++) {
-        dataCols.forEach(col => { if (!wsHS.getCell(col+r).value) sv(wsHS, col+r, 0); });
+        dataCols.forEach(col => { const addr = col+r; if (!(_cellCollector['Hygiene Schedule'] || {})[addr]) sv(wsHS, addr, 0); });
       }
 
       /* Populate hygiene schedule form data if provided */
@@ -822,100 +748,53 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       }
 
       console.log('Hygiene Schedule: populated week dates relative to', thisMonday.toISOString().slice(0,10));
-    }
   }
 
   /* ═══ EMPLOYEE COSTS ═══ */
   if (employeeCosts) {
-    const wsEC = wb.getWorksheet('Employee Costs');
-    if (wsEC) {
-      console.log('Writing Employee Costs data...');
-      /* Staff positions: name→D, rate→E, hours→F (G has formulas for monthly cost) */
-      const staffRowMap = { om: 7, f1: 9, f2: 10, f3: 11, f4: 12, f5: 13, b1: 16, b2: 17, b3: 18, b4: 19, b5: 14 };
-      /* Relabel row 14 from "front6" to "back 5" */
-      sv(wsEC, 'C14', 'back 5');
-      if (employeeCosts.staff) {
-        employeeCosts.staff.forEach(p => {
-          const r = staffRowMap[p.key] || p.row;
-          if (r) {
-            if (p.name) sv(wsEC, 'D' + r, p.name);
-            if (p.rate) { sv(wsEC, 'E' + r, p.rate); try { wsEC.getCell('E' + r).numFmt = '#,##0.00'; } catch(e) {} }
-            if (p.hours) { sv(wsEC, 'F' + r, p.hours); try { wsEC.getCell('F' + r).numFmt = '#,##0'; } catch(e) {} }
-            /* Ensure monthly cost formula exists */
-            try { wsEC.getCell('G' + r).value = { formula: 'E' + r + '*F' + r }; wsEC.getCell('G' + r).numFmt = '#,##0.00'; } catch(e) {}
-          }
-        });
-      }
-      /* Staff benefits & employment cost % */
-      if (employeeCosts.staffBenefits) sv(wsEC, 'G22', employeeCosts.staffBenefits);
-      if (employeeCosts.staffEmpCostPct && employeeCosts.staffEmpCostPct !== 0.10) {
-        /* Update formula with custom % instead of default 10% */
-        try { wsEC.getCell('G21').value = { formula: 'G20*' + employeeCosts.staffEmpCostPct }; } catch(e) {}
-      }
-
-      /* Hygiene positions: name→D, rate→E, hours→F
-         Template has RDH 1-3 at rows 27-29. If h4/h5 have data,
-         insert rows after 29 and adjust summary formulas. */
-      const extraHyg = (employeeCosts.hygiene || []).filter(p => p.key === 'h4' || p.key === 'h5');
-      const extraCount = extraHyg.length;
-      if (extraCount > 0) {
-        /* Insert rows after row 29 for extra RDH positions */
-        try { wsEC.spliceRows(30, 0, ...Array(extraCount).fill([])); } catch(e) {
-          console.warn('spliceRows failed, inserting manually');
-          for (let i = 0; i < extraCount; i++) {
-            try { wsEC.insertRow(30 + i, []); } catch(e2) {}
-          }
+    console.log('Writing Employee Costs data...');
+    /* Staff positions: name→D, rate→E, hours→F (G has formulas for monthly cost) */
+    const staffRowMap = { om: 7, f1: 9, f2: 10, f3: 11, f4: 12, f5: 13, b1: 16, b2: 17, b3: 18, b4: 19, b5: 14 };
+    /* Relabel row 14 from "front6" to "back 5" */
+    sv(wsEC, 'C14', 'back 5');
+    if (employeeCosts.staff) {
+      employeeCosts.staff.forEach(p => {
+        const r = staffRowMap[p.key] || p.row;
+        if (r) {
+          if (p.name) sv(wsEC, 'D' + r, p.name);
+          if (p.rate) sv(wsEC, 'E' + r, p.rate);
+          if (p.hours) sv(wsEC, 'F' + r, p.hours);
         }
-        /* Write extra RDH labels and formulas */
-        extraHyg.forEach((p, i) => {
-          const r = 30 + i;
-          sv(wsEC, 'C' + r, p.label || ('rdh ' + (4 + i)));
-          try { wsEC.getCell('G' + r).value = { formula: 'E' + r + '*F' + r }; } catch(e) {}
-        });
-        /* Fix summary formulas shifted down by extraCount */
-        const wRow = 30 + extraCount;      // wages row
-        const eRow = wRow + 1;              // employment costs row
-        const bRow = wRow + 2;              // benefits row
-        const tRow = wRow + 3;              // hygiene total row
-        try { wsEC.getCell('G' + wRow).value = { formula: 'SUM(G27:G' + (29 + extraCount) + ')' }; } catch(e) {}
-        try { wsEC.getCell('G' + eRow).value = { formula: 'G' + wRow + '*0.1' }; } catch(e) {}
-        /* benefits value at bRow, total at tRow */
-        try { wsEC.getCell('G' + tRow).value = { formula: 'G' + wRow + '+G' + eRow + '+G' + bRow }; } catch(e) {}
-      }
-
-      /* Write all hygiene position data (h1-h5) */
-      const hygBaseMap = { h1: 27, h2: 28, h3: 29, h4: 30, h5: 31 };
-      if (employeeCosts.hygiene) {
-        employeeCosts.hygiene.forEach(p => {
-          const r = hygBaseMap[p.key] || p.row;
-          if (r) {
-            if (p.name) sv(wsEC, 'D' + r, p.name);
-            if (p.rate) { sv(wsEC, 'E' + r, p.rate); try { wsEC.getCell('E' + r).numFmt = '#,##0.00'; } catch(e) {} }
-            if (p.hours) { sv(wsEC, 'F' + r, p.hours); try { wsEC.getCell('F' + r).numFmt = '#,##0'; } catch(e) {} }
-            try { wsEC.getCell('G' + r).value = { formula: 'E' + r + '*F' + r }; wsEC.getCell('G' + r).numFmt = '#,##0.00'; } catch(e) {}
-          }
-        });
-      }
-
-      /* Hygiene benefits & employment cost % (row shifts if extra RDH added) */
-      const hygBenRow = 32 + extraCount;
-      const hygEmpRow = 31 + extraCount;
-      if (employeeCosts.hygBenefits) sv(wsEC, 'G' + hygBenRow, employeeCosts.hygBenefits);
-      if (employeeCosts.hygEmpCostPct && employeeCosts.hygEmpCostPct !== 0.10) {
-        try { wsEC.getCell('G' + hygEmpRow).value = { formula: 'G' + (30 + extraCount) + '*' + employeeCosts.hygEmpCostPct }; } catch(e) {}
-      }
-
-      /* Benefits policy notes (rows shift if extra RDH added) */
-      const benOffset = extraCount;
-      if (employeeCosts.benefits) {
-        const benMap = { sick: 35 + benOffset, holidays: 36 + benOffset, vacation: 37 + benOffset, bonus: 38 + benOffset, k401: 39 + benOffset, medical: 40 + benOffset, dental: 41 + benOffset, other: 42 + benOffset };
-        Object.entries(employeeCosts.benefits).forEach(([key, val]) => {
-          if (val && benMap[key]) sv(wsEC, 'D' + benMap[key], val);
-        });
-      }
-
-      console.log('Employee Costs: done');
+      });
     }
+    /* Staff benefits & employment cost % */
+    if (employeeCosts.staffBenefits) sv(wsEC, 'G22', employeeCosts.staffBenefits);
+
+    /* Hygiene positions: name→D, rate→E, hours→F */
+    const hygBaseMap = { h1: 27, h2: 28, h3: 29, h4: 30, h5: 31 };
+    if (employeeCosts.hygiene) {
+      employeeCosts.hygiene.forEach(p => {
+        const r = hygBaseMap[p.key] || p.row;
+        if (r) {
+          if (p.name) sv(wsEC, 'D' + r, p.name);
+          if (p.rate) sv(wsEC, 'E' + r, p.rate);
+          if (p.hours) sv(wsEC, 'F' + r, p.hours);
+        }
+      });
+    }
+
+    /* Hygiene benefits & employment cost % */
+    if (employeeCosts.hygBenefits) sv(wsEC, 'G32', employeeCosts.hygBenefits);
+
+    /* Benefits policy notes */
+    if (employeeCosts.benefits) {
+      const benMap = { sick: 35, holidays: 36, vacation: 37, bonus: 38, k401: 39, medical: 40, dental: 41, other: 42 };
+      Object.entries(employeeCosts.benefits).forEach(([key, val]) => {
+        if (val && benMap[key]) sv(wsEC, 'D' + benMap[key], val);
+      });
+    }
+
+    console.log('Employee Costs: done');
   }
 
   /* ═══ P&L INPUT ═══ */
@@ -975,213 +854,129 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     console.log('P&L Input: wrote ' + (row - 6) + ' expense items to rows 6-' + (row-1) + ', template formulas at 48-51 preserved');
   }
 
-  /* ═══ P&L RAW IMPORT (new sheet) ═══ */
-  if (plData && plData.items && plData.items.length > 0) {
-    let wsRaw = wb.getWorksheet('P&L Raw Import');
-    if (!wsRaw) wsRaw = wb.addWorksheet('P&L Raw Import');
-    sv(wsRaw, 'A1', 'P&L Raw Import — ' + (practiceName || 'Practice'));
-    sv(wsRaw, 'A3', 'Line Item'); sv(wsRaw, 'B3', 'Amount'); sv(wsRaw, 'C3', 'Category'); sv(wsRaw, 'D3', 'Notes');
+  /* ═══ P&L RAW IMPORT & P&L IMAGE (sheets 9-10, ExcelJS-only) ═══ */
+  let sheets9to10Buf = null;
+  let needsSheets9to10 = (plData && plData.items && plData.items.length > 0) || plImageB64;
 
-    let rr = 5;
-    /* Income items first */
-    const incomeItems = plData.items.filter(i => i.section === 'Income');
-    const cogsItems = plData.items.filter(i => i.section === 'COGS');
-    const expenseItems = plData.items.filter(i => i.section !== 'Income' && i.section !== 'COGS');
+  if (needsSheets9to10) {
+    const wbNewSheets = new ExcelJS.Workbook();
 
-    if (incomeItems.length > 0) {
-      sv(wsRaw, 'A'+rr, 'INCOME'); rr++;
-      for (const item of incomeItems) {
-        sv(wsRaw, 'A'+rr, item.item); sv(wsRaw, 'B'+rr, item.amount); sv(wsRaw, 'C'+rr, 'Income'); rr++;
+    /* P&L Raw Import */
+    if (plData && plData.items && plData.items.length > 0) {
+      const wsRaw = wbNewSheets.addWorksheet('P&L Raw Import');
+      wsRaw.getCell('A1').value = 'P&L Raw Import — ' + (practiceName || 'Practice');
+      wsRaw.getCell('A3').value = 'Line Item';
+      wsRaw.getCell('B3').value = 'Amount';
+      wsRaw.getCell('C3').value = 'Category';
+      wsRaw.getCell('D3').value = 'Notes';
+
+      let rr = 5;
+      const incomeItems = plData.items.filter(i => i.section === 'Income');
+      const cogsItems = plData.items.filter(i => i.section === 'COGS');
+      const expenseItems = plData.items.filter(i => i.section !== 'Income' && i.section !== 'COGS');
+
+      if (incomeItems.length > 0) {
+        wsRaw.getCell('A'+rr).value = 'INCOME'; rr++;
+        for (const item of incomeItems) {
+          wsRaw.getCell('A'+rr).value = item.item;
+          wsRaw.getCell('B'+rr).value = item.amount;
+          wsRaw.getCell('C'+rr).value = 'Income';
+          rr++;
+        }
+        const totalSales = incomeItems.reduce((s,i) => s + i.amount, 0);
+        wsRaw.getCell('A'+rr).value = 'Total Sales';
+        wsRaw.getCell('B'+rr).value = totalSales;
+        wsRaw.getCell('C'+rr).value = 'Income';
+        rr++;
       }
-      const totalSales = incomeItems.reduce((s,i) => s + i.amount, 0);
-      sv(wsRaw, 'A'+rr, 'Total Sales'); sv(wsRaw, 'B'+rr, totalSales); sv(wsRaw, 'C'+rr, 'Income'); rr++;
-    }
-    if (plData.totalIncome) { sv(wsRaw, 'A'+rr, 'TOTAL INCOME'); sv(wsRaw, 'B'+rr, plData.totalIncome); sv(wsRaw, 'D'+rr, 'Net collections'); rr++; }
-    rr++;
-    if (cogsItems.length > 0) {
-      sv(wsRaw, 'A'+rr, 'COST OF GOODS SOLD');
-      const cogsTotal = cogsItems.reduce((s,i) => s + i.amount, 0);
-      sv(wsRaw, 'B'+rr, cogsTotal); sv(wsRaw, 'C'+rr, 'COGS'); rr++;
-      if (plData.totalIncome) { sv(wsRaw, 'A'+rr, 'GROSS PROFIT'); sv(wsRaw, 'B'+rr, plData.totalIncome - cogsTotal); rr++; }
-      rr++;
-    }
-    sv(wsRaw, 'A'+rr, 'EXPENSES'); rr++;
-    for (const item of expenseItems) {
-      const cat = plCategory(item.item);
-      sv(wsRaw, 'A'+rr, item.item);
-      sv(wsRaw, 'B'+rr, item.amount);
-      if (cat === null) {
-        sv(wsRaw, 'C'+rr, 'EXCLUDED');
-        sv(wsRaw, 'D'+rr, 'Non-cash — excluded');
-      } else if (cat === 'O') {
-        sv(wsRaw, 'C'+rr, 'Add-Back');
-        sv(wsRaw, 'D'+rr, 'Owner — add-back');
-      } else {
-        const catNames = {F:'Dental Supplies',H:'Staff Costs',J:'Rent & Parking',K:'Marketing',L:'Office Supplies',M:'Other'};
-        sv(wsRaw, 'C'+rr, catNames[cat] || 'Other');
+      if (plData.totalIncome) {
+        wsRaw.getCell('A'+rr).value = 'TOTAL INCOME';
+        wsRaw.getCell('B'+rr).value = plData.totalIncome;
+        wsRaw.getCell('D'+rr).value = 'Net collections';
+        rr++;
       }
-      /* Strikethrough ALL expense items — MUST use cell.style to override template styles */
-      ['A','B','C','D'].forEach(col => {
-        try {
-          const c = wsRaw.getCell(col+rr);
-          c.style = { font: { name: 'Verdana', size: 10, strike: true, color: { argb: 'FF888888' } } };
-        } catch(e) {}
-      });
       rr++;
+      if (cogsItems.length > 0) {
+        wsRaw.getCell('A'+rr).value = 'COST OF GOODS SOLD';
+        const cogsTotal = cogsItems.reduce((s,i) => s + i.amount, 0);
+        wsRaw.getCell('B'+rr).value = cogsTotal;
+        wsRaw.getCell('C'+rr).value = 'COGS';
+        rr++;
+        if (plData.totalIncome) {
+          wsRaw.getCell('A'+rr).value = 'GROSS PROFIT';
+          wsRaw.getCell('B'+rr).value = plData.totalIncome - cogsTotal;
+          rr++;
+        }
+        rr++;
+      }
+      wsRaw.getCell('A'+rr).value = 'EXPENSES'; rr++;
+      for (const item of expenseItems) {
+        const cat = plCategory(item.item);
+        wsRaw.getCell('A'+rr).value = item.item;
+        wsRaw.getCell('B'+rr).value = item.amount;
+        if (cat === null) {
+          wsRaw.getCell('C'+rr).value = 'EXCLUDED';
+          wsRaw.getCell('D'+rr).value = 'Non-cash — excluded';
+        } else if (cat === 'O') {
+          wsRaw.getCell('C'+rr).value = 'Add-Back';
+          wsRaw.getCell('D'+rr).value = 'Owner — add-back';
+        } else {
+          const catNames = {F:'Dental Supplies',H:'Staff Costs',J:'Rent & Parking',K:'Marketing',L:'Office Supplies',M:'Other'};
+          wsRaw.getCell('C'+rr).value = catNames[cat] || 'Other';
+        }
+        rr++;
+      }
+      rr++;
+      if (plData.totalExpense) {
+        wsRaw.getCell('A'+rr).value = 'TOTAL EXPENSES';
+        wsRaw.getCell('B'+rr).value = plData.totalExpense;
+        wsRaw.getCell('D'+rr).value = 'Per P&L';
+        rr++;
+      }
+      rr++;
+      if (plData.netIncome != null) {
+        wsRaw.getCell('A'+rr).value = 'NET INCOME';
+        wsRaw.getCell('B'+rr).value = plData.netIncome;
+        wsRaw.getCell('D'+rr).value = 'Per P&L';
+      }
+
+      wsRaw.getColumn('A').width = 35;
+      wsRaw.getColumn('B').width = 15;
+      wsRaw.getColumn('C').width = 18;
+      wsRaw.getColumn('D').width = 30;
+      console.log('P&L Raw Import: written');
     }
-    rr++;
-    if (plData.totalExpense) { sv(wsRaw, 'A'+rr, 'TOTAL EXPENSES'); sv(wsRaw, 'B'+rr, plData.totalExpense); sv(wsRaw, 'D'+rr, 'Per P&L'); rr++; }
-    rr++;
-    if (plData.netIncome != null) { sv(wsRaw, 'A'+rr, 'NET INCOME'); sv(wsRaw, 'B'+rr, plData.netIncome); sv(wsRaw, 'D'+rr, 'Per P&L'); }
 
-    /* Set column widths to match master template */
-    wsRaw.getColumn('A').width = 35;
-    wsRaw.getColumn('B').width = 15;
-    wsRaw.getColumn('C').width = 18;
-    wsRaw.getColumn('D').width = 30;
-
-    /* Bold header cells (this is a new sheet, so no template corruption risk) */
-    ['A1','A3','B3','C3','D3'].forEach(addr => {
-      try { wsRaw.getCell(addr).font = { name: 'Verdana', size: 10, bold: true }; } catch(e) {}
-    });
-  }
-
-  /* ═══ P&L IMAGE — embed using ExcelJS native image support ═══ */
-  {
-    let wsImg = wb.getWorksheet('P&L Image');
-    if (!wsImg) wsImg = wb.addWorksheet('P&L Image');
+    /* P&L Image */
     if (plImageB64) {
+      const wsImg = wbNewSheets.addWorksheet('P&L Image');
       try {
         const imgBuf = Buffer.from(plImageB64, 'base64');
-        const imageId = wb.addImage({ buffer: imgBuf, extension: 'jpeg' });
+        const imageId = wbNewSheets.addImage({ buffer: imgBuf, extension: 'jpeg' });
         wsImg.addImage(imageId, {
           tl: { col: 0, row: 0 },
           br: { col: 10, row: 50 }
         });
-        console.log('P&L image embedded server-side, size:', imgBuf.length, 'bytes');
+        console.log('P&L image embedded, size:', imgBuf.length, 'bytes');
       } catch(imgErr) {
         console.warn('Could not embed P&L image:', imgErr.message);
-        sv(wsImg, 'A1', 'P&L image could not be embedded');
+        wsImg.getCell('A1').value = 'P&L image could not be embedded';
       }
-    } else {
-      sv(wsImg, 'A1', '');
     }
+
+    sheets9to10Buf = await wbNewSheets.xlsx.writeBuffer();
+    console.log('Sheets 9-10 ExcelJS buffer written:', sheets9to10Buf.byteLength, 'bytes');
   }
 
-  /* NOTE: Per-sheet theme color fixes REMOVED — iterating over empty styled cells
-     (PW col H, FO col J, TG col F, BP col K) was causing ExcelJS to instantiate
-     those cells and corrupt their values during serialization. Some yellow fills
-     may appear in notes columns, but this is cosmetic — data integrity is preserved.
-     If yellow fills are unacceptable, fix them ONLY on cells that have actual values. */
+  /* Now inject collected cell values into template, along with sheets 9-10 if present */
+  const injStart = Date.now();
+  const elapsed = injStart - t0;
+  console.log('Time before injection:', elapsed, 'ms');
 
-  /* NOTE: Global yellow-to-white sweep REMOVED — it was causing ExcelJS to
-     instantiate empty styled cells and corrupt their values (style indices
-     appearing as cell values, e.g. $612-$623 in Financial Overview).
-     Per-sheet targeted fixes above handle the known problem cells. */
-
-  /* NOTE: Global font fix REMOVED — iterating every cell in every sheet (including
-     empty styled cells) was causing ExcelJS to instantiate cells and corrupt them
-     during serialization. Style indices were being written as cell values (e.g.
-     $612-$623 in Financial Overview column C, "745"/"746" in P&L Input).
-     Font corrections are now applied ONLY to cells where we explicitly set values. */
-
-  /* ═══ FIX TAB ORDER ═══ */
-  /* ExcelJS may reorder sheets. Force the correct order by rebuilding _worksheets.
-     The _worksheets array is 1-based (index 0 = undefined). */
-  const desiredOrder = [
-    'Production Worksheet',
-    'All Codes - Production Report',
-    'Hygiene Schedule',
-    'Financial Overview',
-    'Targets & Goal',
-    'Employee Costs',
-    'Budgetary P&L',
-    'P&L Input',
-    'P&L Raw Import',
-    'P&L Image'
-  ];
-  const ordered = [];
-  for (const name of desiredOrder) {
-    const ws = wb.getWorksheet(name);
-    if (ws) ordered.push(ws);
-  }
-  /* Include any extra sheets not in the desired list */
-  for (const ws of wb.worksheets) {
-    if (!ordered.includes(ws)) ordered.push(ws);
-  }
-  /* Rebuild the internal array and reassign IDs */
-  wb._worksheets = [undefined];
-  ordered.forEach((ws, i) => {
-    ws.id = i + 1;
-    ws.orderNo = i;
-    wb._worksheets.push(ws);
-  });
-  console.log('Tab order fixed:', wb.worksheets.map(s=>s.name).join(', '));
-
-  /* ═══ EXTRACT CELL DATA FROM EXCELJS OBJECTS ═══
-     Build a cell map directly from in-memory ExcelJS workbook objects.
-     This is far more reliable than parsing ExcelJS's XML output (which uses
-     shared strings, varying attribute orders, etc.) */
-  const cellMap = {};
-  for (const ws of wb.worksheets) {
-    const sheetNum = ws.id;
-    if (sheetNum < 1 || sheetNum > 8) continue;  /* Only template sheets */
-    cellMap[sheetNum] = {};
-    ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
-      row.eachCell({ includeEmpty: false }, (cell, colNum) => {
-        const ref = cell.address;
-        const val = cell.value;
-        if (val === null || val === undefined) return;
-
-        let isFormula = false;
-        let isInlineStr = false;
-        let value;
-
-        if (typeof val === 'object' && val !== null && val.formula) {
-          value = val.formula;
-          isFormula = true;
-        } else if (typeof val === 'object' && val !== null && val.result !== undefined) {
-          /* Formula result object */
-          value = val.formula || String(val.result);
-          isFormula = !!val.formula;
-        } else if (typeof val === 'string') {
-          value = val;
-          isInlineStr = true;
-        } else if (typeof val === 'number' || typeof val === 'boolean') {
-          value = String(val);
-        } else if (val instanceof Date) {
-          value = String(val.getTime() / 86400000 + 25569); /* Excel date serial */
-        } else {
-          value = String(val);
-        }
-
-        cellMap[sheetNum][ref] = { value, isFormula, isInlineStr };
-      });
-    });
-    console.log(`CellMap sheet ${sheetNum} (${ws.name}): ${Object.keys(cellMap[sheetNum]).length} cells`);
-  }
-
-  const excelJsBuf = await wb.xlsx.writeBuffer();
-  console.log('ExcelJS buffer written:', excelJsBuf.byteLength, 'bytes');
-
-  /* Post-process: surgically inject cell values into original template to preserve styles. */
-  let finalBuf;
-  const ppStart = Date.now();
-  const elapsed = ppStart - t0;
-  console.log('Time before post-processing:', elapsed, 'ms');
-
-  if (elapsed > 18000) {
-    console.warn('Skipping post-processing — already at', elapsed, 'ms');
-    finalBuf = Buffer.from(excelJsBuf);
-  } else {
-    try {
-      finalBuf = await postProcessServerSide(Buffer.from(excelJsBuf), templateBuf, cellMap);
-      console.log('Post-processing complete in', Date.now()-ppStart, 'ms,', finalBuf.length, 'bytes');
-    } catch (ppErr) {
-      console.error('Post-processing failed, using ExcelJS output:', ppErr.message);
-      finalBuf = Buffer.from(excelJsBuf);
-    }
-  }
+  const finalBuf = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf);
+  const injTime = Date.now() - injStart;
+  const totalTime = Date.now() - t0;
+  console.log('Injection complete in', injTime, 'ms, total:', totalTime, 'ms, output:', finalBuf.length, 'bytes');
 
   return {
     xlsxB64: finalBuf.toString('base64'),
@@ -1195,7 +990,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
-      _cellMapDebug: Object.fromEntries(Object.entries(cellMap).map(([k,v]) => [k, { count: Object.keys(v).length, sample: Object.entries(v).slice(0,3).map(([ref,d]) => `${ref}=${d.value}`) }]))
+      _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
   };
 }
