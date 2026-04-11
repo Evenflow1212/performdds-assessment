@@ -1987,7 +1987,7 @@ async function postProcessClientSide(excelJsB64) {
     console.log('PP: sheet' + si + ':', cellValues.size, 'values injected');
   }
 
-  /* 6. Add new sheets (9, 10) from ExcelJS */
+  /* 6. Add new sheets (9, 10) from ExcelJS — convert shared string refs to inlineStr */
   for (const si of [9, 10]) {
     const sheetPath = 'xl/worksheets/sheet' + si + '.xml';
     const ejsFile = ejsZip.file(sheetPath);
@@ -1997,6 +1997,11 @@ async function postProcessClientSide(excelJsB64) {
     xml = xml.replace(/\s*xmlns:mc="[^"]*"/g, '');
     xml = xml.replace(/\s*mc:Ignorable="[^"]*"/g, '');
     xml = xml.replace(/\s*xmlns:x14ac="[^"]*"/g, '');
+    /* Convert t="s" shared string refs to inlineStr using ExcelJS shared strings */
+    xml = xml.replace(/<c r="([A-Z]+\d+)"([^>]*) t="s"([^>]*)><v>(\d+)<\/v><\/c>/g, function(match, ref, pre, post, idx) {
+      const strVal = sharedStrings[parseInt(idx)] || '';
+      return '<c r="' + ref + '"' + pre + ' t="inlineStr"' + post + '><is><t>' + ppEscXml(strVal) + '</t></is></c>';
+    });
     outZip.file(sheetPath, xml);
   }
 
@@ -2015,17 +2020,24 @@ async function postProcessClientSide(excelJsB64) {
 
   /* 7. Update workbook.xml: add sheets 9 & 10 */
   let wbXml = await tmplZip.file('xl/workbook.xml').async('string');
+  /* Find the next available rId by scanning existing rels */
+  let relsXml = await tmplZip.file('xl/_rels/workbook.xml.rels').async('string');
+  const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
+  let maxId = 0;
+  existingIds.forEach(m => { const n = parseInt(m.match(/\d+/)[0]); if (n > maxId) maxId = n; });
+  const rId9 = 'rId' + (maxId + 1);
+  const rId10 = 'rId' + (maxId + 2);
+  console.log('PP: using', rId9, 'and', rId10, 'for new sheets (max existing was rId' + maxId + ')');
   const newSheets =
-    '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Raw Import" sheetId="9" state="visible" r:id="rId9"/>' +
-    '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Image" sheetId="10" state="visible" r:id="rId10"/>';
+    '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Raw Import" sheetId="9" state="visible" r:id="' + rId9 + '"/>' +
+    '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Image" sheetId="10" state="visible" r:id="' + rId10 + '"/>';
   wbXml = wbXml.replace('</sheets>', newSheets + '</sheets>');
   outZip.file('xl/workbook.xml', wbXml);
 
-  /* Update workbook.xml.rels */
-  let relsXml = await tmplZip.file('xl/_rels/workbook.xml.rels').async('string');
+  /* Update workbook.xml.rels — use absolute paths to match template style */
   const newRels =
-    '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet9.xml" Id="rId9"/>' +
-    '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet10.xml" Id="rId10"/>';
+    '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet9.xml" Id="' + rId9 + '"/>' +
+    '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet10.xml" Id="' + rId10 + '"/>';
   relsXml = relsXml.replace('</Relationships>', newRels + '</Relationships>');
   outZip.file('xl/_rels/workbook.xml.rels', relsXml);
 
