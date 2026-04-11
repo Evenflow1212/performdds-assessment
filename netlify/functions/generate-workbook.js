@@ -321,10 +321,12 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       let xml = await excelZip.file(srcPath)?.async('string');
       if (xml) {
         /* Replace all t="s" cells with inline strings */
+        /* NOTE: sharedStrings text is already XML-escaped from the source XML,
+           so do NOT apply escapeXml again (that causes double-encoding: & → &amp;amp;) */
         xml = xml.replace(/<c\s([^>]*?)t="s"([^>]*)>\s*<v>(\d+)<\/v>\s*<\/c>/g, (full, pre, post, idxStr) => {
           const i = parseInt(idxStr, 10);
           if (i < sharedStrings.length) {
-            const text = escapeXml(sharedStrings[i]);
+            const text = sharedStrings[i];
             return `<c ${pre}t="inlineStr"${post}><is><t>${text}</t></is></c>`;
           }
           return full;
