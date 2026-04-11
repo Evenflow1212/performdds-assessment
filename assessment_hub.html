@@ -2129,9 +2129,14 @@ function ppInjectValues(templateXml, cellValues) {
     }
   }
   for (const [ref, cell] of cellValues) {
+    /* Skip ALL secondary merged cells — whether they exist in template or not */
+    if (mergedSecondary.has(ref)) continue;
     const typeAttr = (cell.t === 's' || cell.t === 'str' || (cell.f === null && isNaN(cell.v))) ? ' t="inlineStr"' : '';
     let inner = '';
-    if (cell.f) inner += '<f>' + ppEscXml(cell.f) + '</f>';
+    /* cell.f and cell.v are extracted from ExcelJS XML via regex, so they are
+       already XML-encoded. Only string values (inlineStr) need escaping because
+       shared-string lookup returns decoded text. */
+    if (cell.f) inner += '<f>' + cell.f + '</f>';
     if (typeAttr.includes('inlineStr')) {
       inner += '<is><t>' + ppEscXml(cell.v) + '</t></is>';
     } else if (cell.v !== '' && cell.v !== undefined) {
@@ -2147,8 +2152,7 @@ function ppInjectValues(templateXml, cellValues) {
         : '<c r="' + ref + '"' + styleAttr + typeAttr + '/>';
       xml = xml.slice(0, cm.index) + newCell + xml.slice(cm.index + cm[0].length);
     } else {
-      /* Cell doesn't exist in template — only add if it's NOT a secondary merged cell */
-      if (mergedSecondary.has(ref)) continue;
+      /* Cell doesn't exist in template — add to the row */
       const rowNum = ref.match(/\d+/)[0];
       const rowRe = new RegExp('(<row r="' + rowNum + '"[^>]*>)([\\s\\S]*?)(</row>)');
       const rm = rowRe.exec(xml);
