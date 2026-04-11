@@ -1,7 +1,8 @@
 'use strict';
 const ExcelJS = require('exceljs');
 const fetch   = require('node-fetch');
-const JSZip   = require('jszip');
+let JSZip;
+try { JSZip = require('jszip'); } catch(e) { console.warn('JSZip not available, post-processing disabled:', e.message); }
 
 /* Helper: set cell value safely */
 function sv(ws, addr, val) { try { ws.getCell(addr).value = val; } catch(e) {} }
@@ -1298,11 +1299,16 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   /* Post-process: merge ExcelJS values into original template to preserve styles */
   let finalBuf;
-  try {
-    finalBuf = await postProcessWorkbook(templateBuf, Buffer.from(excelJsBuf), plImageB64);
-    console.log('Post-processing succeeded, using template-based output');
-  } catch (ppErr) {
-    console.warn('Post-processing failed, falling back to ExcelJS output:', ppErr.message);
+  if (JSZip) {
+    try {
+      finalBuf = await postProcessWorkbook(templateBuf, Buffer.from(excelJsBuf), plImageB64);
+      console.log('Post-processing succeeded, using template-based output');
+    } catch (ppErr) {
+      console.warn('Post-processing failed, falling back to ExcelJS output:', ppErr.message);
+      finalBuf = Buffer.from(excelJsBuf);
+    }
+  } else {
+    console.warn('JSZip not loaded, skipping post-processing');
     finalBuf = Buffer.from(excelJsBuf);
   }
 
