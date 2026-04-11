@@ -8,7 +8,7 @@
   timeout = 26
 
 [functions."parse-pdf"]
-  timeout = 10
+  timeout = 26
 
 [functions."extract-pdf"]
   timeout = 26
