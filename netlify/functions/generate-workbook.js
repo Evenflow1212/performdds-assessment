@@ -167,17 +167,14 @@ function baseCode(code) { return code.replace(/\.\d+$/, ''); }
  * Extract cell values from ExcelJS output and inject into original template.
  * Preserves template styles, merges, and all formatting.
  */
-async function postProcessServerSide(excelJsBuf, templateBuf) {
+async function postProcessServerSide(excelJsBuf, templateBuf, preBuiltCellMap) {
   const excelJsZip = await JSZip.loadAsync(excelJsBuf);
   const templateZip = await JSZip.loadAsync(templateBuf);
 
-  /* Build shared strings lookup from ExcelJS output.
-     ExcelJS uses shared strings by default — text values are stored as indices
-     into xl/sharedStrings.xml. We must resolve these to actual text. */
+  /* Build shared strings lookup from ExcelJS output (needed for sheets 9-10 copy). */
   const sharedStrings = [];
   const sstXml = await excelJsZip.file('xl/sharedStrings.xml')?.async('string');
   if (sstXml) {
-    /* Extract each <si>...</si> element, then concatenate all <t> text within */
     const siPattern = /<si>([\s\S]*?)<\/si>/g;
     let siMatch;
     while ((siMatch = siPattern.exec(sstXml)) !== null) {
@@ -193,63 +190,9 @@ async function postProcessServerSide(excelJsBuf, templateBuf) {
     console.log('Shared strings resolved:', sharedStrings.length, 'entries');
   }
 
-  /* Extract cell values from ExcelJS output sheets (worksheets 1-8) */
-  const excelJsCells = {};
-  for (let sheetNum = 1; sheetNum <= 8; sheetNum++) {
-    const xmlPath = `xl/worksheets/sheet${sheetNum}.xml`;
-    const xml = await excelJsZip.file(xmlPath)?.async('string');
-    if (!xml) continue;
-
-    excelJsCells[sheetNum] = {};
-    /* Parse cells from ExcelJS output */
-    const cellPattern = /<c\s+r="([^"]+)"(?:\s+s="(\d+)")?(?:\s+t="([^"]*)")?[^>]*>([^<]*(?:<[^>]*>[^<]*)*)<\/c>/g;
-    let match;
-    while ((match = cellPattern.exec(xml)) !== null) {
-      const cellRef = match[1];
-      const styleIdx = match[2];
-      const cellType = match[3] || '';
-      const cellContent = match[4];
-
-      /* Extract value: look for <v>...</v> or <f>...</f> or <is>...</is> */
-      let value = null;
-      let isFormula = false;
-      let isInlineStr = false;
-
-      if (cellContent.includes('<f>')) {
-        const fMatch = cellContent.match(/<f[^>]*>([^<]*)<\/f>/);
-        if (fMatch) {
-          value = fMatch[1];
-          isFormula = true;
-        }
-      } else if (cellContent.includes('<is>')) {
-        const isMatch = cellContent.match(/<is>(?:<t[^>]*>)?([^<]*)/);
-        if (isMatch) {
-          value = isMatch[1];
-          isInlineStr = true;
-        }
-      } else {
-        const vMatch = cellContent.match(/<v>([^<]*)<\/v>/);
-        if (vMatch) {
-          value = vMatch[1];
-          /* Resolve shared string references: t="s" means value is an index */
-          if (cellType === 's' && sharedStrings.length > 0) {
-            const idx = parseInt(value, 10);
-            if (!isNaN(idx) && idx < sharedStrings.length) {
-              value = sharedStrings[idx];
-              isInlineStr = true;  /* Convert to inline string for injection */
-            }
-          }
-        }
-      }
-
-      excelJsCells[sheetNum][cellRef] = {
-        value,
-        isFormula,
-        isInlineStr,
-        styleIdx
-      };
-    }
-  }
+  /* Use pre-built cell map (extracted directly from ExcelJS objects, not XML).
+     This bypasses all XML parsing issues (shared strings, attribute order, etc.) */
+  const excelJsCells = preBuiltCellMap || {};
 
   /* Process template sheets (1-8) and inject values — SINGLE-PASS approach.
      Instead of running one regex per ExcelJS cell (O(n*m) on huge XML), we do
@@ -1175,23 +1118,64 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   });
   console.log('Tab order fixed:', wb.worksheets.map(s=>s.name).join(', '));
 
+  /* ═══ EXTRACT CELL DATA FROM EXCELJS OBJECTS ═══
+     Build a cell map directly from in-memory ExcelJS workbook objects.
+     This is far more reliable than parsing ExcelJS's XML output (which uses
+     shared strings, varying attribute orders, etc.) */
+  const cellMap = {};
+  for (const ws of wb.worksheets) {
+    const sheetNum = ws.id;
+    if (sheetNum < 1 || sheetNum > 8) continue;  /* Only template sheets */
+    cellMap[sheetNum] = {};
+    ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
+      row.eachCell({ includeEmpty: false }, (cell, colNum) => {
+        const ref = cell.address;
+        const val = cell.value;
+        if (val === null || val === undefined) return;
+
+        let isFormula = false;
+        let isInlineStr = false;
+        let value;
+
+        if (typeof val === 'object' && val !== null && val.formula) {
+          value = val.formula;
+          isFormula = true;
+        } else if (typeof val === 'object' && val !== null && val.result !== undefined) {
+          /* Formula result object */
+          value = val.formula || String(val.result);
+          isFormula = !!val.formula;
+        } else if (typeof val === 'string') {
+          value = val;
+          isInlineStr = true;
+        } else if (typeof val === 'number' || typeof val === 'boolean') {
+          value = String(val);
+        } else if (val instanceof Date) {
+          value = String(val.getTime() / 86400000 + 25569); /* Excel date serial */
+        } else {
+          value = String(val);
+        }
+
+        cellMap[sheetNum][ref] = { value, isFormula, isInlineStr };
+      });
+    });
+    console.log(`CellMap sheet ${sheetNum} (${ws.name}): ${Object.keys(cellMap[sheetNum]).length} cells`);
+  }
+
   const excelJsBuf = await wb.xlsx.writeBuffer();
   console.log('ExcelJS buffer written:', excelJsBuf.byteLength, 'bytes');
 
-  /* Post-process: surgically inject ExcelJS values into original template to preserve styles.
-     Skip if template is not available (e.g. fetch failed) or if env var disables it. */
+  /* Post-process: surgically inject cell values into original template to preserve styles. */
   let finalBuf;
   const ppStart = Date.now();
   const elapsed = ppStart - t0;
   console.log('Time before post-processing:', elapsed, 'ms');
 
-  /* If we've used more than 18s already, skip post-processing to avoid timeout */
   if (elapsed > 18000) {
     console.warn('Skipping post-processing — already at', elapsed, 'ms');
     finalBuf = Buffer.from(excelJsBuf);
   } else {
     try {
-      finalBuf = await postProcessServerSide(Buffer.from(excelJsBuf), templateBuf);
+      finalBuf = await postProcessServerSide(Buffer.from(excelJsBuf), templateBuf, cellMap);
       console.log('Post-processing complete in', Date.now()-ppStart, 'ms,', finalBuf.length, 'bytes');
     } catch (ppErr) {
       console.error('Post-processing failed, using ExcelJS output:', ppErr.message);
