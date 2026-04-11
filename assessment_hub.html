@@ -2152,7 +2152,8 @@ function ppInjectValues(templateXml, cellValues) {
         : '<c r="' + ref + '"' + styleAttr + typeAttr + '/>';
       xml = xml.slice(0, cm.index) + newCell + xml.slice(cm.index + cm[0].length);
     } else {
-      /* Cell doesn't exist in template — add to the row */
+      /* Cell doesn't exist in template — insert in correct column order within the row.
+         Excel requires cells sorted by column; appending to end causes "Cell information" repair. */
       const rowNum = ref.match(/\d+/)[0];
       const rowRe = new RegExp('(<row r="' + rowNum + '"[^>]*>)([\\s\\S]*?)(</row>)');
       const rm = rowRe.exec(xml);
@@ -2160,7 +2161,22 @@ function ppInjectValues(templateXml, cellValues) {
         const newCell = inner
           ? '<c r="' + ref + '"' + typeAttr + '>' + inner + '</c>'
           : '<c r="' + ref + '"' + typeAttr + '/>';
-        xml = xml.slice(0, rm.index) + rm[1] + rm[2] + newCell + rm[3] + xml.slice(rm.index + rm[0].length);
+        const newColNum = ref.match(/[A-Z]+/)[0].split('').reduce((n,c) => n*26+c.charCodeAt(0)-64, 0);
+        const rowContent = rm[2];
+        /* Find the right insertion point by scanning existing cells */
+        const existingCells = [];
+        const scanRe = /<c r="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g;
+        let sm;
+        while ((sm = scanRe.exec(rowContent)) !== null) {
+          const cn = sm[1].split('').reduce((n,c) => n*26+c.charCodeAt(0)-64, 0);
+          existingCells.push({ col: cn, end: sm.index + sm[0].length });
+        }
+        let insertPos = 0; // position within rowContent
+        for (const ec of existingCells) {
+          if (ec.col < newColNum) insertPos = ec.end;
+        }
+        const newRowContent = rowContent.slice(0, insertPos) + newCell + rowContent.slice(insertPos);
+        xml = xml.slice(0, rm.index) + rm[1] + newRowContent + rm[3] + xml.slice(rm.index + rm[0].length);
       }
     }
   }
