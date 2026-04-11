@@ -604,8 +604,29 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     console.log('Pass 2: removed sharedStrings ref from workbook.xml.rels');
   }
 
+  /* === VERIFICATION: confirm styles.xml was actually restored === */
+  const verifyStyles = await fixZip.file('xl/styles.xml')?.async('string');
+  if (verifyStyles) {
+    const vXfs = verifyStyles.match(/cellXfs count="(\d+)"/);
+    const vFonts = verifyStyles.match(/fonts count="(\d+)"/);
+    const vBlue = verifyStyles.includes('FF4472C4');
+    const vYellow = verifyStyles.includes('FFFFFF00');
+    console.log('VERIFY fixZip styles: cellXfs=' + (vXfs?vXfs[1]:'?') + ' fonts=' + (vFonts?vFonts[1]:'?') + ' blue=' + vBlue + ' yellow=' + vYellow);
+  } else {
+    console.error('VERIFY: fixZip has NO styles.xml!');
+  }
+
   const finalBuf = await fixZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   console.log('Pass 2 final output:', finalBuf.length, 'bytes');
+
+  /* Double-verify the final buffer */
+  const finalZip = await JSZip.loadAsync(finalBuf);
+  const finalStyles = await finalZip.file('xl/styles.xml')?.async('string');
+  if (finalStyles) {
+    const fXfs = finalStyles.match(/cellXfs count="(\d+)"/);
+    console.log('FINAL VERIFY: cellXfs=' + (fXfs?fXfs[1]:'?') + ' len=' + finalStyles.length);
+  }
+
   return finalBuf;
 }
 
@@ -1225,6 +1246,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
+      _version: 'v3-strikethrough-blue',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
