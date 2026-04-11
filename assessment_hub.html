@@ -2035,30 +2035,24 @@ async function generate() {
     const employeeCosts = skipped[6] ? null : collectEmployeeCosts();
     console.log('Employee costs:', employeeCosts ? 'collected' : 'skipped');
 
-    /* Step 2: Build workbook from parsed data (fast, no Claude) — do NOT send image to server */
+    /* Step 2: Build workbook from parsed data — include P&L image for server-side embedding */
     console.log('Step 2: Building workbook from parsed data...');
+    const payload = { prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts };
+    /* Send P&L image to server for native ExcelJS embedding (avoids JSZip corruption) */
+    if (plImageB64 && plImageB64.length < 3 * 1024 * 1024) {
+      payload.plImageB64 = plImageB64;
+      console.log('Including P&L image in payload:', Math.round(plImageB64.length/1024), 'KB');
+    } else if (plImageB64) {
+      console.warn('P&L image too large for server payload (' + Math.round(plImageB64.length/1024) + 'KB), skipping');
+    }
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts })
+      body: JSON.stringify(payload)
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Generation failed');
     generatedWorkbook = data.xlsxB64;
-
-    /* Step 3: Embed P&L image client-side using JSZip (avoids Netlify payload limits) */
-    console.log('Step 3 check: plImageB64=' + (plImageB64 ? Math.round(plImageB64.length/1024)+'KB' : 'NULL') + ', JSZip=' + typeof JSZip);
-    if (plImageB64 && typeof JSZip !== 'undefined') {
-      try {
-        console.log('Step 3: Embedding P&L image client-side via JSZip...');
-        generatedWorkbook = await embedPlImageClientSide(generatedWorkbook, plImageB64);
-        console.log('Step 3: P&L image embedded successfully!');
-      } catch(embedErr) {
-        console.error('Step 3 FAILED:', embedErr.message, embedErr.stack);
-      }
-    } else {
-      console.warn('Step 3 SKIPPED: plImageB64=' + (plImageB64 ? 'exists' : 'null') + ', JSZip=' + typeof JSZip + ', files[3]=' + (files[3] ? files[3].name : 'null'));
-    }
 
     document.getElementById('generatingState').classList.remove('visible');
     document.getElementById('resultCard').classList.add('visible');

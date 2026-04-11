@@ -151,7 +151,7 @@ R(['D7310','D7311','D7320','D7321','D7410','D7411','D7412','D7440','D7450','D745
 function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 
 /* ─── Build the workbook from pre-parsed text ─── */
-async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts) {
+async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64) {
   /* Parse the Claude output text into structured data */
   const prodData = parseProduction(prodText || '');
   const collData = collText ? parseCollections(collText) : null;
@@ -938,11 +938,26 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     });
   }
 
-  /* ═══ P&L IMAGE (placeholder — actual image embedded client-side via JSZip) ═══ */
+  /* ═══ P&L IMAGE — embed using ExcelJS native image support ═══ */
   {
     let wsImg = wb.getWorksheet('P&L Image');
     if (!wsImg) wsImg = wb.addWorksheet('P&L Image');
-    sv(wsImg, 'A1', '');  /* Placeholder — image will be embedded client-side */
+    if (plImageB64) {
+      try {
+        const imgBuf = Buffer.from(plImageB64, 'base64');
+        const imageId = wb.addImage({ buffer: imgBuf, extension: 'jpeg' });
+        wsImg.addImage(imageId, {
+          tl: { col: 0, row: 0 },
+          br: { col: 10, row: 50 }
+        });
+        console.log('P&L image embedded server-side, size:', imgBuf.length, 'bytes');
+      } catch(imgErr) {
+        console.warn('Could not embed P&L image:', imgErr.message);
+        sv(wsImg, 'A1', 'P&L image could not be embedded');
+      }
+    } else {
+      sv(wsImg, 'A1', '');
+    }
   }
 
   /* ═══ FIX THEME COLORS ACROSS ALL SHEETS ═══ */
@@ -1095,12 +1110,12 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); } catch(e) { return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'Invalid JSON'})}; }
 
-  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, hygieneData=null, employeeCosts=null } = body;
+  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, hygieneData=null, employeeCosts=null, plImageB64=null } = body;
   if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
     console.log('Building workbook from pre-parsed data...');
-    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts);
+    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64);
 
     return {
       statusCode: 200,
