@@ -2,8 +2,7 @@
   functions = "netlify/functions"
 
 [functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["jszip"]
+  node_bundler = "nft"
 
 [functions."generate-workbook"]
   timeout = 26
