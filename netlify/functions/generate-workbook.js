@@ -419,7 +419,7 @@ async function postProcessServerSide(excelJsBuf, templateBuf) {
   console.log('Post-processing: injected values into template, preserved styles');
 
   /* Generate final buffer */
-  const finalBuf = await templateZip.generateAsync({ type: 'nodebuffer' });
+  const finalBuf = await templateZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   return finalBuf;
 }
 
