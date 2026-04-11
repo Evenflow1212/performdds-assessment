@@ -2311,32 +2311,16 @@ async function generate() {
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Generation failed');
-    /* Post-process: merge ExcelJS values into original template to preserve styles */
-    try {
-      console.log('Starting client-side post-processing...');
-      generatedWorkbook = await postProcessClientSide(data.xlsxB64);
-      /* Quick sanity check: verify output has template-level styles */
-      try {
-        const checkBin = atob(generatedWorkbook);
-        const checkArr = new Uint8Array(checkBin.length);
-        for (let i = 0; i < checkBin.length; i++) checkArr[i] = checkBin.charCodeAt(i);
-        const checkZip = await JSZip.loadAsync(checkArr);
-        const checkStyles = await checkZip.file('xl/styles.xml').async('string');
-        const checkXfs = (checkStyles.match(/cellXfs count="(\d+)"/) || [])[1];
-        console.log('Post-processing output verification: cellXfs=' + checkXfs);
-        if (parseInt(checkXfs) < 700) {
-          console.error('POST-PROCESSING OUTPUT HAS WRONG STYLES (' + checkXfs + ' cellXfs). Using raw ExcelJS as fallback.');
-          generatedWorkbook = data.xlsxB64;
-        } else {
-          console.log('Post-processing succeeded — template styles preserved (' + checkXfs + ' cellXfs)');
-        }
-      } catch (vErr) {
-        console.warn('Could not verify post-processing output:', vErr.message);
-      }
-    } catch (ppErr) {
-      console.error('Post-processing FAILED:', ppErr.message, ppErr.stack);
-      generatedWorkbook = data.xlsxB64;
-    }
+    /* Use raw ExcelJS output directly — server already produces complete workbook
+       with all 10 sheets, data, formulas, and embedded P&L image.
+       Previous post-processing (template overlay) was causing data corruption:
+       - Production Worksheet showed 0s (merged cell values lost)
+       - All Codes had unwanted strikethrough (template styles not overridden)
+       - Financial Overview showed placeholder values
+       - P&L layout broken
+       Raw ExcelJS output has correct data with slightly simplified styles. */
+    generatedWorkbook = data.xlsxB64;
+    console.log('Using raw ExcelJS output (no post-processing). Size:', Math.round(generatedWorkbook.length / 1024), 'KB');
 
     _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
@@ -2348,6 +2332,8 @@ async function generate() {
       { val: s.months ? s.months + ' months' : '—', lbl: 'Period' },
       { val: s.netCollections ? '$' + Number(s.netCollections).toLocaleString() : '—', lbl: 'Net Collections' },
       { val: s.plParsed ? 'Yes ✅' : (plText ? 'Partial' : 'Not uploaded'), lbl: 'P&L Parsed' },
+      { val: employeeCosts ? 'Yes ✅' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
+      { val: hygieneData ? 'Yes ✅' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     _generating = false;
