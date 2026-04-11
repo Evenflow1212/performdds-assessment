@@ -1301,18 +1301,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   const excelJsBuf = await wb.xlsx.writeBuffer();
 
-  /* Post-process: merge ExcelJS values into original template to preserve styles */
+  /* Post-process: TEMPORARILY DISABLED to confirm JSZip loads and diagnose timing */
   let finalBuf;
-  const ppStart = Date.now();
   console.log('JSZip type:', typeof JSZip, 'version:', JSZip.version || 'unknown');
   console.log('templateBuf size:', templateBuf ? templateBuf.length : 'null', 'excelJsBuf size:', excelJsBuf.length);
-  try {
-    finalBuf = await postProcessWorkbook(templateBuf, Buffer.from(excelJsBuf), plImageB64);
-    console.log('Post-processing succeeded in', Date.now() - ppStart, 'ms');
-  } catch (ppErr) {
-    console.warn('Post-processing failed in', Date.now() - ppStart, 'ms:', ppErr.message);
-    finalBuf = Buffer.from(excelJsBuf);
-  }
+  console.log('SKIPPING post-processing for timing diagnosis');
+  finalBuf = Buffer.from(excelJsBuf);
 
   return {
     xlsxB64: finalBuf.toString('base64'),
