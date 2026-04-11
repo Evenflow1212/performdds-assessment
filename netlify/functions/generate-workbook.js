@@ -2,6 +2,11 @@
 const ExcelJS = require('exceljs');
 const fetch   = require('node-fetch');
 const JSZip   = require('jszip');
+const fs      = require('fs');
+const path    = require('path');
+
+/* Module-level template cache — survives across warm invocations */
+let _cachedTemplateBuf = null;
 
 /* Helper: set cell value safely */
 function sv(ws, addr, val) { try { ws.getCell(addr).value = val; } catch(e) {} }
@@ -444,14 +449,37 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   if (collData) console.log('Collections:', collData.payments, 'over', collData.months, 'months');
   if (plData) console.log('P&L:', plData.items.length, 'items, income:', plData.totalIncome);
 
-  /* Load template */
+  /* Load template — from local bundled file (fast) or module cache (instant on warm) */
   let wb, templateBuf;
   const t0 = Date.now();
   try {
-    const tr = await fetch('https://dentalpracticeassessments.com/Blank_Assessment_Template.xlsx');
-    if (!tr.ok) throw new Error('Template HTTP ' + tr.status);
-    templateBuf = await tr.buffer();
-    console.log('Template fetched:', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
+    if (_cachedTemplateBuf) {
+      templateBuf = _cachedTemplateBuf;
+      console.log('Template from cache:', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
+    } else {
+      /* Try local file first (bundled via included_files), then HTTP fallback */
+      const localPath = path.resolve(__dirname, '..', '..', 'Blank_Assessment_Template.xlsx');
+      const localPath2 = path.resolve(__dirname, 'Blank_Assessment_Template.xlsx');
+      const localPath3 = path.resolve(process.cwd(), 'Blank_Assessment_Template.xlsx');
+      if (fs.existsSync(localPath)) {
+        templateBuf = fs.readFileSync(localPath);
+        console.log('Template from local (../..):', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
+      } else if (fs.existsSync(localPath2)) {
+        templateBuf = fs.readFileSync(localPath2);
+        console.log('Template from local (same dir):', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
+      } else if (fs.existsSync(localPath3)) {
+        templateBuf = fs.readFileSync(localPath3);
+        console.log('Template from local (cwd):', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
+      } else {
+        console.log('Local template not found, trying paths:', localPath, localPath2, localPath3);
+        console.log('Falling back to HTTP fetch...');
+        const tr = await fetch('https://dentalpracticeassessments.com/Blank_Assessment_Template.xlsx');
+        if (!tr.ok) throw new Error('Template HTTP ' + tr.status);
+        templateBuf = await tr.buffer();
+        console.log('Template fetched via HTTP:', templateBuf.length, 'bytes in', Date.now()-t0, 'ms');
+      }
+      _cachedTemplateBuf = templateBuf;  /* Cache for warm invocations */
+    }
     const t1 = Date.now();
     wb = new ExcelJS.Workbook();
     await wb.xlsx.load(Buffer.from(templateBuf));
