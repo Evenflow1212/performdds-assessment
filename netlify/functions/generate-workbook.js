@@ -249,18 +249,38 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     });
 
-    /* Insert new cells that didn't exist in template */
+    /* Insert new cells that didn't exist in template.
+       For All Codes (sheet 2) and P&L Input (sheet 8), use template-correct styles
+       instead of s="0" so formatting matches and strikethrough can apply. */
     const newCellsByRow = {};
+
+    /* All Codes (sheet 2) alternating style map:
+       Even rows: A/B=458, C=459, D/E=460, F=461
+       Odd rows:  A/B=462, C=463, D/E=464, F=465 */
+    const AC_EVEN = {A:'458',B:'458',C:'459',D:'460',E:'460',F:'461'};
+    const AC_ODD  = {A:'462',B:'462',C:'463',D:'464',E:'464',F:'465'};
+
     for (const [cellRef, val] of Object.entries(sheetCells)) {
       if (matched.has(cellRef)) continue;
       if (val === null || val === undefined) continue;
 
+      const colLetter = cellRef.match(/^[A-Z]+/)[0];
       const rowNum = cellRef.match(/\d+$/)[0];
+      const rNum = parseInt(rowNum);
+
+      /* Determine correct style for this sheet */
+      let styleId = '0';
+      if (sheetNum === 2 && rNum >= 2 && 'ABCDEF'.includes(colLetter)) {
+        styleId = (rNum % 2 === 0) ? (AC_EVEN[colLetter] || '458') : (AC_ODD[colLetter] || '462');
+      } else if (sheetNum === 8 && rNum >= 6 && rNum <= 50) {
+        styleId = '385'; /* P&L Input data style */
+      }
+
       let cellXml;
       if (typeof val === 'string') {
-        cellXml = `<c r="${cellRef}" s="0" t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>`;
+        cellXml = `<c r="${cellRef}" s="${styleId}" t="inlineStr"><is><t>${escapeXml(val)}</t></is></c>`;
       } else {
-        cellXml = `<c r="${cellRef}" s="0" t="n"><v>${escapeXml(String(val))}</v></c>`;
+        cellXml = `<c r="${cellRef}" s="${styleId}" t="n"><v>${escapeXml(String(val))}</v></c>`;
       }
 
       if (!newCellsByRow[rowNum]) newCellsByRow[rowNum] = [];
@@ -305,18 +325,25 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
     /* ── All Codes (sheet 2): apply strikethrough to rows used in Production Worksheet ── */
     if (sheetNum === 2 && _acStrikeRows.length > 0) {
-      /* Change style 462→752, 463→753, 464→754, 465→755 for matched rows.
-         New styles 752-755 are added in post-processing (copies of 462-465 with strikethrough font). */
-      const strikeMap = {'462':'752','463':'753','464':'754','465':'755'};
+      /* Template uses alternating styles:
+         Even rows: 458,459,460,461 → strikethrough: 756,757,758,759
+         Odd rows:  462,463,464,465 → strikethrough: 752,753,754,755
+         All 8 strikethrough styles are added in post-processing (copies with fontId="66"). */
+      const strikeMap = {
+        '458':'756','459':'757','460':'758','461':'759',
+        '462':'752','463':'753','464':'754','465':'755'
+      };
       const strikeRowSet = new Set(_acStrikeRows.map(String));
-      xml = xml.replace(/<c\s([^>]*?)r="([A-Z]+)(\d+)"([^>]*?)s="(462|463|464|465)"([^>]*?)(?:\/?>(?:[\s\S]*?<\/c>)?)/g,
+      let strikeApplied = 0;
+      xml = xml.replace(/<c\s([^>]*?)r="([A-Z]+)(\d+)"([^>]*?)s="(458|459|460|461|462|463|464|465)"([^>]*?)(?:\/?>(?:[\s\S]*?<\/c>)?)/g,
         (full, pre, col, rowNum, mid, styleId, post) => {
           if (strikeRowSet.has(rowNum)) {
+            strikeApplied++;
             return full.replace(`s="${styleId}"`, `s="${strikeMap[styleId]}"`);
           }
           return full;
         });
-      console.log('All Codes: applied strikethrough styles to ' + _acStrikeRows.length + ' rows');
+      console.log('All Codes: applied strikethrough to ' + strikeApplied + ' cells across ' + _acStrikeRows.length + ' rows');
     }
 
     /* ── Financial Overview (sheet 4): fix #DIV/0! and column widths ── */
@@ -562,26 +589,31 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
 
-    /* === Add cellXfs 752-755: copies of 462-465 with fontId="66" === */
+    /* === Add cellXfs 752-759: strikethrough copies of 462-465 AND 458-461 with fontId="66" === */
+    /* 752-755 = copies of 462-465 (odd row styles) with strikethrough font
+       756-759 = copies of 458-461 (even row styles) with strikethrough font */
     const xfsMatch = stylesXml.match(/<cellXfs[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
     if (xfsMatch) {
       const xfCount = parseInt(xfsMatch[1]);
       const xfsContent = xfsMatch[2];
-      /* Extract individual <xf .../> or <xf ...>...</xf> entries */
       const xfEntries = [];
       const xfRe = /<xf\s[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g;
       let xm;
       while ((xm = xfRe.exec(xfsContent)) !== null) xfEntries.push(xm[0]);
       if (xfEntries.length >= 466) {
-        /* Create copies of indices 462-465 with fontId swapped to 66 */
         let newXfs = '';
+        /* 752-755: strikethrough copies of odd-row styles 462-465 */
         for (let i = 462; i <= 465; i++) {
+          newXfs += xfEntries[i].replace(/fontId="\d+"/, 'fontId="66"');
+        }
+        /* 756-759: strikethrough copies of even-row styles 458-461 */
+        for (let i = 458; i <= 461; i++) {
           newXfs += xfEntries[i].replace(/fontId="\d+"/, 'fontId="66"');
         }
         const newXfsContent = xfsContent + newXfs;
         stylesXml = stylesXml.replace(xfsMatch[0],
-          `<cellXfs count="${xfCount + 4}">${newXfsContent}</cellXfs>`);
-        console.log('Pass 2: added cellXfs 752-755 (strikethrough copies of 462-465), new count', xfCount + 4);
+          `<cellXfs count="${xfCount + 8}">${newXfsContent}</cellXfs>`);
+        console.log('Pass 2: added cellXfs 752-759 (8 strikethrough styles), new count', xfCount + 8);
       }
     }
 
@@ -1284,7 +1316,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v4-comprehensive-strike-formatting',
+      _version: 'v5-full-strike-proper-styles',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
