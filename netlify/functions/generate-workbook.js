@@ -328,12 +328,44 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
           `<f>IFERROR(${c}44/I44,0)</f>`
         );
       });
-      /* Widen columns that show ##### — increase D,E columns */
-      xml = xml.replace(/<col min="4" max="4"[^>]*\/>/,
-        '<col min="4" max="4" width="14" customWidth="1"/>');
-      xml = xml.replace(/<col min="8" max="8"[^>]*\/>/,
-        '<col min="8" max="8" width="13" customWidth="1"/>');
+      /* Widen columns that show ##### — AR section and payment rows need wider columns */
+      /* Col B (min=2): payment labels + dollar amounts */
+      xml = xml.replace(/<col[^>]*min="2" max="2"[^>]*\/>/,
+        '<col min="2" max="2" width="16" customWidth="1" style="383"/>');
+      /* Cols C-H (min=3-8): dollar amounts for AR and payments */
+      xml = xml.replace(/<col[^>]*min="3" max="3"[^>]*\/>/,
+        '<col min="3" max="3" width="14" customWidth="1" style="383"/>');
+      xml = xml.replace(/<col[^>]*min="4" max="4"[^>]*\/>/,
+        '<col min="4" max="4" width="14" customWidth="1" style="383"/>');
+      xml = xml.replace(/<col[^>]*min="5" max="5"[^>]*\/>/,
+        '<col min="5" max="5" width="14" customWidth="1" style="383"/>');
+      xml = xml.replace(/<col[^>]*min="6" max="6"[^>]*\/>/,
+        '<col min="6" max="6" width="14" customWidth="1" style="383"/>');
+      xml = xml.replace(/<col[^>]*min="7" max="7"[^>]*\/>/,
+        '<col min="7" max="7" width="14" customWidth="1" style="383"/>');
+      xml = xml.replace(/<col[^>]*min="8" max="8"[^>]*\/>/,
+        '<col min="8" max="8" width="14" customWidth="1" style="383"/>');
       console.log('Financial Overview: fixed IFERROR and column widths');
+    }
+
+    /* ── P&L Input (sheet 8): ensure data rows are visible ── */
+    if (sheetNum === 8) {
+      /* Template has customHeight="1" which forces 12.75pt even if content overflows.
+         Remove customHeight on data rows (6-50) so Excel auto-sizes, and set minimum 15pt. */
+      xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
+        const r = parseInt(rNum);
+        if (r >= 6 && r <= 50) {
+          /* Remove customHeight and ensure reasonable height */
+          let newAttrs = attrs.replace(/\s*customHeight="1"/g, '');
+          newAttrs = newAttrs.replace(/ht="[^"]*"/, 'ht="15"');
+          return `<row r="${rNum}"${newAttrs}>`;
+        }
+        return full;
+      });
+      /* Widen column A for expense names */
+      xml = xml.replace(/<col[^>]*min="1" max="1"[^>]*\/>/,
+        '<col min="1" max="1" width="35" customWidth="1" style="385"/>');
+      console.log('P&L Input: fixed row heights and column A width');
     }
 
     console.log(`Sheet ${sheetNum}: matched=${_regexMatches} hits=${_dataHits} replaced=${matched.size} formulaSkip=${_formulaSkip} newCells=${Object.values(newCellsByRow).flat().length}`);
@@ -803,13 +835,19 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   let directMatchCount = 0;
   const sampleUnmatched = [];
 
-  /* Collect data rows — track which rows need strikethrough (codes used in Production Worksheet) */
+  /* Collect data rows — track which rows need strikethrough.
+     Strikethrough = code is a recognized ADA dental code (D + 4 digits) AND has non-zero production.
+     This covers ALL standard procedure codes: diagnostic, preventive, restorative, endo, perio,
+     prosth, implant, ortho, oral surgery, and adjunctive — not just those with specific PW row mappings.
+     Codes with $0 production or non-standard format remain un-struck. */
   _acStrikeRows = [];
+  const ADA_CODE_RE = /^D\d{4}$/;
   allCodes.forEach((c, i) => {
     const r = i + 2;
     const bc = baseCode(c.code);
-    const isUsed = LEFT.hasOwnProperty(bc) || SRP_CODES.includes(bc) || RIGHT.hasOwnProperty(bc);
-    if (isUsed) { directMatchCount++; _acStrikeRows.push(r); }
+    const hasPWRow = LEFT.hasOwnProperty(bc) || SRP_CODES.includes(bc) || RIGHT.hasOwnProperty(bc);
+    const isRecognized = ADA_CODE_RE.test(bc) && c.total > 0;
+    if (hasPWRow || isRecognized) { directMatchCount++; _acStrikeRows.push(r); }
     else if (sampleUnmatched.length < 5) sampleUnmatched.push(c.code);
 
     sv(wsAC, 'A'+r, c.code);
@@ -1246,7 +1284,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v3-strikethrough-blue',
+      _version: 'v4-comprehensive-strike-formatting',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
