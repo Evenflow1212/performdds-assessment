@@ -274,6 +274,31 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
 
+    /* Fix template bugs on Employee Costs (sheet 6) */
+    if (sheetNum === 6) {
+      /* F9 has date format s="644" instead of General s="641" */
+      xml = xml.replace(/<c r="F9" s="644"/, '<c r="F9" s="641"');
+      /* G7, G9, G16-G18 are hardcoded 0 instead of formulas — add =E*F formulas */
+      [7, 9, 16, 17, 18].forEach(r => {
+        xml = xml.replace(
+          new RegExp(`<c r="G${r}" s="642" t="n"><v>0</v></c>`),
+          `<c r="G${r}" s="642"><f>E${r}*F${r}</f><v></v></c>`
+        );
+      });
+      /* Remove benefits section (rows 34-42) — clear all cell content but keep rows for structure */
+      for (let r = 34; r <= 42; r++) {
+        /* Replace any cell with content in these rows with empty cell preserving style */
+        xml = xml.replace(
+          new RegExp(`<c\\s([^>]*?)r="([A-Z]+${r})"([^>]*)>.*?</c>`, 'gs'),
+          (full, pre, ref, post) => {
+            const styleMatch = full.match(/\ss="(\d+)"/);
+            const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
+            return `<c r="${ref}"${styleAttr}/>`;
+          }
+        );
+      }
+    }
+
     console.log(`Sheet ${sheetNum}: matched=${_regexMatches} hits=${_dataHits} replaced=${matched.size} formulaSkip=${_formulaSkip} newCells=${Object.values(newCellsByRow).flat().length}`);
     templateZip.file(xmlPath, xml);
   }
@@ -413,13 +438,19 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
      the corrupted files with the originals saved at the start. */
   const fixZip = await JSZip.loadAsync(pass1Buf);
 
-  /* Restore original template styles.xml with strikethrough removed */
+  /* Restore original template styles.xml — fix only the grey placeholder font */
   if (_originalStylesXml) {
     let stylesXml = _originalStylesXml;
-    /* Remove ALL forms of strikethrough: <strike val="1"/> and <strike/> */
-    stylesXml = stylesXml.replace(/<strike\s*(?:val="1"\s*)?\/>/g, '');
-    /* Change grey placeholder color to black */
-    stylesXml = stylesXml.replace(/<color rgb="FF888888"\/>/g, '<color rgb="FF000000"/>');
+    /* Only remove strikethrough from fonts that have grey color FF888888 (font 31 = placeholder).
+       Fonts 47-49 have legitimate strikethrough for All Codes & P&L Raw Import — keep those. */
+    stylesXml = stylesXml.replace(/<font>([\s\S]*?)<\/font>/g, (fullFont, inner) => {
+      if (inner.includes('FF888888') && inner.includes('<strike')) {
+        let fixed = inner.replace(/<strike\s*(?:val="1"\s*)?\/>\s*/g, '');
+        fixed = fixed.replace(/<color rgb="FF888888"\/>/g, '<color rgb="FF000000"/>');
+        return `<font>${fixed}</font>`;
+      }
+      return fullFont;
+    });
     fixZip.file('xl/styles.xml', stylesXml);
     console.log('Pass 2: restored styles.xml:', stylesXml.length, 'chars (original 752 cellXfs)');
   }
@@ -859,13 +890,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     /* Hygiene benefits & employment cost % */
     if (employeeCosts.hygBenefits) sv(wsEC, 'G32', employeeCosts.hygBenefits);
 
-    /* Benefits policy notes */
-    if (employeeCosts.benefits) {
-      const benMap = { sick: 35, holidays: 36, vacation: 37, bonus: 38, k401: 39, medical: 40, dental: 41, other: 42 };
-      Object.entries(employeeCosts.benefits).forEach(([key, val]) => {
-        if (val && benMap[key]) sv(wsEC, 'D' + benMap[key], val);
-      });
-    }
+    /* Benefits section removed per client request — clear rows 34-42 */
+    /* (template rows with sick pay, holidays, vacation, bonus, 401K, medical, dental, other) */
 
     console.log('Employee Costs: done');
   }
