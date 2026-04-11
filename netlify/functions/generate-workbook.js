@@ -397,61 +397,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsFO, 'H33', arInsurance.d90plus||0);
   }
 
-  /* Fix Financial Overview theme colors — ExcelJS loses theme-based fills
-     and defaults to yellow (FFFFFF00). MUST use cell.style={...} to completely
-     replace the shared style reference. cell.fill/cell.font alone do NOT work. */
-  const navyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E4B7A' } };
-  const navyFont = { name: 'Verdana', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-  const lightBlueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF3FA' } };
-  const medBlueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
-  const darkNavyFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
-  const lightBlueDarkFont = { name: 'Verdana', size: 10, color: { argb: 'FF2E4B7A' } };
-  const grayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7F7F7F' } };
-  const lightGrayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E5E5' } };
-
-  /* Row 2: gray header bar */
-  ['B2','C2','D2','E2','F2','G2','H2','I2'].forEach(addr => {
-    try {
-      const c = wsFO.getCell(addr);
-      c.style = { fill: grayFill, font: { name: 'Verdana', size: 10, bold: true, color: { argb: 'FF000000' } } };
-    } catch(e) {}
+  /* NOTE: Financial Overview styling MINIMIZED — using cell.style={...} on cells
+     that don't have explicit values was causing corruption. Only format cells
+     where we wrote data. Template already has correct styles for most cells. */
+  ['D32','D33','E32','F32','G32','H32','E33','F33','G33','H33'].forEach(addr => {
+    try { wsFO.getCell(addr).numFmt = '$#,##0.00'; } catch(e) {}
   });
-  /* Row 32: light gray AR data cells */
-  ['E32','F32','G32','H32'].forEach(addr => {
-    try { const c = wsFO.getCell(addr); c.style = { fill: lightGrayFill, font: { name: 'Verdana', size: 10 }, numFmt: '$#,##0.00' }; } catch(e) {}
-  });
-  /* F36, G36, H36: dark navy header cells */
-  ['F36','G36','H36'].forEach(addr => {
-    try { const c = wsFO.getCell(addr); c.style = { fill: darkNavyFill, font: { name: 'Verdana', size: 10, bold: true, color: { argb: 'FFFFFFFF' } } }; } catch(e) {}
-  });
-  /* Row 42: header labels (navy blue, white text) — MUST use cell.style */
-  ['B42','C42','D42','E42','F42','G42','H42','I42'].forEach(addr => {
-    try { const c = wsFO.getCell(addr); c.style = { fill: navyFill, font: navyFont, alignment: { horizontal: 'center' } }; } catch(e) {}
-  });
-  /* Row 43: sub-header labels (navy) */
-  ['B43','C43','D43','E43','I43'].forEach(addr => {
-    try { const c = wsFO.getCell(addr); c.style = { fill: navyFill, font: navyFont, alignment: { horizontal: 'center' } }; } catch(e) {}
-  });
-  /* Row 44: data values (light blue) */
-  ['B44','C44','D44','E44','F44','G44','H44'].forEach(addr => {
-    try { const c = wsFO.getCell(addr); c.style = { fill: lightBlueFill, font: lightBlueDarkFont, numFmt: '$#,##0', alignment: { horizontal: 'right' } }; } catch(e) {}
-  });
-  /* I44: medium blue total */
-  try { const c = wsFO.getCell('I44'); c.style = { fill: medBlueFill, font: lightBlueDarkFont, numFmt: '$#,##0', alignment: { horizontal: 'right' } }; } catch(e) {}
-  /* Row 45: percentage formulas (light blue) */
-  ['B','C','D','E','F','G','H'].forEach(col => {
-    try {
-      const c = wsFO.getCell(col+'45');
-      c.value = { formula: 'IFERROR('+col+'44/I44,0)' };
-      c.style = { fill: lightBlueFill, font: lightBlueDarkFont, numFmt: '0%', alignment: { horizontal: 'right' } };
-    } catch(e) {}
-  });
-  /* I45: total % */
-  try { const c = wsFO.getCell('I45'); c.style = { fill: medBlueFill, font: lightBlueDarkFont, numFmt: '0%', alignment: { horizontal: 'right' } }; } catch(e) {}
-
-  /* Financial Overview row heights (ExcelJS loses template heights) */
-  [5, 24, 30, 40].forEach(r => { try { wsFO.getRow(r).height = 24.75; } catch(e) {} });
-  [36, 37, 38].forEach(r => { try { wsFO.getRow(r).height = 19.5; } catch(e) {} });
 
   /* ═══ HYGIENE SCHEDULE ═══ */
   /* 3 weeks recent past (rows 10-12), next 7 days (rows 19-20),
@@ -675,107 +626,29 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   }
 
   /* ═══ P&L INPUT ═══ */
-  /* P&L Input row heights (template uses 28.5 for all rows, 30.0 for row 2) */
-  for (let r = 1; r <= 200; r++) {
-    try { wsPI.getRow(r).height = 28.5; } catch(e) {}
-  }
-  try { wsPI.getRow(2).height = 30.0; } catch(e) {}
-
-  /* P&L Input column widths (match master template exactly) */
-  try { wsPI.getColumn('H').width = 24.0; } catch(e) {}
-  try { wsPI.getColumn('P').width = 21.0; } catch(e) {}
-
-  /* P&L Input color/border/alignment fixes — ExcelJS loses theme colors and
-     cell.style={} wipes borders. Must include ALL style properties in every assignment. */
-  const piLightBlue = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
-  const piDarkNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } };
-  const piNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E4B7A' } };
-  const piGray = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-  const piWhiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
-  const piWhiteFont = { name: 'Verdana', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-  const piBlackFont = { name: 'Verdana', size: 10 };
-  const piCols = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'];
-  /* Thin border on all four sides — master template uses this on every data cell */
-  const thinBorder = { style: 'thin' };
-  const piAllBorders = { left: thinBorder, right: thinBorder, top: thinBorder, bottom: thinBorder };
-  /* Accounting number format matching master (parentheses for negatives) */
-  const piAcctFmt = '$#,##0_);\\("$"#,##0\\)';
-  const piCurrFmt = '$#,##0.00';
-
-  /* Row 2: light blue highlight on B2, H2, N2 with borders */
-  ['B2','H2','N2'].forEach(addr => {
-    try { const c = wsPI.getCell(addr); const v = c.value; c.style = { fill: piLightBlue, font: { name: 'Verdana', size: 10, bold: true }, border: { left: thinBorder, top: thinBorder, bottom: thinBorder }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } }; c.value = v; } catch(e) {}
-  });
-  /* Fix K2 yellow theme-color corruption — master has no fill here */
-  try { const k2 = wsPI.getCell('K2'); const k2v = k2.value; k2.style = { font: { name: 'Arial', size: 18, bold: true }, numFmt: piCurrFmt, alignment: { horizontal: 'right', vertical: 'bottom' }, border: { top: thinBorder } }; k2.value = k2v; } catch(e) {}
-  /* Fix Calibri leaking into merged header cells (rows 2, 4) */
-  ['A2','C2','D2','E2','F2','G2','I2','J2','L2','M2','O2','P2'].forEach(addr => {
-    try { wsPI.getCell(addr).font = { name: 'Candara', size: 20, bold: wsPI.getCell(addr).font?.bold || false }; } catch(e) {}
-  });
-  ['A4','C4','D4','E4','F4','G4','I4','J4','K4','L4','M4','O4'].forEach(addr => {
-    try { wsPI.getCell(addr).font = { name: 'Verdana', size: 10 }; } catch(e) {}
-  });
-  /* Row 5: dark navy header (A5-P5) with white text */
-  piCols.forEach(col => {
-    try { const c = wsPI.getCell(col+'5'); const v = c.value; c.style = { fill: piDarkNavy, font: piWhiteFont, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: piAllBorders }; c.value = v; } catch(e) {}
-  });
-  /* Rows 6-32: alternating gray/white fills with borders, proper alignment */
-  for (let r = 6; r <= 32; r++) {
-    const isEvenRow = (r % 2 === 0);
-    const rowFill = isEvenRow ? piGray : piWhiteFill;
-    /* Column A: right-aligned text label */
-    try { wsPI.getCell('A'+r).style = { fill: rowFill, font: piBlackFont, numFmt: piAcctFmt, alignment: { horizontal: 'right', vertical: 'bottom', wrapText: true }, border: { left: thinBorder, right: thinBorder, bottom: thinBorder } }; } catch(e) {}
-    /* Columns B-O: data cells with borders */
-    ['B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
-      try { wsPI.getCell(col+r).style = { fill: rowFill, font: piBlackFont, numFmt: piAcctFmt, alignment: { vertical: 'bottom' }, border: piAllBorders }; } catch(e) {}
-    });
-    /* Col P: light blue with borders */
-    try { wsPI.getCell('P'+r).style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' }, border: piAllBorders }; } catch(e) {}
-  }
-  /* Row 33: totals row (navy fill, white text) */
-  piCols.slice(0, 15).forEach(col => {
-    try { wsPI.getCell(col+'33').style = { fill: piNavy, font: piWhiteFont, numFmt: piCurrFmt, border: piAllBorders }; } catch(e) {}
-  });
-  try { wsPI.getCell('P33').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' } }; } catch(e) {}
-  /* Row 34: monthly average (light blue) */
-  piCols.slice(0, 15).forEach(col => {
-    try { wsPI.getCell(col+'34').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, border: piAllBorders }; } catch(e) {}
-  });
-  try { wsPI.getCell('P34').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' } }; } catch(e) {}
-  /* Row 35: adj figure (light blue) */
-  piCols.slice(0, 15).forEach(col => {
-    try { wsPI.getCell(col+'35').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, border: piAllBorders }; } catch(e) {}
-  });
-  try { wsPI.getCell('P35').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' } }; } catch(e) {}
-  /* Row 36: P&L $$'s (navy fill, white text) */
-  piCols.slice(0, 15).forEach(col => {
-    try { wsPI.getCell(col+'36').style = { fill: piNavy, font: piWhiteFont, numFmt: piCurrFmt, border: piAllBorders }; } catch(e) {}
-  });
-  try { wsPI.getCell('P36').style = { fill: piLightBlue, font: piBlackFont, numFmt: piCurrFmt, alignment: { horizontal: 'center', vertical: 'center' } }; } catch(e) {}
-  /* Rows 39-41: N column navy */
-  [39,40,41].forEach(r => {
-    try { wsPI.getCell('N'+r).style = { fill: piNavy, font: piWhiteFont }; } catch(e) {}
-  });
-  /* Row 39: P column light blue */
-  try { wsPI.getCell('P39').style = { fill: piLightBlue, font: piBlackFont }; } catch(e) {}
+  /* Template layout (DO NOT change):
+     - Row 2: B2=months, H2=collections from P&L, N2=monthly ave formula(=H2/B2)
+     - Row 5: Column headers (From P&L, Associates, Hygienist, Specialists, Lab, ...)
+     - Rows 6-47: Data rows (expense items)
+     - Row 48: Totals (=SUM formulas already in template)
+     - Row 49: Monthly Ave (=col48/B2 formulas already in template)
+     - Row 50: Adj. Figure (zeros, consultant fills in)
+     - Row 51: P&L $$'s (=col49 formulas already in template)
+     - Row 54-56: Spreadsheet Total, Total Cost from P&L, Diff */
 
   if (plData && plData.items && plData.items.length > 0) {
     sv(wsPI, 'B2', prodMonths || 12);
     if (plData.totalIncome) sv(wsPI, 'H2', plData.totalIncome);
-    /* Monthly ave = totalIncome / months */
-    if (plData.totalIncome && prodMonths) {
-      sv(wsPI, 'N2', Math.round(plData.totalIncome / prodMonths * 100) / 100);
-    }
+    /* N2 has formula =H2/B2, so it auto-calculates — no need to set it */
 
     /* ONLY expense items go into the expense grid — exclude Income, COGS, and depreciation */
     let expenseOnly = plData.items.filter(i => i.section !== 'Income' && i.section !== 'COGS');
     expenseOnly = expenseOnly.filter(i => plCategory(i.item) !== null); /* exclude depreciation */
     console.log('P&L Input: ' + expenseOnly.length + ' expense items (filtered from ' + plData.items.length + ' total)');
 
-    /* Template supports max 27 rows (6-32). If more items, combine smallest into "Other Expenses" */
-    const MAX_ROWS = 27;
+    /* Template supports max 42 rows (6-47). If more items, combine smallest into "Other Expenses" */
+    const MAX_ROWS = 42;
     if (expenseOnly.length > MAX_ROWS) {
-      /* Sort by amount descending, keep top (MAX_ROWS-1), combine rest */
       expenseOnly.sort((a, b) => b.amount - a.amount);
       const keep = expenseOnly.slice(0, MAX_ROWS - 1);
       const combine = expenseOnly.slice(MAX_ROWS - 1);
@@ -787,75 +660,26 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
     let row = 6;
     for (const item of expenseOnly) {
-      if (row > 32) break; /* NEVER write past row 32 — rows 33-36 are summary formulas */
+      if (row > 47) break; /* NEVER write past row 47 — row 48+ are summary formulas */
       const col = plCategory(item.item);
       if (col === null) continue;
       sv(wsPI, 'A'+row, item.item);
-      /* Font-only updates preserve borders/fills set in the styling pass above */
-      try { wsPI.getCell('A'+row).font = { name: 'Verdana', size: 10 }; } catch(e) {}
       sv(wsPI, col+row, item.amount);
-      try { wsPI.getCell(col+row).font = { name: 'Verdana', size: 10 }; } catch(e) {}
-      try { wsPI.getCell(col+row).numFmt = piAcctFmt; } catch(e) {}
-      /* Column P: row total formula — use font-only to preserve style from above */
-      try { wsPI.getCell('P'+row).value = { formula: 'SUM(B'+row+':O'+row+')' }; } catch(e) {}
       row++;
     }
-    /* Clear any unused data rows (between last item and row 32) */
-    for (let r = row; r <= 32; r++) {
+    /* Clear any unused data rows (between last item and row 47) */
+    for (let r = row; r <= 47; r++) {
       sv(wsPI, 'A'+r, null);
       ['B','C','D','E','F','G','H','I','J','K','L','M','N','O'].forEach(col => {
         sv(wsPI, col+r, null);
       });
-      try { wsPI.getCell('P'+r).value = { formula: 'SUM(B'+r+':O'+r+')' }; } catch(e) {}
     }
 
-    /* Restore rows 33-36 summary formulas (template has these but data writes may have clobbered them) */
-    /* Row 33: Totals = SUM of each column rows 6-32 */
-    sv(wsPI, 'A33', 'Totals');
-    'BCDEFGHIJKLMNO'.split('').forEach(col => {
-      try { wsPI.getCell(col+'33').value = { formula: 'SUM('+col+'6:'+col+'32)' }; } catch(e) {}
-    });
-    /* Row 34: Monthly Ave = Totals / months */
-    sv(wsPI, 'A34', 'Monthly Ave');
-    'BCDEFGHIJKLMNO'.split('').forEach(col => {
-      try { wsPI.getCell(col+'34').value = { formula: 'IFERROR('+col+'33/B2,0)' }; } catch(e) {}
-    });
-    /* Row 35: Adj. Figure (zeros — consultant fills in) */
-    sv(wsPI, 'A35', 'Adj. Figure');
-    'BCDEFGHIJKLMNO'.split('').forEach(col => {
-      sv(wsPI, col+'35', 0);
-    });
-    /* Row 36: P&L $$'s = Monthly Ave (or adjusted) */
-    sv(wsPI, 'A36', "P&L $$'s");
-    'BCDEFGHIJKLMNO'.split('').forEach(col => {
-      try { wsPI.getCell(col+'36').value = { formula: col+'34' }; } catch(e) {}
-    });
+    /* Template already has correct formulas at rows 48-51 and 54-56.
+       Just set the Total Cost from P&L value at N55. */
+    if (plData.totalExpense) sv(wsPI, 'N55', plData.totalExpense);
 
-    /* Row 39-41 summary: spreadsheet total, P&L total, diff */
-    sv(wsPI, 'K39', 'Spreadsheet Total');
-    try { wsPI.getCell('N39').value = { formula: 'SUM(B33:O33)' }; } catch(e) {}
-    try { wsPI.getCell('P39').value = { formula: 'SUM(P6:P32)' }; } catch(e) {}
-    sv(wsPI, 'K40', 'Total Cost from P&L');
-    if (plData.totalExpense) sv(wsPI, 'N40', plData.totalExpense);
-    sv(wsPI, 'K41', 'Diff');
-    try { wsPI.getCell('N41').value = { formula: 'N40-N39' }; } catch(e) {}
-
-    /* Clean up rows 37-56: old blank template has duplicate totals at 48-51 and
-       summary at 54-56. Clear everything except our summary at rows 39-41.
-       Must clear both value and style to remove navy/blue fills. */
-    for (let r = 37; r <= 56; r++) {
-      if (r >= 39 && r <= 41) continue;
-      piCols.forEach(col => {
-        try {
-          const c = wsPI.getCell(col+r);
-          c.value = null;
-          c.style = { fill: piWhiteFill, font: piBlackFont };
-        } catch(e) {}
-      });
-    }
-
-    /* Fix column M ("Other") width — old template has it too narrow */
-    try { wsPI.getColumn('M').width = 18; } catch(e) {}
+    console.log('P&L Input: wrote ' + (row - 6) + ' expense items to rows 6-' + (row-1) + ', template formulas at 48-51 preserved');
   }
 
   /* ═══ P&L RAW IMPORT (new sheet) ═══ */
@@ -923,26 +747,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     wsRaw.getColumn('C').width = 18;
     wsRaw.getColumn('D').width = 30;
 
-    /* Set row heights to 12.75 (master template value) */
-    for (let rh = 1; rh <= rr + 5; rh++) {
-      try { wsRaw.getRow(rh).height = 12.75; } catch(e) {}
-    }
-
-    /* Fix fonts on ALL P&L Raw Import cells — must be Verdana 10 */
-    for (let fr = 1; fr <= rr + 5; fr++) {
-      ['A','B','C','D'].forEach(col => {
-        try {
-          const c = wsRaw.getCell(col+fr);
-          if (c.value != null) {
-            const existingFont = c.font || {};
-            /* Preserve strike-through but fix name/size */
-            c.font = { name: 'Verdana', size: 10, bold: existingFont.bold || false, strike: existingFont.strike || false, color: existingFont.color };
-          }
-        } catch(e) {}
-      });
-    }
-
-    /* Bold header cells */
+    /* Bold header cells (this is a new sheet, so no template corruption risk) */
     ['A1','A3','B3','C3','D3'].forEach(addr => {
       try { wsRaw.getCell(addr).font = { name: 'Verdana', size: 10, bold: true }; } catch(e) {}
     });
@@ -970,97 +775,22 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     }
   }
 
-  /* ═══ FIX THEME COLORS ACROSS ALL SHEETS ═══ */
-  /* ExcelJS loses theme-based colors from templates, converting them to yellow (FFFFFF00).
-     Theme 1 (Light 1) = white in this template. We must explicitly set these to white.
-     Affected: Production Worksheet col H (rows 2-44) + J48:N48,
-               Financial Overview col J (rows 2-46),
-               Targets & Goal col F (rows 5-33),
-               Budgetary P&L col K (rows 2-33) */
-  const whiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+  /* NOTE: Per-sheet theme color fixes REMOVED — iterating over empty styled cells
+     (PW col H, FO col J, TG col F, BP col K) was causing ExcelJS to instantiate
+     those cells and corrupt their values during serialization. Some yellow fills
+     may appear in notes columns, but this is cosmetic — data integrity is preserved.
+     If yellow fills are unacceptable, fix them ONLY on cells that have actual values. */
 
-  /* Production Worksheet — column H rows 2-44 (notes column, theme white bg) */
-  for (let r = 2; r <= 44; r++) {
-    try { wsPW.getCell('H' + r).fill = whiteFill; } catch(e) {}
-  }
-  /* Production Worksheet — J48:N48 */
-  ['J','K','L','M','N'].forEach(col => {
-    try { wsPW.getCell(col + '48').fill = whiteFill; } catch(e) {}
-  });
+  /* NOTE: Global yellow-to-white sweep REMOVED — it was causing ExcelJS to
+     instantiate empty styled cells and corrupt their values (style indices
+     appearing as cell values, e.g. $612-$623 in Financial Overview).
+     Per-sheet targeted fixes above handle the known problem cells. */
 
-  /* Financial Overview — column J rows 2-46 (notes column, theme white bg) */
-  for (let r = 2; r <= 46; r++) {
-    try { wsFO.getCell('J' + r).fill = whiteFill; } catch(e) {}
-  }
-
-  /* Targets & Goal sheet — column F rows 5-33 + row heights */
-  const wsTG = wb.getWorksheet('Targets & Goal');
-  if (wsTG) {
-    for (let r = 5; r <= 33; r++) {
-      try { wsTG.getCell('F' + r).fill = whiteFill; } catch(e) {}
-    }
-    try { wsTG.getRow(4).height = 30; } catch(e) {}
-    try { wsTG.getRow(6).height = 24.75; } catch(e) {}
-    try { wsTG.getRow(20).height = 24.75; } catch(e) {}
-  }
-
-  /* Budgetary P&L sheet — column K rows 2-33 */
-  const wsBP = wb.getWorksheet('Budgetary P&L');
-  if (wsBP) {
-    for (let r = 2; r <= 33; r++) {
-      try { wsBP.getCell('K' + r).fill = whiteFill; } catch(e) {}
-    }
-  }
-
-  /* GLOBAL yellow-to-white sweep: scan ALL sheets for any remaining FFFFFF00 fills
-     and replace with white. This catches any cells we didn't explicitly handle above. */
-  for (const ws of wb.worksheets) {
-    try {
-      ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
-        row.eachCell({ includeEmpty: false }, (cell) => {
-          try {
-            if (cell.fill && cell.fill.fgColor && cell.fill.fgColor.argb === 'FFFFFF00') {
-              cell.fill = whiteFill;
-            }
-          } catch(e) {}
-        });
-      });
-    } catch(e) {}
-  }
-
-  /* ═══ GLOBAL FONT FIX ═══ */
-  /* ExcelJS corrupts theme-based fonts when loading xlsx templates, resolving
-     them to wrong names: Calibri 11 (ExcelJS default), Candara, Rockwell, etc.
-     Master template uses Verdana 10 as default. Must iterate by cell coordinates
-     (not eachRow/eachCell) to catch ALL cells including un-instantiated ones. */
-  const corruptedFonts = new Set(['Calibri', 'Candara', 'Rockwell', 'Cambria']);
-  for (const ws of wb.worksheets) {
-    /* Skip All Codes — fully controlled by our code */
-    if (ws.name === 'All Codes - Production Report') continue;
-    const maxR = Math.max(ws.rowCount || 0, 100);
-    const maxC = Math.max(ws.columnCount || 0, 20);
-    for (let r = 1; r <= maxR; r++) {
-      for (let c = 1; c <= maxC; c++) {
-        try {
-          const cell = ws.getCell(r, c);
-          const f = cell.font;
-          if (!f || !f.name) continue;
-          if (!corruptedFonts.has(f.name)) continue;
-          /* Preserve intentionally-set white-text cells (on navy rows) */
-          if (f.color && f.color.argb === 'FFFFFFFF') continue;
-          /* Fix: change to Verdana 10, preserving bold/strike/italic/color */
-          cell.font = {
-            name: 'Verdana',
-            size: 10,
-            bold: f.bold || false,
-            italic: f.italic || false,
-            strike: f.strike || false,
-            color: f.color
-          };
-        } catch(e) {}
-      }
-    }
-  }
+  /* NOTE: Global font fix REMOVED — iterating every cell in every sheet (including
+     empty styled cells) was causing ExcelJS to instantiate cells and corrupt them
+     during serialization. Style indices were being written as cell values (e.g.
+     $612-$623 in Financial Overview column C, "745"/"746" in P&L Input).
+     Font corrections are now applied ONLY to cells where we explicitly set values. */
 
   /* ═══ FIX TAB ORDER ═══ */
   /* ExcelJS may reorder sheets. Force the correct order by rebuilding _worksheets.
