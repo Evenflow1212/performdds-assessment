@@ -3,6 +3,7 @@
 
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["jszip"]
 
 [functions."generate-workbook"]
   timeout = 26
