@@ -400,23 +400,31 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
   console.log('Template injection complete');
 
-  /* ─── Post-processing: restore template's original styles.xml ─── */
-  /* The ExcelJS/JSZip pipeline contaminates styles.xml (reduces 752 cellXfs to ~350)
-     and injects sharedStrings.xml. Restore originals and apply modifications. */
+  /* ═══ PASS 1: Generate the xlsx from templateZip ═══ */
+  const pass1Buf = await templateZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  console.log('Pass 1 output:', pass1Buf.length, 'bytes');
+
+  /* ═══ PASS 2: Post-process — restore template styles, remove contamination ═══ */
+  /* JSZip/ExcelJS contamination replaces the template's styles.xml (752 cellXfs)
+     with a smaller ExcelJS version (~350 cellXfs) and injects sharedStrings.xml.
+     This second pass loads the pass-1 output as a fresh zip and forcibly replaces
+     the corrupted files with the originals saved at the start. */
+  const fixZip = await JSZip.loadAsync(pass1Buf);
+
+  /* Restore original template styles.xml with strikethrough removed */
   if (_originalStylesXml) {
     let stylesXml = _originalStylesXml;
     /* Remove ALL forms of strikethrough: <strike val="1"/> and <strike/> */
     stylesXml = stylesXml.replace(/<strike\s*(?:val="1"\s*)?\/>/g, '');
     /* Change grey placeholder color to black */
     stylesXml = stylesXml.replace(/<color rgb="FF888888"\/>/g, '<color rgb="FF000000"/>');
-    templateZip.file('xl/styles.xml', stylesXml);
-    console.log('Restored template styles.xml with modifications:', stylesXml.length, 'chars');
+    fixZip.file('xl/styles.xml', stylesXml);
+    console.log('Pass 2: restored styles.xml:', stylesXml.length, 'chars (original 752 cellXfs)');
   }
 
-  /* Restore template Content_Types and append only our additions */
+  /* Restore template Content_Types and append additions for sheets 9-10 */
   if (_originalContentTypes) {
     let ct = _originalContentTypes;
-    /* Add sheet9, sheet10, drawings, jpeg content types if needed */
     if (!ct.includes('sheet9.xml')) {
       ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
     }
@@ -429,26 +437,32 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     if (!ct.includes('Extension="png"')) {
       ct = ct.replace(/<\/Types>/, '<Default Extension="png" ContentType="image/png"/></Types>');
     }
-    /* Add drawing overrides from ExcelJS sheets if present */
-    if (sheets9to10Buf) {
-      const excelZipCT = await JSZip.loadAsync(sheets9to10Buf);
-      for (const filePath of Object.keys(excelZipCT.files)) {
-        if (filePath.match(/^xl\/drawings\/drawing\d+\.xml$/) && !ct.includes(filePath)) {
-          ct = ct.replace(/<\/Types>/, `<Override PartName="/${filePath}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`);
-        }
+    /* Check for drawing overrides */
+    for (const filePath of Object.keys(fixZip.files)) {
+      if (filePath.match(/^xl\/drawings\/drawing\d+\.xml$/) && !ct.includes(filePath)) {
+        ct = ct.replace(/<\/Types>/, `<Override PartName="/${filePath}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`);
       }
     }
-    templateZip.file('[Content_Types].xml', ct);
-    console.log('Restored template Content_Types with additions');
+    fixZip.file('[Content_Types].xml', ct);
+    console.log('Pass 2: restored Content_Types');
   }
 
-  /* Remove ExcelJS contamination: sharedStrings.xml should NOT exist (template has none) */
-  if (templateZip.file('xl/sharedStrings.xml')) {
-    templateZip.remove('xl/sharedStrings.xml');
-    console.log('Removed contaminated sharedStrings.xml');
+  /* Remove sharedStrings.xml (template has none — ExcelJS injects one) */
+  if (fixZip.file('xl/sharedStrings.xml')) {
+    fixZip.remove('xl/sharedStrings.xml');
+    console.log('Pass 2: removed sharedStrings.xml');
   }
 
-  const finalBuf = await templateZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  /* Remove sharedStrings reference from workbook.xml.rels */
+  let wbRels = await fixZip.file('xl/_rels/workbook.xml.rels')?.async('string');
+  if (wbRels && wbRels.includes('sharedStrings')) {
+    wbRels = wbRels.replace(/<Relationship[^>]*sharedStrings[^>]*\/>/g, '');
+    fixZip.file('xl/_rels/workbook.xml.rels', wbRels);
+    console.log('Pass 2: removed sharedStrings ref from workbook.xml.rels');
+  }
+
+  const finalBuf = await fixZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  console.log('Pass 2 final output:', finalBuf.length, 'bytes');
   return finalBuf;
 }
 
