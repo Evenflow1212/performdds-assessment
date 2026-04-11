@@ -2109,6 +2109,25 @@ function ppEscXml(s) {
 /* Helper: inject cell values into template XML preserving styles */
 function ppInjectValues(templateXml, cellValues) {
   let xml = templateXml;
+  /* Build set of secondary merged cells (all cells in merges EXCEPT the top-left origin).
+     Excel requires only the origin cell to hold content; values in secondary cells trigger repair. */
+  const mergedSecondary = new Set();
+  const mcRe = /<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"\/>/g;
+  let mcM;
+  while ((mcM = mcRe.exec(xml)) !== null) {
+    const c1 = mcM[1], r1 = parseInt(mcM[2]), c2 = mcM[3], r2 = parseInt(mcM[4]);
+    const col1 = c1.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+    const col2 = c2.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+    for (let r = r1; r <= r2; r++) {
+      for (let c = col1; c <= col2; c++) {
+        if (r === r1 && c === col1) continue; // skip origin
+        let cs = '';
+        let cc = c;
+        while (cc > 0) { cs = String.fromCharCode(((cc - 1) % 26) + 65) + cs; cc = Math.floor((cc - 1) / 26); }
+        mergedSecondary.add(cs + r);
+      }
+    }
+  }
   for (const [ref, cell] of cellValues) {
     const typeAttr = (cell.t === 's' || cell.t === 'str' || (cell.f === null && isNaN(cell.v))) ? ' t="inlineStr"' : '';
     let inner = '';
@@ -2128,6 +2147,8 @@ function ppInjectValues(templateXml, cellValues) {
         : '<c r="' + ref + '"' + styleAttr + typeAttr + '/>';
       xml = xml.slice(0, cm.index) + newCell + xml.slice(cm.index + cm[0].length);
     } else {
+      /* Cell doesn't exist in template — only add if it's NOT a secondary merged cell */
+      if (mergedSecondary.has(ref)) continue;
       const rowNum = ref.match(/\d+/)[0];
       const rowRe = new RegExp('(<row r="' + rowNum + '"[^>]*>)([\\s\\S]*?)(</row>)');
       const rm = rowRe.exec(xml);
