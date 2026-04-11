@@ -2061,9 +2061,13 @@ async function postProcessClientSide(excelJsB64) {
   const tmplXfsM = tmplStylesXml.match(/cellXfs count="(\d+)"/);
   const tmplXfsCount = tmplXfsM ? parseInt(tmplXfsM[1]) : 0;
   console.log('PP VERIFY: output cellXfs=' + outXfsCount + ', template cellXfs=' + tmplXfsCount);
-  if (outXfsCount !== tmplXfsCount) {
-    console.warn('PP VERIFY: styles.xml mismatch! Re-copying from template...');
+  if (outXfsCount < tmplXfsCount) {
+    /* Only overwrite if output has FEWER styles (ExcelJS contamination).
+       Server may legitimately ADD styles (e.g. strikethrough fonts 752-755). */
+    console.warn('PP VERIFY: styles.xml contaminated (fewer cellXfs)! Re-copying from template...');
     outZip.file('xl/styles.xml', await tmplZip.file('xl/styles.xml').async('uint8array'));
+  } else if (outXfsCount > tmplXfsCount) {
+    console.log('PP VERIFY: output has', outXfsCount - tmplXfsCount, 'additional cellXfs — server additions preserved');
   }
   /* Remove sharedStrings.xml if template doesn't have one (ExcelJS artifact) */
   if (!tmplZip.file('xl/sharedStrings.xml') && outZip.file('xl/sharedStrings.xml')) {
