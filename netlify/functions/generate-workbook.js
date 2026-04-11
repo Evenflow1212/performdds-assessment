@@ -216,14 +216,15 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       if (val === null || val === undefined) return fullMatch;
       _dataHits++;
 
+      /* Mark this cell as existing in template (even if we skip it) */
+      matched.add(cellRef);
+
       /* CRITICAL: Never overwrite template formulas */
       const templateHasFormula = fullMatch.includes('<f>') || fullMatch.includes('<f ');
       if (templateHasFormula) {
         _formulaSkip++;
         return fullMatch;
       }
-
-      matched.add(cellRef);
       _replaced++;
 
       /* Preserve template style */
@@ -293,31 +294,53 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       console.log('ExcelJS shared strings resolved:', sharedStrings.length);
     }
 
-    /* Copy sheets 9-10, converting shared strings to inline strings */
-    for (let sheetNum = 9; sheetNum <= 10; sheetNum++) {
-      const xmlPath = `xl/worksheets/sheet${sheetNum}.xml`;
-      let xml = await excelZip.file(xmlPath)?.async('string');
+    /* Discover ExcelJS sheet file paths dynamically (ExcelJS may name them sheet1/sheet2, not sheet9/sheet10) */
+    const excelSheetFiles = Object.keys(excelZip.files)
+      .filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f))
+      .sort((a, b) => {
+        const na = parseInt(a.match(/sheet(\d+)/)[1]);
+        const nb = parseInt(b.match(/sheet(\d+)/)[1]);
+        return na - nb;
+      });
+    console.log('ExcelJS sheet files found:', excelSheetFiles);
+
+    /* Map ExcelJS sheets → template sheet9, sheet10 */
+    const targetSheetNums = [9, 10];
+    let hasSheet9 = false, hasSheet10 = false;
+    for (let idx = 0; idx < excelSheetFiles.length && idx < 2; idx++) {
+      const srcPath = excelSheetFiles[idx];
+      const targetNum = targetSheetNums[idx];
+      const targetPath = `xl/worksheets/sheet${targetNum}.xml`;
+      let xml = await excelZip.file(srcPath)?.async('string');
       if (xml) {
         /* Replace all t="s" cells with inline strings */
-        xml = xml.replace(/<c\s([^>]*?)t="s"([^>]*)>\s*<v>(\d+)<\/v>\s*<\/c>/g, (full, pre, post, idx) => {
-          const i = parseInt(idx, 10);
+        xml = xml.replace(/<c\s([^>]*?)t="s"([^>]*)>\s*<v>(\d+)<\/v>\s*<\/c>/g, (full, pre, post, idxStr) => {
+          const i = parseInt(idxStr, 10);
           if (i < sharedStrings.length) {
             const text = escapeXml(sharedStrings[i]);
             return `<c ${pre}t="inlineStr"${post}><is><t>${text}</t></is></c>`;
           }
           return full;
         });
-        templateZip.file(xmlPath, xml);
-        console.log(`Sheet ${sheetNum}: converted shared strings to inline`);
+        templateZip.file(targetPath, xml);
+        if (targetNum === 9) hasSheet9 = true;
+        if (targetNum === 10) hasSheet10 = true;
+        console.log(`ExcelJS ${srcPath} → ${targetPath}: converted shared strings to inline`);
       }
     }
 
-    /* Copy sheet rels, images, and drawings */
+    /* Copy rels for ExcelJS sheets, remapping to sheet9/10 */
+    for (let idx = 0; idx < excelSheetFiles.length && idx < 2; idx++) {
+      const srcNum = excelSheetFiles[idx].match(/sheet(\d+)/)[1];
+      const targetNum = targetSheetNums[idx];
+      const srcRels = `xl/worksheets/_rels/sheet${srcNum}.xml.rels`;
+      const targetRels = `xl/worksheets/_rels/sheet${targetNum}.xml.rels`;
+      const content = await excelZip.file(srcRels)?.async('nodebuffer');
+      if (content) templateZip.file(targetRels, content);
+    }
+
+    /* Copy media and drawings */
     for (const filePath of Object.keys(excelZip.files)) {
-      if (filePath.match(/xl\/worksheets\/_rels\/sheet(9|10)\.xml\.rels/)) {
-        const content = await excelZip.file(filePath)?.async('nodebuffer');
-        if (content) templateZip.file(filePath, content);
-      }
       if (filePath.startsWith('xl/media/') && !templateZip.file(filePath)) {
         const content = await excelZip.file(filePath)?.async('nodebuffer');
         if (content) templateZip.file(filePath, content);
@@ -327,10 +350,6 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         if (content) templateZip.file(filePath, content);
       }
     }
-
-    /* Update workbook.xml, rels, and Content_Types for sheets 9-10 */
-    const hasSheet9 = excelZip.file('xl/worksheets/sheet9.xml');
-    const hasSheet10 = excelZip.file('xl/worksheets/sheet10.xml');
 
     let workbookXml = await templateZip.file('xl/workbook.xml')?.async('string');
     if (workbookXml && (hasSheet9 || hasSheet10)) {
