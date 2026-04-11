@@ -5,7 +5,7 @@
   node_bundler = "esbuild"
 
 [functions."generate-workbook"]
-  timeout = 10
+  timeout = 26
 
 [functions."parse-pdf"]
   timeout = 10
