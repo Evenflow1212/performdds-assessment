@@ -1,8 +1,7 @@
 'use strict';
 const ExcelJS = require('exceljs');
 const fetch   = require('node-fetch');
-/* JSZip post-processing temporarily disabled — re-enable after bundler fix */
-/* const JSZip = require('jszip'); */
+const JSZip   = require('jszip');
 
 /* Helper: set cell value safely */
 function sv(ws, addr, val) { try { ws.getCell(addr).value = val; } catch(e) {} }
@@ -373,13 +372,14 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   if (collData) console.log('Collections:', collData.payments, 'over', collData.months, 'months');
   if (plData) console.log('P&L:', plData.items.length, 'items, income:', plData.totalIncome);
 
-  /* Load template */
-  let wb;
+  /* Load template — keep raw buffer for post-processing */
+  let wb, templateBuf;
   try {
     const tr = await fetch('https://dentalpracticeassessments.com/Blank_Assessment_Template.xlsx');
     if (!tr.ok) throw new Error('Template HTTP ' + tr.status);
+    templateBuf = await tr.buffer();
     wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await tr.buffer());
+    await wb.xlsx.load(Buffer.from(templateBuf));
     console.log('Template loaded, sheets:', wb.worksheets.map(s=>s.name).join(', '));
   } catch(e) {
     console.error('Template load failed:', e.message);
@@ -1296,8 +1296,15 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   const excelJsBuf = await wb.xlsx.writeBuffer();
 
-  /* Post-process disabled for now — return ExcelJS output directly */
-  const finalBuf = Buffer.from(excelJsBuf);
+  /* Post-process: merge ExcelJS values into original template to preserve styles */
+  let finalBuf;
+  try {
+    finalBuf = await postProcessWorkbook(templateBuf, Buffer.from(excelJsBuf), plImageB64);
+    console.log('Post-processing succeeded, using template-based output');
+  } catch (ppErr) {
+    console.warn('Post-processing failed, falling back to ExcelJS output:', ppErr.message);
+    finalBuf = Buffer.from(excelJsBuf);
+  }
 
   return {
     xlsxB64: finalBuf.toString('base64'),
