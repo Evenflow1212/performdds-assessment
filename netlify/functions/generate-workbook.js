@@ -410,6 +410,18 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
   console.log('Template injection complete');
 
+  /* ─── Post-processing: remove strikethrough from all fonts ─── */
+  /* The template uses strikethrough + grey as placeholder styling for unfilled rows.
+     Once data is injected, we strip ALL strikethrough so filled cells display normally. */
+  let stylesXml = await templateZip.file('xl/styles.xml')?.async('string');
+  if (stylesXml) {
+    stylesXml = stylesXml.replace(/<strike val="1"\/>/g, '');
+    /* Also change grey placeholder color to black for font 31 */
+    stylesXml = stylesXml.replace(/<color rgb="FF888888"\/>/g, '<color rgb="FF000000"/>');
+    templateZip.file('xl/styles.xml', stylesXml);
+    console.log('Styles post-processing: removed strikethrough, fixed grey colors');
+  }
+
   const finalBuf = await templateZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   return finalBuf;
 }
