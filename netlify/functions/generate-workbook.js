@@ -183,6 +183,13 @@ function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf) {
   const templateZip = await JSZip.loadAsync(templateBuf);
 
+  /* ─── Preserve template's original styles.xml and Content_Types ─── */
+  /* Something in the JSZip/ExcelJS pipeline contaminates these files.
+     We save them now and restore (with modifications) at the very end. */
+  const _originalStylesXml = await templateZip.file('xl/styles.xml')?.async('string');
+  const _originalContentTypes = await templateZip.file('[Content_Types].xml')?.async('string');
+  console.log('Preserved template styles.xml:', _originalStylesXml?.length, 'chars');
+
   /* Process template sheets (1-8) with collected values */
   for (let sheetNum = 1; sheetNum <= 8; sheetNum++) {
     /* Get collected values for this sheet */
@@ -388,38 +395,57 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       templateZip.file('xl/_rels/workbook.xml.rels', wbRelsXml);
     }
 
-    let contentTypesXml = await templateZip.file('[Content_Types].xml')?.async('string');
-    if (contentTypesXml) {
-      if (hasSheet9 && !contentTypesXml.includes('sheet9.xml')) {
-        contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
-      }
-      if (hasSheet10 && !contentTypesXml.includes('sheet10.xml')) {
-        contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet10.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
-      }
-      if (!contentTypesXml.includes('Extension="jpeg"') && !contentTypesXml.includes('Extension="jpg"')) {
-        contentTypesXml = contentTypesXml.replace(/<\/Types>/, '<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
-      }
-      for (const filePath of Object.keys(excelZip.files)) {
-        if (filePath.match(/^xl\/drawings\/drawing\d+\.xml$/) && !contentTypesXml.includes(filePath)) {
-          contentTypesXml = contentTypesXml.replace(/<\/Types>/, `<Override PartName="/${filePath}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`);
-        }
-      }
-      templateZip.file('[Content_Types].xml', contentTypesXml);
-    }
+    /* Content_Types handled in post-processing from preserved original */
   }
 
   console.log('Template injection complete');
 
-  /* ─── Post-processing: remove strikethrough from all fonts ─── */
-  /* The template uses strikethrough + grey as placeholder styling for unfilled rows.
-     Once data is injected, we strip ALL strikethrough so filled cells display normally. */
-  let stylesXml = await templateZip.file('xl/styles.xml')?.async('string');
-  if (stylesXml) {
-    stylesXml = stylesXml.replace(/<strike val="1"\/>/g, '');
-    /* Also change grey placeholder color to black for font 31 */
+  /* ─── Post-processing: restore template's original styles.xml ─── */
+  /* The ExcelJS/JSZip pipeline contaminates styles.xml (reduces 752 cellXfs to ~350)
+     and injects sharedStrings.xml. Restore originals and apply modifications. */
+  if (_originalStylesXml) {
+    let stylesXml = _originalStylesXml;
+    /* Remove ALL forms of strikethrough: <strike val="1"/> and <strike/> */
+    stylesXml = stylesXml.replace(/<strike\s*(?:val="1"\s*)?\/>/g, '');
+    /* Change grey placeholder color to black */
     stylesXml = stylesXml.replace(/<color rgb="FF888888"\/>/g, '<color rgb="FF000000"/>');
     templateZip.file('xl/styles.xml', stylesXml);
-    console.log('Styles post-processing: removed strikethrough, fixed grey colors');
+    console.log('Restored template styles.xml with modifications:', stylesXml.length, 'chars');
+  }
+
+  /* Restore template Content_Types and append only our additions */
+  if (_originalContentTypes) {
+    let ct = _originalContentTypes;
+    /* Add sheet9, sheet10, drawings, jpeg content types if needed */
+    if (!ct.includes('sheet9.xml')) {
+      ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+    }
+    if (!ct.includes('sheet10.xml')) {
+      ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet10.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+    }
+    if (!ct.includes('Extension="jpeg"') && !ct.includes('Extension="jpg"')) {
+      ct = ct.replace(/<\/Types>/, '<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
+    }
+    if (!ct.includes('Extension="png"')) {
+      ct = ct.replace(/<\/Types>/, '<Default Extension="png" ContentType="image/png"/></Types>');
+    }
+    /* Add drawing overrides from ExcelJS sheets if present */
+    if (sheets9to10Buf) {
+      const excelZipCT = await JSZip.loadAsync(sheets9to10Buf);
+      for (const filePath of Object.keys(excelZipCT.files)) {
+        if (filePath.match(/^xl\/drawings\/drawing\d+\.xml$/) && !ct.includes(filePath)) {
+          ct = ct.replace(/<\/Types>/, `<Override PartName="/${filePath}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`);
+        }
+      }
+    }
+    templateZip.file('[Content_Types].xml', ct);
+    console.log('Restored template Content_Types with additions');
+  }
+
+  /* Remove ExcelJS contamination: sharedStrings.xml should NOT exist (template has none) */
+  if (templateZip.file('xl/sharedStrings.xml')) {
+    templateZip.remove('xl/sharedStrings.xml');
+    console.log('Removed contaminated sharedStrings.xml');
   }
 
   const finalBuf = await templateZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
