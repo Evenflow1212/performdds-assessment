@@ -1,8 +1,8 @@
 'use strict';
 const ExcelJS = require('exceljs');
 const fetch   = require('node-fetch');
-let JSZip;
-try { JSZip = require('jszip'); } catch(e) { console.warn('JSZip not available, post-processing disabled:', e.message); }
+/* JSZip post-processing temporarily disabled — re-enable after bundler fix */
+/* const JSZip = require('jszip'); */
 
 /* Helper: set cell value safely */
 function sv(ws, addr, val) { try { ws.getCell(addr).value = val; } catch(e) {} }
@@ -373,14 +373,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   if (collData) console.log('Collections:', collData.payments, 'over', collData.months, 'months');
   if (plData) console.log('P&L:', plData.items.length, 'items, income:', plData.totalIncome);
 
-  /* Load template — keep raw buffer for post-processing */
-  let wb, templateBuf;
+  /* Load template */
+  let wb;
   try {
     const tr = await fetch('https://dentalpracticeassessments.com/Blank_Assessment_Template.xlsx');
     if (!tr.ok) throw new Error('Template HTTP ' + tr.status);
-    templateBuf = await tr.buffer();
     wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(Buffer.from(templateBuf));
+    await wb.xlsx.load(await tr.buffer());
     console.log('Template loaded, sheets:', wb.worksheets.map(s=>s.name).join(', '));
   } catch(e) {
     console.error('Template load failed:', e.message);
@@ -1297,20 +1296,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   const excelJsBuf = await wb.xlsx.writeBuffer();
 
-  /* Post-process: merge ExcelJS values into original template to preserve styles */
-  let finalBuf;
-  if (JSZip) {
-    try {
-      finalBuf = await postProcessWorkbook(templateBuf, Buffer.from(excelJsBuf), plImageB64);
-      console.log('Post-processing succeeded, using template-based output');
-    } catch (ppErr) {
-      console.warn('Post-processing failed, falling back to ExcelJS output:', ppErr.message);
-      finalBuf = Buffer.from(excelJsBuf);
-    }
-  } else {
-    console.warn('JSZip not loaded, skipping post-processing');
-    finalBuf = Buffer.from(excelJsBuf);
-  }
+  /* Post-process disabled for now — return ExcelJS output directly */
+  const finalBuf = Buffer.from(excelJsBuf);
 
   return {
     xlsxB64: finalBuf.toString('base64'),
