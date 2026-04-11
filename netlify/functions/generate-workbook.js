@@ -1,6 +1,7 @@
 'use strict';
 const ExcelJS = require('exceljs');
 const fetch   = require('node-fetch');
+const JSZip   = require('jszip');
 
 /* Helper: set cell value safely */
 function sv(ws, addr, val) { try { ws.getCell(addr).value = val; } catch(e) {} }
@@ -150,6 +151,213 @@ R(['D7310','D7311','D7320','D7321','D7410','D7411','D7412','D7440','D7450','D745
 
 function baseCode(code) { return code.replace(/\.\d+$/, ''); }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   POST-PROCESSING: Merge ExcelJS cell values into the original template ZIP.
+   ExcelJS corrupts template styles (drops 752→295 cellXfs), causing Excel
+   to show a repair dialog. This function preserves the template's XML
+   structure and only injects cell values from ExcelJS output.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Extract all cell values from an ExcelJS-generated sheet XML.
+ * Returns Map: cellRef → { v: valueStr, t: typeStr, f: formulaStr }
+ */
+function extractCellValues(sheetXml, sharedStrings) {
+  const cells = new Map();
+  const cellRe = /<c r="([A-Z]+\d+)"([^>]*)>([\s\S]*?)<\/c>/g;
+  let m;
+  while ((m = cellRe.exec(sheetXml)) !== null) {
+    const ref = m[1], attrs = m[2], content = m[3];
+    const vM = content.match(/<v>([\s\S]*?)<\/v>/);
+    const fM = content.match(/<f>([\s\S]*?)<\/f>/);
+    if (!vM && !fM) continue;
+
+    const tM = attrs.match(/t="([^"]+)"/);
+    let type = tM ? tM[1] : null;
+    let value = vM ? vM[1] : null;
+
+    /* Resolve shared-string index → inline string */
+    if (type === 's' && value !== null && sharedStrings) {
+      const idx = parseInt(value, 10);
+      if (idx < sharedStrings.length) {
+        value = sharedStrings[idx];
+        type = 'inlineStr';
+      }
+    }
+    cells.set(ref, { v: value, t: type, f: fM ? fM[1] : null });
+  }
+  return cells;
+}
+
+/** Escape XML special characters */
+function escXml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/**
+ * Inject ExcelJS cell values into template sheet XML, preserving styles.
+ */
+function injectValues(templateXml, cellValues) {
+  let xml = templateXml;
+  for (const [ref, data] of cellValues) {
+    /* Build new cell content */
+    let inner = '';
+    if (data.t === 'inlineStr' && data.v !== null) {
+      inner = '<is><t>' + escXml(data.v) + '</t></is>';
+    } else {
+      if (data.f) inner += '<f>' + data.f + '</f>';
+      if (data.v !== null) inner += '<v>' + data.v + '</v>';
+    }
+    const typeAttr = (data.t && data.t !== 'n') ? ' t="' + data.t + '"' : '';
+
+    /* Try to find existing cell in template and replace */
+    const cellRe = new RegExp(
+      '<c r="' + ref + '"([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)'
+    );
+    const cm = cellRe.exec(xml);
+    if (cm) {
+      /* Preserve the template's style attribute (s="NNN") */
+      const sM = cm[1].match(/s="(\d+)"/);
+      const styleAttr = sM ? ' s="' + sM[1] + '"' : '';
+      const newCell = inner
+        ? '<c r="' + ref + '"' + styleAttr + typeAttr + '>' + inner + '</c>'
+        : '<c r="' + ref + '"' + styleAttr + typeAttr + '/>';
+      xml = xml.slice(0, cm.index) + newCell + xml.slice(cm.index + cm[0].length);
+    } else {
+      /* Cell doesn't exist in template — insert into the right row */
+      const rowNum = ref.match(/\d+/)[0];
+      const rowRe = new RegExp('(<row r="' + rowNum + '"[^>]*>)([\\s\\S]*?)(</row>)');
+      const rm = rowRe.exec(xml);
+      if (rm) {
+        const newCell = inner
+          ? '<c r="' + ref + '"' + typeAttr + '>' + inner + '</c>'
+          : '<c r="' + ref + '"' + typeAttr + '/>';
+        xml = xml.slice(0, rm.index) + rm[1] + rm[2] + newCell + rm[3] + xml.slice(rm.index + rm[0].length);
+      }
+    }
+  }
+  return xml;
+}
+
+/**
+ * Parse the shared-strings table from ExcelJS output.
+ * Returns array of string values indexed by position.
+ */
+function parseSharedStrings(ssXml) {
+  const strings = [];
+  const siRe = /<si>([\s\S]*?)<\/si>/g;
+  let m;
+  while ((m = siRe.exec(ssXml)) !== null) {
+    /* Handle <t>text</t> and <r><t>text</t></r> (rich text) */
+    const texts = [];
+    const tRe = /<t[^>]*>([\s\S]*?)<\/t>/g;
+    let tm;
+    while ((tm = tRe.exec(m[1])) !== null) texts.push(tm[1]);
+    strings.push(texts.join(''));
+  }
+  return strings;
+}
+
+/**
+ * Post-process: merge ExcelJS cell values into the original template ZIP.
+ * templateBuf = original template Buffer
+ * excelJsBuf  = ExcelJS-generated Buffer
+ * plImageB64  = optional base64 P&L image
+ * Returns a clean xlsx Buffer with template styles preserved.
+ */
+async function postProcessWorkbook(templateBuf, excelJsBuf, plImageB64) {
+  const tmplZip = await JSZip.loadAsync(templateBuf);
+  const ejsZip  = await JSZip.loadAsync(excelJsBuf);
+
+  /* Parse ExcelJS shared strings */
+  const ssFile = ejsZip.file('xl/sharedStrings.xml');
+  const sharedStrings = ssFile ? parseSharedStrings(await ssFile.async('string')) : [];
+  console.log('Post-process: shared strings count:', sharedStrings.length);
+
+  /* Create output zip starting from template */
+  const outZip = new JSZip();
+
+  /* Copy ALL template files */
+  for (const [path, file] of Object.entries(tmplZip.files)) {
+    if (file.dir) continue;
+    outZip.file(path, await file.async('nodebuffer'));
+  }
+
+  /* For each template sheet (1-8), overlay ExcelJS cell values */
+  const templateSheetCount = 8; /* Template has sheets 1-8 */
+  for (let si = 1; si <= templateSheetCount; si++) {
+    const sheetPath = 'xl/worksheets/sheet' + si + '.xml';
+    const tmplXml = await tmplZip.file(sheetPath).async('string');
+    const ejsFile = ejsZip.file(sheetPath);
+    if (!ejsFile) continue;
+    const ejsXml = await ejsFile.async('string');
+
+    const cellValues = extractCellValues(ejsXml, sharedStrings);
+    const merged = injectValues(tmplXml, cellValues);
+    outZip.file(sheetPath, merged);
+    console.log('Post-process sheet' + si + ':', cellValues.size, 'values injected');
+  }
+
+  /* Add new sheets (9 = P&L Raw Import, 10 = P&L Image) from ExcelJS */
+  for (const si of [9, 10]) {
+    const sheetPath = 'xl/worksheets/sheet' + si + '.xml';
+    const ejsFile = ejsZip.file(sheetPath);
+    if (!ejsFile) continue;
+    let xml = await ejsFile.async('string');
+    /* Strip ExcelJS-specific artifacts */
+    xml = xml.replace(/\s*x14ac:dyDescent="[^"]*"/g, '');
+    xml = xml.replace(/\s*xmlns:mc="[^"]*"/g, '');
+    xml = xml.replace(/\s*mc:Ignorable="[^"]*"/g, '');
+    xml = xml.replace(/\s*xmlns:x14ac="[^"]*"/g, '');
+    outZip.file(sheetPath, xml);
+  }
+
+  /* Copy sheet10 rels (for drawing/image reference) */
+  const s10relsPath = 'xl/worksheets/_rels/sheet10.xml.rels';
+  const s10rels = ejsZip.file(s10relsPath);
+  if (s10rels) outZip.file(s10relsPath, await s10rels.async('nodebuffer'));
+
+  /* Copy drawing and image files from ExcelJS */
+  for (const [path, file] of Object.entries(ejsZip.files)) {
+    if (file.dir) continue;
+    if (path.startsWith('xl/drawings/') || path.startsWith('xl/media/')) {
+      outZip.file(path, await file.async('nodebuffer'));
+    }
+  }
+
+  /* Update workbook.xml: add sheets 9 & 10 */
+  let wbXml = await tmplZip.file('xl/workbook.xml').async('string');
+  const newSheets =
+    '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Raw Import" sheetId="9" state="visible" r:id="rId9"/>' +
+    '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Image" sheetId="10" state="visible" r:id="rId10"/>';
+  wbXml = wbXml.replace('</sheets>', newSheets + '</sheets>');
+  outZip.file('xl/workbook.xml', wbXml);
+
+  /* Update workbook.xml.rels: add rels for sheets 9, 10, and sharedStrings */
+  let relsXml = await tmplZip.file('xl/_rels/workbook.xml.rels').async('string');
+  const newRels =
+    '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet9.xml" Id="rId9"/>' +
+    '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet10.xml" Id="rId10"/>';
+  relsXml = relsXml.replace('</Relationships>', newRels + '</Relationships>');
+  outZip.file('xl/_rels/workbook.xml.rels', relsXml);
+
+  /* Update [Content_Types].xml */
+  let ctXml = await tmplZip.file('[Content_Types].xml').async('string');
+  let newCt =
+    '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+    '<Override PartName="/xl/worksheets/sheet10.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+  if (!ctXml.includes('drawing+xml'))
+    newCt += '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>';
+  if (!ctXml.includes('image/jpeg'))
+    newCt += '<Default Extension="jpeg" ContentType="image/jpeg"/>';
+  ctXml = ctXml.replace('</Types>', newCt + '</Types>');
+  outZip.file('[Content_Types].xml', ctXml);
+
+  const finalBuf = await outZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  console.log('Post-process complete, output size:', finalBuf.length);
+  return finalBuf;
+}
+
 /* ─── Build the workbook from pre-parsed text ─── */
 async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64) {
   /* Parse the Claude output text into structured data */
@@ -164,13 +372,14 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   if (collData) console.log('Collections:', collData.payments, 'over', collData.months, 'months');
   if (plData) console.log('P&L:', plData.items.length, 'items, income:', plData.totalIncome);
 
-  /* Load template */
-  let wb;
+  /* Load template — keep raw buffer for post-processing */
+  let wb, templateBuf;
   try {
     const tr = await fetch('https://dentalpracticeassessments.com/Blank_Assessment_Template.xlsx');
     if (!tr.ok) throw new Error('Template HTTP ' + tr.status);
+    templateBuf = await tr.buffer();
     wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await tr.buffer());
+    await wb.xlsx.load(Buffer.from(templateBuf));
     console.log('Template loaded, sheets:', wb.worksheets.map(s=>s.name).join(', '));
   } catch(e) {
     console.error('Template load failed:', e.message);
@@ -1085,9 +1294,20 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   });
   console.log('Tab order fixed:', wb.worksheets.map(s=>s.name).join(', '));
 
-  const buf = await wb.xlsx.writeBuffer();
+  const excelJsBuf = await wb.xlsx.writeBuffer();
+
+  /* Post-process: merge ExcelJS values into original template to preserve styles */
+  let finalBuf;
+  try {
+    finalBuf = await postProcessWorkbook(templateBuf, Buffer.from(excelJsBuf), plImageB64);
+    console.log('Post-processing succeeded, using template-based output');
+  } catch (ppErr) {
+    console.warn('Post-processing failed, falling back to ExcelJS output:', ppErr.message);
+    finalBuf = Buffer.from(excelJsBuf);
+  }
+
   return {
-    xlsxB64: Buffer.from(buf).toString('base64'),
+    xlsxB64: finalBuf.toString('base64'),
     summary: {
       codesFound: codes.length,
       totalProduction: totalProd.toFixed(2),
