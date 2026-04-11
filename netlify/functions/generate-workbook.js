@@ -171,6 +171,28 @@ async function postProcessServerSide(excelJsBuf, templateBuf) {
   const excelJsZip = await JSZip.loadAsync(excelJsBuf);
   const templateZip = await JSZip.loadAsync(templateBuf);
 
+  /* Build shared strings lookup from ExcelJS output.
+     ExcelJS uses shared strings by default — text values are stored as indices
+     into xl/sharedStrings.xml. We must resolve these to actual text. */
+  const sharedStrings = [];
+  const sstXml = await excelJsZip.file('xl/sharedStrings.xml')?.async('string');
+  if (sstXml) {
+    /* Extract each <si>...</si> element, then concatenate all <t> text within */
+    const siPattern = /<si>([\s\S]*?)<\/si>/g;
+    let siMatch;
+    while ((siMatch = siPattern.exec(sstXml)) !== null) {
+      const siContent = siMatch[1];
+      const texts = [];
+      const tPattern = /<t[^>]*>([^<]*)<\/t>/g;
+      let tMatch;
+      while ((tMatch = tPattern.exec(siContent)) !== null) {
+        texts.push(tMatch[1]);
+      }
+      sharedStrings.push(texts.join(''));
+    }
+    console.log('Shared strings resolved:', sharedStrings.length, 'entries');
+  }
+
   /* Extract cell values from ExcelJS output sheets (worksheets 1-8) */
   const excelJsCells = {};
   for (let sheetNum = 1; sheetNum <= 8; sheetNum++) {
@@ -209,6 +231,14 @@ async function postProcessServerSide(excelJsBuf, templateBuf) {
         const vMatch = cellContent.match(/<v>([^<]*)<\/v>/);
         if (vMatch) {
           value = vMatch[1];
+          /* Resolve shared string references: t="s" means value is an index */
+          if (cellType === 's' && sharedStrings.length > 0) {
+            const idx = parseInt(value, 10);
+            if (!isNaN(idx) && idx < sharedStrings.length) {
+              value = sharedStrings[idx];
+              isInlineStr = true;  /* Convert to inline string for injection */
+            }
+          }
         }
       }
 
@@ -308,11 +338,23 @@ async function postProcessServerSide(excelJsBuf, templateBuf) {
     templateZip.file(xmlPath, xml);
   }
 
-  /* Copy sheets 9 and 10 from ExcelJS (P&L Raw Import and P&L Image) */
+  /* Copy sheets 9 and 10 from ExcelJS (P&L Raw Import and P&L Image).
+     Must resolve shared string references since template has no sharedStrings.xml. */
   for (let sheetNum = 9; sheetNum <= 10; sheetNum++) {
     const xmlPath = `xl/worksheets/sheet${sheetNum}.xml`;
-    const xml = await excelJsZip.file(xmlPath)?.async('string');
-    if (xml) {
+    let xml = await excelJsZip.file(xmlPath)?.async('string');
+    if (xml && sharedStrings.length > 0) {
+      /* Replace all t="s" cells with inline strings */
+      xml = xml.replace(/<c\s([^>]*?)t="s"([^>]*)>\s*<v>(\d+)<\/v>\s*<\/c>/g, (full, pre, post, idx) => {
+        const i = parseInt(idx, 10);
+        if (i < sharedStrings.length) {
+          const text = escapeXml(sharedStrings[i]);
+          return `<c ${pre}t="inlineStr"${post}><is><t>${text}</t></is></c>`;
+        }
+        return full;
+      });
+      templateZip.file(xmlPath, xml);
+    } else if (xml) {
       templateZip.file(xmlPath, xml);
     }
   }
