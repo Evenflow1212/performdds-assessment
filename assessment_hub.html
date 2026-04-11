@@ -2053,7 +2053,30 @@ async function postProcessClientSide(excelJsB64) {
   ctXml = ctXml.replace('</Types>', newCt + '</Types>');
   outZip.file('[Content_Types].xml', ctXml);
 
-  /* 8. Generate final zip as base64 */
+  /* 8. SAFETY: verify styles.xml is from template (752 cellXfs), not ExcelJS */
+  const outStylesXml = await outZip.file('xl/styles.xml').async('string');
+  const outXfsM = outStylesXml.match(/cellXfs count="(\d+)"/);
+  const outXfsCount = outXfsM ? parseInt(outXfsM[1]) : 0;
+  const tmplStylesXml = await tmplZip.file('xl/styles.xml').async('string');
+  const tmplXfsM = tmplStylesXml.match(/cellXfs count="(\d+)"/);
+  const tmplXfsCount = tmplXfsM ? parseInt(tmplXfsM[1]) : 0;
+  console.log('PP VERIFY: output cellXfs=' + outXfsCount + ', template cellXfs=' + tmplXfsCount);
+  if (outXfsCount !== tmplXfsCount) {
+    console.warn('PP VERIFY: styles.xml mismatch! Re-copying from template...');
+    outZip.file('xl/styles.xml', await tmplZip.file('xl/styles.xml').async('uint8array'));
+  }
+  /* Remove sharedStrings.xml if template doesn't have one (ExcelJS artifact) */
+  if (!tmplZip.file('xl/sharedStrings.xml') && outZip.file('xl/sharedStrings.xml')) {
+    console.warn('PP VERIFY: removing stray sharedStrings.xml');
+    outZip.remove('xl/sharedStrings.xml');
+  }
+  /* Re-copy _rels/.rels, docProps/* from template to prevent ExcelJS contamination */
+  for (const safePath of ['_rels/.rels', 'docProps/app.xml', 'docProps/core.xml']) {
+    const tmplFile = tmplZip.file(safePath);
+    if (tmplFile) outZip.file(safePath, await tmplFile.async('uint8array'));
+  }
+
+  /* 9. Generate final zip as base64 */
   const finalB64 = await outZip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
   console.log('PP: complete in', Math.round(performance.now()-t0), 'ms, output:', Math.round(finalB64.length/1024), 'KB');
   return finalB64;
@@ -2134,11 +2157,14 @@ function ppParseSharedStrings(ssXml) {
   return strings;
 }
 
+let _generating = false;
 async function generate() {
+  if (_generating) { console.warn('Generate already in progress, ignoring duplicate click'); return; }
   if (!files[1] || !files[2]) {
     alert('Please upload both the Production Report (Step 1) and the Collections Summary (Step 2) before generating.');
     return;
   }
+  _generating = true;
   document.getElementById('step8').classList.remove('visible');
   document.getElementById('generatingState').classList.add('visible');
   try {
@@ -2248,12 +2274,30 @@ async function generate() {
     try {
       console.log('Starting client-side post-processing...');
       generatedWorkbook = await postProcessClientSide(data.xlsxB64);
-      console.log('Post-processing succeeded — template styles preserved');
+      /* Quick sanity check: verify output has template-level styles */
+      try {
+        const checkBin = atob(generatedWorkbook);
+        const checkArr = new Uint8Array(checkBin.length);
+        for (let i = 0; i < checkBin.length; i++) checkArr[i] = checkBin.charCodeAt(i);
+        const checkZip = await JSZip.loadAsync(checkArr);
+        const checkStyles = await checkZip.file('xl/styles.xml').async('string');
+        const checkXfs = (checkStyles.match(/cellXfs count="(\d+)"/) || [])[1];
+        console.log('Post-processing output verification: cellXfs=' + checkXfs);
+        if (parseInt(checkXfs) < 700) {
+          console.error('POST-PROCESSING OUTPUT HAS WRONG STYLES (' + checkXfs + ' cellXfs). Using raw ExcelJS as fallback.');
+          generatedWorkbook = data.xlsxB64;
+        } else {
+          console.log('Post-processing succeeded — template styles preserved (' + checkXfs + ' cellXfs)');
+        }
+      } catch (vErr) {
+        console.warn('Could not verify post-processing output:', vErr.message);
+      }
     } catch (ppErr) {
-      console.warn('Post-processing failed, using ExcelJS output:', ppErr.message);
+      console.error('Post-processing FAILED:', ppErr.message, ppErr.stack);
       generatedWorkbook = data.xlsxB64;
     }
 
+    _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
     document.getElementById('resultCard').classList.add('visible');
     const s = data.summary || {};
@@ -2265,6 +2309,7 @@ async function generate() {
       { val: s.plParsed ? 'Yes ✅' : (plText ? 'Partial' : 'Not uploaded'), lbl: 'P&L Parsed' },
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
+    _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
     document.getElementById('step8').classList.add('visible');
     alert('Error generating workbook: ' + err.message + '\n\nPlease check your files and try again.');
