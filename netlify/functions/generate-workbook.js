@@ -273,7 +273,8 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       if (sheetNum === 2 && rNum >= 2 && 'ABCDEF'.includes(colLetter)) {
         styleId = (rNum % 2 === 0) ? (AC_EVEN[colLetter] || '458') : (AC_ODD[colLetter] || '462');
       } else if (sheetNum === 8 && rNum >= 6 && rNum <= 50) {
-        styleId = '385'; /* P&L Input data style */
+        /* Use template styles: 728 for col A (text label), 729 for cols B+ (dollar data) */
+        styleId = (colLetter === 'A') ? '728' : '729';
       }
 
       let cellXml;
@@ -419,8 +420,9 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       /* Widen columns — replace entire <cols> section (Pass 2 also does this as backup) */
       xml = xml.replace(/<cols>[\s\S]*?<\/cols>/,
         `<cols>
-<col min="1" max="1" width="50" customWidth="1" style="0"/>
-<col min="2" max="15" width="15" customWidth="1" style="0"/>
+<col min="1" max="1" width="50" customWidth="1" style="728"/>
+<col min="2" max="15" width="15" customWidth="1" style="729"/>
+<col min="16" max="16" width="15" customWidth="1" style="727"/>
 </cols>`);
       console.log('P&L Input: fixed row heights and column widths');
     }
@@ -775,29 +777,33 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
       /* 1. Fix column widths — replace entire <cols> section so column A is wide enough
             for expense names and data columns are sized for dollar amounts.
-            Col A=50 (long expense names), data cols=15 (dollar amounts with $ formatting) */
+            Col A=50 (long expense names, style=728), data cols=15 (dollar amounts, style=729) */
       xml = xml.replace(/<cols>[\s\S]*?<\/cols>/,
         `<cols>
-<col min="1" max="1" width="50" customWidth="1" style="0"/>
-<col min="2" max="15" width="15" customWidth="1" style="0"/>
+<col min="1" max="1" width="50" customWidth="1" style="728"/>
+<col min="2" max="15" width="15" customWidth="1" style="729"/>
+<col min="16" max="16" width="15" customWidth="1" style="727"/>
 </cols>`);
 
-      /* 2. Fix cell styles — ANY style on data cells in rows 6-47 gets forced to s="0"
-            (default style: no bold, no wrapText, normal font).
-            Previous fix only caught s="0"|s="1" but ExcelJS assigns s="312","313","317" etc.
-            which map to WRONG styles in the restored template styles.xml (760 cellXfs). */
+      /* 2. Fix cell styles — cells in rows 6-47 with non-template styles get fixed.
+            Template sheet8 uses styles 705, 723-732. Anything else is ExcelJS contamination
+            (312, 313, 317 etc.) which maps to WRONG styles in the restored 760-cellXfs styles.xml.
+            Fix: set contaminated cells to template styles (728 for col A, 729 for cols B+). */
+      const templateSheet8Styles = new Set(['0','385','705','723','724','725','726','727','728','729','730','731','732']);
       xml = xml.replace(/<c\s([^>]*?)r="([A-Z]+)(\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,
         (full, pre, col, rowNum, post, inner) => {
           const r = parseInt(rowNum);
           if (r >= 6 && r <= 47) {
             const styleMatch = full.match(/\ss="(\d+)"/);
+            const correctStyle = (col === 'A') ? '728' : '729';
             if (!styleMatch) {
-              /* No style attribute — add s="0" */
-              return full.replace(`r="${col}${rowNum}"`, `r="${col}${rowNum}" s="0"`);
-            } else {
-              /* Force ALL cells to s="0" (default — no wrap, no bold) */
-              return full.replace(/\ss="\d+"/, ' s="0"');
+              /* No style attribute — add correct template style */
+              return full.replace(`r="${col}${rowNum}"`, `r="${col}${rowNum}" s="${correctStyle}"`);
+            } else if (!templateSheet8Styles.has(styleMatch[1])) {
+              /* Non-template style (ExcelJS contamination) — replace with template style */
+              return full.replace(`s="${styleMatch[1]}"`, `s="${correctStyle}"`);
             }
+            /* Template style — keep as-is */
           }
           return full;
         });
@@ -1573,7 +1579,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v14-colfix|f:' + (_injDiag?.finalXfs||'?'),
+      _version: 'v15-templatestyles',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
