@@ -868,18 +868,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const sampleUnmatched = [];
 
   /* Collect data rows — track which rows need strikethrough.
-     Strikethrough = code is a recognized ADA dental code (D + 4 digits) AND has non-zero production.
-     This covers ALL standard procedure codes: diagnostic, preventive, restorative, endo, perio,
-     prosth, implant, ortho, oral surgery, and adjunctive — not just those with specific PW row mappings.
-     Codes with $0 production or non-standard format remain un-struck. */
+     Strikethrough = code was imported into the Production Worksheet (exists in usedInPW set).
+     Only codes that map to specific PW rows get struck through. */
   _acStrikeRows = [];
-  const ADA_CODE_RE = /^D\d{4}$/;
   allCodes.forEach((c, i) => {
     const r = i + 2;
-    const bc = baseCode(c.code);
-    const hasPWRow = LEFT.hasOwnProperty(bc) || SRP_CODES.includes(bc) || RIGHT.hasOwnProperty(bc);
-    const isRecognized = ADA_CODE_RE.test(bc) && c.total > 0;
-    if (hasPWRow || isRecognized) { directMatchCount++; _acStrikeRows.push(r); }
+    if (usedInPW.has(c.code)) { directMatchCount++; _acStrikeRows.push(r); }
     else if (sampleUnmatched.length < 5) sampleUnmatched.push(c.code);
 
     sv(wsAC, 'A'+r, c.code);
@@ -1316,7 +1310,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v5-full-strike-proper-styles',
+      _version: 'v6-pw-only-strike',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
