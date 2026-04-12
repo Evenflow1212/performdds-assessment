@@ -1038,6 +1038,41 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       const nRows = [3,5,7,8,9,12,14,18,21,24,26,28,31,33,35,39,40,43,44,45,47,50,51,52,53,55,56,57,58,60,61,68];
       nRows.forEach(r => { xml = swapStyle(xml, 'N'+r, '428'); });
       console.log('Pass 2 sheet1: fixed ' + eRows.length + ' E-cells, ' + gRows.length + ' G-cells, ' + nRows.length + ' N-cells');
+
+      /* ── Batting Average box: style F38-F41 cells (F:G already merged in template) ── */
+      /* F38:G38 through F43:G43 are pre-merged empty cells in the template.
+         sv() in Pass 1 sets F38 (title), F39 (value), F40/F41 (benchmark text).
+         Here we apply proper styles:
+         Style 402 = section header (light blue bg, thin gray border, left-align)
+         Style 411 = data cell (white bg, thin gray border, right-align) */
+
+      /* Helper: replace an existing cell's style, preserving inline text */
+      function baCell(xml, ref, style) {
+        const existing = new RegExp(`<c\\s[^>]*r="${ref}"[^/>]*(?:/>|>[\\s\\S]*?</c>)`, 's');
+        if (existing.test(xml)) {
+          xml = xml.replace(existing, (full) => {
+            const textMatch = full.match(/<is><t>([^<]*)<\/t><\/is>/);
+            if (textMatch) {
+              return `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${textMatch[1]}</t></is></c>`;
+            }
+            return `<c r="${ref}" s="${style}"/>`;
+          });
+        }
+        return xml;
+      }
+
+      /* Title: F38:G38 (already merged in template) */
+      xml = baCell(xml, 'F38', '402');
+
+      /* Value: F39:G39 (already merged) */
+      xml = baCell(xml, 'F39', '411');
+
+      /* Benchmark text: F40:G40 and F41:G41 (already merged) */
+      xml = baCell(xml, 'F40', '402');
+      xml = baCell(xml, 'F41', '402');
+
+      console.log('Pass 2 sheet1: styled batting average box (F38-F41)');
+
       return xml;
     },
     'xl/worksheets/sheet4.xml': (xml) => {
@@ -1546,6 +1581,47 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsPW, 'L'+row, agg.qty);
     sv(wsPW, 'M'+row, Math.round(agg.total*100)/100);
     sv(wsPW, 'N'+row, agg.qty > 0 ? Math.round(agg.total/agg.qty*100)/100 : 0);
+  }
+
+  /* ═══ BATTING AVERAGE BOX (Production Worksheet, F38:G41) ═══ */
+  /* Batting Average = monthly visits / monthly crowns prepped
+     Visits/mo = comp exams (E12) + focused exams (E11) + adult prophy (E21)
+                 + perio maintenance (E23)
+     Crowns/mo = E36 (avg number of crowns prepped per month)
+     Since E-cells are D/D5, the ratio = (D12+D11+D21+D23)/(D31+D32+D33+D34+D35)
+     (months cancel out). */
+  {
+    const visits = (leftAgg[12]?.qty || 0)   // comprehensive exams
+                 + (leftAgg[11]?.qty || 0)   // focused exams
+                 + (leftAgg[21]?.qty || 0)   // adult prophy
+                 + (leftAgg[23]?.qty || 0);  // perio maintenance
+
+    /* Crowns: replicate template E36 denominator = (D31+D32+D33+D34+D35)/D5
+       D31 = porcelain/ceramic (leftAgg row 31)
+       D32 = porcelain/high noble (leftAgg row 32)
+       D33 = SUM(L3:L8) = right-side rows 3-8 (veneers, inlays, onlays, implant crowns)
+       D34 = L18 = SUM(L12:L17) = right-side bridge unit rows 12-17
+       D35 = L8 = implant crowns (right-side row 8) */
+    const d31 = leftAgg[31]?.qty || 0;
+    const d32 = leftAgg[32]?.qty || 0;
+    let d33 = 0;
+    for (let r = 3; r <= 8; r++) d33 += (rightAgg[r]?.qty || 0);
+    let d34 = 0;
+    for (let r = 12; r <= 17; r++) d34 += (rightAgg[r]?.qty || 0);
+    const d35 = rightAgg[8]?.qty || 0;
+    const totalCrowns = d31 + d32 + d33 + d34 + d35;
+
+    let battingAvgText = 'N/A';
+    if (totalCrowns > 0) {
+      const ratio = Math.round(visits / totalCrowns * 10) / 10;
+      battingAvgText = ratio.toFixed(1) + ' to 1';
+    }
+
+    sv(wsPW, 'F38', 'BATTING AVERAGE');
+    sv(wsPW, 'F39', battingAvgText);
+    sv(wsPW, 'F40', 'Better than 5:1 is good.');
+    sv(wsPW, 'F41', 'Further from 1 is worse.');
+    console.log('Batting average:', battingAvgText, '(visits=' + visits + ', crowns=' + totalCrowns + ')');
   }
 
   /* Preserve number formatting on Production Worksheet key cells */
@@ -2114,7 +2190,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v29-candara-14',
+      _version: 'v30-batting-avg',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
