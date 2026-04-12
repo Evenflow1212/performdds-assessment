@@ -230,11 +230,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       /* Mark this cell as existing in template (even if we skip it) */
       matched.add(cellRef);
 
-      /* CRITICAL: Never overwrite template formulas */
+      /* If cell has a formula BUT we have explicit data from sv(), overwrite it.
+         sv() calls are intentional — we want the value to replace the formula.
+         Template formulas that should be preserved won't have sv() calls. */
       const templateHasFormula = fullMatch.includes('<f>') || fullMatch.includes('<f ');
       if (templateHasFormula) {
         _formulaSkip++;
-        return fullMatch;
+        console.log('Overwriting formula in', cellRef, 'with value', val);
       }
       _replaced++;
 
@@ -422,7 +424,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         `<cols>
 <col min="1" max="1" width="40" customWidth="1" style="2"/>
 <col min="2" max="7" width="14" customWidth="1" style="316"/>
-<col min="8" max="8" width="16" customWidth="1" style="316"/>
+<col min="8" max="8" width="18" customWidth="1" style="316"/>
 <col min="9" max="15" width="14" customWidth="1" style="316"/>
 <col min="16" max="17" width="16" customWidth="1" style="316"/>
 </cols>`);
@@ -784,7 +786,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         `<cols>
 <col min="1" max="1" width="40" customWidth="1" style="2"/>
 <col min="2" max="7" width="14" customWidth="1" style="316"/>
-<col min="8" max="8" width="16" customWidth="1" style="316"/>
+<col min="8" max="8" width="18" customWidth="1" style="316"/>
 <col min="9" max="15" width="14" customWidth="1" style="316"/>
 <col min="16" max="17" width="16" customWidth="1" style="316"/>
 </cols>`);
@@ -1587,7 +1589,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v17-finyears',
+      _version: 'v18-formulafix',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
