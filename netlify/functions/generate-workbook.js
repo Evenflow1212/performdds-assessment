@@ -746,10 +746,46 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 <col min="10" max="10" width="1.66" customWidth="1" style="383"/>
 <col min="11" max="25" width="10.83" customWidth="1" style="383"/>
 </cols>`);
+
+      /* Hide monthly rows 8-19 (no per-month data available from Dentrix reports).
+         Set hidden="1" and ht="0" so they collapse. */
+      xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
+        const r = parseInt(rNum);
+        if (r >= 8 && r <= 19) {
+          /* Hide monthly rows */
+          let a = attrs.replace(/\s*hidden="[^"]*"/g, '').replace(/\s*ht="[^"]*"/g, '').replace(/\s*customHeight="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="0" hidden="1" customHeight="1">`;
+        }
+        /* Improve spacing on key section rows */
+        if (r === 20 || r === 22) {
+          /* TOTAL and AVERAGE rows — make them taller for emphasis */
+          let a = attrs.replace(/\s*ht="[^"]*"/g, '').replace(/\s*customHeight="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="18" customHeight="1">`;
+        }
+        if (r === 23 || r === 29 || r === 39) {
+          /* Section spacer rows — add breathing room */
+          let a = attrs.replace(/\s*ht="[^"]*"/g, '').replace(/\s*customHeight="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="22" customHeight="1">`;
+        }
+        if (r === 24 || r === 30 || r === 40) {
+          /* Section header rows — taller for prominence */
+          let a = attrs.replace(/\s*ht="[^"]*"/g, '').replace(/\s*customHeight="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="20" customHeight="1">`;
+        }
+        if (r === 44) {
+          /* Payment data row — taller */
+          let a = attrs.replace(/\s*ht="[^"]*"/g, '').replace(/\s*customHeight="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="24" customHeight="1">`;
+        }
+        return full;
+      });
+
       /* IFERROR on row 45 */
       ['B','C','D','E','F','G','H'].forEach(c => {
         xml = xml.replace(new RegExp(`<f>${c}44/I44</f>`), `<f>IFERROR(${c}44/I44,0)</f>`);
       });
+
+      console.log('Pass 2 sheet4: cols fixed, monthly rows hidden, spacing improved');
       return xml;
     },
     'xl/worksheets/sheet7.xml': (xml) => {
@@ -1589,7 +1625,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v18-formulafix',
+      _version: 'v19-finlayout',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
