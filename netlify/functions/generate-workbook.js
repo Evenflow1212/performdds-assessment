@@ -860,22 +860,81 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     console.error('VERIFY: fixZip has NO styles.xml!');
   }
 
-  const finalBuf = await fixZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
-  console.log('Pass 2 final output:', finalBuf.length, 'bytes');
+  /* ═══ FRESH ZIP BUILD: create brand-new zip, copying files one by one ═══ */
+  /* JSZip in-place modifications to a loaded zip may not persist to generateAsync().
+     Build a completely new zip object, copying each file individually and replacing
+     styles.xml, sheet XML (with fixes), and skipping sharedStrings. */
+  const freshZip = new JSZip();
+  const modifiedStyles = await fixZip.file('xl/styles.xml')?.async('string');
+  const msXfs = modifiedStyles?.match(/cellXfs count="(\d+)"/);
+  console.log('Modified styles before fresh copy: cellXfs=' + (msXfs?msXfs[1]:'?'));
 
-  /* Double-verify the final buffer */
-  const finalZip = await JSZip.loadAsync(finalBuf);
-  const finalStyles = await finalZip.file('xl/styles.xml')?.async('string');
-  const finalHasSS = !!finalZip.file('xl/sharedStrings.xml');
-  if (finalStyles) {
-    const fXfs = finalStyles.match(/cellXfs count="(\d+)"/);
-    const fFonts = finalStyles.match(/fonts count="(\d+)"/);
-    const xfsCount = parseInt(fXfs?.[1]||'0');
-    console.log('FINAL VERIFY: cellXfs=' + (fXfs?fXfs[1]:'?') + ' fonts=' + (fFonts?fFonts[1]:'?') + ' sharedStrings=' + finalHasSS + ' len=' + finalStyles.length);
-    if (xfsCount < 700) {
-      console.error('!!! FINAL OUTPUT STILL CONTAMINATED !!! cellXfs=' + xfsCount + ' — styles were NOT restored. This explains all formatting issues.');
+  /* Collect sheet fixes that were applied to fixZip */
+  const fixedSheets = {};
+  for (const [sheetPath] of Object.entries(sheetFixes)) {
+    const xml = await fixZip.file(sheetPath)?.async('string');
+    if (xml) fixedSheets[sheetPath] = xml;
+  }
+
+  /* Also get the modified workbook.xml.rels (sharedStrings ref removed) */
+  const fixedWbRels = await fixZip.file('xl/_rels/workbook.xml.rels')?.async('string');
+
+  /* Copy all files from pass1 to fresh zip, with replacements */
+  for (const filePath of Object.keys(pass1Zip.files)) {
+    if (pass1Zip.files[filePath].dir) continue;
+
+    /* Skip sharedStrings.xml entirely */
+    if (filePath === 'xl/sharedStrings.xml') {
+      console.log('Fresh zip: skipped sharedStrings.xml');
+      continue;
+    }
+
+    /* Replace styles.xml with our modified version */
+    if (filePath === 'xl/styles.xml' && modifiedStyles) {
+      freshZip.file(filePath, modifiedStyles);
+      console.log('Fresh zip: replaced styles.xml (' + modifiedStyles.length + ' chars)');
+      continue;
+    }
+
+    /* Replace Content_Types with our restored version */
+    if (filePath === '[Content_Types].xml') {
+      const ct = await fixZip.file(filePath)?.async('string');
+      if (ct) { freshZip.file(filePath, ct); continue; }
+    }
+
+    /* Replace fixed sheets */
+    if (fixedSheets[filePath]) {
+      freshZip.file(filePath, fixedSheets[filePath]);
+      console.log('Fresh zip: replaced', filePath);
+      continue;
+    }
+
+    /* Replace workbook.xml.rels (sharedStrings ref removed) */
+    if (filePath === 'xl/_rels/workbook.xml.rels' && fixedWbRels) {
+      freshZip.file(filePath, fixedWbRels);
+      continue;
+    }
+
+    /* Copy everything else as-is */
+    const content = await pass1Zip.file(filePath)?.async('nodebuffer');
+    if (content) freshZip.file(filePath, content);
+  }
+
+  const finalBuf = await freshZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  console.log('Fresh zip final output:', finalBuf.length, 'bytes');
+
+  /* Final verification */
+  const verifyFinal = await JSZip.loadAsync(finalBuf);
+  const vfStyles = await verifyFinal.file('xl/styles.xml')?.async('string');
+  const vfHasSS = !!verifyFinal.file('xl/sharedStrings.xml');
+  if (vfStyles) {
+    const vfXfs = vfStyles.match(/cellXfs count="(\d+)"/);
+    const vfCount = parseInt(vfXfs?.[1]||'0');
+    console.log('FINAL VERIFY: cellXfs=' + vfCount + ' sharedStrings=' + vfHasSS + ' len=' + vfStyles.length);
+    if (vfCount < 700) {
+      console.error('!!! STILL CONTAMINATED after fresh zip! cellXfs=' + vfCount);
     } else {
-      console.log('FINAL OUTPUT CLEAN: styles intact with ' + xfsCount + ' cellXfs');
+      console.log('FINAL OUTPUT CLEAN: ' + vfCount + ' cellXfs');
     }
   }
 
@@ -1498,7 +1557,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v10-defensive-styles-verify',
+      _version: 'v11-fresh-zip-build',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
