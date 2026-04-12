@@ -816,6 +816,20 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
       return fullFont;
     });
+    /* === Normalize ALL fonts to Candara; standardize sizes to clean hierarchy === */
+    /* Size ladder: 36 → 24 → 20 → 18 → 16 → 14 (body).
+       Body text (9-12pt) → 14pt.  Oddball header sizes: 28→24, 23→24, 22→20.
+       Tiny footnote fonts (6-8pt) left as-is. */
+    stylesXml = stylesXml.replace(/<font>([\s\S]*?)<\/font>/g, (full, inner) => {
+      let m = inner.replace(/<name val="[^"]*"\s*\/>/g, '<name val="Candara"/>');
+      m = m.replace(/<sz val="(9|1[012])"\s*\/>/g, '<sz val="14"/>');
+      m = m.replace(/<sz val="28"\s*\/>/g, '<sz val="24"/>');
+      m = m.replace(/<sz val="23"\s*\/>/g, '<sz val="24"/>');
+      m = m.replace(/<sz val="22"\s*\/>/g, '<sz val="20"/>');
+      return `<font>${m}</font>`;
+    });
+    console.log('Pass 2: normalized all fonts to Candara, standardized size hierarchy');
+
     /* === Add strikethrough font (index 66) for All Codes used-code rows === */
     /* Font 66: copy of font 31 (Arial 10pt black) but WITH strikethrough */
     const fontsMatch = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
@@ -2080,7 +2094,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v28-swot-fix',
+      _version: 'v29-candara-14',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
