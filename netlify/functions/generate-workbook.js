@@ -419,8 +419,8 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       /* Widen columns — replace entire <cols> section (Pass 2 also does this as backup) */
       xml = xml.replace(/<cols>[\s\S]*?<\/cols>/,
         `<cols>
-<col min="1" max="1" width="35" customWidth="1" style="385"/>
-<col min="2" max="15" width="13" customWidth="1" style="385"/>
+<col min="1" max="1" width="50" customWidth="1" style="0"/>
+<col min="2" max="15" width="15" customWidth="1" style="0"/>
 </cols>`);
       console.log('P&L Input: fixed row heights and column widths');
     }
@@ -774,39 +774,29 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       /* P&L Input: comprehensive fix for spacing — cell styles, column widths, row heights */
 
       /* 1. Fix column widths — replace entire <cols> section so column A is wide enough
-            for expense names and data columns are sized for dollar amounts */
+            for expense names and data columns are sized for dollar amounts.
+            Col A=50 (long expense names), data cols=15 (dollar amounts with $ formatting) */
       xml = xml.replace(/<cols>[\s\S]*?<\/cols>/,
         `<cols>
-<col min="1" max="1" width="35" customWidth="1" style="385"/>
-<col min="2" max="2" width="13" customWidth="1" style="385"/>
-<col min="3" max="3" width="13" customWidth="1" style="385"/>
-<col min="4" max="4" width="13" customWidth="1" style="385"/>
-<col min="5" max="5" width="13" customWidth="1" style="385"/>
-<col min="6" max="6" width="13" customWidth="1" style="385"/>
-<col min="7" max="7" width="13" customWidth="1" style="385"/>
-<col min="8" max="8" width="13" customWidth="1" style="385"/>
-<col min="9" max="9" width="13" customWidth="1" style="385"/>
-<col min="10" max="10" width="13" customWidth="1" style="385"/>
-<col min="11" max="11" width="13" customWidth="1" style="385"/>
-<col min="12" max="12" width="13" customWidth="1" style="385"/>
-<col min="13" max="13" width="13" customWidth="1" style="385"/>
-<col min="14" max="14" width="13" customWidth="1" style="385"/>
-<col min="15" max="15" width="13" customWidth="1" style="385"/>
+<col min="1" max="1" width="50" customWidth="1" style="0"/>
+<col min="2" max="15" width="15" customWidth="1" style="0"/>
 </cols>`);
 
-      /* 2. Fix cell styles — data cells in rows 6-47 that got s="0" or s="1"
-            (from ExcelJS contamination) should use s="385" (template data style) */
+      /* 2. Fix cell styles — ANY style on data cells in rows 6-47 gets forced to s="0"
+            (default style: no bold, no wrapText, normal font).
+            Previous fix only caught s="0"|s="1" but ExcelJS assigns s="312","313","317" etc.
+            which map to WRONG styles in the restored template styles.xml (760 cellXfs). */
       xml = xml.replace(/<c\s([^>]*?)r="([A-Z]+)(\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,
         (full, pre, col, rowNum, post, inner) => {
           const r = parseInt(rowNum);
           if (r >= 6 && r <= 47) {
             const styleMatch = full.match(/\ss="(\d+)"/);
             if (!styleMatch) {
-              /* No style attribute — add s="385" */
-              return full.replace(`r="${col}${rowNum}"`, `r="${col}${rowNum}" s="385"`);
-            } else if (styleMatch[1] === '0' || styleMatch[1] === '1') {
-              /* Contaminated style — replace with template style */
-              return full.replace(`s="${styleMatch[1]}"`, 's="385"');
+              /* No style attribute — add s="0" */
+              return full.replace(`r="${col}${rowNum}"`, `r="${col}${rowNum}" s="0"`);
+            } else {
+              /* Force ALL cells to s="0" (default — no wrap, no bold) */
+              return full.replace(/\ss="\d+"/, ' s="0"');
             }
           }
           return full;
@@ -1583,7 +1573,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v13|p1:' + (_injDiag?.p1Xfs||'?') + '|p2null:' + (_injDiag?.pass2StylesNull?'Y':'N') + '|orig:' + (_injDiag?.origStylesLen||0) + '|final:' + (_injDiag?.finalXfs||'?'),
+      _version: 'v14-colfix|f:' + (_injDiag?.finalXfs||'?'),
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
