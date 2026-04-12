@@ -416,10 +416,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         }
         return full;
       });
-      /* Widen column A for expense names */
-      xml = xml.replace(/<col[^>]*min="1" max="1"[^>]*\/>/,
-        '<col min="1" max="1" width="35" customWidth="1" style="385"/>');
-      console.log('P&L Input: fixed row heights and column A width');
+      /* Widen columns — replace entire <cols> section (Pass 2 also does this as backup) */
+      xml = xml.replace(/<cols>[\s\S]*?<\/cols>/,
+        `<cols>
+<col min="1" max="1" width="35" customWidth="1" style="385"/>
+<col min="2" max="15" width="13" customWidth="1" style="385"/>
+</cols>`);
+      console.log('P&L Input: fixed row heights and column widths');
     }
 
     console.log(`Sheet ${sheetNum}: matched=${_regexMatches} hits=${_dataHits} replaced=${matched.size} formulaSkip=${_formulaSkip} newCells=${Object.values(newCellsByRow).flat().length}`);
@@ -731,16 +734,64 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       return xml;
     },
     'xl/worksheets/sheet8.xml': (xml) => {
-      /* P&L Input: fix row heights and column A width */
+      /* P&L Input: comprehensive fix for spacing — cell styles, column widths, row heights */
+
+      /* 1. Fix column widths — replace entire <cols> section so column A is wide enough
+            for expense names and data columns are sized for dollar amounts */
+      xml = xml.replace(/<cols>[\s\S]*?<\/cols>/,
+        `<cols>
+<col min="1" max="1" width="35" customWidth="1" style="385"/>
+<col min="2" max="2" width="13" customWidth="1" style="385"/>
+<col min="3" max="3" width="13" customWidth="1" style="385"/>
+<col min="4" max="4" width="13" customWidth="1" style="385"/>
+<col min="5" max="5" width="13" customWidth="1" style="385"/>
+<col min="6" max="6" width="13" customWidth="1" style="385"/>
+<col min="7" max="7" width="13" customWidth="1" style="385"/>
+<col min="8" max="8" width="13" customWidth="1" style="385"/>
+<col min="9" max="9" width="13" customWidth="1" style="385"/>
+<col min="10" max="10" width="13" customWidth="1" style="385"/>
+<col min="11" max="11" width="13" customWidth="1" style="385"/>
+<col min="12" max="12" width="13" customWidth="1" style="385"/>
+<col min="13" max="13" width="13" customWidth="1" style="385"/>
+<col min="14" max="14" width="13" customWidth="1" style="385"/>
+<col min="15" max="15" width="13" customWidth="1" style="385"/>
+</cols>`);
+
+      /* 2. Fix cell styles — data cells in rows 6-47 that got s="0" or s="1"
+            (from ExcelJS contamination) should use s="385" (template data style) */
+      xml = xml.replace(/<c\s([^>]*?)r="([A-Z]+)(\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,
+        (full, pre, col, rowNum, post, inner) => {
+          const r = parseInt(rowNum);
+          if (r >= 6 && r <= 47) {
+            const styleMatch = full.match(/\ss="(\d+)"/);
+            if (!styleMatch) {
+              /* No style attribute — add s="385" */
+              return full.replace(`r="${col}${rowNum}"`, `r="${col}${rowNum}" s="385"`);
+            } else if (styleMatch[1] === '0' || styleMatch[1] === '1') {
+              /* Contaminated style — replace with template style */
+              return full.replace(`s="${styleMatch[1]}"`, 's="385"');
+            }
+          }
+          return full;
+        });
+
+      /* 3. Fix row heights — remove customHeight forcing, set explicit 15pt height.
+            Also add ht="15" to rows that don't have a height attribute at all. */
       xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
         const r = parseInt(rNum);
         if (r >= 6 && r <= 50) {
           let a = attrs.replace(/\s*customHeight="1"/g, '');
-          a = a.replace(/ht="[^"]*"/, 'ht="15"');
+          if (/ht="[^"]*"/.test(a)) {
+            a = a.replace(/ht="[^"]*"/, 'ht="15"');
+          } else {
+            a += ' ht="15"';
+          }
           return `<row r="${rNum}"${a}>`;
         }
         return full;
       });
+
+      console.log('Pass 2 sheet8: fixed cols, cell styles, row heights');
       return xml;
     }
   };
@@ -1410,7 +1461,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v8-pass2-sheet-fixes',
+      _version: 'v9-pl-input-spacing-fix',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
