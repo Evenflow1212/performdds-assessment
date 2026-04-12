@@ -305,25 +305,21 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     if (sheetNum === 6) {
       /* F9 has date format s="644" instead of General s="641" */
       xml = xml.replace(/<c r="F9" s="644"/, '<c r="F9" s="641"');
-      /* G7, G9, G16-G18 are hardcoded 0 instead of formulas — add =E*F formulas */
-      [7, 9, 16, 17, 18].forEach(r => {
+      /* ALL staff/hygiene G-column cells are hardcoded 0 — add =E*F formulas */
+      const ecFormulaRows = [7, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 27, 28, 29];
+      ecFormulaRows.forEach(r => {
+        /* Match G{r} with any style, value=0 or empty */
         xml = xml.replace(
-          new RegExp(`<c r="G${r}" s="642" t="n"><v>0</v></c>`),
+          new RegExp(`<c\\s[^>]*r="G${r}"[^>]*>.*?</c>`, 's'),
+          `<c r="G${r}" s="642"><f>E${r}*F${r}</f><v></v></c>`
+        );
+        /* Also handle self-closing <c .../> tags */
+        xml = xml.replace(
+          new RegExp(`<c\\s[^>]*r="G${r}"[^/]*/>`, 's'),
           `<c r="G${r}" s="642"><f>E${r}*F${r}</f><v></v></c>`
         );
       });
-      /* Remove benefits section (rows 34-42) — clear all cell content but keep rows for structure */
-      for (let r = 34; r <= 42; r++) {
-        /* Replace any cell with content in these rows with empty cell preserving style */
-        xml = xml.replace(
-          new RegExp(`<c\\s([^>]*?)r="([A-Z]+${r})"([^>]*)>.*?</c>`, 'gs'),
-          (full, pre, ref, post) => {
-            const styleMatch = full.match(/\ss="(\d+)"/);
-            const styleAttr = styleMatch ? ` s="${styleMatch[1]}"` : '';
-            return `<c r="${ref}"${styleAttr}/>`;
-          }
-        );
-      }
+      /* Benefits rows 35-42 — keep content, don't clear */
     }
 
     /* ── All Codes (sheet 2): apply strikethrough to rows used in Production Worksheet ── */
@@ -733,23 +729,32 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   const sheetFixes = {
     'xl/worksheets/sheet1.xml': (xml) => {
       /* Production Worksheet: fix cells with General number format.
-         Several formula cells in the template have fmt=General instead of
-         integer (fmt=0) or dollar ($#,##0). Fix by swapping style IDs:
-         - E column per-month qty: s=424/413 (General) → s=419 (integer fmt=0)
-         - N column avg fee: s=417/454 (General) → s=428 ($#,##0)
-         - G30 production total: s=413 (General) → s=427 ($#,##0 dollar) */
-      const styleSwaps = {
-        'E18': '419', 'E30': '419', 'E36': '419',
-        'N9': '428', 'N18': '428', 'N47': '428', 'N55': '428', 'N68': '428',
-        'G30': '427'
-      };
-      for (const [ref, newStyle] of Object.entries(styleSwaps)) {
-        xml = xml.replace(
-          new RegExp(`(<c [^>]*r="${ref}"[^>]*?)s="\\d+"`, 's'),
-          `$1s="${newStyle}"`
+         Template formula cells have fmt=General → show raw decimals.
+         Bulk-fix by column: E=integer, G=dollar, N=dollar.
+         Use robust regex that handles s= before or after r= in attributes. */
+      function swapStyle(xml, ref, newStyle) {
+        /* Try s= after r= */
+        let result = xml.replace(
+          new RegExp(`(<c\\s[^>]*?r="${ref}"[^>]*?)\\ss="\\d+"`, 's'),
+          `$1 s="${newStyle}"`
+        );
+        if (result !== xml) return result;
+        /* Try s= before r= */
+        return xml.replace(
+          new RegExp(`(<c\\s[^>]*?)s="\\d+"([^>]*?r="${ref}")`, 's'),
+          `$1s="${newStyle}"$2`
         );
       }
-      console.log('Pass 2 sheet1: fixed General format cells');
+      /* E column: per-month quantities → integer format s="419" */
+      const eRows = [10,11,12,13,16,17,18,21,22,23,24,25,26,27,30,31,32,33,34,35,36,39,40,41,42,43,44];
+      eRows.forEach(r => { xml = swapStyle(xml, 'E'+r, '419'); });
+      /* G column: total dollars → dollar format s="427" */
+      const gRows = [5,6,20,21,22,23,24,25,26,27,28,30,31,32,33,34,35,36];
+      gRows.forEach(r => { xml = swapStyle(xml, 'G'+r, '427'); });
+      /* N column: avg fee → dollar format s="428" */
+      const nRows = [3,5,7,8,9,12,14,18,21,24,26,28,31,33,35,39,40,43,44,45,47,50,51,52,53,55,56,57,58,60,61,68];
+      nRows.forEach(r => { xml = swapStyle(xml, 'N'+r, '428'); });
+      console.log('Pass 2 sheet1: fixed ' + eRows.length + ' E-cells, ' + gRows.length + ' G-cells, ' + nRows.length + ' N-cells');
       return xml;
     },
     'xl/worksheets/sheet4.xml': (xml) => {
@@ -776,22 +781,22 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         /* 8-19: hidden monthly rows */
         8:0, 9:0, 10:0, 11:0, 12:0, 13:0, 14:0, 15:0, 16:0, 17:0, 18:0, 19:0,
         /* Section 1: Historical Production */
-        5:26, 6:16, 7:16,
-        20:20, 21:16, 22:20,
+        5:28, 6:20, 7:20,
+        20:22, 21:20, 22:22,
         /* Spacer */
-        23:18,
+        23:20,
         /* Section 2: P&L Collection comparison */
-        24:22, 25:18, 26:18, 27:20, 28:18,
+        24:24, 25:20, 26:20, 27:22, 28:20,
         /* Spacer */
-        29:18,
+        29:20,
         /* Section 3: Accounts Receivable */
-        30:22, 31:16, 32:18, 33:18, 34:20,
-        35:10,
-        36:18, 37:18, 38:18,
+        30:24, 31:20, 32:20, 33:20, 34:22,
+        35:12,
+        36:20, 37:20, 38:20,
         /* Spacer */
-        39:22,
+        39:24,
         /* Section 4: Collections by Payment Type */
-        40:22, 41:8, 42:16, 43:16, 44:24, 45:20
+        40:24, 41:10, 42:20, 43:20, 44:26, 45:22
       };
       function stripHt(a) {
         return a.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '');
@@ -812,6 +817,34 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       });
 
       console.log('Pass 2 sheet4: cols fixed, monthly rows hidden, spacing improved');
+      return xml;
+    },
+    'xl/worksheets/sheet5.xml': (xml) => {
+      /* Targets & Goal: increase row heights so every row is clearly readable.
+         Template default is 12.75 which is too tight. Set every content row explicitly. */
+      const tgRowHeights = {
+        1: 8,       /* top margin */
+        2: 48,      /* main title */
+        3: 20,      /* subtitle / description */
+        4: 18, 5: 18, 6: 18, 7: 18, 8: 18, 9: 18, 10: 18,
+        11: 18, 12: 18, 13: 18, 14: 18, 15: 18, 16: 18, 17: 18, 18: 18,
+        19: 34,     /* section divider (was 30) */
+        20: 18, 21: 18, 22: 18, 23: 18, 24: 18, 25: 18, 26: 18,
+        27: 18, 28: 18, 29: 18, 30: 18, 31: 18, 32: 18,
+        33: 76,     /* large section header (was 73.5) */
+        34: 18, 35: 18, 36: 18, 37: 18, 38: 18, 39: 18, 40: 18,
+        41: 18, 42: 18, 43: 18, 44: 18, 45: 18
+      };
+      function stripHtTG(a) {
+        return a.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '');
+      }
+      xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
+        const r = parseInt(rNum);
+        const ht = tgRowHeights[r];
+        if (ht === undefined) return full;
+        return `<row r="${rNum}"${stripHtTG(attrs)} ht="${ht}" customHeight="1">`;
+      });
+      console.log('Pass 2 sheet5: Targets & Goal row heights set for all content rows');
       return xml;
     },
     'xl/worksheets/sheet7.xml': (xml) => {
@@ -1202,7 +1235,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   _acStrikeRows = [];
   allCodes.forEach((c, i) => {
     const r = i + 2;
-    if (usedInPW.has(c.code)) { directMatchCount++; _acStrikeRows.push(r); }
+    if (usedInPW.has(c.code) && c.total > 0) { directMatchCount++; _acStrikeRows.push(r); }
     else if (sampleUnmatched.length < 5) sampleUnmatched.push(c.code);
 
     sv(wsAC, 'A'+r, c.code);
@@ -1448,8 +1481,30 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     /* Hygiene benefits & employment cost % */
     if (employeeCosts.hygBenefits) sv(wsEC, 'G32', employeeCosts.hygBenefits);
 
-    /* Benefits section removed per client request — clear rows 34-42 */
-    /* (template rows with sick pay, holidays, vacation, bonus, 401K, medical, dental, other) */
+    /* Employment cost % — calculate from wages and write to G21 (staff) and G31 (hygiene) */
+    if (employeeCosts.staffEmpCostPct) {
+      let totalStaffWages = 0;
+      (employeeCosts.staff || []).forEach(p => { totalStaffWages += (p.rate || 0) * (p.hours || 0); });
+      sv(wsEC, 'G21', Math.round(totalStaffWages * employeeCosts.staffEmpCostPct * 100) / 100);
+    }
+    if (employeeCosts.hygEmpCostPct) {
+      let totalHygWages = 0;
+      (employeeCosts.hygiene || []).forEach(p => { totalHygWages += (p.rate || 0) * (p.hours || 0); });
+      sv(wsEC, 'G31', Math.round(totalHygWages * employeeCosts.hygEmpCostPct * 100) / 100);
+    }
+
+    /* Benefits policy notes — write to rows 35-42, column D */
+    if (employeeCosts.benefits) {
+      const b = employeeCosts.benefits;
+      if (b.sick) sv(wsEC, 'D35', b.sick);
+      if (b.holidays) sv(wsEC, 'D36', b.holidays);
+      if (b.vacation) sv(wsEC, 'D37', b.vacation);
+      if (b.bonus) sv(wsEC, 'D38', b.bonus);
+      if (b.k401) sv(wsEC, 'D39', b.k401);
+      if (b.medical) sv(wsEC, 'D40', b.medical);
+      if (b.dental) sv(wsEC, 'D41', b.dental);
+      if (b.other) sv(wsEC, 'D42', b.other);
+    }
 
     console.log('Employee Costs: done');
   }
@@ -1651,7 +1706,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v21-prodfix',
+      _version: 'v22-rowheights',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
