@@ -573,20 +573,49 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
   console.log('Template injection complete');
 
+  /* ═══ PRE-PASS 1 VERIFICATION: check styles.xml is intact in templateZip ═══ */
+  const prePassStyles = await templateZip.file('xl/styles.xml')?.async('string');
+  const preXfs = prePassStyles?.match(/cellXfs count="(\d+)"/);
+  console.log('PRE-PASS1 VERIFY: cellXfs=' + (preXfs?preXfs[1]:'MISSING!') + ' len=' + (prePassStyles?.length||0));
+  if (!prePassStyles || parseInt(preXfs?.[1]||'0') < 700) {
+    console.error('CRITICAL: styles.xml was corrupted BEFORE Pass 1! Forcing restore...');
+    if (_originalStylesXml) {
+      templateZip.file('xl/styles.xml', _originalStylesXml);
+      console.log('Force-restored styles.xml from saved original');
+    }
+  }
+
   /* ═══ PASS 1: Generate the xlsx from templateZip ═══ */
   const pass1Buf = await templateZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   console.log('Pass 1 output:', pass1Buf.length, 'bytes');
 
+  /* ═══ POST-PASS 1 VERIFICATION: check if contamination occurred ═══ */
+  const pass1Zip = await JSZip.loadAsync(pass1Buf);
+  const pass1Styles = await pass1Zip.file('xl/styles.xml')?.async('string');
+  const p1Xfs = pass1Styles?.match(/cellXfs count="(\d+)"/);
+  const p1HasSS = !!pass1Zip.file('xl/sharedStrings.xml');
+  console.log('POST-PASS1 VERIFY: cellXfs=' + (p1Xfs?p1Xfs[1]:'MISSING!') + ' sharedStrings=' + p1HasSS + ' len=' + (pass1Styles?.length||0));
+
+  if (parseInt(p1Xfs?.[1]||'0') < 700) {
+    console.error('*** CONTAMINATION DETECTED in Pass 1 output! cellXfs=' + (p1Xfs?p1Xfs[1]:'?') + ' (expected 752+). Will fix in Pass 2.');
+  }
+
   /* ═══ PASS 2: Post-process — restore template styles, remove contamination ═══ */
-  /* JSZip/ExcelJS contamination replaces the template's styles.xml (752 cellXfs)
-     with a smaller ExcelJS version (~350 cellXfs) and injects sharedStrings.xml.
-     This second pass loads the pass-1 output as a fresh zip and forcibly replaces
-     the corrupted files with the originals saved at the start. */
-  const fixZip = await JSZip.loadAsync(pass1Buf);
+  /* If Pass 1 output has contaminated styles (ExcelJS rewrites ~350 cellXfs),
+     Pass 2 restores the original template's styles.xml (752 cellXfs) and applies fixes. */
+  const fixZip = pass1Zip; /* Reuse already-loaded zip instead of loading again */
 
   /* Restore original template styles.xml — fix only the grey placeholder font */
-  if (_originalStylesXml) {
-    let stylesXml = _originalStylesXml;
+  /* CRITICAL FALLBACK: If _originalStylesXml is somehow null, re-read from template */
+  let stylesSource = _originalStylesXml;
+  if (!stylesSource) {
+    console.error('CRITICAL: _originalStylesXml is null! Re-reading from template...');
+    const fallbackZip = await JSZip.loadAsync(templateBuf);
+    stylesSource = await fallbackZip.file('xl/styles.xml')?.async('string');
+    console.log('Fallback styles loaded:', stylesSource?.length, 'chars');
+  }
+  if (stylesSource) {
+    let stylesXml = stylesSource;
     /* Only remove strikethrough from fonts that have grey color FF888888 (font 31 = placeholder).
        Fonts 47-49 have legitimate strikethrough for All Codes & P&L Raw Import — keep those. */
     stylesXml = stylesXml.replace(/<font>([\s\S]*?)<\/font>/g, (fullFont, inner) => {
@@ -837,9 +866,17 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   /* Double-verify the final buffer */
   const finalZip = await JSZip.loadAsync(finalBuf);
   const finalStyles = await finalZip.file('xl/styles.xml')?.async('string');
+  const finalHasSS = !!finalZip.file('xl/sharedStrings.xml');
   if (finalStyles) {
     const fXfs = finalStyles.match(/cellXfs count="(\d+)"/);
-    console.log('FINAL VERIFY: cellXfs=' + (fXfs?fXfs[1]:'?') + ' len=' + finalStyles.length);
+    const fFonts = finalStyles.match(/fonts count="(\d+)"/);
+    const xfsCount = parseInt(fXfs?.[1]||'0');
+    console.log('FINAL VERIFY: cellXfs=' + (fXfs?fXfs[1]:'?') + ' fonts=' + (fFonts?fFonts[1]:'?') + ' sharedStrings=' + finalHasSS + ' len=' + finalStyles.length);
+    if (xfsCount < 700) {
+      console.error('!!! FINAL OUTPUT STILL CONTAMINATED !!! cellXfs=' + xfsCount + ' — styles were NOT restored. This explains all formatting issues.');
+    } else {
+      console.log('FINAL OUTPUT CLEAN: styles intact with ' + xfsCount + ' cellXfs');
+    }
   }
 
   return finalBuf;
@@ -1461,7 +1498,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v9-pl-input-spacing-fix',
+      _version: 'v10-defensive-styles-verify',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }

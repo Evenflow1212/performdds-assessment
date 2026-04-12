@@ -2315,16 +2315,12 @@ async function generate() {
     });
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Generation failed');
-    /* Use raw ExcelJS output directly — server already produces complete workbook
-       with all 10 sheets, data, formulas, and embedded P&L image.
-       Previous post-processing (template overlay) was causing data corruption:
-       - Production Worksheet showed 0s (merged cell values lost)
-       - All Codes had unwanted strikethrough (template styles not overridden)
-       - Financial Overview showed placeholder values
-       - P&L layout broken
-       Raw ExcelJS output has correct data with slightly simplified styles. */
+    /* Server produces complete workbook via JSZip template injection + ExcelJS sheets 9-10 */
     generatedWorkbook = data.xlsxB64;
-    console.log('Using raw ExcelJS output (no post-processing). Size:', Math.round(generatedWorkbook.length / 1024), 'KB');
+    const sv = data.summary?._version || 'unknown';
+    console.log('Workbook received. Version:', sv, 'Size:', Math.round(generatedWorkbook.length / 1024), 'KB');
+    console.log('Debug:', JSON.stringify(data.summary?._debug || {}));
+    console.log('Timing:', JSON.stringify(data.summary?._timing || {}));
 
     _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
@@ -2338,6 +2334,7 @@ async function generate() {
       { val: s.plParsed ? 'Yes ✅' : (plText ? 'Partial' : 'Not uploaded'), lbl: 'P&L Parsed' },
       { val: employeeCosts ? 'Yes ✅' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
       { val: hygieneData ? 'Yes ✅' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
+      { val: s._version || '?', lbl: 'Engine' },
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     _generating = false;
