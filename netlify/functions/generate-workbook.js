@@ -755,7 +755,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         /* 8-19: hidden monthly rows */
         8:0, 9:0, 10:0, 11:0, 12:0, 13:0, 14:0, 15:0, 16:0, 17:0, 18:0, 19:0,
         /* Section 1: Historical Production */
-        5:18, 6:16, 7:16,
+        5:26, 6:16, 7:16,
         20:20, 21:16, 22:20,
         /* Spacer */
         23:18,
