@@ -207,10 +207,10 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     if (!sheetName) continue;
 
     const sheetCells = _cellCollector[sheetName] || {};
-    if (Object.keys(sheetCells).length === 0) {
-      console.log(`Sheet ${sheetNum}: no collected data, skipping`);
-      continue;
-    }
+    const hasCellData = Object.keys(sheetCells).length > 0;
+
+    /* IMPORTANT: Always process every sheet — even sheets with no cell data need
+       column width, row height, and IFERROR fixes applied in Pass 1. */
 
     const xmlPath = `xl/worksheets/sheet${sheetNum}.xml`;
     let xml = await templateZip.file(xmlPath)?.async('string');
@@ -1735,7 +1735,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v23-polish',
+      _version: 'v24-allsheets',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
