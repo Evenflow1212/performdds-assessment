@@ -681,6 +681,79 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     console.log('Pass 2: restored Content_Types');
   }
 
+  /* ═══ PASS 2 sheet-level fixes: column widths, IFERROR ═══ */
+  /* These must happen in Pass 2 because ExcelJS contamination rewrites sheet XML
+     during Pass 1, changing style="383" to style="1" and potentially resetting column widths. */
+  const sheetFixes = {
+    'xl/worksheets/sheet4.xml': (xml) => {
+      /* Financial Overview: widen columns for AR dollar amounts */
+      xml = xml.replace(/<cols>[\s\S]*?<\/cols>/, `<cols>
+<col min="1" max="1" width="1.66" customWidth="1" style="383"/>
+<col min="2" max="2" width="16" customWidth="1" style="383"/>
+<col min="3" max="3" width="14" customWidth="1" style="383"/>
+<col min="4" max="4" width="15" customWidth="1" style="383"/>
+<col min="5" max="5" width="15" customWidth="1" style="383"/>
+<col min="6" max="6" width="14" customWidth="1" style="383"/>
+<col min="7" max="7" width="14" customWidth="1" style="383"/>
+<col min="8" max="8" width="14" customWidth="1" style="383"/>
+<col min="9" max="9" width="26.5" customWidth="1" style="383"/>
+<col min="10" max="10" width="1.66" customWidth="1" style="383"/>
+<col min="11" max="25" width="10.83" customWidth="1" style="383"/>
+</cols>`);
+      /* IFERROR on row 45 */
+      ['B','C','D','E','F','G','H'].forEach(c => {
+        xml = xml.replace(new RegExp(`<f>${c}44/I44</f>`), `<f>IFERROR(${c}44/I44,0)</f>`);
+      });
+      return xml;
+    },
+    'xl/worksheets/sheet7.xml': (xml) => {
+      /* Budgetary P&L: wrap division formulas in IFERROR, widen cols */
+      xml = xml.replace(/<f>([^<]*?\/[^<]*?)<\/f>/g, (full, formula) => {
+        if (formula.startsWith('IFERROR')) return full;
+        if (/\/[A-Z$]+\d+/.test(formula) || /\/\d/.test(formula)) {
+          return `<f>IFERROR(${formula},0)</f>`;
+        }
+        return full;
+      });
+      xml = xml.replace(/<cols>[\s\S]*?<\/cols>/, `<cols>
+<col min="1" max="1" width="1.17" customWidth="1" style="383"/>
+<col min="2" max="2" width="19.66" customWidth="1" style="383"/>
+<col min="3" max="3" width="8" customWidth="1" style="383"/>
+<col min="4" max="4" width="13" customWidth="1" style="383"/>
+<col min="5" max="5" width="1.66" customWidth="1" style="383"/>
+<col min="6" max="6" width="8" customWidth="1" style="383"/>
+<col min="7" max="7" width="13" customWidth="1" style="383"/>
+<col min="8" max="8" width="1.66" customWidth="1" style="383"/>
+<col min="9" max="9" width="8" customWidth="1" style="383"/>
+<col min="10" max="10" width="13" customWidth="1" style="383"/>
+<col min="11" max="11" width="1.17" customWidth="1" style="383"/>
+</cols>`);
+      return xml;
+    },
+    'xl/worksheets/sheet8.xml': (xml) => {
+      /* P&L Input: fix row heights and column A width */
+      xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
+        const r = parseInt(rNum);
+        if (r >= 6 && r <= 50) {
+          let a = attrs.replace(/\s*customHeight="1"/g, '');
+          a = a.replace(/ht="[^"]*"/, 'ht="15"');
+          return `<row r="${rNum}"${a}>`;
+        }
+        return full;
+      });
+      return xml;
+    }
+  };
+
+  for (const [path, fixFn] of Object.entries(sheetFixes)) {
+    let xml = await fixZip.file(path)?.async('string');
+    if (xml) {
+      xml = fixFn(xml);
+      fixZip.file(path, xml);
+      console.log('Pass 2: applied fixes to', path);
+    }
+  }
+
   /* Remove sharedStrings.xml (template has none — ExcelJS injects one) */
   if (fixZip.file('xl/sharedStrings.xml')) {
     fixZip.remove('xl/sharedStrings.xml');
@@ -1337,7 +1410,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v7-formatting-fixes',
+      _version: 'v8-pass2-sheet-fixes',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
