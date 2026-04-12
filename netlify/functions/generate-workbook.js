@@ -1153,14 +1153,23 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   /* ═══ FINANCIAL OVERVIEW ═══ */
   sv(wsFO, 'D4', practiceName);
-  const primaryYear = years.length >= 2 ? years[1] : years[0] || new Date().getFullYear();
-  sv(wsFO, 'E6', primaryYear);
-  sv(wsFO, 'E20', Math.round(totalProd*100)/100);
-  sv(wsFO, 'E21', prodMonths);
 
+  /* Year headers: use the first year in the data range as the primary data year.
+     Template layout: C6=year-2, E6=year-1, G6=dataYear (rightmost = most recent).
+     Production/collection totals go in the data year columns (G/H). */
+  const dataYear = years[0] || new Date().getFullYear();
+  sv(wsFO, 'C6', dataYear - 2);
+  sv(wsFO, 'E6', dataYear - 1);
+  sv(wsFO, 'G6', dataYear);
+
+  /* Production total → G20 (data year column), months → G21 */
+  sv(wsFO, 'G20', Math.round(totalProd*100)/100);
+  sv(wsFO, 'G21', prodMonths);
+
+  /* Collection total → H20 (data year collection column), months → H21 */
   if (collData && collData.payments) {
-    sv(wsFO, 'F20', Math.round(collData.payments*100)/100);
-    sv(wsFO, 'F21', collData.months || prodMonths);
+    sv(wsFO, 'H20', Math.round(collData.payments*100)/100);
+    sv(wsFO, 'H21', collData.months || prodMonths);
   }
 
   if (plData && plData.totalIncome) {
@@ -1578,7 +1587,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v16-cleanstyles',
+      _version: 'v17-finyears',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
