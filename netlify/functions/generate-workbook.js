@@ -963,6 +963,19 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     console.log('Pass 2: restored styles.xml:', stylesXml.length, 'chars');
   }
 
+  /* === Normalize theme.xml default fonts to Candara === */
+  /* ExcelJS generates theme.xml with Calibri as major/minor font.
+     Cells without explicit applyFont inherit from the theme, so we must update it. */
+  let _pass2ThemeXml = null;
+  {
+    const themeRaw = await pass1Zip.file('xl/theme/theme1.xml')?.async('string');
+    if (themeRaw) {
+      _pass2ThemeXml = themeRaw.replace(/typeface="[^"]*"/g, 'typeface="Candara"');
+      fixZip.file('xl/theme/theme1.xml', _pass2ThemeXml);
+      console.log('Pass 2: normalized theme.xml fonts to Candara');
+    }
+  }
+
   /* Restore template Content_Types and append additions for sheets 9-10 */
   let _pass2ContentTypes = null;
   if (_originalContentTypes) {
@@ -1339,6 +1352,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     if (filePath === 'xl/_rels/workbook.xml.rels' && _pass2WbRels) {
       freshZip.file(filePath, _pass2WbRels);
       console.log('Fresh zip: replaced workbook.xml.rels FROM JS VARIABLE');
+      continue;
+    }
+
+    /* Replace theme.xml with Candara-normalized version FROM JS VARIABLE */
+    if (filePath === 'xl/theme/theme1.xml' && _pass2ThemeXml) {
+      freshZip.file(filePath, _pass2ThemeXml);
+      console.log('Fresh zip: replaced theme1.xml FROM JS VARIABLE');
       continue;
     }
 
