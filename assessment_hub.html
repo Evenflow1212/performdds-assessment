@@ -2321,6 +2321,7 @@ async function generate() {
     console.log('Workbook received. Version:', sv, 'Size:', Math.round(generatedWorkbook.length / 1024), 'KB');
     console.log('Debug:', JSON.stringify(data.summary?._debug || {}));
     console.log('Timing:', JSON.stringify(data.summary?._timing || {}));
+    console.log('InjDiag:', JSON.stringify(data.summary?._injDiag || {}));
 
     _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
@@ -2335,7 +2336,8 @@ async function generate() {
       { val: employeeCosts ? 'Yes ✅' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
       { val: hygieneData ? 'Yes ✅' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
       { val: s._version || '?', lbl: 'Engine' },
-    ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
+      { val: s._injDiag ? `xfs=${s._injDiag.finalXfs} ss=${s._injDiag.finalHasSS} p2null=${s._injDiag.pass2StylesNull} p2len=${s._injDiag.pass2StylesLen} orig=${s._injDiag.origStylesLen} p1=${s._injDiag.p1Xfs}` : '?', lbl: 'Diag' },
+    ].map(item => `<div class="summary-stat"><div class="val" style="font-size:11px;word-break:break-all">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     _generating = false;
     document.getElementById('generatingState').classList.remove('visible');

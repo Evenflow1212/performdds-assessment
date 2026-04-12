@@ -936,9 +936,23 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   const verifyFinal = await JSZip.loadAsync(finalBuf);
   const vfStyles = await verifyFinal.file('xl/styles.xml')?.async('string');
   const vfHasSS = !!verifyFinal.file('xl/sharedStrings.xml');
+  const _diag = {
+    pass2StylesNull: _pass2StylesXml === null,
+    pass2StylesLen: _pass2StylesXml?.length || 0,
+    pass2CTNull: _pass2ContentTypes === null,
+    pass2SheetFixKeys: Object.keys(_pass2SheetFixes),
+    pass2WbRelsNull: _pass2WbRels === null,
+    origStylesLen: _originalStylesXml?.length || 0,
+    stylesSourceNull: !stylesSource,
+    p1Xfs: p1Xfs?.[1] || '?',
+    finalXfs: '?',
+    finalHasSS: vfHasSS,
+    finalStylesStart: vfStyles?.substring(0, 60) || 'NONE'
+  };
   if (vfStyles) {
     const vfXfs = vfStyles.match(/cellXfs count="(\d+)"/);
     const vfCount = parseInt(vfXfs?.[1]||'0');
+    _diag.finalXfs = String(vfCount);
     console.log('FINAL VERIFY: cellXfs=' + vfCount + ' sharedStrings=' + vfHasSS + ' len=' + vfStyles.length);
     if (vfCount < 700) {
       console.error('!!! STILL CONTAMINATED after fresh zip! cellXfs=' + vfCount);
@@ -947,7 +961,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     }
   }
 
-  return finalBuf;
+  return { buf: finalBuf, _diag };
 }
 
 /* Helper: escape XML special characters */
@@ -1550,10 +1564,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const elapsed = injStart - t0;
   console.log('Time before injection:', elapsed, 'ms');
 
-  const finalBuf = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf);
+  const injResult = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf);
+  const finalBuf = injResult.buf;
+  const _injDiag = injResult._diag;
   const injTime = Date.now() - injStart;
   const totalTime = Date.now() - t0;
   console.log('Injection complete in', injTime, 'ms, total:', totalTime, 'ms, output:', finalBuf.length, 'bytes');
+  console.log('Injection diagnostics:', JSON.stringify(_injDiag));
 
   return {
     xlsxB64: finalBuf.toString('base64'),
@@ -1566,8 +1583,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v12-jsvar-bypass',
+      _version: 'v12b-diag',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
+      _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
   };
