@@ -398,31 +398,52 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 <col min="10" max="10" width="13" customWidth="1" style="383"/>
 <col min="11" max="11" width="1.17" customWidth="1" style="383"/>
 </cols>`);
-      console.log('Budgetary P&L: fixed IFERROR and column widths');
+      /* Fix row heights: row 4 (practice name) and row 32 (section header) need to be taller */
+      xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
+        const r = parseInt(rNum);
+        if (r === 4 || r === 32) {
+          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="24" customHeight="1">`;
+        }
+        if (r === 5) {
+          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="22" customHeight="1">`;
+        }
+        return full;
+      });
+      console.log('Budgetary P&L: fixed IFERROR, column widths, and row heights');
     }
 
     /* ── P&L Input (sheet 8): ensure data rows are visible ── */
     if (sheetNum === 8) {
       /* Template has customHeight="1" which forces 12.75pt even if content overflows.
-         Remove customHeight on data rows (6-50) so Excel auto-sizes, and set minimum 15pt. */
+         Remove customHeight on data rows (6-50) so Excel auto-sizes, and set minimum 15pt.
+         Row 5 is the header row — make it 30pt so column labels aren't cut off. */
       xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
         const r = parseInt(rNum);
+        if (r === 5) {
+          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="30" customHeight="1">`;
+        }
         if (r >= 6 && r <= 50) {
-          /* Remove customHeight and ensure reasonable height */
           let newAttrs = attrs.replace(/\s*customHeight="1"/g, '');
           newAttrs = newAttrs.replace(/ht="[^"]*"/, 'ht="15"');
           return `<row r="${rNum}"${newAttrs}>`;
         }
         return full;
       });
-      /* Widen columns — replace entire <cols> section (Pass 2 also does this as backup) */
+      /* Widen columns — F, G, K, P wider to avoid ###### on totals */
       xml = xml.replace(/<cols>[\s\S]*?<\/cols>/,
         `<cols>
 <col min="1" max="1" width="40" customWidth="1" style="2"/>
-<col min="2" max="7" width="14" customWidth="1" style="316"/>
+<col min="2" max="5" width="14" customWidth="1" style="316"/>
+<col min="6" max="6" width="16" customWidth="1" style="316"/>
+<col min="7" max="7" width="18" customWidth="1" style="316"/>
 <col min="8" max="8" width="18" customWidth="1" style="316"/>
-<col min="9" max="15" width="14" customWidth="1" style="316"/>
-<col min="16" max="17" width="16" customWidth="1" style="316"/>
+<col min="9" max="10" width="14" customWidth="1" style="316"/>
+<col min="11" max="11" width="16" customWidth="1" style="316"/>
+<col min="12" max="15" width="14" customWidth="1" style="316"/>
+<col min="16" max="17" width="18" customWidth="1" style="316"/>
 </cols>`);
       console.log('P&L Input: fixed row heights and column widths');
     }
@@ -880,10 +901,14 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       xml = xml.replace(/<cols>[\s\S]*?<\/cols>/,
         `<cols>
 <col min="1" max="1" width="40" customWidth="1" style="2"/>
-<col min="2" max="7" width="14" customWidth="1" style="316"/>
+<col min="2" max="5" width="14" customWidth="1" style="316"/>
+<col min="6" max="6" width="16" customWidth="1" style="316"/>
+<col min="7" max="7" width="18" customWidth="1" style="316"/>
 <col min="8" max="8" width="18" customWidth="1" style="316"/>
-<col min="9" max="15" width="14" customWidth="1" style="316"/>
-<col min="16" max="17" width="16" customWidth="1" style="316"/>
+<col min="9" max="10" width="14" customWidth="1" style="316"/>
+<col min="11" max="11" width="16" customWidth="1" style="316"/>
+<col min="12" max="15" width="14" customWidth="1" style="316"/>
+<col min="16" max="17" width="18" customWidth="1" style="316"/>
 </cols>`);
 
       /* 2. Fix cell styles — force clean styles on ALL data cells rows 6-47.
@@ -904,10 +929,14 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
           return full;
         });
 
-      /* 3. Fix row heights — remove customHeight forcing, set explicit 15pt height.
-            Also add ht="15" to rows that don't have a height attribute at all. */
+      /* 3. Fix row heights — set explicit heights for header and data rows */
       xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
         const r = parseInt(rNum);
+        if (r === 5) {
+          /* Row 5 is the column header row — needs to be tall enough to show full labels */
+          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="30" customHeight="1">`;
+        }
         if (r >= 6 && r <= 50) {
           let a = attrs.replace(/\s*customHeight="1"/g, '');
           if (/ht="[^"]*"/.test(a)) {
@@ -1706,7 +1735,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v22-rowheights',
+      _version: 'v23-polish',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
