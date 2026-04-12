@@ -338,7 +338,7 @@ function baseCode(code) { return code.replace(/\.\d+$/, ''); }
  * For sheets 1-8: direct regex injection preserving styles.
  * For sheets 9-10: resolve shared strings to inline strings.
  */
-async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf) {
+async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData, practiceName) {
   const templateZip = await JSZip.loadAsync(templateBuf);
 
   /* ─── Preserve template's original styles.xml and Content_Types ─── */
@@ -802,6 +802,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
      JSZip .file(path, content) writes do NOT persist for .file(path).async() reads
      on the same loaded zip — we MUST keep the JS variable and use it in the fresh zip. */
   let _pass2StylesXml = null;
+  let _swotStyles = null;  /* SWOT style indices — set during Pass 2, used for SWOT XML generation */
 
   if (stylesSource) {
     let stylesXml = stylesSource;
@@ -872,6 +873,76 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       (full, pre, post) => pre + 'FF3574B7' + post
     );
     console.log('Pass 2: changed yellow fills (FFFFFF00) to PerformDDS blue (FF3574B7)');
+
+    /* === Add SWOT Analysis styles to template styles.xml === */
+    /* These give us proper colored section headers, fills, and borders for the SWOT sheet.
+       We parse current counts (which include the strikethrough additions above), then append. */
+    {
+      const _fm2 = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
+      const _flm = stylesXml.match(/<fills[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fills>/);
+      const _brm = stylesXml.match(/<borders[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/borders>/);
+      const _xm2 = stylesXml.match(/<cellXfs[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
+
+      if (_fm2 && _flm && _brm && _xm2) {
+        const fi = parseInt(_fm2[1]);   /* current font count */
+        const fli = parseInt(_flm[1]);  /* current fill count */
+        const bri = parseInt(_brm[1]);  /* current border count */
+        const xi = parseInt(_xm2[1]);   /* current cellXf count */
+
+        /* ── 7 new fonts ── */
+        const SF_TITLE  = fi, SF_S = fi+1, SF_W = fi+2, SF_O = fi+3, SF_T = fi+4, SF_BUL = fi+5, SF_FOOT = fi+6;
+        const swotFonts =
+          '<font><b/><sz val="20"/><color rgb="FF1A1A2E"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="14"/><color rgb="FF10B981"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="14"/><color rgb="FFEF4444"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="14"/><color rgb="FF3574B7"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="14"/><color rgb="FFF59E0B"/><name val="Candara"/></font>' +
+          '<font><sz val="14"/><color rgb="FF333333"/><name val="Candara"/></font>' +
+          '<font><i/><sz val="10"/><color rgb="FF94A3B8"/><name val="Candara"/></font>';
+        stylesXml = stylesXml.replace(_fm2[0],
+          `<fonts count="${fi + 7}">${_fm2[2]}${swotFonts}</fonts>`);
+
+        /* ── 4 new fills (light section backgrounds) ── */
+        const SFL_S = fli, SFL_W = fli+1, SFL_O = fli+2, SFL_T = fli+3;
+        const swotFills =
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFECFDF5"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFFEF2F2"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFEFF6FF"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFBEB"/><bgColor indexed="64"/></patternFill></fill>';
+        stylesXml = stylesXml.replace(_flm[0],
+          `<fills count="${fli + 4}">${_flm[2]}${swotFills}</fills>`);
+
+        /* ── 6 new borders ── */
+        const SB_TITLE = bri, SB_S = bri+1, SB_W = bri+2, SB_O = bri+3, SB_T = bri+4, SB_BUL = bri+5;
+        const swotBorders =
+          '<border><left/><right/><top/><bottom style="medium"><color rgb="FF3574B7"/></bottom><diagonal/></border>' +
+          '<border><left style="thick"><color rgb="FF10B981"/></left><right/><top/><bottom style="thin"><color rgb="FF10B981"/></bottom><diagonal/></border>' +
+          '<border><left style="thick"><color rgb="FFEF4444"/></left><right/><top/><bottom style="thin"><color rgb="FFEF4444"/></bottom><diagonal/></border>' +
+          '<border><left style="thick"><color rgb="FF3574B7"/></left><right/><top/><bottom style="thin"><color rgb="FF3574B7"/></bottom><diagonal/></border>' +
+          '<border><left style="thick"><color rgb="FFF59E0B"/></left><right/><top/><bottom style="thin"><color rgb="FFF59E0B"/></bottom><diagonal/></border>' +
+          '<border><left style="thin"><color rgb="FFE2E8F0"/></left><right/><top/><bottom/><diagonal/></border>';
+        stylesXml = stylesXml.replace(_brm[0],
+          `<borders count="${bri + 6}">${_brm[2]}${swotBorders}</borders>`);
+
+        /* ── 7 new cellXfs ── */
+        const SX_TITLE = xi, SX_S = xi+1, SX_W = xi+2, SX_O = xi+3, SX_T = xi+4, SX_BUL = xi+5, SX_FOOT = xi+6;
+        const swotXfs =
+          `<xf numFmtId="0" fontId="${SF_TITLE}" fillId="0" borderId="${SB_TITLE}" xfId="0" applyFont="1" applyBorder="1"/>` +
+          `<xf numFmtId="0" fontId="${SF_S}" fillId="${SFL_S}" borderId="${SB_S}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+          `<xf numFmtId="0" fontId="${SF_W}" fillId="${SFL_W}" borderId="${SB_W}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+          `<xf numFmtId="0" fontId="${SF_O}" fillId="${SFL_O}" borderId="${SB_O}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+          `<xf numFmtId="0" fontId="${SF_T}" fillId="${SFL_T}" borderId="${SB_T}" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+          `<xf numFmtId="0" fontId="${SF_BUL}" fillId="0" borderId="${SB_BUL}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top" indent="1"/></xf>` +
+          `<xf numFmtId="0" fontId="${SF_FOOT}" fillId="0" borderId="0" xfId="0" applyFont="1"/>`;
+        stylesXml = stylesXml.replace(_xm2[0],
+          `<cellXfs count="${xi + 7}">${_xm2[2]}${swotXfs}</cellXfs>`);
+
+        _swotStyles = { SX_TITLE, SX_S, SX_W, SX_O, SX_T, SX_BUL, SX_FOOT };
+        console.log('Pass 2: added SWOT styles — fonts ' + fi + '-' + (fi+6) + ', fills ' + fli + '-' + (fli+3) + ', borders ' + bri + '-' + (bri+5) + ', xfs ' + xi + '-' + (xi+6));
+      } else {
+        console.warn('Pass 2: could not parse styles.xml for SWOT additions');
+      }
+    }
 
     fixZip.file('xl/styles.xml', stylesXml);
     _pass2StylesXml = stylesXml;  /* Save for fresh zip build — bypasses JSZip read bug */
@@ -1129,6 +1200,54 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       fixZip.file(path, xml);
       console.log('Pass 2: applied fixes to', path);
     }
+  }
+
+  /* === Generate SWOT sheet XML directly (bypasses ExcelJS style contamination) === */
+  if (swotData && _swotStyles) {
+    let swotRows = '';
+    let sr = 1;
+
+    /* Title row */
+    swotRows += `<row r="${sr}" ht="40" customHeight="1"><c r="B${sr}" s="${_swotStyles.SX_TITLE}" t="inlineStr"><is><t>${escapeXml('SWOT Analysis \u2014 ' + (practiceName || 'Practice'))}</t></is></c></row>`;
+    sr++;
+    swotRows += `<row r="${sr}" ht="12" customHeight="1"/>`;
+    sr++;
+
+    const swotSections = [
+      { title: 'STRENGTHS',     items: swotData.strengths || [],     xf: _swotStyles.SX_S },
+      { title: 'WEAKNESSES',    items: swotData.weaknesses || [],    xf: _swotStyles.SX_W },
+      { title: 'OPPORTUNITIES', items: swotData.opportunities || [], xf: _swotStyles.SX_O },
+      { title: 'THREATS',       items: swotData.threats || [],       xf: _swotStyles.SX_T }
+    ];
+
+    for (const sec of swotSections) {
+      /* Section header */
+      swotRows += `<row r="${sr}" ht="30" customHeight="1"><c r="B${sr}" s="${sec.xf}" t="inlineStr"><is><t>${escapeXml(sec.title)}</t></is></c></row>`;
+      sr++;
+      /* Bullet items */
+      for (const item of sec.items) {
+        swotRows += `<row r="${sr}" ht="28" customHeight="1"><c r="B${sr}" s="${_swotStyles.SX_BUL}" t="inlineStr"><is><t>${escapeXml('\u2022  ' + item)}</t></is></c></row>`;
+        sr++;
+      }
+      /* Spacer */
+      swotRows += `<row r="${sr}" ht="16" customHeight="1"/>`;
+      sr++;
+    }
+
+    /* Footer */
+    sr++;
+    const _dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    swotRows += `<row r="${sr}"><c r="B${sr}" s="${_swotStyles.SX_FOOT}" t="inlineStr"><is><t>${escapeXml('Generated by Perform DDS Assessment System \u2014 ' + _dateStr)}</t></is></c></row>`;
+
+    const swotSheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<sheetFormatPr defaultRowHeight="15"/>' +
+      '<cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="90" customWidth="1"/></cols>' +
+      '<sheetData>' + swotRows + '</sheetData>' +
+      '</worksheet>';
+
+    _pass2SheetFixes['xl/worksheets/sheet11.xml'] = swotSheetXml;
+    console.log('Pass 2: generated SWOT XML directly (' + swotSheetXml.length + ' chars, ' + sr + ' rows, styles: ' + JSON.stringify(_swotStyles) + ')');
   }
 
   /* Remove sharedStrings.xml (template has none — ExcelJS injects one) */
@@ -1942,7 +2061,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const elapsed = injStart - t0;
   console.log('Time before injection:', elapsed, 'ms');
 
-  const injResult = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf);
+  const injResult = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData || null, practiceName);
   const finalBuf = injResult.buf;
   const _injDiag = injResult._diag;
   const injTime = Date.now() - injStart;
@@ -1961,7 +2080,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v27-visual-redesign',
+      _version: 'v28-swot-fix',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
