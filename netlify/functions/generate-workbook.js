@@ -749,28 +749,40 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
       /* Hide monthly rows 8-19 (no per-month data available from Dentrix reports).
          Set hidden="1" and ht="0" so they collapse. */
-      /* Helper: strip height attrs safely (customHeight BEFORE ht to avoid partial match) */
+      /* Comprehensive row height map for Financial Overview.
+         Template default is 12.75 which is too tight. Set every row explicitly. */
+      const foRowHeights = {
+        /* 8-19: hidden monthly rows */
+        8:0, 9:0, 10:0, 11:0, 12:0, 13:0, 14:0, 15:0, 16:0, 17:0, 18:0, 19:0,
+        /* Section 1: Historical Production */
+        5:18, 6:16, 7:16,
+        20:20, 21:16, 22:20,
+        /* Spacer */
+        23:18,
+        /* Section 2: P&L Collection comparison */
+        24:22, 25:18, 26:18, 27:20, 28:18,
+        /* Spacer */
+        29:18,
+        /* Section 3: Accounts Receivable */
+        30:22, 31:16, 32:18, 33:18, 34:20,
+        35:10,
+        36:18, 37:18, 38:18,
+        /* Spacer */
+        39:22,
+        /* Section 4: Collections by Payment Type */
+        40:22, 41:8, 42:16, 43:16, 44:24, 45:20
+      };
       function stripHt(a) {
         return a.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '');
       }
       xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
         const r = parseInt(rNum);
-        if (r >= 8 && r <= 19) {
+        const ht = foRowHeights[r];
+        if (ht === undefined) return full;
+        if (ht === 0) {
           return `<row r="${rNum}"${stripHt(attrs)} ht="0" hidden="1" customHeight="1">`;
         }
-        if (r === 20 || r === 22) {
-          return `<row r="${rNum}"${stripHt(attrs)} ht="18" customHeight="1">`;
-        }
-        if (r === 23 || r === 29 || r === 39) {
-          return `<row r="${rNum}"${stripHt(attrs)} ht="22" customHeight="1">`;
-        }
-        if (r === 24 || r === 30 || r === 40) {
-          return `<row r="${rNum}"${stripHt(attrs)} ht="20" customHeight="1">`;
-        }
-        if (r === 44) {
-          return `<row r="${rNum}"${stripHt(attrs)} ht="24" customHeight="1">`;
-        }
-        return full;
+        return `<row r="${rNum}"${stripHt(attrs)} ht="${ht}" customHeight="1">`;
       });
 
       /* IFERROR on row 45 */
