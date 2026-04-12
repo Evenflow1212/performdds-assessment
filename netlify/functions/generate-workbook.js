@@ -614,6 +614,11 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     stylesSource = await fallbackZip.file('xl/styles.xml')?.async('string');
     console.log('Fallback styles loaded:', stylesSource?.length, 'chars');
   }
+  /* CRITICAL: declare stylesXml in outer scope so fresh zip build can access it directly.
+     JSZip .file(path, content) writes do NOT persist for .file(path).async() reads
+     on the same loaded zip — we MUST keep the JS variable and use it in the fresh zip. */
+  let _pass2StylesXml = null;
+
   if (stylesSource) {
     let stylesXml = stylesSource;
     /* Only remove strikethrough from fonts that have grey color FF888888 (font 31 = placeholder).
@@ -685,10 +690,12 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     console.log('Pass 2: changed yellow fills (FFFFFF00) to blue (FF4472C4)');
 
     fixZip.file('xl/styles.xml', stylesXml);
+    _pass2StylesXml = stylesXml;  /* Save for fresh zip build — bypasses JSZip read bug */
     console.log('Pass 2: restored styles.xml:', stylesXml.length, 'chars');
   }
 
   /* Restore template Content_Types and append additions for sheets 9-10 */
+  let _pass2ContentTypes = null;
   if (_originalContentTypes) {
     let ct = _originalContentTypes;
     if (!ct.includes('sheet9.xml')) {
@@ -710,6 +717,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
     fixZip.file('[Content_Types].xml', ct);
+    _pass2ContentTypes = ct;  /* Save for fresh zip build — bypasses JSZip read bug */
     console.log('Pass 2: restored Content_Types');
   }
 
@@ -825,10 +833,14 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     }
   };
 
+  /* CRITICAL: Read sheet XML from pass1Zip (NOT fixZip) — pass1Zip was loaded from a buffer
+     so .file().async() reads work correctly. Store results in _pass2SheetFixes for fresh zip. */
+  const _pass2SheetFixes = {};
   for (const [path, fixFn] of Object.entries(sheetFixes)) {
-    let xml = await fixZip.file(path)?.async('string');
+    let xml = await pass1Zip.file(path)?.async('string');
     if (xml) {
       xml = fixFn(xml);
+      _pass2SheetFixes[path] = xml;  /* Save for fresh zip build */
       fixZip.file(path, xml);
       console.log('Pass 2: applied fixes to', path);
     }
@@ -841,11 +853,16 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   }
 
   /* Remove sharedStrings reference from workbook.xml.rels */
-  let wbRels = await fixZip.file('xl/_rels/workbook.xml.rels')?.async('string');
+  /* CRITICAL: Read from pass1Zip, not fixZip */
+  let wbRels = await pass1Zip.file('xl/_rels/workbook.xml.rels')?.async('string');
+  let _pass2WbRels = null;
   if (wbRels && wbRels.includes('sharedStrings')) {
     wbRels = wbRels.replace(/<Relationship[^>]*sharedStrings[^>]*\/>/g, '');
+    _pass2WbRels = wbRels;  /* Save for fresh zip build */
     fixZip.file('xl/_rels/workbook.xml.rels', wbRels);
     console.log('Pass 2: removed sharedStrings ref from workbook.xml.rels');
+  } else {
+    _pass2WbRels = wbRels;  /* No change needed but still save for fresh zip */
   }
 
   /* === VERIFICATION: confirm styles.xml was actually restored === */
@@ -861,25 +878,15 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   }
 
   /* ═══ FRESH ZIP BUILD: create brand-new zip, copying files one by one ═══ */
-  /* JSZip in-place modifications to a loaded zip may not persist to generateAsync().
-     Build a completely new zip object, copying each file individually and replacing
-     styles.xml, sheet XML (with fixes), and skipping sharedStrings. */
+  /* CRITICAL FIX (v12): Use _pass2* JS variables directly instead of reading from fixZip.
+     JSZip .file(path, content) writes do NOT persist for .file(path).async() reads
+     on the same loaded zip instance. Previous versions read back contaminated originals. */
   const freshZip = new JSZip();
-  const modifiedStyles = await fixZip.file('xl/styles.xml')?.async('string');
-  const msXfs = modifiedStyles?.match(/cellXfs count="(\d+)"/);
-  console.log('Modified styles before fresh copy: cellXfs=' + (msXfs?msXfs[1]:'?'));
 
-  /* Collect sheet fixes that were applied to fixZip */
-  const fixedSheets = {};
-  for (const [sheetPath] of Object.entries(sheetFixes)) {
-    const xml = await fixZip.file(sheetPath)?.async('string');
-    if (xml) fixedSheets[sheetPath] = xml;
-  }
+  const msXfs = _pass2StylesXml?.match(/cellXfs count="(\d+)"/);
+  console.log('Pass 2 styles (from JS variable): cellXfs=' + (msXfs?msXfs[1]:'NULL!') + ' len=' + (_pass2StylesXml?.length||0));
 
-  /* Also get the modified workbook.xml.rels (sharedStrings ref removed) */
-  const fixedWbRels = await fixZip.file('xl/_rels/workbook.xml.rels')?.async('string');
-
-  /* Copy all files from pass1 to fresh zip, with replacements */
+  /* Copy all files from pass1 to fresh zip, with replacements from JS variables */
   for (const filePath of Object.keys(pass1Zip.files)) {
     if (pass1Zip.files[filePath].dir) continue;
 
@@ -889,33 +896,35 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       continue;
     }
 
-    /* Replace styles.xml with our modified version */
-    if (filePath === 'xl/styles.xml' && modifiedStyles) {
-      freshZip.file(filePath, modifiedStyles);
-      console.log('Fresh zip: replaced styles.xml (' + modifiedStyles.length + ' chars)');
+    /* Replace styles.xml with our modified version FROM JS VARIABLE */
+    if (filePath === 'xl/styles.xml' && _pass2StylesXml) {
+      freshZip.file(filePath, _pass2StylesXml);
+      console.log('Fresh zip: replaced styles.xml (' + _pass2StylesXml.length + ' chars) FROM JS VARIABLE');
       continue;
     }
 
-    /* Replace Content_Types with our restored version */
-    if (filePath === '[Content_Types].xml') {
-      const ct = await fixZip.file(filePath)?.async('string');
-      if (ct) { freshZip.file(filePath, ct); continue; }
-    }
-
-    /* Replace fixed sheets */
-    if (fixedSheets[filePath]) {
-      freshZip.file(filePath, fixedSheets[filePath]);
-      console.log('Fresh zip: replaced', filePath);
+    /* Replace Content_Types with our restored version FROM JS VARIABLE */
+    if (filePath === '[Content_Types].xml' && _pass2ContentTypes) {
+      freshZip.file(filePath, _pass2ContentTypes);
+      console.log('Fresh zip: replaced [Content_Types].xml FROM JS VARIABLE');
       continue;
     }
 
-    /* Replace workbook.xml.rels (sharedStrings ref removed) */
-    if (filePath === 'xl/_rels/workbook.xml.rels' && fixedWbRels) {
-      freshZip.file(filePath, fixedWbRels);
+    /* Replace fixed sheets FROM JS VARIABLE */
+    if (_pass2SheetFixes[filePath]) {
+      freshZip.file(filePath, _pass2SheetFixes[filePath]);
+      console.log('Fresh zip: replaced', filePath, 'FROM JS VARIABLE');
       continue;
     }
 
-    /* Copy everything else as-is */
+    /* Replace workbook.xml.rels FROM JS VARIABLE */
+    if (filePath === 'xl/_rels/workbook.xml.rels' && _pass2WbRels) {
+      freshZip.file(filePath, _pass2WbRels);
+      console.log('Fresh zip: replaced workbook.xml.rels FROM JS VARIABLE');
+      continue;
+    }
+
+    /* Copy everything else as-is from pass1Zip (reads from buffer-loaded zip work fine) */
     const content = await pass1Zip.file(filePath)?.async('nodebuffer');
     if (content) freshZip.file(filePath, content);
   }
@@ -1557,7 +1566,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v11-fresh-zip-build',
+      _version: 'v12-jsvar-bypass',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
