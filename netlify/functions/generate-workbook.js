@@ -1583,7 +1583,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v12b-diag',
+      _version: 'v13|p1:' + (_injDiag?.p1Xfs||'?') + '|p2null:' + (_injDiag?.pass2StylesNull?'Y':'N') + '|orig:' + (_injDiag?.origStylesLen||0) + '|final:' + (_injDiag?.finalXfs||'?'),
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
