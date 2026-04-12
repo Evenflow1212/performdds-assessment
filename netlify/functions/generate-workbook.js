@@ -13,6 +13,7 @@ let _cellCollector = {};
 
 /* Strikethrough tracking — module-level so injectValuesIntoTemplate can access */
 let _acStrikeRows = [];          // All Codes rows used in Production Worksheet
+let _battingAvgText = 'N/A';     // Batting average ratio text for Production Worksheet
 let _plInputExpenseNames = new Set();  // P&L expenses written to P&L Input sheet
 
 /**
@@ -1039,39 +1040,27 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       nRows.forEach(r => { xml = swapStyle(xml, 'N'+r, '428'); });
       console.log('Pass 2 sheet1: fixed ' + eRows.length + ' E-cells, ' + gRows.length + ' G-cells, ' + nRows.length + ' N-cells');
 
-      /* ── Batting Average box: style F38-F41 cells (F:G already merged in template) ── */
-      /* F38:G38 through F43:G43 are pre-merged empty cells in the template.
-         sv() in Pass 1 sets F38 (title), F39 (value), F40/F41 (benchmark text).
-         Here we apply proper styles:
-         Style 402 = section header (light blue bg, thin gray border, left-align)
-         Style 411 = data cell (white bg, thin gray border, right-align) */
-
-      /* Helper: replace an existing cell's style, preserving inline text */
-      function baCell(xml, ref, style) {
-        const existing = new RegExp(`<c\\s[^>]*r="${ref}"[^/>]*(?:/>|>[\\s\\S]*?</c>)`, 's');
-        if (existing.test(xml)) {
-          xml = xml.replace(existing, (full) => {
-            const textMatch = full.match(/<is><t>([^<]*)<\/t><\/is>/);
-            if (textMatch) {
-              return `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${textMatch[1]}</t></is></c>`;
-            }
-            return `<c r="${ref}" s="${style}"/>`;
-          });
+      /* ── Batting Average box: inject directly in Pass 2 (bypasses sv() JSZip bug) ── */
+      /* F38:G38 and F39:G39 are pre-merged empty cells in the template.
+         Replace F38 with title, F39 with value. Use style 402 (section header)
+         for title and 411 (data cell with border) for value.
+         _battingAvgText is set during Pass 1 data aggregation. */
+      function baReplace(xml, ref, style, text) {
+        const re = new RegExp(`<c\\s[^>]*r="${ref}"[^/>]*(?:/>|>[\\s\\S]*?</c>)`, 's');
+        const replacement = text
+          ? `<c r="${ref}" s="${style}" t="inlineStr"><is><t>${text}</t></is></c>`
+          : `<c r="${ref}" s="${style}"/>`;
+        if (re.test(xml)) {
+          xml = xml.replace(re, replacement);
         }
         return xml;
       }
-
-      /* Title: F38:G38 (already merged in template) */
-      xml = baCell(xml, 'F38', '402');
-
-      /* Value: F39:G39 (already merged) */
-      xml = baCell(xml, 'F39', '411');
-
-      /* Benchmark text: F40:G40 and F41:G41 (already merged) */
-      xml = baCell(xml, 'F40', '402');
-      xml = baCell(xml, 'F41', '402');
-
-      console.log('Pass 2 sheet1: styled batting average box (F38-F41)');
+      xml = baReplace(xml, 'F38', '402', 'BATTING AVERAGE');
+      xml = baReplace(xml, 'F39', '411', _battingAvgText);
+      /* Clear remaining merged cells so they don't show stale data */
+      xml = baReplace(xml, 'F40', '402', null);
+      xml = baReplace(xml, 'F41', '402', null);
+      console.log('Pass 2 sheet1: injected batting average box (' + _battingAvgText + ')');
 
       return xml;
     },
@@ -1459,6 +1448,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   _cellCollector = {};
   _acStrikeRows = [];
   _plInputExpenseNames = new Set();
+  _battingAvgText = 'N/A';
 
   /* Sheet name → sheet number mapping */
   const sheetNameMap = {
@@ -1617,10 +1607,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       battingAvgText = ratio.toFixed(1) + ' to 1';
     }
 
-    sv(wsPW, 'F38', 'BATTING AVERAGE');
-    sv(wsPW, 'F39', battingAvgText);
-    sv(wsPW, 'F40', 'Better than 5:1 is good.');
-    sv(wsPW, 'F41', 'Further from 1 is worse.');
+    _battingAvgText = battingAvgText;
     console.log('Batting average:', battingAvgText, '(visits=' + visits + ', crowns=' + totalCrowns + ')');
   }
 
