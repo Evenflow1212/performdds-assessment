@@ -145,8 +145,9 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
 
   /* Derive key metrics */
   const netCollections = collData?.payments || plData?.totalIncome || 0;
+  const collMonths = collData?.months || prodMonths || 1;
   const collectionRate = totalProd > 0 && netCollections > 0 ? (netCollections / totalProd * 100) : 0;
-  const monthlyCollections = netCollections > 0 && prodMonths > 0 ? netCollections / prodMonths : 0;
+  const monthlyCollections = netCollections > 0 && collMonths > 0 ? netCollections / collMonths : 0;
 
   /* Code lookups */
   const codeQty = (prefix) => codes.filter(c => c.code.startsWith(prefix)).reduce((s,c) => s + c.qty, 0);
@@ -201,8 +202,9 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     if (plData.netIncome != null) netIncomePct = (plData.netIncome / netCollections * 100);
   }
 
-  /* Employee cost from form data (more accurate if available) */
-  if (employeeCosts && netCollections > 0) {
+  /* Employee cost from form data — only use as FALLBACK when P&L staff cost is unavailable.
+     P&L captures total payroll; the form only has partial staff entered by the consultant. */
+  if (employeeCosts && netCollections > 0 && totalStaffCost === 0) {
     let totalWages = 0;
     (employeeCosts.staff || []).forEach(p => { totalWages += (p.rate || 0) * (p.hours || 0) * 4.33; });
     (employeeCosts.hygiene || []).forEach(p => { totalWages += (p.rate || 0) * (p.hours || 0) * 4.33; });
@@ -1956,7 +1958,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v25-swot',
+      _version: 'v26-swot-fix',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
