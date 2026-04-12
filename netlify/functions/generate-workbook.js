@@ -132,6 +132,158 @@ function plCategory(item) {
   return 'M';
 }
 
+/* ─── SWOT Analysis Generator ─── */
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceName) {
+  const strengths = [];
+  const weaknesses = [];
+  const opportunities = [];
+  const threats = [];
+
+  const { codes, months: prodMonths } = prodData;
+  const totalProd = codes.reduce((s,c) => s + c.total, 0);
+  const monthlyProd = prodMonths > 0 ? totalProd / prodMonths : 0;
+
+  /* Derive key metrics */
+  const netCollections = collData?.payments || plData?.totalIncome || 0;
+  const collectionRate = totalProd > 0 && netCollections > 0 ? (netCollections / totalProd * 100) : 0;
+  const monthlyCollections = netCollections > 0 && prodMonths > 0 ? netCollections / prodMonths : 0;
+
+  /* Code lookups */
+  const codeQty = (prefix) => codes.filter(c => c.code.startsWith(prefix)).reduce((s,c) => s + c.qty, 0);
+  const codeTotal = (prefix) => codes.filter(c => c.code.startsWith(prefix)).reduce((s,c) => s + c.total, 0);
+  const exactQty = (code) => { const f = codes.find(c => c.code === code); return f ? f.qty : 0; };
+
+  /* NP flow (D0150 = comp exams) */
+  const compExams = exactQty('D0150');
+  const npPerMonth = prodMonths > 0 ? Math.round(compExams / prodMonths) : 0;
+
+  /* Active patient estimate (prophy + perio maint per year) */
+  const prophyQty = exactQty('D1110') + exactQty('D1120');
+  const perioMaintQty = exactQty('D4910');
+  const activePatientEst = Math.round((prophyQty + perioMaintQty) / (prodMonths / 12));
+
+  /* Hygiene production */
+  const hygCodes = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0274'];
+  let hygProd = 0;
+  for (const hc of hygCodes) { hygProd += codeTotal(hc); }
+  const hygPct = totalProd > 0 ? (hygProd / totalProd * 100) : 0;
+
+  /* Perio metrics */
+  const srpQty = exactQty('D4341') + exactQty('D4342');
+  const perioRatio = prophyQty > 0 ? (srpQty / prophyQty * 100) : 0;
+
+  /* Specialty production (endo, oral surgery, implants, ortho, perio surgery) */
+  const endoTotal = codeTotal('D3310') + codeTotal('D3320') + codeTotal('D3330') + codeTotal('D3346') + codeTotal('D3347') + codeTotal('D3348');
+  const osTotal = codeTotal('D7140') + codeTotal('D7210') + codeTotal('D7220') + codeTotal('D7230') + codeTotal('D7240') + codeTotal('D7250');
+  const implantTotal = codeTotal('D6010') + codeTotal('D6011') + codeTotal('D6012') + codeTotal('D6013') + codeTotal('D6100') + codeTotal('D6104');
+  const orthoTotal = codeTotal('D8040') + codeTotal('D8080') + codeTotal('D8090') + codeTotal('D8220');
+  const specTotal = endoTotal + osTotal + implantTotal + orthoTotal;
+  const specPct = totalProd > 0 ? (specTotal / totalProd * 100) : 0;
+
+  /* Panorex */
+  const hasPanorex = exactQty('D0330') > 0;
+
+  /* P&L-derived metrics */
+  let staffCostPct = 0, labPct = 0, supplyPct = 0, netIncomePct = 0;
+  let totalStaffCost = 0, totalLabCost = 0, totalSupplyCost = 0;
+  if (plData && plData.items && netCollections > 0) {
+    for (const item of plData.items) {
+      if (item.section === 'Income' || item.section === 'COGS') continue;
+      const cat = plCategory(item.item);
+      if (cat === 'H') totalStaffCost += item.amount;
+      const l = item.item.toLowerCase();
+      if (/lab\s*(fee|cost|expense)/i.test(l) || l.includes('laboratory')) totalLabCost += item.amount;
+      if (/dental.*suppl|job.*suppl/i.test(l)) totalSupplyCost += item.amount;
+    }
+    staffCostPct = (totalStaffCost / netCollections * 100);
+    labPct = (totalLabCost / netCollections * 100);
+    supplyPct = (totalSupplyCost / netCollections * 100);
+    if (plData.netIncome != null) netIncomePct = (plData.netIncome / netCollections * 100);
+  }
+
+  /* Employee cost from form data (more accurate if available) */
+  if (employeeCosts && netCollections > 0) {
+    let totalWages = 0;
+    (employeeCosts.staff || []).forEach(p => { totalWages += (p.rate || 0) * (p.hours || 0) * 4.33; });
+    (employeeCosts.hygiene || []).forEach(p => { totalWages += (p.rate || 0) * (p.hours || 0) * 4.33; });
+    if (totalWages > 0) {
+      const annualWages = totalWages * 12;
+      const empStaffPct = annualWages / netCollections * 100;
+      if (empStaffPct > 0) staffCostPct = empStaffPct;
+    }
+  }
+
+  /* AR metrics */
+  const totalAR = (arPatient?.total || 0) + (arInsurance?.total || 0);
+  const ar90Plus = (arPatient?.d90plus || 0) + (arInsurance?.d90plus || 0);
+  const ar90Pct = totalAR > 0 ? (ar90Plus / totalAR * 100) : 0;
+
+  /* ── STRENGTHS ── */
+  if (collectionRate >= 95) strengths.push('Collection rate is strong at ' + Math.round(collectionRate) + '%');
+  if (hygPct >= 28) strengths.push('Hygiene department is performing well at ' + Math.round(hygPct) + '% of total production');
+  if (staffCostPct > 0 && staffCostPct <= 22) strengths.push('Staff costs are well managed at ' + Math.round(staffCostPct) + '% of collections');
+  if (npPerMonth >= 30) strengths.push('Strong new patient flow at ' + npPerMonth + ' per month');
+  if (activePatientEst >= 1000) strengths.push('Practice has a strong active patient base, estimated at approximately ' + activePatientEst);
+  if (perioMaintQty > 0 && perioRatio >= 15) strengths.push('Solid soft tissue management protocols appear to be in place');
+  if (specTotal > 0 && specPct >= 5) strengths.push('The practice has established in-house specialty services');
+  if (totalAR > 0 && ar90Pct < 5) strengths.push('AR management is healthy with minimal aged receivables');
+  if (netIncomePct >= 30) strengths.push('Practice net income is strong at ' + Math.round(netIncomePct) + '% of collections');
+  if (monthlyProd >= 80000) strengths.push('Production volume is strong at $' + Math.round(monthlyProd).toLocaleString() + ' per month');
+
+  /* ── WEAKNESSES ── */
+  if (collectionRate > 0 && collectionRate < 93) weaknesses.push('Collection rate of ' + Math.round(collectionRate) + '% is below the 98% benchmark');
+  if (staffCostPct > 25) weaknesses.push('Staff wages at ' + Math.round(staffCostPct) + '% of collections significantly exceed the 20% benchmark');
+  if (hygPct > 0 && hygPct < 25) weaknesses.push('Hygiene production at ' + Math.round(hygPct) + '% is below the 30-35% target');
+  if (perioMaintQty === 0 && prophyQty > 0) weaknesses.push('Perio maintenance appears limited — no D4910 codes present');
+  if (srpQty === 0 && prophyQty > 50) weaknesses.push('Periodontal disease appears to be under-diagnosed — no SRP procedures found');
+  else if (perioRatio > 0 && perioRatio < 8 && prophyQty > 50) weaknesses.push('Periodontal disease may be under-diagnosed relative to the patient flow');
+  if (!hasPanorex) weaknesses.push('The practice does not appear to have a Panorex');
+  if (labPct > 5) weaknesses.push('Lab costs at ' + labPct.toFixed(1) + '% of collections exceed the 4% benchmark');
+  if (supplyPct > 5) weaknesses.push('Dental supply costs at ' + supplyPct.toFixed(1) + '% are above benchmark');
+  if (totalAR > 0 && ar90Pct > 10) weaknesses.push('Aged AR over 90 days at ' + Math.round(ar90Pct) + '% needs attention');
+  if (npPerMonth > 0 && npPerMonth < 15) weaknesses.push('New patient flow is low at ' + npPerMonth + ' per month');
+  if (activePatientEst > 0 && activePatientEst < 500) weaknesses.push('Active patient base is small, estimated at approximately ' + activePatientEst);
+  if (netIncomePct > 0 && netIncomePct < 15) weaknesses.push('Net income at ' + Math.round(netIncomePct) + '% of collections is below the 30% target');
+
+  /* ── OPPORTUNITIES ── */
+  if (perioMaintQty === 0 || perioRatio < 10) opportunities.push('Developing soft tissue management protocols would increase patient care and hygiene revenue');
+  if (hygPct > 0 && hygPct < 28) opportunities.push('Additional hygiene capacity could significantly increase patient flow and production');
+  if (specTotal === 0) opportunities.push('Bringing specialists in-house would increase the range of treatment and revenue');
+  if (collectionRate > 0 && collectionRate < 95) {
+    const potentialRecovery = Math.round((0.98 - collectionRate/100) * totalProd);
+    if (potentialRecovery > 0) opportunities.push('Improved collection systems could recover approximately $' + potentialRecovery.toLocaleString() + ' annually');
+  }
+  if (staffCostPct > 25) {
+    const targetSavings = Math.round((staffCostPct/100 - 0.20) * netCollections / 12);
+    if (targetSavings > 0) opportunities.push('Staff cost optimization could improve profitability by approximately $' + targetSavings.toLocaleString() + ' monthly');
+  }
+  if (npPerMonth > 0 && npPerMonth < 20) opportunities.push('Focused marketing could improve new patient flow');
+  if (orthoTotal === 0) opportunities.push('Clear aligner therapy represents an untapped revenue opportunity');
+  if (!hasPanorex) opportunities.push('A panoramic machine would assist in growing in-house specialty services');
+  if (totalAR > 0 && ar90Pct > 10) {
+    opportunities.push('Focused AR management could recover a significant portion of the $' + Math.round(ar90Plus).toLocaleString() + ' in 90+ day receivables');
+  }
+
+  /* ── THREATS ── */
+  threats.push('A change in ownership or management style can lead to patient and staff attrition');
+  if (staffCostPct > 25 && netIncomePct < 20) threats.push('Current overhead levels may prevent the practice from investing in growth');
+  if (npPerMonth > 0) {
+    const npProd = codeTotal('D0150');
+    const npProdPct = totalProd > 0 ? (npProd / totalProd * 100) : 0;
+    if (npProdPct > 5) threats.push('The practice may be overly reliant on new patient flow');
+  }
+  if (specPct > 15) threats.push('Heavy reliance on specialty services means the provider must be able to sustain this production');
+  threats.push('Experienced staff may resist changes in philosophy or management style');
+
+  /* Ensure minimum bullets per section */
+  if (strengths.length === 0) strengths.push('Further data is needed to fully assess practice strengths');
+  if (weaknesses.length === 0) weaknesses.push('No significant weaknesses were identified from the available data');
+  if (opportunities.length === 0) opportunities.push('A comprehensive review of the practice operations could identify growth opportunities');
+  if (threats.length === 0) threats.push('Market conditions and competitive landscape should be evaluated');
+
+  return { strengths, weaknesses, opportunities, threats };
+}
+
 /* ─── Production Worksheet mappings ─── */
 const LEFT = {'D0120':10,'D0140':11,'D0150':12,'D0180':13,'D0210':16,'D0274':17,'D0330':18,
   'D1110':21,'D1120':22,'D4910':23,'D4381':25,'D4346':26,'D2740':31,'D2750':32};
@@ -485,10 +637,10 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       });
     console.log('ExcelJS sheet files found:', excelSheetFiles);
 
-    /* Map ExcelJS sheets → template sheet9, sheet10 */
-    const targetSheetNums = [9, 10];
-    let hasSheet9 = false, hasSheet10 = false;
-    for (let idx = 0; idx < excelSheetFiles.length && idx < 2; idx++) {
+    /* Map ExcelJS sheets → template sheet9, sheet10, sheet11 */
+    const targetSheetNums = [9, 10, 11];
+    let hasSheet9 = false, hasSheet10 = false, hasSheet11 = false;
+    for (let idx = 0; idx < excelSheetFiles.length && idx < 3; idx++) {
       const srcPath = excelSheetFiles[idx];
       const targetNum = targetSheetNums[idx];
       const targetPath = `xl/worksheets/sheet${targetNum}.xml`;
@@ -528,12 +680,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         templateZip.file(targetPath, xml);
         if (targetNum === 9) hasSheet9 = true;
         if (targetNum === 10) hasSheet10 = true;
+        if (targetNum === 11) hasSheet11 = true;
         console.log(`ExcelJS ${srcPath} → ${targetPath}: converted shared strings to inline`);
       }
     }
 
-    /* Copy rels for ExcelJS sheets, remapping to sheet9/10 */
-    for (let idx = 0; idx < excelSheetFiles.length && idx < 2; idx++) {
+    /* Copy rels for ExcelJS sheets, remapping to sheet9/10/11 */
+    for (let idx = 0; idx < excelSheetFiles.length && idx < 3; idx++) {
       const srcNum = excelSheetFiles[idx].match(/sheet(\d+)/)[1];
       const targetNum = targetSheetNums[idx];
       const srcRels = `xl/worksheets/_rels/sheet${srcNum}.xml.rels`;
@@ -555,7 +708,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     }
 
     let workbookXml = await templateZip.file('xl/workbook.xml')?.async('string');
-    if (workbookXml && (hasSheet9 || hasSheet10)) {
+    if (workbookXml && (hasSheet9 || hasSheet10 || hasSheet11)) {
       const sheetsPattern = /<sheets>([\s\S]*?)<\/sheets>/;
       const sheetsMatch = workbookXml.match(sheetsPattern);
       if (sheetsMatch) {
@@ -574,6 +727,9 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         if (hasSheet10 && !sheetsContent.includes('rId12')) {
           sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Image" sheetId="${maxId + 2}" state="visible" r:id="rId12"/>`;
         }
+        if (hasSheet11 && !sheetsContent.includes('rId13')) {
+          sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="SWOT Analysis" sheetId="${maxId + 3}" state="visible" r:id="rId13"/>`;
+        }
 
         workbookXml = workbookXml.replace(sheetsPattern, `<sheets>${sheetsContent}</sheets>`);
         templateZip.file('xl/workbook.xml', workbookXml);
@@ -587,6 +743,9 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
       if (hasSheet10 && !wbRelsXml.includes('sheet10.xml')) {
         wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet10.xml" Id="rId12"/></Relationships>');
+      }
+      if (hasSheet11 && !wbRelsXml.includes('sheet11.xml')) {
+        wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet11.xml" Id="rId13"/></Relationships>');
       }
       templateZip.file('xl/_rels/workbook.xml.rels', wbRelsXml);
     }
@@ -726,6 +885,9 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     }
     if (!ct.includes('sheet10.xml')) {
       ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet10.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+    }
+    if (!ct.includes('sheet11.xml')) {
+      ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet11.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
     }
     if (!ct.includes('Extension="jpeg"') && !ct.includes('Extension="jpg"')) {
       ct = ct.replace(/<\/Types>/, '<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
@@ -1597,11 +1759,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     console.log('P&L Input: wrote ' + (row - 6) + ' expense items to rows 6-' + (row-1) + ', template formulas at 48-51 preserved');
   }
 
-  /* ═══ P&L RAW IMPORT & P&L IMAGE (sheets 9-10, ExcelJS-only) ═══ */
+  /* ═══ P&L RAW IMPORT, P&L IMAGE & SWOT ANALYSIS (sheets 9-11, ExcelJS-only) ═══ */
   let sheets9to10Buf = null;
-  let needsSheets9to10 = (plData && plData.items && plData.items.length > 0) || plImageB64;
+  const swotData = generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceName);
+  const needsExtraSheets = (plData && plData.items && plData.items.length > 0) || plImageB64 || swotData;
 
-  if (needsSheets9to10) {
+  if (needsExtraSheets) {
     const wbNewSheets = new ExcelJS.Workbook();
 
     /* P&L Raw Import */
@@ -1707,8 +1870,66 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       }
     }
 
+    /* ═══ SWOT ANALYSIS (sheet 11) ═══ */
+    if (swotData) {
+      const wsSWOT = wbNewSheets.addWorksheet('SWOT Analysis');
+
+      /* Column widths */
+      wsSWOT.getColumn('A').width = 3;
+      wsSWOT.getColumn('B').width = 85;
+
+      /* Title */
+      const titleCell = wsSWOT.getCell('B1');
+      titleCell.value = 'SWOT Analysis — ' + (practiceName || 'Practice');
+      titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FF1F3864' } };
+      wsSWOT.getRow(1).height = 28;
+      wsSWOT.getRow(2).height = 8; /* spacer */
+
+      let row = 3;
+
+      const sections = [
+        { title: 'Strengths', items: swotData.strengths, color: 'FF2E7D32', bgColor: 'FFE8F5E9' },
+        { title: 'Weaknesses', items: swotData.weaknesses, color: 'FFC62828', bgColor: 'FFFFEBEE' },
+        { title: 'Opportunities', items: swotData.opportunities, color: 'FF1565C0', bgColor: 'FFE3F2FD' },
+        { title: 'Threats', items: swotData.threats, color: 'FFE65100', bgColor: 'FFFFF3E0' }
+      ];
+
+      for (const section of sections) {
+        /* Section header */
+        const hdrCell = wsSWOT.getCell('B' + row);
+        hdrCell.value = section.title;
+        hdrCell.font = { name: 'Arial', size: 12, bold: true, color: { argb: section.color } };
+        hdrCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: section.bgColor } };
+        hdrCell.border = { bottom: { style: 'thin', color: { argb: section.color } } };
+        wsSWOT.getRow(row).height = 22;
+        row++;
+
+        /* Bullet items */
+        for (const item of section.items) {
+          const bulletCell = wsSWOT.getCell('B' + row);
+          bulletCell.value = '•  ' + item;
+          bulletCell.font = { name: 'Arial', size: 10.5 };
+          bulletCell.alignment = { wrapText: true, vertical: 'top' };
+          wsSWOT.getRow(row).height = 20;
+          row++;
+        }
+
+        /* Spacer row between sections */
+        wsSWOT.getRow(row).height = 10;
+        row++;
+      }
+
+      /* Footer */
+      row++;
+      const footerCell = wsSWOT.getCell('B' + row);
+      footerCell.value = 'Generated by Perform DDS Assessment System — ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      footerCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: 'FF888888' } };
+
+      console.log('SWOT Analysis: written (' + swotData.strengths.length + 'S, ' + swotData.weaknesses.length + 'W, ' + swotData.opportunities.length + 'O, ' + swotData.threats.length + 'T)');
+    }
+
     sheets9to10Buf = await wbNewSheets.xlsx.writeBuffer();
-    console.log('Sheets 9-10 ExcelJS buffer written:', sheets9to10Buf.byteLength, 'bytes');
+    console.log('Extra sheets ExcelJS buffer written:', sheets9to10Buf.byteLength, 'bytes');
   }
 
   /* Now inject collected cell values into template, along with sheets 9-10 if present */
@@ -1735,7 +1956,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v24-allsheets',
+      _version: 'v25-swot',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
