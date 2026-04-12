@@ -731,6 +731,27 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   /* These must happen in Pass 2 because ExcelJS contamination rewrites sheet XML
      during Pass 1, changing style="383" to style="1" and potentially resetting column widths. */
   const sheetFixes = {
+    'xl/worksheets/sheet1.xml': (xml) => {
+      /* Production Worksheet: fix cells with General number format.
+         Several formula cells in the template have fmt=General instead of
+         integer (fmt=0) or dollar ($#,##0). Fix by swapping style IDs:
+         - E column per-month qty: s=424/413 (General) → s=419 (integer fmt=0)
+         - N column avg fee: s=417/454 (General) → s=428 ($#,##0)
+         - G30 production total: s=413 (General) → s=427 ($#,##0 dollar) */
+      const styleSwaps = {
+        'E18': '419', 'E30': '419', 'E36': '419',
+        'N9': '428', 'N18': '428', 'N47': '428', 'N55': '428', 'N68': '428',
+        'G30': '427'
+      };
+      for (const [ref, newStyle] of Object.entries(styleSwaps)) {
+        xml = xml.replace(
+          new RegExp(`(<c [^>]*r="${ref}"[^>]*?)s="\\d+"`, 's'),
+          `$1s="${newStyle}"`
+        );
+      }
+      console.log('Pass 2 sheet1: fixed General format cells');
+      return xml;
+    },
     'xl/worksheets/sheet4.xml': (xml) => {
       /* Financial Overview: widen columns for AR dollar amounts */
       xml = xml.replace(/<cols>[\s\S]*?<\/cols>/, `<cols>
@@ -1630,7 +1651,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v19b-xmlfix',
+      _version: 'v21-prodfix',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
