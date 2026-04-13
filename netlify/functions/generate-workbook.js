@@ -979,8 +979,8 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         const BA_FNT_TITLE = fi3;
         const BA_FNT_VALUE = fi3 + 1;
         const baFonts =
-          '<font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +     /* title: bold 14pt white */
-          '<font><b/><sz val="28"/><color rgb="FF1A1A2E"/><name val="Candara"/></font>';       /* value: bold 28pt dark */
+          '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +     /* title: bold 12pt white */
+          '<font><b/><sz val="20"/><color rgb="FF1A1A2E"/><name val="Candara"/></font>';       /* value: bold 20pt dark */
         stylesXml = stylesXml.replace(_fm3[0],
           `<fonts count="${fi3 + 2}">${_fm3[2]}${baFonts}</fonts>`);
 
@@ -998,8 +998,8 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         const BA_BDR_BOT = bri3 + 1;
         const bdrColor = 'FF3574B7';  /* PerformDDS blue */
         const baBorders =
-          `<border><left style="medium"><color rgb="${bdrColor}"/></left><right style="medium"><color rgb="${bdrColor}"/></right><top style="medium"><color rgb="${bdrColor}"/></top><bottom style="thin"><color rgb="${bdrColor}"/></bottom><diagonal/></border>` +
-          `<border><left style="medium"><color rgb="${bdrColor}"/></left><right style="medium"><color rgb="${bdrColor}"/></right><top/><bottom style="medium"><color rgb="${bdrColor}"/></bottom><diagonal/></border>`;
+          `<border><left style="thin"><color rgb="${bdrColor}"/></left><right style="thin"><color rgb="${bdrColor}"/></right><top style="thin"><color rgb="${bdrColor}"/></top><bottom/><diagonal/></border>` +
+          `<border><left style="thin"><color rgb="${bdrColor}"/></left><right style="thin"><color rgb="${bdrColor}"/></right><top/><bottom style="thin"><color rgb="${bdrColor}"/></bottom><diagonal/></border>`;
         stylesXml = stylesXml.replace(_brm3[0],
           `<borders count="${bri3 + 2}">${_brm3[2]}${baBorders}</borders>`);
 
@@ -1120,6 +1120,17 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       xml = baReplace(xml, 'F38', baTitle, 'BATTING AVERAGE');
       xml = baReplace(xml, 'F39', baValue, _battingAvgText);
       /* F40-F41 left with template default style (no fill, no border) */
+
+      /* Set row heights so the box is more square and text isn't clipped */
+      xml = xml.replace(/<row\s([^>]*r="38"[^>]*)>/, (m, attrs) => {
+        attrs = attrs.replace(/\bht="[^"]*"/, '').replace(/\bcustomHeight="[^"]*"/, '');
+        return `<row ${attrs.trim()} ht="25" customHeight="1">`;
+      });
+      xml = xml.replace(/<row\s([^>]*r="39"[^>]*)>/, (m, attrs) => {
+        attrs = attrs.replace(/\bht="[^"]*"/, '').replace(/\bcustomHeight="[^"]*"/, '');
+        return `<row ${attrs.trim()} ht="40" customHeight="1">`;
+      });
+
       console.log('Pass 2 sheet1: injected batting average box (' + _battingAvgText + ') styles: title=' + baTitle + ' value=' + baValue);
 
       return xml;
