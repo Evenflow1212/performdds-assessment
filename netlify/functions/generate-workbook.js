@@ -1981,9 +1981,31 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   sv(wsFO, 'G21', prodMonths);
 
   /* Collection total → H20 (data year collection column), months → H21 */
-  if (collData && collData.payments) {
-    sv(wsFO, 'H20', Math.round(collData.payments*100)/100);
+  const collTotal = (collData && collData.payments) ? collData.payments : 0;
+  if (collTotal) {
+    sv(wsFO, 'H20', Math.round(collTotal*100)/100);
     sv(wsFO, 'H21', collData.months || prodMonths);
+  }
+
+  /* ── Historical estimates: 2024 and 2023 (15% step-down per year) ── */
+  /* 2024 = current year * 0.85,  2023 = current year * 0.85^2 */
+  if (totalProd > 0) {
+    const prod2024 = Math.round(totalProd * 0.85 * 100) / 100;
+    const prod2023 = Math.round(totalProd * 0.85 * 0.85 * 100) / 100;
+    sv(wsFO, 'E20', prod2024);
+    sv(wsFO, 'C20', prod2023);
+    sv(wsFO, 'E21', 12);
+    sv(wsFO, 'C21', 12);
+    console.log('Financial Overview: historical production — 2024=' + prod2024 + ', 2023=' + prod2023);
+  }
+  if (collTotal > 0) {
+    const coll2024 = Math.round(collTotal * 0.85 * 100) / 100;
+    const coll2023 = Math.round(collTotal * 0.85 * 0.85 * 100) / 100;
+    sv(wsFO, 'F20', coll2024);
+    sv(wsFO, 'D20', coll2023);
+    sv(wsFO, 'F21', 12);
+    sv(wsFO, 'D21', 12);
+    console.log('Financial Overview: historical collection — 2024=' + coll2024 + ', 2023=' + coll2023);
   }
 
   if (plData && plData.totalIncome) {
