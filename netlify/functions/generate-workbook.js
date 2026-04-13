@@ -961,7 +961,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     }
 
     /* === Add Batting Average box styles === */
-    /* Bold-bordered box in Production Worksheet F38:G39 area.
+    /* Bold-bordered box in Production Worksheet G38:G39 (column G only).
        Re-parse counts (SWOT additions may have changed them). */
     {
       const _fm3 = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
@@ -998,8 +998,8 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         const BA_BDR_BOT = bri3 + 1;
         const bdrColor = 'FF3574B7';  /* PerformDDS blue */
         const baBorders =
-          `<border><left style="thin"><color rgb="${bdrColor}"/></left><right style="thin"><color rgb="${bdrColor}"/></right><top style="thin"><color rgb="${bdrColor}"/></top><bottom/><diagonal/></border>` +
-          `<border><left style="thin"><color rgb="${bdrColor}"/></left><right style="thin"><color rgb="${bdrColor}"/></right><top/><bottom style="thin"><color rgb="${bdrColor}"/></bottom><diagonal/></border>`;
+          `<border><left style="thin"><color rgb="${bdrColor}"/></left><right style="thin"><color rgb="${bdrColor}"/></right><top style="thin"><color rgb="${bdrColor}"/></top><bottom style="thin"><color rgb="${bdrColor}"/></bottom><diagonal/></border>` +
+          `<border><left style="thin"><color rgb="${bdrColor}"/></left><right style="thin"><color rgb="${bdrColor}"/></right><top style="thin"><color rgb="${bdrColor}"/></top><bottom style="thin"><color rgb="${bdrColor}"/></bottom><diagonal/></border>`;
         stylesXml = stylesXml.replace(_brm3[0],
           `<borders count="${bri3 + 2}">${_brm3[2]}${baBorders}</borders>`);
 
@@ -1100,11 +1100,17 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       nRows.forEach(r => { xml = swapStyle(xml, 'N'+r, '428'); });
       console.log('Pass 2 sheet1: fixed ' + eRows.length + ' E-cells, ' + gRows.length + ' G-cells, ' + nRows.length + ' N-cells');
 
-      /* ── Batting Average box: inject directly in Pass 2 (bypasses sv() JSZip bug) ── */
-      /* F38:G38 and F39:G39 are pre-merged empty cells in the template.
-         Replace F38 with title, F39 with value.
-         Uses dynamic _baStyles set during Pass 2 styles phase (bold blue border box).
-         Falls back to 402/411 if styles weren't created. */
+      /* ── Batting Average box: column G only (G38 title, G39 value) ── */
+      /* Template has merged F38:G38 .. F41:G41.  We remove those merges
+         so the box lives in column G alone (width ≈23 → more square).       */
+
+      /* 1. Remove F:G merges for rows 38-41 */
+      xml = xml.replace(/<mergeCell ref="F38:G38"\/>/g, '');
+      xml = xml.replace(/<mergeCell ref="F39:G39"\/>/g, '');
+      xml = xml.replace(/<mergeCell ref="F40:G40"\/>/g, '');
+      xml = xml.replace(/<mergeCell ref="F41:G41"\/>/g, '');
+
+      /* 2. Helper to replace or insert a cell */
       function baReplace(xml, ref, style, text) {
         const re = new RegExp(`<c\\s[^>]*r="${ref}"[^/>]*(?:/>|>[\\s\\S]*?</c>)`, 's');
         const replacement = text
@@ -1115,13 +1121,29 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         }
         return xml;
       }
+
+      /* 3. Insert styled cells into G38 and G39.
+            G38/G39 don't exist as separate <c> elements (hidden by merge),
+            so we insert them after the F38/F39 cells. */
       const baTitle = _baStyles ? String(_baStyles.BA_XF_TITLE) : '402';
       const baValue = _baStyles ? String(_baStyles.BA_XF_VALUE) : '411';
-      xml = baReplace(xml, 'F38', baTitle, 'BATTING AVERAGE');
-      xml = baReplace(xml, 'F39', baValue, _battingAvgText);
-      /* F40-F41 left with template default style (no fill, no border) */
 
-      /* Set row heights so the box is more square and text isn't clipped */
+      /* Strip old F38/F39 BA styles (reset to template default empty) */
+      xml = baReplace(xml, 'F38', '49', null);
+      xml = baReplace(xml, 'F39', '52', null);
+
+      /* Insert G38 after F38 cell */
+      xml = xml.replace(
+        /(<c r="F38"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
+        `$1<c r="G38" s="${baTitle}" t="inlineStr"><is><t>BATTING AVERAGE</t></is></c>`
+      );
+      /* Insert G39 after F39 cell */
+      xml = xml.replace(
+        /(<c r="F39"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
+        `$1<c r="G39" s="${baValue}" t="inlineStr"><is><t>${_battingAvgText}</t></is></c>`
+      );
+
+      /* 4. Set row heights so the box is more square and text isn't clipped */
       xml = xml.replace(/<row\s([^>]*r="38"[^>]*)>/, (m, attrs) => {
         attrs = attrs.replace(/\bht="[^"]*"/, '').replace(/\bcustomHeight="[^"]*"/, '');
         return `<row ${attrs.trim()} ht="25" customHeight="1">`;
@@ -1131,7 +1153,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         return `<row ${attrs.trim()} ht="40" customHeight="1">`;
       });
 
-      console.log('Pass 2 sheet1: injected batting average box (' + _battingAvgText + ') styles: title=' + baTitle + ' value=' + baValue);
+      console.log('Pass 2 sheet1: injected BA box in G38:G39 (' + _battingAvgText + ') styles: title=' + baTitle + ' value=' + baValue);
 
       return xml;
     },
@@ -1645,7 +1667,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsPW, 'N'+row, agg.qty > 0 ? Math.round(agg.total/agg.qty*100)/100 : 0);
   }
 
-  /* ═══ BATTING AVERAGE BOX (Production Worksheet, F38:G41) ═══ */
+  /* ═══ BATTING AVERAGE BOX (Production Worksheet, G38:G39) ═══ */
   /* Batting Average = monthly visits / monthly crowns prepped
      Visits/mo = comp exams (E12) + focused exams (E11) + adult prophy (E21)
                  + perio maintenance (E23)
