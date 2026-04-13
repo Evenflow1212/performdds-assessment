@@ -2262,7 +2262,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   /* ═══ EMPLOYEE COSTS ═══ */
   /* If no hub form employeeCosts provided, derive estimates from P&L data */
-  if (!employeeCosts && plData && plData.items && plData.items.length > 0) {
+  const hasEmployeeData = employeeCosts && (employeeCosts.staff || employeeCosts.hygiene);
+  if (!hasEmployeeData && plData && plData.items && plData.items.length > 0) {
     console.log('Employee Costs: deriving from P&L data (no hub form data)...');
     const collAmt = collData?.payments || plData?.totalIncome || 0;
 
@@ -2356,8 +2357,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       console.log('Employee Costs: estimated ' + estStaffCount + ' staff + ' + estBackCount + ' back + ' + estHygCount + ' hygienists from P&L wages=$' + totalPayrollWages);
     }
   }
-  if (employeeCosts) {
-    console.log('Writing Employee Costs data...');
+  if (hasEmployeeData) {
+    console.log('Writing Employee Costs data from hub form...');
     /* Staff positions: name→D, rate→E, hours→F (G has formulas for monthly cost) */
     const staffRowMap = { om: 7, f1: 9, f2: 10, f3: 11, f4: 12, f5: 13, b1: 16, b2: 17, b3: 18, b4: 19, b5: 14 };
     /* Relabel row 14 from "front6" to "back 5" */
