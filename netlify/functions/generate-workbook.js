@@ -15,6 +15,7 @@ let _cellCollector = {};
 let _acStrikeRows = [];          // All Codes rows used in Production Worksheet
 let _battingAvgText = 'N/A';     // Batting average ratio text for Production Worksheet
 let _baStyles = null;            // Batting Average box style indices — set during Pass 2
+let _collStyles = null;          // Collections by Payor style indices — set during Pass 2
 let _plInputExpenseNames = new Set();  // P&L expenses written to P&L Input sheet
 let _plInputLastDataRow = 47;         // Last P&L Input expense row with data (rows after this are hidden)
 
@@ -883,13 +884,95 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
 
-    /* === Change yellow fill (FFFFFF00) to PerformDDS blue on Financial Overview payment category cells === */
-    /* Fill 11 uses FFFFFF00 (yellow) — change to PerformDDS blue FF3574B7 */
-    stylesXml = stylesXml.replace(
-      /(<fill>[\s\S]*?<fgColor rgb=")FFFFFF00("[\s\S]*?<\/fill>)/g,
-      (full, pre, post) => pre + 'FF3574B7' + post
-    );
-    console.log('Pass 2: changed yellow fills (FFFFFF00) to PerformDDS blue (FF3574B7)');
+    /* === Convert ALL blue/yellow fills to dark navy (FF1A1A2E) with white text === */
+    /* Template uses FF3574B7 (medium blue), FF2C6AA0 (darker blue), FFFFFF00 (yellow)
+       for section banners on Production Worksheet and Financial Overview.
+       Change them ALL to dark navy and make the text white. */
+    {
+      /* Step 1: Replace fill colors within <fill> elements only */
+      stylesXml = stylesXml.replace(/<fill>[\s\S]*?<\/fill>/g, (full) => {
+        return full.replace(/FFFFFF00/g, 'FF1A1A2E').replace(/FF3574B7/g, 'FF1A1A2E').replace(/FF2C6AA0/g, 'FF1A1A2E');
+      });
+
+      /* Step 2: Find which fill indices now contain dark navy */
+      const _fillsM = stylesXml.match(/<fills[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fills>/);
+      const _fillArr = [];
+      if (_fillsM) {
+        const _flRe = /<fill>[\s\S]*?<\/fill>/g;
+        let _flm;
+        while ((_flm = _flRe.exec(_fillsM[2])) !== null) _fillArr.push(_flm[0]);
+      }
+      const navyFillIds = new Set();
+      _fillArr.forEach((f, i) => { if (f.includes('FF1A1A2E') && f.includes('solid')) navyFillIds.add(i); });
+
+      /* Step 3: Parse fonts and cellXfs */
+      const _fntM = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
+      const _xfM = stylesXml.match(/<cellXfs[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
+
+      if (_fntM && _xfM && navyFillIds.size > 0) {
+        const fontArr = [];
+        const _fnRe = /<font>[\s\S]*?<\/font>/g;
+        let _fnm;
+        while ((_fnm = _fnRe.exec(_fntM[2])) !== null) fontArr.push(_fnm[0]);
+        let fontCount = parseInt(_fntM[1]);
+
+        const xfArr = [];
+        const _xfRe = /<xf\s[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g;
+        let _xm;
+        while ((_xm = _xfRe.exec(_xfM[2])) !== null) xfArr.push(_xm[0]);
+
+        /* Step 4: Find unique fontIds used by navy-fill cellXfs, create white copies */
+        const fontIdsNeeded = new Set();
+        xfArr.forEach(xf => {
+          const fillM = xf.match(/fillId="(\d+)"/);
+          if (fillM && navyFillIds.has(parseInt(fillM[1]))) {
+            const fontM = xf.match(/fontId="(\d+)"/);
+            if (fontM) fontIdsNeeded.add(parseInt(fontM[1]));
+          }
+        });
+
+        const fontIdMap = {};
+        let newFonts = '';
+        let nextFontIdx = fontCount;
+        fontIdsNeeded.forEach(fid => {
+          if (fid < fontArr.length) {
+            let wf = fontArr[fid];
+            /* Remove any existing color tags and add white */
+            wf = wf.replace(/<color[^/]*\/>/g, '');
+            wf = wf.replace(/<color [^>]*>[^<]*<\/color>/g, '');
+            wf = wf.replace('<font>', '<font><color rgb="FFFFFFFF"/>');
+            newFonts += wf;
+            fontIdMap[fid] = nextFontIdx;
+            nextFontIdx++;
+          }
+        });
+
+        if (newFonts) {
+          stylesXml = stylesXml.replace(_fntM[0],
+            `<fonts count="${nextFontIdx}">${_fntM[2]}${newFonts}</fonts>`);
+
+          /* Step 5: Update cellXfs — change fontId for navy-fill entries */
+          let modified = false;
+          for (let i = 0; i < xfArr.length; i++) {
+            const fillM = xfArr[i].match(/fillId="(\d+)"/);
+            if (fillM && navyFillIds.has(parseInt(fillM[1]))) {
+              const fontM = xfArr[i].match(/fontId="(\d+)"/);
+              if (fontM && fontIdMap[parseInt(fontM[1])] !== undefined) {
+                xfArr[i] = xfArr[i].replace(/fontId="\d+"/, `fontId="${fontIdMap[parseInt(fontM[1])]}"`);
+                modified = true;
+              }
+            }
+          }
+          if (modified) {
+            stylesXml = stylesXml.replace(_xfM[0],
+              `<cellXfs count="${xfArr.length}">${xfArr.join('')}</cellXfs>`);
+          }
+          console.log('Pass 2: converted blue fills→dark navy, created ' + Object.keys(fontIdMap).length + ' white fonts, updated cellXfs');
+        }
+      } else {
+        console.log('Pass 2: fill color replacement done (no cellXfs font changes needed)');
+      }
+    }
 
     /* === Add SWOT Analysis styles to template styles.xml === */
     /* These give us proper colored section headers, fills, and borders for the SWOT sheet.
@@ -1017,6 +1100,56 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         console.log('Pass 2: added BA box styles — fonts ' + fi3 + '-' + (fi3+1) + ', fills ' + fli3 + '-' + (fli3+1) + ', borders ' + bri3 + '-' + (bri3+1) + ', xfs ' + xi3 + '-' + (xi3+1));
       } else {
         console.warn('Pass 2: could not parse styles.xml for BA box additions');
+      }
+    }
+
+    /* === Add Collections by Payor styles (dark navy + white text) === */
+    {
+      const _fm4 = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
+      const _flm4 = stylesXml.match(/<fills[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fills>/);
+      const _xm4 = stylesXml.match(/<cellXfs[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
+
+      if (_fm4 && _flm4 && _xm4) {
+        let fi4 = parseInt(_fm4[1]);
+        let fli4 = parseInt(_flm4[1]);
+        let xi4 = parseInt(_xm4[1]);
+
+        /* 3 new fonts: white regular 14, white bold 14, white bold 20 (header) */
+        const CL_FNT_REG = fi4;
+        const CL_FNT_BOLD = fi4 + 1;
+        const CL_FNT_HDR = fi4 + 2;
+        const clFonts =
+          '<font><sz val="14"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="20"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>';
+        stylesXml = stylesXml.replace(_fm4[0],
+          `<fonts count="${fi4 + 3}">${_fm4[2]}${clFonts}</fonts>`);
+
+        /* 1 new fill: dark navy */
+        const CL_FILL = fli4;
+        const clFills = '<fill><patternFill patternType="solid"><fgColor rgb="FF1A1A2E"/><bgColor indexed="64"/></patternFill></fill>';
+        stylesXml = stylesXml.replace(_flm4[0],
+          `<fills count="${fli4 + 1}">${_flm4[2]}${clFills}</fills>`);
+
+        /* 5 new cellXfs */
+        const CL_XF_HDR = xi4;       /* header row: bold 20pt white, dark navy, left-aligned */
+        const CL_XF_LABEL = xi4 + 1; /* category label: regular white, dark navy, center */
+        const CL_XF_DOLLAR = xi4 + 2; /* dollar amount: bold white, dark navy, $#,##0 */
+        const CL_XF_PCT = xi4 + 3;   /* percentage: regular white, dark navy, 0% */
+        const CL_XF_SPACER = xi4 + 4; /* spacer: dark navy fill, no text */
+        const clXfs =
+          `<xf numFmtId="0" fontId="${CL_FNT_HDR}" fillId="${CL_FILL}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${CL_FNT_REG}" fillId="${CL_FILL}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+          `<xf numFmtId="166" fontId="${CL_FNT_BOLD}" fillId="${CL_FILL}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+          `<xf numFmtId="9" fontId="${CL_FNT_REG}" fillId="${CL_FILL}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${CL_FNT_REG}" fillId="${CL_FILL}" borderId="0" xfId="0" applyFont="1" applyFill="1"/>`;
+        stylesXml = stylesXml.replace(_xm4[0],
+          `<cellXfs count="${xi4 + 5}">${_xm4[2]}${clXfs}</cellXfs>`);
+
+        _collStyles = { CL_XF_HDR, CL_XF_LABEL, CL_XF_DOLLAR, CL_XF_PCT, CL_XF_SPACER };
+        console.log('Pass 2: added Collections styles — fonts ' + fi4 + '-' + (fi4+2) + ', fill ' + fli4 + ', xfs ' + xi4 + '-' + (xi4+4));
+      } else {
+        console.warn('Pass 2: could not parse styles.xml for Collections additions');
       }
     }
 
@@ -1217,7 +1350,15 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         xml = xml.replace(new RegExp(`<f>${c}44/I44</f>`), `<f>IFERROR(${c}44/I44,0)</f>`);
       });
 
-      console.log('Pass 2 sheet4: cols fixed, monthly rows hidden, spacing improved');
+      /* Collections header (B40) and spacer row (41) — apply dark navy style */
+      if (_collStyles) {
+        /* B40: replace style with dark navy header */
+        xml = xml.replace(/(<c\s[^>]*r="B40"\s[^>]*?)s="\d+"/, `$1s="${_collStyles.CL_XF_HDR}"`);
+        /* Row 41 spacer cells: apply dark navy spacer style */
+        xml = xml.replace(/(<c\s[^>]*r="[B-I]41"\s[^>]*?)s="\d+"/g, `$1s="${_collStyles.CL_XF_SPACER}"`);
+      }
+
+      console.log('Pass 2 sheet4: cols fixed, monthly rows hidden, spacing improved, collections restyled');
       return xml;
     },
     'xl/worksheets/sheet5.xml': (xml) => {
@@ -1322,7 +1463,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         if (r >= 6 && r <= lastDataRow) {
           /* Visible data rows */
           let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '');
-          return `<row r="${rNum}"${a} ht="15" customHeight="1">`;
+          return `<row r="${rNum}"${a} ht="20" customHeight="1">`;
         }
         if (r > lastDataRow && r <= 47) {
           /* Empty rows after last expense — hide them */
@@ -1332,7 +1473,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         if (r >= 48 && r <= 51) {
           /* Summary/formula rows — keep visible */
           let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '');
-          return `<row r="${rNum}"${a} ht="15" customHeight="1">`;
+          return `<row r="${rNum}"${a} ht="20" customHeight="1">`;
         }
         return full;
       });
@@ -1340,8 +1481,56 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       console.log('Pass 2 sheet8: fixed cols, cell styles, row heights; hiding rows ' + (lastDataRow+1) + '-47');
       return xml;
     },
+    'xl/worksheets/sheet3.xml': (xml) => {
+      /* Hygiene Schedule: fix cramped row heights and #DIV/0! errors */
+
+      /* 1. Increase row heights — template default is 12.75 which is too tight */
+      const hsRowHeights = {
+        1:8, 2:44, 3:7, 4:30,
+        /* Data section rows 5-16: bump from 12.75 to 20 */
+        5:20, 6:20, 7:20, 8:18, 9:20, 10:20, 11:20, 12:20, 13:20,
+        14:20, 15:20, 16:20, 17:8,
+        /* Next 7 days */
+        18:22, 19:20, 20:20, 21:20, 22:6,
+        /* Near future */
+        23:20, 24:20, 25:20, 26:20, 27:20, 28:20, 29:20, 30:20, 31:6,
+        /* Future future */
+        32:20, 33:20, 34:20, 35:20, 36:22,
+        /* Potential section */
+        37:24, 38:20, 39:20, 40:20, 41:20, 42:20, 43:20, 44:20,
+        45:20, 46:20, 47:20, 48:20, 49:20, 50:20, 51:20, 52:20, 53:20,
+        54:8, 55:25
+      };
+      xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
+        const r = parseInt(rNum);
+        const ht = hsRowHeights[r];
+        if (ht === undefined) return full;
+        let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '');
+        return `<row r="${rNum}"${a} ht="${ht}" customHeight="1">`;
+      });
+
+      /* 2. Wrap division formulas with IFERROR to prevent #DIV/0! */
+      /* N15: =K15/F15 → =IFERROR(K15/F15,"") */
+      xml = xml.replace(/<f>K15\/F15<\/f>/g, '<f>IFERROR(K15/F15,"")</f>');
+      /* N21: =K21/F21 */
+      xml = xml.replace(/<f>K21\/F21<\/f>/g, '<f>IFERROR(K21/F21,"")</f>');
+      /* N30: =K30/F30 */
+      xml = xml.replace(/<f>K30\/F30<\/f>/g, '<f>IFERROR(K30/F30,"")</f>');
+      /* O34: division of sums */
+      xml = xml.replace(/<f>\(D34\+F34\+H34\+J34\+L34\+N34\)\/\(C34\+E34\+G34\+I34\+K34\+M34\)<\/f>/g,
+        '<f>IFERROR((D34+F34+H34+J34+L34+N34)/(C34+E34+G34+I34+K34+M34),"")</f>');
+      /* O35: division of sums */
+      xml = xml.replace(/<f>\(D35\+F35\+H35\+J35\+L35\+N35\)\/\(C35\+E35\+G35\+I35\+K35\+M35\)<\/f>/g,
+        '<f>IFERROR((D35+F35+H35+J35+L35+N35)/(C35+E35+G35+I35+K35+M35),"")</f>');
+
+      /* N15: =K15/F15 may also appear as IFERROR already, handle alternate form */
+      xml = xml.replace(/<f>K15\/F16<\/f>/g, '<f>IFERROR(K15/F16,"")</f>');
+
+      console.log('Pass 2 sheet3: fixed Hygiene Schedule row heights and IFERROR wrappers');
+      return xml;
+    },
     'xl/worksheets/sheet6.xml': (xml) => {
-      /* Hygiene Schedule: clear template placeholder names and text */
+      /* Employee Costs: clear template placeholder names and text */
       function clearCell(xml, ref, style) {
         const re = new RegExp(`<c\\s[^>]*r="${ref}"[^/>]*(?:/>|>[\\s\\S]*?</c>)`, 's');
         const replacement = `<c r="${ref}" s="${style}"/>`;
@@ -1567,6 +1756,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   _plInputLastDataRow = 47;
   _battingAvgText = 'N/A';
   _baStyles = null;
+  _collStyles = null;
 
   /* Sheet name → sheet number mapping */
   const sheetNameMap = {
