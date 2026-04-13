@@ -1119,9 +1119,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       const baValue = _baStyles ? String(_baStyles.BA_XF_VALUE) : '411';
       xml = baReplace(xml, 'F38', baTitle, 'BATTING AVERAGE');
       xml = baReplace(xml, 'F39', baValue, _battingAvgText);
-      /* Clear remaining merged cells so they don't show stale data */
-      xml = baReplace(xml, 'F40', baTitle, null);
-      xml = baReplace(xml, 'F41', baTitle, null);
+      /* F40-F41 left with template default style (no fill, no border) */
       console.log('Pass 2 sheet1: injected batting average box (' + _battingAvgText + ') styles: title=' + baTitle + ' value=' + baValue);
 
       return xml;
