@@ -16,6 +16,7 @@ let _acStrikeRows = [];          // All Codes rows used in Production Worksheet
 let _battingAvgText = 'N/A';     // Batting average ratio text for Production Worksheet
 let _baStyles = null;            // Batting Average box style indices — set during Pass 2
 let _plInputExpenseNames = new Set();  // P&L expenses written to P&L Input sheet
+let _plInputLastDataRow = 47;         // Last P&L Input expense row with data (rows after this are hidden)
 
 /**
  * Collect cell values without writing to ExcelJS.
@@ -1308,27 +1309,49 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
           return full;
         });
 
-      /* 3. Fix row heights — set explicit heights for header and data rows */
+      /* 3. Fix row heights — set explicit heights for header and data rows.
+            Hide empty rows between last data row and summary row 48. */
+      const lastDataRow = _plInputLastDataRow;
       xml = xml.replace(/<row\s+r="(\d+)"([^>]*)>/g, (full, rNum, attrs) => {
         const r = parseInt(rNum);
         if (r === 5) {
           /* Row 5 is the column header row — needs to be tall enough to show full labels */
-          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '');
+          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '');
           return `<row r="${rNum}"${a} ht="30" customHeight="1">`;
         }
-        if (r >= 6 && r <= 50) {
-          let a = attrs.replace(/\s*customHeight="1"/g, '');
-          if (/ht="[^"]*"/.test(a)) {
-            a = a.replace(/ht="[^"]*"/, 'ht="15"');
-          } else {
-            a += ' ht="15"';
-          }
-          return `<row r="${rNum}"${a}>`;
+        if (r >= 6 && r <= lastDataRow) {
+          /* Visible data rows */
+          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="15" customHeight="1">`;
+        }
+        if (r > lastDataRow && r <= 47) {
+          /* Empty rows after last expense — hide them */
+          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="0" hidden="1" customHeight="1">`;
+        }
+        if (r >= 48 && r <= 51) {
+          /* Summary/formula rows — keep visible */
+          let a = attrs.replace(/\s*customHeight="[^"]*"/g, '').replace(/\s+ht="[^"]*"/g, '').replace(/\s*hidden="[^"]*"/g, '');
+          return `<row r="${rNum}"${a} ht="15" customHeight="1">`;
         }
         return full;
       });
 
-      console.log('Pass 2 sheet8: fixed cols, cell styles, row heights');
+      console.log('Pass 2 sheet8: fixed cols, cell styles, row heights; hiding rows ' + (lastDataRow+1) + '-47');
+      return xml;
+    },
+    'xl/worksheets/sheet6.xml': (xml) => {
+      /* Hygiene Schedule: clear template placeholder names and text */
+      function clearCell(xml, ref, style) {
+        const re = new RegExp(`<c\\s[^>]*r="${ref}"[^/>]*(?:/>|>[\\s\\S]*?</c>)`, 's');
+        const replacement = `<c r="${ref}" s="${style}"/>`;
+        return re.test(xml) ? xml.replace(re, replacement) : xml;
+      }
+      xml = clearCell(xml, 'D27', '639');  /* Jodi Kalik → blank */
+      xml = clearCell(xml, 'D28', '639');  /* Liesa Mcghee → blank */
+      xml = clearCell(xml, 'D35', '659');  /* As CA law → blank */
+
+      console.log('Pass 2 sheet6: cleared template placeholder names (D27, D28, D35)');
       return xml;
     }
   };
@@ -1541,6 +1564,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   _cellCollector = {};
   _acStrikeRows = [];
   _plInputExpenseNames = new Set();
+  _plInputLastDataRow = 47;
   _battingAvgText = 'N/A';
   _baStyles = null;
 
@@ -2056,6 +2080,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       _plInputExpenseNames.add(item.item.toLowerCase().trim());
       row++;
     }
+    /* Track last data row for Pass 2 empty-row hiding */
+    _plInputLastDataRow = row - 1;  /* row is already 1 past the last written item */
+
     /* Clear any unused data rows (between last item and row 47) */
     for (let r = row; r <= 47; r++) {
       sv(wsPI, 'A'+r, null);
