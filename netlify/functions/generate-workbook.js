@@ -2262,7 +2262,10 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   /* ═══ EMPLOYEE COSTS ═══ */
   /* If no hub form employeeCosts provided, derive estimates from P&L data */
-  const hasEmployeeData = employeeCosts && (employeeCosts.staff || employeeCosts.hygiene);
+  const hasEmployeeData = employeeCosts && (
+    (Array.isArray(employeeCosts.staff) ? employeeCosts.staff.length > 0 : !!employeeCosts.staff) ||
+    (Array.isArray(employeeCosts.hygiene) ? employeeCosts.hygiene.length > 0 : !!employeeCosts.hygiene)
+  );
   if (!hasEmployeeData && plData && plData.items && plData.items.length > 0) {
     console.log('Employee Costs: deriving from P&L data (no hub form data)...');
     const collAmt = collData?.payments || plData?.totalIncome || 0;
