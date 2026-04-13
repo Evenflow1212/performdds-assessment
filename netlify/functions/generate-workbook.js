@@ -14,6 +14,7 @@ let _cellCollector = {};
 /* Strikethrough tracking — module-level so injectValuesIntoTemplate can access */
 let _acStrikeRows = [];          // All Codes rows used in Production Worksheet
 let _battingAvgText = 'N/A';     // Batting average ratio text for Production Worksheet
+let _baStyles = null;            // Batting Average box style indices — set during Pass 2
 let _plInputExpenseNames = new Set();  // P&L expenses written to P&L Input sheet
 
 /**
@@ -959,6 +960,65 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
 
+    /* === Add Batting Average box styles === */
+    /* Bold-bordered box in Production Worksheet F38:G39 area.
+       Re-parse counts (SWOT additions may have changed them). */
+    {
+      const _fm3 = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
+      const _flm3 = stylesXml.match(/<fills[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fills>/);
+      const _brm3 = stylesXml.match(/<borders[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/borders>/);
+      const _xm3 = stylesXml.match(/<cellXfs[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
+
+      if (_fm3 && _flm3 && _brm3 && _xm3) {
+        let fi3 = parseInt(_fm3[1]);
+        let fli3 = parseInt(_flm3[1]);
+        let bri3 = parseInt(_brm3[1]);
+        let xi3 = parseInt(_xm3[1]);
+
+        /* 2 new fonts */
+        const BA_FNT_TITLE = fi3;
+        const BA_FNT_VALUE = fi3 + 1;
+        const baFonts =
+          '<font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +     /* title: bold 14pt white */
+          '<font><b/><sz val="28"/><color rgb="FF1A1A2E"/><name val="Candara"/></font>';       /* value: bold 28pt dark */
+        stylesXml = stylesXml.replace(_fm3[0],
+          `<fonts count="${fi3 + 2}">${_fm3[2]}${baFonts}</fonts>`);
+
+        /* 2 new fills */
+        const BA_FILL_HEADER = fli3;       /* PerformDDS blue header */
+        const BA_FILL_BODY = fli3 + 1;     /* light gray body */
+        const baFills =
+          '<fill><patternFill patternType="solid"><fgColor rgb="FF3574B7"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFF5F5F5"/><bgColor indexed="64"/></patternFill></fill>';
+        stylesXml = stylesXml.replace(_flm3[0],
+          `<fills count="${fli3 + 2}">${_flm3[2]}${baFills}</fills>`);
+
+        /* 2 new borders: top half and bottom half of the box */
+        const BA_BDR_TOP = bri3;
+        const BA_BDR_BOT = bri3 + 1;
+        const bdrColor = 'FF3574B7';  /* PerformDDS blue */
+        const baBorders =
+          `<border><left style="medium"><color rgb="${bdrColor}"/></left><right style="medium"><color rgb="${bdrColor}"/></right><top style="medium"><color rgb="${bdrColor}"/></top><bottom style="thin"><color rgb="${bdrColor}"/></bottom><diagonal/></border>` +
+          `<border><left style="medium"><color rgb="${bdrColor}"/></left><right style="medium"><color rgb="${bdrColor}"/></right><top/><bottom style="medium"><color rgb="${bdrColor}"/></bottom><diagonal/></border>`;
+        stylesXml = stylesXml.replace(_brm3[0],
+          `<borders count="${bri3 + 2}">${_brm3[2]}${baBorders}</borders>`);
+
+        /* 2 new cellXfs */
+        const BA_XF_TITLE = xi3;
+        const BA_XF_VALUE = xi3 + 1;
+        const baXfs =
+          `<xf numFmtId="0" fontId="${BA_FNT_TITLE}" fillId="${BA_FILL_HEADER}" borderId="${BA_BDR_TOP}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${BA_FNT_VALUE}" fillId="${BA_FILL_BODY}" borderId="${BA_BDR_BOT}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`;
+        stylesXml = stylesXml.replace(_xm3[0],
+          `<cellXfs count="${xi3 + 2}">${_xm3[2]}${baXfs}</cellXfs>`);
+
+        _baStyles = { BA_XF_TITLE, BA_XF_VALUE };
+        console.log('Pass 2: added BA box styles — fonts ' + fi3 + '-' + (fi3+1) + ', fills ' + fli3 + '-' + (fli3+1) + ', borders ' + bri3 + '-' + (bri3+1) + ', xfs ' + xi3 + '-' + (xi3+1));
+      } else {
+        console.warn('Pass 2: could not parse styles.xml for BA box additions');
+      }
+    }
+
     fixZip.file('xl/styles.xml', stylesXml);
     _pass2StylesXml = stylesXml;  /* Save for fresh zip build — bypasses JSZip read bug */
     console.log('Pass 2: restored styles.xml:', stylesXml.length, 'chars');
@@ -1042,9 +1102,9 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
       /* ── Batting Average box: inject directly in Pass 2 (bypasses sv() JSZip bug) ── */
       /* F38:G38 and F39:G39 are pre-merged empty cells in the template.
-         Replace F38 with title, F39 with value. Use style 402 (section header)
-         for title and 411 (data cell with border) for value.
-         _battingAvgText is set during Pass 1 data aggregation. */
+         Replace F38 with title, F39 with value.
+         Uses dynamic _baStyles set during Pass 2 styles phase (bold blue border box).
+         Falls back to 402/411 if styles weren't created. */
       function baReplace(xml, ref, style, text) {
         const re = new RegExp(`<c\\s[^>]*r="${ref}"[^/>]*(?:/>|>[\\s\\S]*?</c>)`, 's');
         const replacement = text
@@ -1055,12 +1115,14 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         }
         return xml;
       }
-      xml = baReplace(xml, 'F38', '402', 'BATTING AVERAGE');
-      xml = baReplace(xml, 'F39', '411', _battingAvgText);
+      const baTitle = _baStyles ? String(_baStyles.BA_XF_TITLE) : '402';
+      const baValue = _baStyles ? String(_baStyles.BA_XF_VALUE) : '411';
+      xml = baReplace(xml, 'F38', baTitle, 'BATTING AVERAGE');
+      xml = baReplace(xml, 'F39', baValue, _battingAvgText);
       /* Clear remaining merged cells so they don't show stale data */
-      xml = baReplace(xml, 'F40', '402', null);
-      xml = baReplace(xml, 'F41', '402', null);
-      console.log('Pass 2 sheet1: injected batting average box (' + _battingAvgText + ')');
+      xml = baReplace(xml, 'F40', baTitle, null);
+      xml = baReplace(xml, 'F41', baTitle, null);
+      console.log('Pass 2 sheet1: injected batting average box (' + _battingAvgText + ') styles: title=' + baTitle + ' value=' + baValue);
 
       return xml;
     },
@@ -1449,6 +1511,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   _acStrikeRows = [];
   _plInputExpenseNames = new Set();
   _battingAvgText = 'N/A';
+  _baStyles = null;
 
   /* Sheet name → sheet number mapping */
   const sheetNameMap = {
@@ -2177,7 +2240,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v30-batting-avg',
+      _version: 'v31-batting-box',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
