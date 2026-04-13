@@ -147,11 +147,14 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   const totalProd = codes.reduce((s,c) => s + c.total, 0);
   const monthlyProd = prodMonths > 0 ? totalProd / prodMonths : 0;
 
-  /* Derive key metrics */
-  const netCollections = collData?.payments || plData?.totalIncome || 0;
+  /* Derive key metrics — pro-rate collections if period differs from production */
+  let netCollections = collData?.payments || plData?.totalIncome || 0;
   const collMonths = collData?.months || prodMonths || 1;
+  if (netCollections > 0 && collMonths > prodMonths && prodMonths > 0) {
+    netCollections = Math.round(netCollections / collMonths * prodMonths * 100) / 100;
+  }
   const collectionRate = totalProd > 0 && netCollections > 0 ? (netCollections / totalProd * 100) : 0;
-  const monthlyCollections = netCollections > 0 && collMonths > 0 ? netCollections / collMonths : 0;
+  const monthlyCollections = netCollections > 0 && prodMonths > 0 ? netCollections / prodMonths : 0;
 
   /* Code lookups */
   const codeQty = (prefix) => codes.filter(c => c.code.startsWith(prefix)).reduce((s,c) => s + c.qty, 0);
@@ -1996,10 +1999,17 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   sv(wsFO, 'G21', prodMonths);
 
   /* Collection total → H20 (data year collection column), months → H21 */
-  const collTotal = (collData && collData.payments) ? collData.payments : 0;
+  /* If the collections period is longer than production period, pro-rate to match */
+  let collTotal = (collData && collData.payments) ? collData.payments : 0;
+  const collMonthsRaw = (collData && collData.months) ? collData.months : prodMonths;
+  if (collTotal > 0 && collMonthsRaw > prodMonths && prodMonths > 0) {
+    const proRated = Math.round(collTotal / collMonthsRaw * prodMonths * 100) / 100;
+    console.log('Collections pro-rated: $' + collTotal + ' over ' + collMonthsRaw + 'mo → $' + proRated + ' over ' + prodMonths + 'mo');
+    collTotal = proRated;
+  }
   if (collTotal) {
     sv(wsFO, 'H20', Math.round(collTotal*100)/100);
-    sv(wsFO, 'H21', collData.months || prodMonths);
+    sv(wsFO, 'H21', prodMonths);
   }
 
   /* ── Historical estimates: 2024 and 2023 (15% step-down per year) ── */
@@ -2667,7 +2677,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       totalProduction: totalProd.toFixed(2),
       months: prodMonths,
       years,
-      netCollections: collData?.payments || plData?.totalIncome || null,
+      netCollections: collTotal || plData?.totalIncome || null,
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
