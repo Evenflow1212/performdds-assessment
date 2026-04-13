@@ -980,23 +980,23 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         const BA_FNT_VALUE = fi3 + 1;
         const baFonts =
           '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +     /* title: bold 12pt white */
-          '<font><b/><sz val="20"/><color rgb="FF1A1A2E"/><name val="Candara"/></font>';       /* value: bold 20pt dark */
+          '<font><b/><sz val="20"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>';       /* value: bold 20pt white */
         stylesXml = stylesXml.replace(_fm3[0],
           `<fonts count="${fi3 + 2}">${_fm3[2]}${baFonts}</fonts>`);
 
         /* 2 new fills */
-        const BA_FILL_HEADER = fli3;       /* PerformDDS blue header */
-        const BA_FILL_BODY = fli3 + 1;     /* light gray body */
+        const BA_FILL_HEADER = fli3;       /* dark navy header */
+        const BA_FILL_BODY = fli3 + 1;     /* dark navy body */
         const baFills =
-          '<fill><patternFill patternType="solid"><fgColor rgb="FF3574B7"/><bgColor indexed="64"/></patternFill></fill>' +
-          '<fill><patternFill patternType="solid"><fgColor rgb="FFF5F5F5"/><bgColor indexed="64"/></patternFill></fill>';
+          '<fill><patternFill patternType="solid"><fgColor rgb="FF1A1A2E"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FF1A1A2E"/><bgColor indexed="64"/></patternFill></fill>';
         stylesXml = stylesXml.replace(_flm3[0],
           `<fills count="${fli3 + 2}">${_flm3[2]}${baFills}</fills>`);
 
         /* 2 new borders: top half and bottom half of the box */
         const BA_BDR_TOP = bri3;
         const BA_BDR_BOT = bri3 + 1;
-        const bdrColor = 'FF3574B7';  /* PerformDDS blue */
+        const bdrColor = 'FF1A1A2E';  /* dark navy */
         const baBorders =
           `<border><left style="thin"><color rgb="${bdrColor}"/></left><right style="thin"><color rgb="${bdrColor}"/></right><top style="thin"><color rgb="${bdrColor}"/></top><bottom style="thin"><color rgb="${bdrColor}"/></bottom><diagonal/></border>` +
           `<border><left style="thin"><color rgb="${bdrColor}"/></left><right style="thin"><color rgb="${bdrColor}"/></right><top style="thin"><color rgb="${bdrColor}"/></top><bottom style="thin"><color rgb="${bdrColor}"/></bottom><diagonal/></border>`;
