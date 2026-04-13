@@ -1358,6 +1358,21 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         xml = xml.replace(/(<c\s[^>]*r="[B-I]41"\s[^>]*?)s="\d+"/g, `$1s="${_collStyles.CL_XF_SPACER}"`);
       }
 
+      /* Fix AR patient row 32: cells E32-H32 have FFF1F5F9 fill + bold that doesn't
+         match insurance row 33. Copy the style from row 33 cells to row 32 cells. */
+      /* Find the style index used by E33 (insurance row) and apply to E32-H32 */
+      const row33StyleMatch = xml.match(/<c\s[^>]*r="E33"[^>]*s="(\d+)"/);
+      if (row33StyleMatch) {
+        const insurStyle = row33StyleMatch[1];
+        ['E32','F32','G32','H32'].forEach(cellRef => {
+          xml = xml.replace(
+            new RegExp(`(<c\\s[^>]*r="${cellRef}"[^>]*?)s="\\d+"`),
+            `$1s="${insurStyle}"`
+          );
+        });
+        console.log('Pass 2 sheet4: AR patient row 32 style normalized to match row 33 (s=' + insurStyle + ')');
+      }
+
       console.log('Pass 2 sheet4: cols fixed, monthly rows hidden, spacing improved, collections restyled');
       return xml;
     },
@@ -2181,10 +2196,156 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         if (hygieneData.pctUnder19) sv(wsHS, 'H48', hygieneData.pctUnder19);
       }
 
+      /* ── Hygiene Schedule POTENTIAL section: derive from production data ── */
+      /* These values feed the formulas in F40-F42, H40-H43, H44, N45-N48 */
+      {
+        const exactQtyHS = (code) => { const f = codes.find(c => c.code === code); return f ? f.qty : 0; };
+        const prophyQtyHS = exactQtyHS('D1110') + exactQtyHS('D1120');
+        const perioMaintQtyHS = exactQtyHS('D4910');
+        const srpQtyHS = exactQtyHS('D4341') + exactQtyHS('D4342');
+        const activePatientEstHS = prodMonths > 0 ? Math.round((prophyQtyHS + perioMaintQtyHS) / (prodMonths / 12)) : 0;
+        const compExamsHS = exactQtyHS('D0150');
+        const npPerMonthHS = prodMonths > 0 ? Math.round(compExamsHS / prodMonths) : 0;
+
+        /* N39: active patients (only if hub form didn't already provide it) */
+        if (!(hygieneData && hygieneData.activePatients) && activePatientEstHS > 0) {
+          sv(wsHS, 'N39', activePatientEstHS);
+        }
+        /* N40: new patients per month from comp exams */
+        if (!(hygieneData && hygieneData.newPatientsPerMonth) && npPerMonthHS > 0) {
+          sv(wsHS, 'N40', npPerMonthHS);
+        }
+        /* N41: perio disease % — estimate from SRP ratio vs prophy */
+        if (!(hygieneData && hygieneData.perioPct)) {
+          const perioRatioHS = prophyQtyHS > 0 ? srpQtyHS / prophyQtyHS : 0.30;
+          sv(wsHS, 'N41', Math.round(perioRatioHS * 100) / 100);
+        }
+        /* N42: perio probing positive % — use industry avg if not provided */
+        if (!(hygieneData && hygieneData.perioPosPct)) {
+          sv(wsHS, 'N42', 0.30);  /* 30% industry avg */
+        }
+        /* H47: patient flow — use active patient estimate as proxy */
+        if (!(hygieneData && hygieneData.patientFlow) && activePatientEstHS > 0) {
+          sv(wsHS, 'H47', activePatientEstHS);
+        }
+        /* H48: % under 19 — use industry avg if not provided */
+        if (!(hygieneData && hygieneData.pctUnder19)) {
+          sv(wsHS, 'H48', 0.20);  /* 20% industry avg */
+        }
+        /* N51: patients scheduled per hygiene day — estimate from production volume */
+        if (!(hygieneData && hygieneData.ptsPerHygDay)) {
+          /* Typical: 8-10 pts per hygienist per day */
+          sv(wsHS, 'N51', 8);
+        }
+        /* F16: days scheduled (working days in reporting period) */
+        if (!(hygieneData && hygieneData.daysScheduled) && prodMonths > 0) {
+          sv(wsHS, 'F16', Math.round(prodMonths * 21));  /* ~21 working days/month */
+        }
+
+        console.log('Hygiene Schedule POTENTIAL: activePatients=' + activePatientEstHS +
+          ' npPerMonth=' + npPerMonthHS + ' prophy=' + prophyQtyHS +
+          ' perioMaint=' + perioMaintQtyHS + ' srp=' + srpQtyHS);
+      }
+
       console.log('Hygiene Schedule: populated week dates relative to', thisMonday.toISOString().slice(0,10));
   }
 
   /* ═══ EMPLOYEE COSTS ═══ */
+  /* If no hub form employeeCosts provided, derive estimates from P&L data */
+  if (!employeeCosts && plData && plData.items && plData.items.length > 0) {
+    console.log('Employee Costs: deriving from P&L data (no hub form data)...');
+    const collAmt = collData?.payments || plData?.totalIncome || 0;
+
+    /* Extract staff-related P&L line items */
+    let totalPayrollWages = 0;
+    let totalPayrollTax = 0;
+    let totalPayrollFees = 0;
+    let totalUniform = 0;
+    const staffLineItems = [];
+
+    for (const item of plData.items) {
+      if (item.section === 'Income' || item.section === 'COGS') continue;
+      const l = item.item.toLowerCase();
+      if (/payroll.*(wage|salar)|^wages?\b/i.test(l)) {
+        totalPayrollWages += item.amount;
+        staffLineItems.push({ name: item.item, amount: item.amount, type: 'wages' });
+      } else if (/payroll.*tax/i.test(l)) {
+        totalPayrollTax += item.amount;
+      } else if (/payroll.*fee/i.test(l)) {
+        totalPayrollFees += item.amount;
+      } else if (/uniform|laundry/i.test(l)) {
+        totalUniform += item.amount;
+      }
+    }
+
+    const totalStaffCostEC = totalPayrollWages + totalPayrollTax + totalPayrollFees + totalUniform;
+
+    if (totalPayrollWages > 0) {
+      /* Estimate: typically 60% staff / 40% hygiene split on wages */
+      const staffWages = Math.round(totalPayrollWages * 0.60);
+      const hygWages = Math.round(totalPayrollWages * 0.40);
+
+      /* Estimate typical positions — assume avg $20/hr staff, $40/hr hygienist */
+      const avgStaffRate = 20;
+      const avgHygRate = 40;
+      const hoursPerMonth = 160; /* full time */
+
+      /* Estimate number of staff from wages: monthly wages / (rate * hours) */
+      const monthlyStaffWages = prodMonths > 0 ? staffWages / prodMonths : staffWages / 12;
+      const monthlyHygWages = prodMonths > 0 ? hygWages / prodMonths : hygWages / 12;
+      const estStaffCount = Math.max(1, Math.min(5, Math.round(monthlyStaffWages / (avgStaffRate * hoursPerMonth))));
+      const estHygCount = Math.max(1, Math.min(5, Math.round(monthlyHygWages / (avgHygRate * hoursPerMonth))));
+
+      /* Distribute wages across estimated positions */
+      const perStaffMonthly = estStaffCount > 0 ? monthlyStaffWages / estStaffCount : 0;
+      const perHygMonthly = estHygCount > 0 ? monthlyHygWages / estHygCount : 0;
+      const estStaffHourly = Math.round(perStaffMonthly / hoursPerMonth * 100) / 100;
+      const estHygHourly = Math.round(perHygMonthly / hoursPerMonth * 100) / 100;
+
+      /* Write Office Manager (row 7) */
+      sv(wsEC, 'D7', 'Office Manager');
+      sv(wsEC, 'E7', Math.round(estStaffHourly * 1.15 * 100) / 100); /* OM gets ~15% premium */
+      sv(wsEC, 'F7', hoursPerMonth);
+
+      /* Write front desk staff (rows 9-13) */
+      const frontLabels = ['Front Desk 1', 'Front Desk 2', 'Front Desk 3', 'Front Desk 4', 'Front Desk 5'];
+      const staffRows = [9, 10, 11, 12, 13];
+      for (let i = 0; i < Math.min(estStaffCount - 1, 5); i++) {
+        sv(wsEC, 'D' + staffRows[i], frontLabels[i]);
+        sv(wsEC, 'E' + staffRows[i], estStaffHourly);
+        sv(wsEC, 'F' + staffRows[i], hoursPerMonth);
+      }
+
+      /* Write back office / assistants (rows 16-19) */
+      const backLabels = ['Dental Asst 1', 'Dental Asst 2', 'Dental Asst 3', 'Dental Asst 4'];
+      const backRows = [16, 17, 18, 19];
+      const estBackCount = Math.max(1, Math.min(4, Math.round(estStaffCount * 0.6)));
+      for (let i = 0; i < estBackCount; i++) {
+        sv(wsEC, 'D' + backRows[i], backLabels[i]);
+        sv(wsEC, 'E' + backRows[i], Math.round(estStaffHourly * 1.05 * 100) / 100);
+        sv(wsEC, 'F' + backRows[i], hoursPerMonth);
+      }
+
+      /* Write hygienists (rows 27-31) */
+      const hygLabels = ['Hygienist 1', 'Hygienist 2', 'Hygienist 3', 'Hygienist 4', 'Hygienist 5'];
+      const hygRows = [27, 28, 29, 30, 31];
+      for (let i = 0; i < Math.min(estHygCount, 5); i++) {
+        sv(wsEC, 'D' + hygRows[i], hygLabels[i]);
+        sv(wsEC, 'E' + hygRows[i], estHygHourly);
+        sv(wsEC, 'F' + hygRows[i], hoursPerMonth);
+      }
+
+      /* Employment cost % estimate (payroll tax as % of wages) */
+      if (totalPayrollTax > 0 && totalPayrollWages > 0) {
+        const empCostPct = Math.round(totalPayrollTax / totalPayrollWages * 100) / 100;
+        /* G21 = staff employment cost $, G31 = hyg employment cost $ */
+        sv(wsEC, 'G21', Math.round(monthlyStaffWages * empCostPct * 100) / 100);
+        sv(wsEC, 'G31', Math.round(monthlyHygWages * empCostPct * 100) / 100);
+      }
+
+      console.log('Employee Costs: estimated ' + estStaffCount + ' staff + ' + estBackCount + ' back + ' + estHygCount + ' hygienists from P&L wages=$' + totalPayrollWages);
+    }
+  }
   if (employeeCosts) {
     console.log('Writing Employee Costs data...');
     /* Staff positions: name→D, rate→E, hours→F (G has formulas for monthly cost) */
