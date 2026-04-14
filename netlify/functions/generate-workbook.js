@@ -119,7 +119,7 @@ function parsePL(text) {
 /* ─── P&L categorization ─── */
 function plCategory(item) {
   const l = item.toLowerCase();
-  if (/payroll.*(wage|salar)|^wages?\b/i.test(l)) return 'H';
+  if (/payroll.*(wage|salar)|\bwages?\b|\bsalary\b|\bsalaries\b/i.test(l)) return 'H';
   if (/payroll.*tax/i.test(l)) return 'H';
   if (/payroll.*fee/i.test(l)) return 'H';
   if (/uniform|laundry/i.test(l)) return 'H';
@@ -2249,8 +2249,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
           /* Typical: 8-10 pts per hygienist per day */
           sv(wsHS, 'N51', 8);
         }
-        /* F16: days scheduled (working days in reporting period) */
-        if (!(hygieneData && hygieneData.daysScheduled) && prodMonths > 0) {
+        /* F16: days scheduled (working days in reporting period) — override small form defaults */
+        const hasRealDaysScheduled = hygieneData && hygieneData.daysScheduled && hygieneData.daysScheduled > 20;
+        if (!hasRealDaysScheduled && prodMonths > 0) {
           sv(wsHS, 'F16', Math.round(prodMonths * 21));  /* ~21 working days/month */
         }
 
@@ -2264,7 +2265,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         const estRDHCount = Math.max(1, Math.round(hygPtsPerDay / 8));
 
         /* RDH SCHEDULED per day (row 7): C=Mon, E=Tue, G=Wed, I=Thu, K=Fri */
-        if (!(hygieneData && hygieneData.rdhPerDay)) {
+        const hasRealRDH = hygieneData && Array.isArray(hygieneData.rdhPerDay) && hygieneData.rdhPerDay.some(v => v > 1);
+        if (!hasRealRDH) {
           const rdhDayCols = ['C','E','G','I','K'];
           rdhDayCols.forEach(col => {
             if (!hsCollector[col + '7']) sv(wsHS, col + '7', estRDHCount);
@@ -2273,7 +2275,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
         /* Recent past (rows 10-12): fill appt/seen with estimated daily volume
            Cols: C=mon appt, D=mon seen, E=tue appt, F=tue seen, G=wed appt, etc. */
-        if (!(hygieneData && hygieneData.recentPast) && hygPtsPerDay > 0) {
+        const hasRealRecentPast = hygieneData && Array.isArray(hygieneData.recentPast) && hygieneData.recentPast.length > 0 && hygieneData.recentPast.some(w => w.data && w.data.some(v => v > 0));
+        if (!hasRealRecentPast && hygPtsPerDay > 0) {
           const apptColsHS = ['C','E','G','I','K','M']; /* appt per day Mon-Sat */
           const seenColsHS = ['D','F','H','J','L','N']; /* seen per day Mon-Sat */
           for (let r = 10; r <= 12; r++) {
@@ -2309,8 +2312,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     (Array.isArray(employeeCosts.staff) ? employeeCosts.staff.length > 0 : !!employeeCosts.staff) ||
     (Array.isArray(employeeCosts.hygiene) ? employeeCosts.hygiene.length > 0 : !!employeeCosts.hygiene)
   );
+  console.log('Employee Costs: hasEmployeeData=' + hasEmployeeData + ' plData=' + !!plData + ' plItems=' + (plData?.items?.length || 0));
   if (!hasEmployeeData && plData && plData.items && plData.items.length > 0) {
-    console.log('Employee Costs: deriving from P&L data (no hub form data)...');
+    console.log('Employee Costs: deriving from P&L data (' + plData.items.length + ' items)...');
     const collAmt = collData?.payments || plData?.totalIncome || 0;
 
     /* Extract staff-related P&L line items */
@@ -2322,10 +2326,11 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
     for (const item of plData.items) {
       if (item.section === 'Income' || item.section === 'COGS') continue;
-      const l = item.item.toLowerCase();
-      if (/payroll.*(wage|salar)|^wages?\b/i.test(l)) {
+      const l = item.item.toLowerCase().trim();
+      if (/payroll.*(wage|salar)|\bwages?\b|\bsalary\b|\bsalaries\b/i.test(l)) {
         totalPayrollWages += item.amount;
         staffLineItems.push({ name: item.item, amount: item.amount, type: 'wages' });
+        console.log('  EC match WAGES: "' + item.item + '" = $' + item.amount);
       } else if (/payroll.*tax/i.test(l)) {
         totalPayrollTax += item.amount;
       } else if (/payroll.*fee/i.test(l)) {
@@ -2334,6 +2339,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         totalUniform += item.amount;
       }
     }
+    console.log('  EC totals: wages=$' + totalPayrollWages + ' tax=$' + totalPayrollTax + ' fees=$' + totalPayrollFees);
 
     const totalStaffCostEC = totalPayrollWages + totalPayrollTax + totalPayrollFees + totalUniform;
 
