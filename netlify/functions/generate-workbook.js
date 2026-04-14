@@ -2264,30 +2264,30 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         /* Estimate hygienists from volume (8 pts/hygienist/day typical) */
         const estRDHCount = Math.max(1, Math.round(hygPtsPerDay / 8));
 
-        /* RDH SCHEDULED per day (row 7): C=Mon, E=Tue, G=Wed, I=Thu, K=Fri */
+        /* RDH SCHEDULED per day (row 7): C=Mon, E=Tue, G=Wed, I=Thu, K=Fri
+           Overwrite zeros — the zero-filling runs first, so hsCollector already has 0 values */
         const hasRealRDH = hygieneData && Array.isArray(hygieneData.rdhPerDay) && hygieneData.rdhPerDay.some(v => v > 1);
-        if (!hasRealRDH) {
+        if (!hasRealRDH && estRDHCount > 0) {
           const rdhDayCols = ['C','E','G','I','K'];
-          rdhDayCols.forEach(col => {
-            if (!hsCollector[col + '7']) sv(wsHS, col + '7', estRDHCount);
-          });
+          rdhDayCols.forEach(col => sv(wsHS, col + '7', estRDHCount));
+          console.log('Hygiene Schedule: wrote RDH SCHEDULED = ' + estRDHCount + '/day (Mon-Fri)');
         }
 
         /* Recent past (rows 10-12): fill appt/seen with estimated daily volume
-           Cols: C=mon appt, D=mon seen, E=tue appt, F=tue seen, G=wed appt, etc. */
+           Cols: C=mon appt, D=mon seen, E=tue appt, F=tue seen, G=wed appt, etc.
+           MUST overwrite — zero-filling already put 0 in these cells */
         const hasRealRecentPast = hygieneData && Array.isArray(hygieneData.recentPast) && hygieneData.recentPast.length > 0 && hygieneData.recentPast.some(w => w.data && w.data.some(v => v > 0));
         if (!hasRealRecentPast && hygPtsPerDay > 0) {
           const apptColsHS = ['C','E','G','I','K','M']; /* appt per day Mon-Sat */
           const seenColsHS = ['D','F','H','J','L','N']; /* seen per day Mon-Sat */
           for (let r = 10; r <= 12; r++) {
             for (let d = 0; d < 5; d++) { /* Mon-Fri */
-              if (!hsCollector[apptColsHS[d] + r]) sv(wsHS, apptColsHS[d] + r, hygPtsPerDay);
-              if (!hsCollector[seenColsHS[d] + r]) sv(wsHS, seenColsHS[d] + r, Math.round(hygPtsPerDay * 0.85)); /* ~85% show rate */
+              sv(wsHS, apptColsHS[d] + r, hygPtsPerDay);
+              sv(wsHS, seenColsHS[d] + r, Math.round(hygPtsPerDay * 0.85)); /* ~85% show rate */
             }
-            /* Saturday — 0 unless practice works Saturdays */
-            if (!hsCollector['M' + r]) sv(wsHS, 'M' + r, 0);
-            if (!hsCollector['N' + r]) sv(wsHS, 'N' + r, 0);
+            /* Saturday stays 0 */
           }
+          console.log('Hygiene Schedule: wrote recent past grid — ' + hygPtsPerDay + ' appt, ' + Math.round(hygPtsPerDay * 0.85) + ' seen per day');
         }
 
         /* N51: patients per hygiene day — use calculated value instead of default 8 */
