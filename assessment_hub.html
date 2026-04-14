@@ -2364,7 +2364,10 @@ async function generate() {
 
     /* Step 2: Build workbook from parsed data — include P&L image for server-side embedding */
     console.log('Step 2: Building workbook from parsed data...');
-    const payload = { prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts };
+    /* Include questionnaire answers from sessionStorage */
+    let practiceProfile = null;
+    try { practiceProfile = JSON.parse(sessionStorage.getItem('practiceProfile')); } catch(e) {}
+    const payload = { prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, practiceProfile };
     /* Send P&L image to server for native ExcelJS embedding (avoids JSZip corruption) */
     if (plImageB64 && plImageB64.length < 3 * 1024 * 1024) {
       payload.plImageB64 = plImageB64;

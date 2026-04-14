@@ -16,6 +16,7 @@ let _acStrikeRows = [];          // All Codes rows used in Production Worksheet
 let _battingAvgText = 'N/A';     // Batting average ratio text for Production Worksheet
 let _baStyles = null;            // Batting Average box style indices — set during Pass 2
 let _collStyles = null;          // Collections by Payor style indices — set during Pass 2
+let _swotTargetSheetNum = 11;    // SWOT sheet number — varies based on extra sheets present
 let _plInputExpenseNames = new Set();  // P&L expenses written to P&L Input sheet
 let _plInputLastDataRow = 47;         // Last P&L Input expense row with data (rows after this are hidden)
 
@@ -345,7 +346,7 @@ function baseCode(code) { return code.replace(/\.\d+$/, ''); }
  * For sheets 1-8: direct regex injection preserving styles.
  * For sheets 9-10: resolve shared strings to inline strings.
  */
-async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData, practiceName) {
+async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData, practiceName, extraSheetNames) {
   const templateZip = await JSZip.loadAsync(templateBuf);
 
   /* ─── Preserve template's original styles.xml and Content_Types ─── */
@@ -646,10 +647,10 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       });
     console.log('ExcelJS sheet files found:', excelSheetFiles);
 
-    /* Map ExcelJS sheets → template sheet9, sheet10, sheet11 */
-    const targetSheetNums = [9, 10, 11];
-    let hasSheet9 = false, hasSheet10 = false, hasSheet11 = false;
-    for (let idx = 0; idx < excelSheetFiles.length && idx < 3; idx++) {
+    /* Map ExcelJS sheets → template sheet9, sheet10, sheet11, sheet12 */
+    const targetSheetNums = [9, 10, 11, 12];
+    let hasSheet9 = false, hasSheet10 = false, hasSheet11 = false, hasSheet12 = false;
+    for (let idx = 0; idx < excelSheetFiles.length && idx < 4; idx++) {
       const srcPath = excelSheetFiles[idx];
       const targetNum = targetSheetNums[idx];
       const targetPath = `xl/worksheets/sheet${targetNum}.xml`;
@@ -666,8 +667,10 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
           }
           return full;
         });
-        /* ── P&L Raw Import (sheet 9): strikethrough expenses used in P&L Input ── */
-        if (targetNum === 9 && _plInputExpenseNames.size > 0) {
+        /* ── P&L Raw Import: strikethrough expenses used in P&L Input ── */
+        /* Detect P&L Raw Import sheet by content (position varies based on Practice Profile presence) */
+        const isPLRawSheet = xml.includes('P&amp;L Raw Import') || xml.includes('P&amp;L Raw');
+        if (isPLRawSheet && _plInputExpenseNames.size > 0) {
           let strikeCount = 0;
           xml = xml.replace(
             /<c\s([^>]*?)r="A(\d+)"([^>]*?)>\s*<is>\s*<t>([^<]*)<\/t>\s*<\/is>\s*<\/c>/g,
@@ -690,12 +693,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         if (targetNum === 9) hasSheet9 = true;
         if (targetNum === 10) hasSheet10 = true;
         if (targetNum === 11) hasSheet11 = true;
+        if (targetNum === 12) hasSheet12 = true;
         console.log(`ExcelJS ${srcPath} → ${targetPath}: converted shared strings to inline`);
       }
     }
 
     /* Copy rels for ExcelJS sheets, remapping to sheet9/10/11 */
-    for (let idx = 0; idx < excelSheetFiles.length && idx < 3; idx++) {
+    for (let idx = 0; idx < excelSheetFiles.length && idx < 4; idx++) {
       const srcNum = excelSheetFiles[idx].match(/sheet(\d+)/)[1];
       const targetNum = targetSheetNums[idx];
       const srcRels = `xl/worksheets/_rels/sheet${srcNum}.xml.rels`;
@@ -716,8 +720,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
 
+    /* Dynamically register extra sheets in workbook.xml using extraSheetNames */
+    const hasSheets = [hasSheet9, hasSheet10, hasSheet11, hasSheet12];
+    const sheetNums = [9, 10, 11, 12];
+    const rIdStart = 11; /* rId11, rId12, rId13, rId14 */
+
     let workbookXml = await templateZip.file('xl/workbook.xml')?.async('string');
-    if (workbookXml && (hasSheet9 || hasSheet10 || hasSheet11)) {
+    if (workbookXml && hasSheets.some(Boolean)) {
       const sheetsPattern = /<sheets>([\s\S]*?)<\/sheets>/;
       const sheetsMatch = workbookXml.match(sheetsPattern);
       if (sheetsMatch) {
@@ -730,14 +739,12 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         }
         const maxId = sheetIds.length > 0 ? Math.max(...sheetIds) : 8;
 
-        if (hasSheet9 && !sheetsContent.includes('rId11')) {
-          sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Raw Import" sheetId="${maxId + 1}" state="visible" r:id="rId11"/>`;
-        }
-        if (hasSheet10 && !sheetsContent.includes('rId12')) {
-          sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Image" sheetId="${maxId + 2}" state="visible" r:id="rId12"/>`;
-        }
-        if (hasSheet11 && !sheetsContent.includes('rId13')) {
-          sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="SWOT Analysis" sheetId="${maxId + 3}" state="visible" r:id="rId13"/>`;
+        for (let i = 0; i < 4; i++) {
+          const rId = 'rId' + (rIdStart + i);
+          if (hasSheets[i] && !sheetsContent.includes(rId)) {
+            const name = (extraSheetNames && extraSheetNames[i]) ? extraSheetNames[i].replace(/&/g, '&amp;') : ('Extra Sheet ' + (i+1));
+            sheetsContent += `<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="${name}" sheetId="${maxId + 1 + i}" state="visible" r:id="${rId}"/>`;
+          }
         }
 
         workbookXml = workbookXml.replace(sheetsPattern, `<sheets>${sheetsContent}</sheets>`);
@@ -747,14 +754,12 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
     let wbRelsXml = await templateZip.file('xl/_rels/workbook.xml.rels')?.async('string');
     if (wbRelsXml) {
-      if (hasSheet9 && !wbRelsXml.includes('sheet9.xml')) {
-        wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet9.xml" Id="rId11"/></Relationships>');
-      }
-      if (hasSheet10 && !wbRelsXml.includes('sheet10.xml')) {
-        wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet10.xml" Id="rId12"/></Relationships>');
-      }
-      if (hasSheet11 && !wbRelsXml.includes('sheet11.xml')) {
-        wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet11.xml" Id="rId13"/></Relationships>');
+      for (let i = 0; i < 4; i++) {
+        const sheetFile = `sheet${sheetNums[i]}.xml`;
+        const rId = 'rId' + (rIdStart + i);
+        if (hasSheets[i] && !wbRelsXml.includes(sheetFile)) {
+          wbRelsXml = wbRelsXml.replace(/<\/Relationships>/, `<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/${sheetFile}" Id="${rId}"/></Relationships>`);
+        }
       }
       templateZip.file('xl/_rels/workbook.xml.rels', wbRelsXml);
     }
@@ -1186,6 +1191,9 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     }
     if (!ct.includes('sheet11.xml')) {
       ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet11.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+    }
+    if (!ct.includes('sheet12.xml')) {
+      ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet12.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
     }
     if (!ct.includes('Extension="jpeg"') && !ct.includes('Extension="jpg"')) {
       ct = ct.replace(/<\/Types>/, '<Default Extension="jpeg" ContentType="image/jpeg"/></Types>');
@@ -1622,8 +1630,10 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       '<sheetData>' + swotRows + '</sheetData>' +
       '</worksheet>';
 
-    _pass2SheetFixes['xl/worksheets/sheet11.xml'] = swotSheetXml;
-    console.log('Pass 2: generated SWOT XML directly (' + swotSheetXml.length + ' chars, ' + sr + ' rows, styles: ' + JSON.stringify(_swotStyles) + ')');
+    /* SWOT sheet number depends on how many ExcelJS sheets precede it */
+    const swotSheetNum = _swotTargetSheetNum || 11;
+    _pass2SheetFixes['xl/worksheets/sheet' + swotSheetNum + '.xml'] = swotSheetXml;
+    console.log('Pass 2: generated SWOT XML directly for sheet' + swotSheetNum + ' (' + swotSheetXml.length + ' chars, ' + sr + ' rows, styles: ' + JSON.stringify(_swotStyles) + ')');
   }
 
   /* Remove sharedStrings.xml (template has none — ExcelJS injects one) */
@@ -1768,7 +1778,7 @@ function escapeRegex(str) {
 }
 
 /* ─── Build the workbook from pre-parsed text ─── */
-async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64) {
+async function buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64, practiceProfile) {
   /* Reset collectors for this invocation */
   _cellCollector = {};
   _acStrikeRows = [];
@@ -1776,6 +1786,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   _plInputLastDataRow = 47;
   _battingAvgText = 'N/A';
   _baStyles = null;
+  _swotTargetSheetNum = 11;
   _collStyles = null;
 
   /* Sheet name → sheet number mapping */
@@ -2536,11 +2547,168 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
   /* ═══ P&L RAW IMPORT, P&L IMAGE & SWOT ANALYSIS (sheets 9-11, ExcelJS-only) ═══ */
   let sheets9to10Buf = null;
+  var extraSheetNames = [];
   const swotData = generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceName);
-  const needsExtraSheets = (plData && plData.items && plData.items.length > 0) || plImageB64 || swotData;
+  const needsExtraSheets = (plData && plData.items && plData.items.length > 0) || plImageB64 || swotData || practiceProfile;
 
   if (needsExtraSheets) {
     const wbNewSheets = new ExcelJS.Workbook();
+
+    /* ═══ PRACTICE PROFILE (first extra sheet) ═══ */
+    if (practiceProfile) {
+      const wsProfile = wbNewSheets.addWorksheet('Practice Profile');
+
+      /* Column widths */
+      wsProfile.getColumn('A').width = 3;
+      wsProfile.getColumn('B').width = 38;
+      wsProfile.getColumn('C').width = 35;
+      wsProfile.getColumn('D').width = 3;
+      wsProfile.getColumn('E').width = 38;
+      wsProfile.getColumn('F').width = 35;
+
+      /* Title */
+      const titleCell = wsProfile.getCell('B1');
+      titleCell.value = 'Practice Profile — ' + (practiceName || practiceProfile.website || 'Assessment');
+      titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF1A1A2E' } };
+      titleCell.border = { bottom: { style: 'medium', color: { argb: 'FF3574B7' } } };
+      wsProfile.mergeCells('B1:F1');
+      wsProfile.getRow(1).height = 32;
+      wsProfile.getRow(2).height = 10;
+
+      const hdrFont = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF3574B7' } };
+      const hdrFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+      const labelFont = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF4A5568' } };
+      const valFont = { name: 'Calibri', size: 10, color: { argb: 'FF1A1A2E' } };
+
+      function sectionHeader(ws, row, col, text) {
+        const c = ws.getCell(col + row);
+        c.value = text;
+        c.font = hdrFont;
+        c.fill = hdrFill;
+        c.border = { bottom: { style: 'thin', color: { argb: 'FF3574B7' } } };
+        ws.getRow(row).height = 22;
+      }
+      function labelVal(ws, row, bCol, cCol, label, value) {
+        const lc = ws.getCell(bCol + row);
+        lc.value = label;
+        lc.font = labelFont;
+        const vc = ws.getCell(cCol + row);
+        vc.value = value;
+        vc.font = valFont;
+      }
+
+      let r = 3;
+
+      /* ── Practice Basics ── */
+      sectionHeader(wsProfile, r, 'B', 'PRACTICE BASICS');
+      sectionHeader(wsProfile, r, 'E', '');
+      r++;
+      labelVal(wsProfile, r, 'B', 'C', 'Zip Code', practiceProfile.zipCode || '—');
+      labelVal(wsProfile, r, 'E', 'F', 'Practice Website', practiceProfile.website || '—');
+      r++;
+      labelVal(wsProfile, r, 'B', 'C', 'Years Owned', practiceProfile.yearsOwned ? practiceProfile.yearsOwned + ' years' : '—');
+      labelVal(wsProfile, r, 'E', 'F', 'Owner Age', practiceProfile.ownerAge ? practiceProfile.ownerAge + ' years old' : '—');
+      r++;
+      const softwareNames = { dentrix: 'Dentrix', eaglesoft: 'Eaglesoft', opendental: 'Open Dental', other: 'Other' };
+      labelVal(wsProfile, r, 'B', 'C', 'Practice Software', softwareNames[practiceProfile.pmSoftware] || practiceProfile.pmSoftware || '—');
+      r += 2;
+
+      /* ── Payor Mix ── */
+      sectionHeader(wsProfile, r, 'B', 'PAYOR MIX');
+      sectionHeader(wsProfile, r, 'E', '');
+      r++;
+      const mix = practiceProfile.payorMix || {};
+      labelVal(wsProfile, r, 'B', 'C', 'In-Network PPO', (mix.ppo || 0) + '%');
+      labelVal(wsProfile, r, 'E', 'F', 'HMO', (mix.hmo || 0) + '%');
+      r++;
+      labelVal(wsProfile, r, 'B', 'C', 'Medicaid / Government', (mix.gov || 0) + '%');
+      labelVal(wsProfile, r, 'E', 'F', 'FFS / Out of Network', (mix.ffs || 0) + '%');
+      r += 2;
+
+      /* ── Schedule & Team ── */
+      sectionHeader(wsProfile, r, 'B', 'SCHEDULE & TEAM');
+      sectionHeader(wsProfile, r, 'E', '');
+      r++;
+      labelVal(wsProfile, r, 'B', 'C', 'Doctor Days / Month', practiceProfile.doctorDays ? practiceProfile.doctorDays + ' days' : '—');
+      labelVal(wsProfile, r, 'E', 'F', 'Hygiene Days / Week', practiceProfile.numHygienists ? practiceProfile.numHygienists + ' days' : '—');
+      r++;
+      labelVal(wsProfile, r, 'B', 'C', 'Has Associate', practiceProfile.hasAssociate ? 'Yes — ' + (practiceProfile.associateDays || 0) + ' days/month' : 'No');
+      labelVal(wsProfile, r, 'E', 'F', 'Operatories Active', (practiceProfile.opsActive || '—') + ' of ' + (practiceProfile.opsTotal || '—') + ' total');
+      r += 2;
+
+      /* ── Daily Production ── */
+      sectionHeader(wsProfile, r, 'B', 'DAILY PRODUCTION & BENCHMARKS');
+      sectionHeader(wsProfile, r, 'E', '');
+      r++;
+      const docAvg = practiceProfile.docDailyAvg === 'idk' ? "Doesn't know" : (practiceProfile.docDailyAvg ? '$' + Number(practiceProfile.docDailyAvg).toLocaleString() + '/day' : '—');
+      const hygAvg = practiceProfile.hygDailyAvg === 'idk' ? "Doesn't know" : (practiceProfile.hygDailyAvg ? '$' + Number(practiceProfile.hygDailyAvg).toLocaleString() + '/day' : '—');
+      labelVal(wsProfile, r, 'B', 'C', 'Doctor Daily Average', docAvg);
+      labelVal(wsProfile, r, 'E', 'F', 'Hygiene Daily Average', hygAvg);
+      r++;
+      const crowns = practiceProfile.crownsPerMonth === 'idk' ? "Doesn't know" : (practiceProfile.crownsPerMonth ? practiceProfile.crownsPerMonth + ' / month' : '—');
+      labelVal(wsProfile, r, 'B', 'C', 'Crowns Per Month', crowns);
+      r++;
+      const goalMap = { yes: 'Yes', no: 'No', sort_of: 'Sort of' };
+      const aheadMap = { yes: 'Yes', no: 'No', sometimes: 'Sometimes' };
+      labelVal(wsProfile, r, 'B', 'C', 'Has Daily Production Goal', goalMap[practiceProfile.hasProductionGoal] || '—');
+      labelVal(wsProfile, r, 'E', 'F', 'Knows If Ahead/Behind Goals', aheadMap[practiceProfile.knowsIfAhead] || '—');
+      r += 2;
+
+      /* ── Goals & Vision ── */
+      sectionHeader(wsProfile, r, 'B', 'GOALS & VISION');
+      sectionHeader(wsProfile, r, 'E', '');
+      r++;
+      const yearsMap = { '1-5': '1–5 years', '5-10': '5–10 years', '10-15': '10–15 years', 'not-on-radar': 'Not on my radar' };
+      labelVal(wsProfile, r, 'B', 'C', 'Years to Continue Working', yearsMap[practiceProfile.yearsToWork] || practiceProfile.yearsToWork || '—');
+      r += 2;
+
+      /* ── Concerns ── */
+      const concerns = practiceProfile.concerns || [];
+      if (concerns.length > 0) {
+        sectionHeader(wsProfile, r, 'B', 'TOP CONCERNS');
+        r++;
+        const concernLabels = {
+          more_profitable: 'Want to be more profitable',
+          more_busy: 'Want to be busier',
+          pay_staff_more: 'Want to pay staff more',
+          owner_bonus: 'Want to take home more',
+          more_control: 'Want more control over practice',
+          staff_issues: 'Staff issues',
+          overhead_high: 'Overhead too high',
+          insurance_rates: 'Insurance reimbursements too low',
+          new_patients: 'Need more new patients',
+          exit_plan: 'Considering selling or retiring'
+        };
+        for (const c of concerns) {
+          const cell = wsProfile.getCell('B' + r);
+          cell.value = '✓  ' + (concernLabels[c] || c);
+          cell.font = valFont;
+          r++;
+        }
+        r++;
+      }
+
+      /* ── Free-form challenge ── */
+      if (practiceProfile.biggestChallenge) {
+        sectionHeader(wsProfile, r, 'B', 'ADDITIONAL NOTES');
+        r++;
+        const noteCell = wsProfile.getCell('B' + r);
+        noteCell.value = practiceProfile.biggestChallenge;
+        noteCell.font = valFont;
+        noteCell.alignment = { wrapText: true, vertical: 'top' };
+        wsProfile.mergeCells('B' + r + ':F' + r);
+        wsProfile.getRow(r).height = 60;
+        r++;
+      }
+
+      /* Footer */
+      r++;
+      const footerCell = wsProfile.getCell('B' + r);
+      footerCell.value = 'Collected via Dental AI Toolkit questionnaire — ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      footerCell.font = { name: 'Calibri', size: 8, italic: true, color: { argb: 'FF94A3B8' } };
+
+      console.log('Practice Profile sheet: written');
+    }
 
     /* P&L Raw Import */
     if (plData && plData.items && plData.items.length > 0) {
@@ -2706,6 +2874,15 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       console.log('SWOT Analysis: written (' + swotData.strengths.length + 'S, ' + swotData.weaknesses.length + 'W, ' + swotData.opportunities.length + 'O, ' + swotData.threats.length + 'T)');
     }
 
+    /* Collect sheet names in order for dynamic registration */
+    extraSheetNames = [];
+    wbNewSheets.eachSheet((ws) => { extraSheetNames.push(ws.name); });
+    console.log('Extra sheet names:', extraSheetNames);
+
+    /* Set SWOT target sheet number based on its position in the ExcelJS workbook */
+    const swotIdx = extraSheetNames.indexOf('SWOT Analysis');
+    if (swotIdx >= 0) _swotTargetSheetNum = 9 + swotIdx;
+
     sheets9to10Buf = await wbNewSheets.xlsx.writeBuffer();
     console.log('Extra sheets ExcelJS buffer written:', sheets9to10Buf.byteLength, 'bytes');
   }
@@ -2715,7 +2892,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const elapsed = injStart - t0;
   console.log('Time before injection:', elapsed, 'ms');
 
-  const injResult = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData || null, practiceName);
+  const injResult = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData || null, practiceName, extraSheetNames || []);
   const finalBuf = injResult.buf;
   const _injDiag = injResult._diag;
   const injTime = Date.now() - injStart;
@@ -2750,12 +2927,12 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); } catch(e) { return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'Invalid JSON'})}; }
 
-  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, hygieneData=null, employeeCosts=null, plImageB64=null } = body;
+  const { prodText, collText, plText, practiceName='', arPatient={}, arInsurance={}, hygieneData=null, employeeCosts=null, plImageB64=null, practiceProfile=null } = body;
   if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
     console.log('Building workbook from pre-parsed data...');
-    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64);
+    const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64, practiceProfile);
 
     return {
       statusCode: 200,
