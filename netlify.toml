@@ -19,6 +19,6 @@
 
 [[redirects]]
   from = "/"
-  to = "/assessment_hub.html"
+  to = "/landing.html"
   status = 200
   force = true

@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dental AI Toolkit — Comprehensive Practice Assessment</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600&display=swap');
+
+  :root {
+    --navy: #0a1628;
+    --navy-light: #1a2a4a;
+    --blue: #3574B7;
+    --blue-light: #4a8fd4;
+    --blue-dark: #2a5f9e;
+    --blue-glow: rgba(53,116,183,0.15);
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --cream: #FAF9F5;
+    --white: #ffffff;
+    --text: #1a1a2e;
+    --text-muted: #6b7a94;
+    --border: #e2e8f0;
+    --success: #10b981;
+    --gradient-hero: linear-gradient(135deg, #0a1628 0%, #1a2a4a 40%, #2a4570 100%);
+    --gradient-blue: linear-gradient(135deg, #3574B7, #4a8fd4);
+    --shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.12);
+    --shadow-blue: 0 4px 20px rgba(53,116,183,0.25);
+    --radius: 16px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER / NAV ── */
+  header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 0 48px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(10,22,40,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    transition: background 0.3s;
+  }
+  .logo {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: white;
+    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-icon {
+    width: 34px;
+    height: 34px;
+    background: var(--gradient-blue);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text span { color: var(--blue-light); }
+
+  nav {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+  nav a {
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: color 0.2s;
+  }
+  nav a:hover { color: white; }
+
+  .vip-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--gold-light);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Montserrat', sans-serif;
+    letter-spacing: 0.03em;
+    transition: all 0.2s;
+  }
+  .vip-btn:hover {
+    background: rgba(255,255,255,0.14);
+    border-color: var(--gold);
+  }
+
+  /* ── VIP MODAL ── */
+  .vip-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+  }
+  .vip-overlay.active { display: flex; }
+  .vip-modal {
+    background: white;
+    border-radius: var(--radius);
+    padding: 40px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    text-align: center;
+  }
+  .vip-modal h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--navy);
+  }
+  .vip-modal p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+  }
+  .vip-modal input {
+    width: 100%;
+    padding: 14px 18px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 1rem;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  .vip-modal input:focus { border-color: var(--blue); }
+  .vip-modal input::placeholder { letter-spacing: 0.05em; text-transform: none; color: #bbb; }
+  .vip-modal-btns {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .vip-modal-btns button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    transition: all 0.2s;
+  }
+  .vip-cancel {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .vip-cancel:hover { background: #eee; }
+  .vip-submit {
+    background: var(--gradient-blue);
+    border: none;
+    color: white;
+  }
+  .vip-submit:hover { opacity: 0.9; transform: translateY(-1px); }
+  .vip-error {
+    color: #e74c3c;
+    font-size: 0.82rem;
+    margin-top: 10px;
+    display: none;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    background: var(--gradient-hero);
+    padding: 160px 48px 100px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    right: -200px;
+    width: 700px;
+    height: 700px;
+    background: radial-gradient(circle, rgba(53,116,183,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -100px;
+    left: -100px;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(53,116,183,0.15);
+    border: 1px solid rgba(53,116,183,0.3);
+    border-radius: 50px;
+    padding: 6px 16px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--blue-light);
+    margin-bottom: 24px;
+    letter-spacing: 0.03em;
+  }
+  .hero h1 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: white;
+    margin-bottom: 20px;
+  }
+  .hero h1 em {
+    font-style: normal;
+    background: var(--gradient-blue);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-sub {
+    font-size: 1.12rem;
+    color: rgba(255,255,255,0.65);
+    line-height: 1.7;
+    margin-bottom: 36px;
+    max-width: 520px;
+  }
+  .hero-ctas {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--gradient-blue);
+    color: white;
+    padding: 16px 36px;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    box-shadow: var(--shadow-blue);
+    transition: all 0.3s;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(53,116,183,0.35); }
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    color: rgba(255,255,255,0.8);
+    padding: 16px 28px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: all 0.3s;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.35); color: white; }
+
+  .hero-stats {
+    display: flex;
+    gap: 40px;
+    margin-top: 40px;
+  }
+  .hero-stat {
+    text-align: left;
+  }
+  .hero-stat-num {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: white;
+  }
+  .hero-stat-label {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.45);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  /* Hero right side — preview card */
+  .hero-preview {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 32px;
+    backdrop-filter: blur(10px);
+  }
+  .preview-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .preview-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .preview-dot.r { background: #ff5f57; }
+  .preview-dot.y { background: #febc2e; }
+  .preview-dot.g { background: #28c840; }
+  .preview-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-left: 8px;
+  }
+  .preview-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .preview-metric {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .preview-metric-label {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .preview-metric-val {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: white;
+  }
+  .preview-metric-val.blue { color: var(--blue-light); }
+  .preview-metric-val.gold { color: var(--gold-light); }
+  .preview-metric-val.green { color: var(--success); }
+  .preview-bar {
+    margin-top: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .preview-bar-label {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+  .preview-bar-track {
+    height: 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    gap: 2px;
+  }
+  .preview-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+  .pbf-blue { width: 38%; background: var(--blue); }
+  .pbf-gold { width: 22%; background: var(--gold); }
+  .pbf-green { width: 18%; background: var(--success); }
+  .pbf-gray { width: 12%; background: rgba(255,255,255,0.15); }
+
+  /* ── FEATURES SECTION ── */
+  .section {
+    padding: 80px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .section-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--blue);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .section-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--navy);
+    margin-bottom: 16px;
+    line-height: 1.2;
+  }
+  .section-desc {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+    max-width: 600px;
+    margin-bottom: 48px;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .feature-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    transition: all 0.3s;
+  }
+  .feature-card:hover {
+    border-color: var(--blue);
+    box-shadow: var(--shadow-blue);
+    transform: translateY(-4px);
+  }
+  .feature-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--blue-glow);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 18px;
+  }
+  .feature-card h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 10px;
+  }
+  .feature-card p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* ── HOW IT WORKS ── */
+  .how-it-works {
+    background: var(--navy);
+    padding: 80px 48px;
+    color: white;
+  }
+  .how-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .how-it-works .section-label { color: var(--blue-light); }
+  .how-it-works .section-title { color: white; }
+  .how-it-works .section-desc { color: rgba(255,255,255,0.55); }
+
+  .steps-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    margin-top: 48px;
+  }
+  .how-step {
+    text-align: center;
+    position: relative;
+  }
+  .how-step-num {
+    width: 52px;
+    height: 52px;
+    background: var(--gradient-blue);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin: 0 auto 16px;
+  }
+  .how-step h4 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .how-step p {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.5;
+  }
+
+  /* ── WHAT YOU GET ── */
+  .sheets-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .sheet-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    transition: all 0.2s;
+  }
+  .sheet-card:hover { border-color: var(--blue-light); box-shadow: var(--shadow); }
+  .sheet-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--blue-glow);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .sheet-card h4 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+  .sheet-card p {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* ── METHODOLOGY ── */
+  .methodology {
+    background: linear-gradient(135deg, #f0f4f8 0%, #e8eef4 100%);
+    padding: 80px 48px;
+  }
+  .method-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .method-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .method-content h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--navy);
+    margin-bottom: 16px;
+    line-height: 1.2;
+  }
+  .method-content p {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+  .method-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 24px;
+  }
+  .method-list li {
+    padding: 10px 0;
+    font-size: 0.92rem;
+    color: var(--text);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .method-list li::before {
+    content: '';
+    display: none;
+  }
+  .method-check {
+    color: var(--success);
+    font-size: 1.1rem;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .method-visual {
+    background: white;
+    border-radius: 20px;
+    padding: 36px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+  }
+  .method-visual-header {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--blue);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .method-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .method-bar-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    width: 100px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .method-bar-track {
+    flex: 1;
+    height: 10px;
+    background: #f0f4f8;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .method-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.6s ease;
+  }
+  .method-bar-val {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text);
+    width: 40px;
+  }
+
+  /* ── TESTIMONIALS ── */
+  .testimonials {
+    padding: 80px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .testimonial-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 48px;
+  }
+  .testimonial-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+  }
+  .testimonial-stars {
+    color: var(--gold);
+    font-size: 1rem;
+    margin-bottom: 16px;
+  }
+  .testimonial-card blockquote {
+    font-size: 0.92rem;
+    color: var(--text);
+    line-height: 1.65;
+    font-style: italic;
+    margin-bottom: 20px;
+  }
+  .testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .testimonial-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--gradient-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .testimonial-name {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .testimonial-role {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  /* ── CTA SECTION ── */
+  .cta-section {
+    background: var(--gradient-hero);
+    padding: 80px 48px;
+    text-align: center;
+    color: white;
+  }
+  .cta-section h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2.4rem;
+    font-weight: 800;
+    margin-bottom: 16px;
+  }
+  .cta-section p {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 36px;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .cta-section .btn-primary {
+    padding: 18px 48px;
+    font-size: 1.05rem;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--navy);
+    padding: 32px 48px;
+    text-align: center;
+    color: rgba(255,255,255,0.35);
+    font-size: 0.8rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .hero-inner { grid-template-columns: 1fr; }
+    .hero-preview { display: none; }
+    .features-grid, .testimonial-grid, .sheets-grid { grid-template-columns: 1fr; }
+    .steps-row { grid-template-columns: repeat(2, 1fr); }
+    .method-grid { grid-template-columns: 1fr; }
+    .hero { padding: 140px 24px 60px; }
+    .hero h1 { font-size: 2.2rem; }
+    .section, .testimonials { padding: 60px 24px; }
+    .how-it-works, .methodology, .cta-section { padding: 60px 24px; }
+    header { padding: 0 20px; }
+    nav a { display: none; }
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up {
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards;
+  }
+  .fade-up.d1 { animation-delay: 0.1s; }
+  .fade-up.d2 { animation-delay: 0.2s; }
+  .fade-up.d3 { animation-delay: 0.3s; }
+  .fade-up.d4 { animation-delay: 0.4s; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">&#9670;</div>
+    <div class="logo-text">Dental<span>AI</span> Toolkit</div>
+  </div>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#methodology">Methodology</a>
+    <a href="#what-you-get">What You Get</a>
+    <button class="vip-btn" onclick="openVipModal()">VIP Access Code</button>
+  </nav>
+</header>
+
+<!-- VIP CODE MODAL -->
+<div class="vip-overlay" id="vipOverlay">
+  <div class="vip-modal">
+    <h3>VIP Access</h3>
+    <p>Enter your access code to unlock your complimentary assessment.</p>
+    <input type="text" id="vipCodeInput" placeholder="Enter code" maxlength="20" autocomplete="off">
+    <div class="vip-error" id="vipError">Invalid access code. Please try again.</div>
+    <div class="vip-modal-btns">
+      <button class="vip-cancel" onclick="closeVipModal()">Cancel</button>
+      <button class="vip-submit" onclick="submitVipCode()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-text fade-up">
+      <div class="hero-badge">&#9889; AI-Powered Practice Intelligence</div>
+      <h1>Comprehensive practice insight in <em>30 minutes</em></h1>
+      <p class="hero-sub">
+        Finally, you can get deep, meaningful key performance indicators, a SWOT assessment,
+        and actionable insight into your practice that you've never had before — powered by
+        25 years of dental consulting expertise combined with AI.
+      </p>
+      <div class="hero-ctas">
+        <a href="questionnaire.html" class="btn-primary">Start Assessment &#8594;</a>
+        <a href="#methodology" class="btn-secondary">See How It Works</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-num">25+</div>
+          <div class="hero-stat-label">Years of expertise</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">200+</div>
+          <div class="hero-stat-label">KPIs analyzed</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">30 min</div>
+          <div class="hero-stat-label">Start to insight</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-preview fade-up d2">
+      <div class="preview-header">
+        <div class="preview-dot r"></div>
+        <div class="preview-dot y"></div>
+        <div class="preview-dot g"></div>
+        <span class="preview-title">Sample Assessment Output</span>
+      </div>
+      <div class="preview-metrics">
+        <div class="preview-metric">
+          <div class="preview-metric-label">Total Production</div>
+          <div class="preview-metric-val blue">$1.64M</div>
+        </div>
+        <div class="preview-metric">
+          <div class="preview-metric-label">Collection Rate</div>
+          <div class="preview-metric-val green">96.2%</div>
+        </div>
+        <div class="preview-metric">
+          <div class="preview-metric-label">Hygiene / Production</div>
+          <div class="preview-metric-val gold">34%</div>
+        </div>
+        <div class="preview-metric">
+          <div class="preview-metric-label">Crown Count</div>
+          <div class="preview-metric-val">224</div>
+        </div>
+      </div>
+      <div class="preview-bar">
+        <div class="preview-bar-label">Production Mix Analysis</div>
+        <div class="preview-bar-track">
+          <div class="preview-bar-fill pbf-blue"></div>
+          <div class="preview-bar-fill pbf-gold"></div>
+          <div class="preview-bar-fill pbf-green"></div>
+          <div class="preview-bar-fill pbf-gray"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="section-label">Why This Is Different</div>
+  <div class="section-title">Not just numbers. Insight.</div>
+  <p class="section-desc">
+    Most practice reports show you what happened. This assessment tells you what it means,
+    what to do about it, and exactly where your opportunity lies.
+  </p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">&#128202;</div>
+      <h3>Production Analysis</h3>
+      <p>Every procedure code mapped, categorized, and benchmarked. See exactly where your production is coming from and where the gaps are.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128176;</div>
+      <h3>Financial Deep Dive</h3>
+      <p>Collections, overhead, staff costs, and P&L analysis that reveals true practice profitability and exactly where money is leaking.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#129658;</div>
+      <h3>Hygiene Optimization</h3>
+      <p>Schedule utilization, patient flow, and hygiene production tracking that shows the health of your recall system.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#127919;</div>
+      <h3>Custom Targets</h3>
+      <p>Personalized daily and monthly production targets based on your actual data, working days, and practice goals.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128640;</div>
+      <h3>SWOT Assessment</h3>
+      <p>AI-generated strengths, weaknesses, opportunities, and threats analysis based on your specific practice data.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128274;</div>
+      <h3>Data Security</h3>
+      <p>Your data is processed in real-time and never stored. Reports are generated and delivered directly to you.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-it-works" id="how-it-works">
+  <div class="how-inner">
+    <div class="section-label">How It Works</div>
+    <div class="section-title">From reports to results in four simple steps</div>
+    <p class="section-desc">
+      Upload the reports you already have from your practice management software.
+      Our AI does the rest.
+    </p>
+    <div class="steps-row">
+      <div class="how-step">
+        <div class="how-step-num">1</div>
+        <h4>Answer a few questions</h4>
+        <p>Quick practice profile — your schedule, team size, payor mix, and goals.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">2</div>
+        <h4>Upload your reports</h4>
+        <p>Production, collections, P&L, and aging reports from Dentrix, Eaglesoft, or Open Dental.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">3</div>
+        <h4>AI analyzes everything</h4>
+        <p>25 years of consulting methodology applied to your specific data in seconds.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-num">4</div>
+        <h4>Get your assessment</h4>
+        <p>Download a comprehensive Excel workbook with KPIs, targets, SWOT, and actionable insight.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT YOU GET -->
+<section class="section" id="what-you-get">
+  <div class="section-label">What You Get</div>
+  <div class="section-title">A complete practice assessment workbook</div>
+  <p class="section-desc">
+    Your personalized assessment includes multiple detailed worksheets, each designed to give you
+    clarity on a different dimension of your practice.
+  </p>
+  <div class="sheets-grid">
+    <div class="sheet-card">
+      <div class="sheet-icon">&#128196;</div>
+      <div>
+        <h4>Production Worksheet</h4>
+        <p>Every procedure code summarized by category with quantities, revenue, and monthly averages.</p>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-icon">&#128203;</div>
+      <div>
+        <h4>All Codes Report</h4>
+        <p>Complete production report with all procedure codes, individual fee analysis, and utilization data.</p>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-icon">&#128197;</div>
+      <div>
+        <h4>Hygiene Schedule</h4>
+        <p>RDH scheduling analysis, patient flow tracking, and future booking health assessment.</p>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-icon">&#128200;</div>
+      <div>
+        <h4>Financial Overview</h4>
+        <p>Collections, AR aging breakdown, and historical production and collection trends.</p>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-icon">&#127919;</div>
+      <div>
+        <h4>Targets & Goals</h4>
+        <p>Custom daily and monthly targets for the doctor and hygiene team based on your data.</p>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-icon">&#128101;</div>
+      <div>
+        <h4>Employee Costs</h4>
+        <p>Staff and hygiene compensation analysis with benefits tracking and overhead calculation.</p>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-icon">&#128178;</div>
+      <div>
+        <h4>Budgetary P&L</h4>
+        <p>Your profit and loss organized into dental-specific categories with target benchmarks.</p>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-icon">&#128161;</div>
+      <div>
+        <h4>SWOT Analysis</h4>
+        <p>AI-generated strengths, weaknesses, opportunities, and threats specific to your practice.</p>
+      </div>
+    </div>
+    <div class="sheet-card">
+      <div class="sheet-icon">&#9889;</div>
+      <div>
+        <h4>Batting Average</h4>
+        <p>Practice performance scorecard measuring key metrics against industry benchmarks.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- METHODOLOGY -->
+<section class="methodology" id="methodology">
+  <div class="method-inner">
+    <div class="method-grid">
+      <div class="method-content">
+        <div class="section-label">Our Methodology</div>
+        <h3>25 years of consulting expertise, now powered by AI</h3>
+        <p>
+          This isn't a generic benchmarking tool. The assessment methodology was developed through
+          decades of hands-on consulting with dental practices across the country — understanding
+          not just what the numbers say, but what they mean for your specific situation.
+        </p>
+        <p>
+          By combining this deep domain expertise with AI analysis, we deliver in 30 minutes
+          what traditionally took weeks of manual review and data crunching.
+        </p>
+        <ul class="method-list">
+          <li><span class="method-check">&#10003;</span> Production categorization refined across hundreds of practices</li>
+          <li><span class="method-check">&#10003;</span> Benchmarks calibrated to practice size, location, and payor mix</li>
+          <li><span class="method-check">&#10003;</span> Hygiene metrics that reveal the true health of your recall system</li>
+          <li><span class="method-check">&#10003;</span> Financial analysis designed specifically for dental practice economics</li>
+          <li><span class="method-check">&#10003;</span> SWOT framework trained on real-world consulting outcomes</li>
+        </ul>
+      </div>
+      <div class="method-visual">
+        <div class="method-visual-header">Sample Analysis Dimensions</div>
+        <div class="method-bar-row">
+          <div class="method-bar-label">Production</div>
+          <div class="method-bar-track"><div class="method-bar-fill" style="width:92%;background:var(--blue)"></div></div>
+          <div class="method-bar-val">92%</div>
+        </div>
+        <div class="method-bar-row">
+          <div class="method-bar-label">Hygiene</div>
+          <div class="method-bar-track"><div class="method-bar-fill" style="width:78%;background:var(--success)"></div></div>
+          <div class="method-bar-val">78%</div>
+        </div>
+        <div class="method-bar-row">
+          <div class="method-bar-label">Overhead</div>
+          <div class="method-bar-track"><div class="method-bar-fill" style="width:65%;background:var(--gold)"></div></div>
+          <div class="method-bar-val">65%</div>
+        </div>
+        <div class="method-bar-row">
+          <div class="method-bar-label">Collections</div>
+          <div class="method-bar-track"><div class="method-bar-fill" style="width:96%;background:var(--blue-light)"></div></div>
+          <div class="method-bar-val">96%</div>
+        </div>
+        <div class="method-bar-row">
+          <div class="method-bar-label">AR Health</div>
+          <div class="method-bar-track"><div class="method-bar-fill" style="width:84%;background:var(--success)"></div></div>
+          <div class="method-bar-val">84%</div>
+        </div>
+        <div class="method-bar-row">
+          <div class="method-bar-label">Scheduling</div>
+          <div class="method-bar-track"><div class="method-bar-fill" style="width:71%;background:var(--gold)"></div></div>
+          <div class="method-bar-val">71%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials" id="testimonials">
+  <div class="section-label">What Doctors Are Saying</div>
+  <div class="section-title">Results that speak for themselves</div>
+  <div class="testimonial-grid">
+    <div class="testimonial-card">
+      <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+      <blockquote>"I've been in practice for 18 years and no one has ever broken down my numbers like this. The hygiene analysis alone was worth it — I had no idea we were leaving that much production on the table."</blockquote>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">JM</div>
+        <div>
+          <div class="testimonial-name">Dr. J. Martinez</div>
+          <div class="testimonial-role">General Dentist, TX</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial-card">
+      <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+      <blockquote>"Within 30 minutes I had more actionable data about my practice than my accountant gives me all year. The SWOT assessment was spot-on and the production targets gave my team real goals to rally around."</blockquote>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">SP</div>
+        <div>
+          <div class="testimonial-name">Dr. S. Patel</div>
+          <div class="testimonial-role">Practice Owner, CA</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial-card">
+      <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+      <blockquote>"I was skeptical that AI could understand the nuances of a dental practice. I was wrong. This tool clearly has serious consulting expertise behind it. The employee cost analysis changed how I think about staffing."</blockquote>
+      <div class="testimonial-author">
+        <div class="testimonial-avatar">RK</div>
+        <div>
+          <div class="testimonial-name">Dr. R. Kim</div>
+          <div class="testimonial-role">Multi-location Owner, FL</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="cta-section">
+  <h2>Ready to see inside your practice?</h2>
+  <p>Get the assessment that combines 25 years of dental consulting expertise with the power of AI.</p>
+  <a href="questionnaire.html" class="btn-primary">Start Your Assessment &#8594;</a>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>&copy; 2026 Dental AI Toolkit. All rights reserved. Built with decades of dental consulting expertise.</p>
+</footer>
+
+<script>
+  function openVipModal() {
+    document.getElementById('vipOverlay').classList.add('active');
+    document.getElementById('vipCodeInput').focus();
+  }
+  function closeVipModal() {
+    document.getElementById('vipOverlay').classList.remove('active');
+    document.getElementById('vipCodeInput').value = '';
+    document.getElementById('vipError').style.display = 'none';
+  }
+  function submitVipCode() {
+    const code = document.getElementById('vipCodeInput').value.trim().toUpperCase();
+    if (!code) return;
+    /* Store VIP code and go directly to questionnaire (skip future paywall) */
+    sessionStorage.setItem('vipCode', code);
+    sessionStorage.setItem('vipAccess', 'true');
+    window.location.href = 'questionnaire.html?vip=1';
+  }
+  /* Close modal on overlay click */
+  document.getElementById('vipOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeVipModal();
+  });
+  /* Close modal on Escape */
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeVipModal();
+  });
+  /* Enter key submits VIP code */
+  document.getElementById('vipCodeInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') submitVipCode();
+  });
+</script>
+
+</body>
+</html>

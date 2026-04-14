@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Practice Profile — Dental AI Toolkit</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600&display=swap');
+
+  :root {
+    --navy: #0a1628;
+    --navy-light: #1a2a4a;
+    --blue: #3574B7;
+    --blue-light: #4a8fd4;
+    --blue-glow: rgba(53,116,183,0.15);
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --cream: #FAF9F5;
+    --white: #ffffff;
+    --text: #1a1a2e;
+    --text-muted: #6b7a94;
+    --border: #e2e8f0;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --gradient-blue: linear-gradient(135deg, #3574B7, #4a8fd4);
+    --shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.08);
+    --shadow-blue: 0 4px 20px rgba(53,116,183,0.25);
+    --radius: 16px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--navy);
+    color: white;
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 68px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .logo {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--gradient-blue);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .logo span { color: var(--blue-light); }
+  .header-sub {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .progress-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .progress-track {
+    flex: 1;
+    height: 6px;
+    background: #e8ecf2;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--gradient-blue);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+  .progress-pct {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--blue);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* ── CONTAINER ── */
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 40px 24px 100px;
+  }
+
+  /* ── INTRO ── */
+  .intro {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .intro h1 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--navy);
+    margin-bottom: 12px;
+  }
+  .intro p {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 540px;
+    margin: 0 auto;
+  }
+
+  /* ── SECTIONS ── */
+  .q-section {
+    margin-bottom: 40px;
+  }
+  .q-section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+  }
+  .q-section-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--blue-glow);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+  .q-section-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--navy);
+  }
+
+  /* ── FORM FIELDS ── */
+  .q-group {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin-bottom: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .q-group:focus-within {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px var(--blue-glow);
+  }
+  .q-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .q-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    line-height: 1.4;
+  }
+  .q-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-family: 'Poppins', sans-serif;
+    color: var(--text);
+    background: var(--cream);
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  .q-input:focus { border-color: var(--blue); background: white; }
+  .q-input::placeholder { color: #b0bec5; }
+
+  select.q-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7a94' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 40px;
+    cursor: pointer;
+  }
+
+  textarea.q-input {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.6;
+  }
+
+  /* Short inputs side by side */
+  .q-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ── NUMBER STEPPER ── */
+  .q-number-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .q-number-wrap .q-input {
+    width: 100px;
+    text-align: center;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+  .q-unit {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  /* ── RADIO BUTTONS ── */
+  .q-radio-group {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .q-radio-option {
+    position: relative;
+  }
+  .q-radio-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .q-radio-option label {
+    display: block;
+    padding: 14px 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    background: var(--cream);
+  }
+  .q-radio-option input:checked + label {
+    border-color: var(--blue);
+    background: var(--blue-glow);
+    color: var(--blue);
+    font-weight: 600;
+  }
+  .q-radio-option label:hover {
+    border-color: var(--blue-light);
+  }
+
+  /* ── YES/NO TOGGLE ── */
+  .q-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .q-toggle-group {
+    display: flex;
+    gap: 8px;
+  }
+  .q-toggle-group label {
+    padding: 10px 24px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--cream);
+  }
+  .q-toggle-group input { display: none; }
+  .q-toggle-group input:checked + label {
+    border-color: var(--blue);
+    background: var(--blue-glow);
+    color: var(--blue);
+    font-weight: 600;
+  }
+
+  /* ── PAYOR MIX SLIDERS ── */
+  .slider-group {
+    margin-bottom: 20px;
+  }
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .slider-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .slider-value {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--blue);
+    min-width: 45px;
+    text-align: right;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: #e8ecf2;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--blue);
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(53,116,183,0.35);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--blue);
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(53,116,183,0.35);
+    cursor: pointer;
+  }
+
+  .slider-total-bar {
+    margin-top: 24px;
+    padding: 16px 20px;
+    background: var(--cream);
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .slider-total-bar.valid {
+    border-color: var(--success);
+    background: #ecfdf5;
+  }
+  .slider-total-bar.over {
+    border-color: var(--error);
+    background: #fef2f2;
+  }
+  .slider-total-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .slider-total-value {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+  }
+  .slider-total-bar.valid .slider-total-value { color: var(--success); }
+  .slider-total-bar.over .slider-total-value { color: var(--error); }
+  .slider-total-bar .slider-total-value { color: var(--text); }
+  .slider-total-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  /* Stacked bar visualization */
+  .mix-visual {
+    margin-top: 16px;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    background: #e8ecf2;
+  }
+  .mix-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+    min-width: 0;
+  }
+  .mix-seg-ppo { background: var(--blue); }
+  .mix-seg-hmo { background: var(--gold); }
+  .mix-seg-gov { background: #8b5cf6; }
+  .mix-seg-ffs { background: var(--success); }
+
+  /* ── ASSOCIATE CONDITIONAL ── */
+  .assoc-details {
+    display: none;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .assoc-details.visible { display: block; }
+
+  /* ── BOTTOM BUTTONS ── */
+  .btn-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 48px;
+    padding-top: 28px;
+    border-top: 2px solid var(--border);
+  }
+  .btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+  .btn-back:hover { border-color: var(--text-muted); color: var(--text); }
+  .btn-next {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--gradient-blue);
+    color: white;
+    padding: 14px 36px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    box-shadow: var(--shadow-blue);
+    transition: all 0.3s;
+  }
+  .btn-next:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(53,116,183,0.35); }
+  .btn-next:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 700px) {
+    .q-row { grid-template-columns: 1fr; }
+    .q-radio-group { grid-template-columns: 1fr; }
+    header { padding: 0 20px; }
+    .progress-wrap { padding: 12px 20px; }
+    .container { padding: 28px 16px 80px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <a href="landing.html" class="logo">
+    <div class="logo-icon">&#9670;</div>
+    Dental<span>AI</span> Toolkit
+  </a>
+  <div class="header-sub">Practice Profile</div>
+</header>
+
+<!-- PROGRESS BAR -->
+<div class="progress-wrap">
+  <div class="progress-label">Profile Completion</div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="progress-pct" id="progressPct">0%</div>
+</div>
+
+<div class="container">
+
+  <!-- INTRO -->
+  <div class="intro">
+    <h1>Tell us about your practice</h1>
+    <p>This takes about 3 minutes. Your answers help us calibrate the assessment to your specific practice and goals.</p>
+  </div>
+
+  <form id="questionnaireForm" autocomplete="off">
+
+    <!-- ═══ SECTION: PRACTICE BASICS ═══ -->
+    <div class="q-section">
+      <div class="q-section-header">
+        <div class="q-section-icon">&#127970;</div>
+        <div class="q-section-title">Practice Basics</div>
+      </div>
+
+      <div class="q-row">
+        <div class="q-group">
+          <label class="q-label">Practice Zip Code</label>
+          <div class="q-hint">Helps us benchmark against your region</div>
+          <input type="text" class="q-input q-tracked" name="zipCode" placeholder="e.g. 77024" maxlength="10" inputmode="numeric">
+        </div>
+        <div class="q-group">
+          <label class="q-label">Practice Website</label>
+          <div class="q-hint">Optional — helps us understand your market presence</div>
+          <input type="url" class="q-input q-tracked" name="website" placeholder="e.g. www.yourpractice.com">
+        </div>
+      </div>
+
+      <div class="q-row">
+        <div class="q-group">
+          <label class="q-label">How long have you owned the practice?</label>
+          <div class="q-number-wrap">
+            <input type="number" class="q-input q-tracked" name="yearsOwned" placeholder="0" min="0" max="60">
+            <span class="q-unit">years</span>
+          </div>
+        </div>
+        <div class="q-group">
+          <label class="q-label">How old are you?</label>
+          <div class="q-number-wrap">
+            <input type="number" class="q-input q-tracked" name="ownerAge" placeholder="0" min="20" max="90">
+            <span class="q-unit">years old</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">What practice management software do you use?</label>
+        <div class="q-hint">This helps us tailor the report upload instructions</div>
+        <select class="q-input q-tracked" name="pmSoftware">
+          <option value="">Select your software...</option>
+          <option value="dentrix">Dentrix</option>
+          <option value="eaglesoft">Eaglesoft</option>
+          <option value="opendental">Open Dental</option>
+          <option value="denticon">Denticon (Planet DDS)</option>
+          <option value="carestack">CareStack</option>
+          <option value="curve">Curve Dental</option>
+          <option value="softdent">SoftDent</option>
+          <option value="practiceworks">PracticeWorks</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Estimated annual collections</label>
+        <div class="q-hint">A rough range is fine — this helps us contextualize your data</div>
+        <select class="q-input q-tracked" name="annualCollections">
+          <option value="">Select a range...</option>
+          <option value="under500k">Under $500,000</option>
+          <option value="500k-750k">$500,000 – $750,000</option>
+          <option value="750k-1m">$750,000 – $1,000,000</option>
+          <option value="1m-1.5m">$1,000,000 – $1,500,000</option>
+          <option value="1.5m-2m">$1,500,000 – $2,000,000</option>
+          <option value="2m-3m">$2,000,000 – $3,000,000</option>
+          <option value="over3m">Over $3,000,000</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ═══ SECTION: PAYOR MIX ═══ -->
+    <div class="q-section">
+      <div class="q-section-header">
+        <div class="q-section-icon">&#128178;</div>
+        <div class="q-section-title">Payor Mix</div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">What is your approximate payor mix?</label>
+        <div class="q-hint">Drag the sliders so they total 100%. This is your best estimate — it doesn't need to be exact.</div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label">In-Network PPO</span>
+            <span class="slider-value" id="ppoVal">0%</span>
+          </div>
+          <input type="range" min="0" max="100" value="0" id="ppoSlider" class="mix-slider" data-target="ppoVal">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label">HMO</span>
+            <span class="slider-value" id="hmoVal">0%</span>
+          </div>
+          <input type="range" min="0" max="100" value="0" id="hmoSlider" class="mix-slider" data-target="hmoVal">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label">Medicaid / Government</span>
+            <span class="slider-value" id="govVal">0%</span>
+          </div>
+          <input type="range" min="0" max="100" value="0" id="govSlider" class="mix-slider" data-target="govVal">
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-label">FFS / Out of Network</span>
+            <span class="slider-value" id="ffsVal">0%</span>
+          </div>
+          <input type="range" min="0" max="100" value="0" id="ffsSlider" class="mix-slider" data-target="ffsVal">
+        </div>
+
+        <div class="mix-visual">
+          <div class="mix-segment mix-seg-ppo" id="mixSegPpo"></div>
+          <div class="mix-segment mix-seg-hmo" id="mixSegHmo"></div>
+          <div class="mix-segment mix-seg-gov" id="mixSegGov"></div>
+          <div class="mix-segment mix-seg-ffs" id="mixSegFfs"></div>
+        </div>
+
+        <div class="slider-total-bar" id="sliderTotalBar">
+          <span class="slider-total-label">Total</span>
+          <span class="slider-total-value" id="sliderTotalValue">0%</span>
+        </div>
+        <div class="slider-total-hint" id="sliderTotalHint">Adjust sliders until the total reaches 100%</div>
+      </div>
+    </div>
+
+    <!-- ═══ SECTION: SCHEDULE & TEAM ═══ -->
+    <div class="q-section">
+      <div class="q-section-header">
+        <div class="q-section-icon">&#128197;</div>
+        <div class="q-section-title">Schedule & Team</div>
+      </div>
+
+      <div class="q-row">
+        <div class="q-group">
+          <label class="q-label">Days you work per month</label>
+          <div class="q-hint">Based on a 4-week month</div>
+          <div class="q-number-wrap">
+            <input type="number" class="q-input q-tracked" name="doctorDays" placeholder="16" min="1" max="24">
+            <span class="q-unit">days / month</span>
+          </div>
+        </div>
+        <div class="q-group">
+          <label class="q-label">How many hygienists?</label>
+          <div class="q-hint">Currently employed</div>
+          <div class="q-number-wrap">
+            <input type="number" class="q-input q-tracked" name="numHygienists" placeholder="2" min="0" max="15">
+            <span class="q-unit">hygienists</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Do you have an associate?</label>
+        <div class="q-toggle-row">
+          <div class="q-toggle-group">
+            <input type="radio" name="hasAssociate" id="assocYes" value="yes">
+            <label for="assocYes">Yes</label>
+            <input type="radio" name="hasAssociate" id="assocNo" value="no" checked>
+            <label for="assocNo">No</label>
+          </div>
+        </div>
+        <div class="assoc-details" id="assocDetails">
+          <label class="q-label">How many days per month does your associate work?</label>
+          <div class="q-number-wrap">
+            <input type="number" class="q-input q-tracked" name="associateDays" placeholder="8" min="1" max="24">
+            <span class="q-unit">days / month</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-row">
+        <div class="q-group">
+          <label class="q-label">Operatories currently functioning</label>
+          <div class="q-number-wrap">
+            <input type="number" class="q-input q-tracked" name="opsActive" placeholder="6" min="1" max="30">
+            <span class="q-unit">ops</span>
+          </div>
+        </div>
+        <div class="q-group">
+          <label class="q-label">Total operatories you could expand to</label>
+          <div class="q-number-wrap">
+            <input type="number" class="q-input q-tracked" name="opsTotal" placeholder="8" min="1" max="30">
+            <span class="q-unit">ops</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SECTION: GOALS & VISION ═══ -->
+    <div class="q-section">
+      <div class="q-section-header">
+        <div class="q-section-icon">&#127919;</div>
+        <div class="q-section-title">Goals & Vision</div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">How many more years do you want to work?</label>
+        <div class="q-hint">This helps us frame recommendations around your timeline</div>
+        <div class="q-radio-group">
+          <div class="q-radio-option">
+            <input type="radio" name="yearsToWork" id="ytw1" value="1-5" class="q-tracked">
+            <label for="ytw1">1 – 5 years</label>
+          </div>
+          <div class="q-radio-option">
+            <input type="radio" name="yearsToWork" id="ytw2" value="5-10" class="q-tracked">
+            <label for="ytw2">5 – 10 years</label>
+          </div>
+          <div class="q-radio-option">
+            <input type="radio" name="yearsToWork" id="ytw3" value="10-15" class="q-tracked">
+            <label for="ytw3">10 – 15 years</label>
+          </div>
+          <div class="q-radio-option">
+            <input type="radio" name="yearsToWork" id="ytw4" value="not-on-radar" class="q-tracked">
+            <label for="ytw4">Not on my radar</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">What is your biggest challenge right now?</label>
+        <div class="q-hint">Be as specific as you like — this helps us focus the assessment on what matters most to you</div>
+        <textarea class="q-input q-tracked" name="biggestChallenge" placeholder="e.g. Staff turnover, declining new patients, overhead too high, insurance reimbursement rates, want to grow but not sure how..."></textarea>
+      </div>
+    </div>
+
+    <!-- ═══ BUTTONS ═══ -->
+    <div class="btn-row">
+      <a href="landing.html" class="btn-back">&#8592; Back</a>
+      <button type="submit" class="btn-next" id="continueBtn">Continue to Report Upload &#8594;</button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  /* ── Payor Mix Sliders ── */
+  const sliders = document.querySelectorAll('.mix-slider');
+  const totalBar = document.getElementById('sliderTotalBar');
+  const totalValue = document.getElementById('sliderTotalValue');
+  const totalHint = document.getElementById('sliderTotalHint');
+
+  function updateSliders() {
+    let total = 0;
+    sliders.forEach(s => {
+      const val = parseInt(s.value);
+      total += val;
+      document.getElementById(s.dataset.target).textContent = val + '%';
+    });
+    totalValue.textContent = total + '%';
+    totalBar.classList.remove('valid', 'over');
+    if (total === 100) {
+      totalBar.classList.add('valid');
+      totalHint.textContent = 'Perfect!';
+    } else if (total > 100) {
+      totalBar.classList.add('over');
+      totalHint.textContent = 'Total exceeds 100% — please adjust';
+    } else {
+      totalHint.textContent = (100 - total) + '% remaining';
+    }
+    /* Update visual bar */
+    document.getElementById('mixSegPpo').style.width = document.getElementById('ppoSlider').value + '%';
+    document.getElementById('mixSegHmo').style.width = document.getElementById('hmoSlider').value + '%';
+    document.getElementById('mixSegGov').style.width = document.getElementById('govSlider').value + '%';
+    document.getElementById('mixSegFfs').style.width = document.getElementById('ffsSlider').value + '%';
+
+    updateProgress();
+  }
+  sliders.forEach(s => s.addEventListener('input', updateSliders));
+
+  /* ── Associate Toggle ── */
+  document.querySelectorAll('input[name="hasAssociate"]').forEach(r => {
+    r.addEventListener('change', function() {
+      document.getElementById('assocDetails').classList.toggle('visible', this.value === 'yes');
+      updateProgress();
+    });
+  });
+
+  /* ── Progress Tracking ── */
+  function updateProgress() {
+    const fields = [
+      !!document.querySelector('[name="zipCode"]').value.trim(),
+      !!document.querySelector('[name="yearsOwned"]').value,
+      !!document.querySelector('[name="ownerAge"]').value,
+      !!document.querySelector('[name="pmSoftware"]').value,
+      !!document.querySelector('[name="annualCollections"]').value,
+      getMixTotal() === 100,
+      !!document.querySelector('[name="doctorDays"]').value,
+      !!document.querySelector('[name="numHygienists"]').value,
+      !!document.querySelector('input[name="yearsToWork"]:checked'),
+      !!document.querySelector('[name="opsActive"]').value,
+    ];
+    const filled = fields.filter(Boolean).length;
+    const pct = Math.round((filled / fields.length) * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = pct + '%';
+  }
+
+  function getMixTotal() {
+    let t = 0;
+    sliders.forEach(s => t += parseInt(s.value));
+    return t;
+  }
+
+  /* Track all inputs */
+  document.querySelectorAll('.q-tracked').forEach(el => {
+    el.addEventListener('input', updateProgress);
+    el.addEventListener('change', updateProgress);
+  });
+
+  /* ── Form Submit ── */
+  document.getElementById('questionnaireForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    /* Collect all answers */
+    const data = {
+      zipCode: document.querySelector('[name="zipCode"]').value.trim(),
+      website: document.querySelector('[name="website"]').value.trim(),
+      yearsOwned: parseInt(document.querySelector('[name="yearsOwned"]').value) || 0,
+      ownerAge: parseInt(document.querySelector('[name="ownerAge"]').value) || 0,
+      pmSoftware: document.querySelector('[name="pmSoftware"]').value,
+      annualCollections: document.querySelector('[name="annualCollections"]').value,
+      payorMix: {
+        ppo: parseInt(document.getElementById('ppoSlider').value),
+        hmo: parseInt(document.getElementById('hmoSlider').value),
+        gov: parseInt(document.getElementById('govSlider').value),
+        ffs: parseInt(document.getElementById('ffsSlider').value),
+      },
+      doctorDays: parseInt(document.querySelector('[name="doctorDays"]').value) || 0,
+      numHygienists: parseInt(document.querySelector('[name="numHygienists"]').value) || 0,
+      hasAssociate: document.querySelector('input[name="hasAssociate"]:checked')?.value === 'yes',
+      associateDays: parseInt(document.querySelector('[name="associateDays"]').value) || 0,
+      opsActive: parseInt(document.querySelector('[name="opsActive"]').value) || 0,
+      opsTotal: parseInt(document.querySelector('[name="opsTotal"]').value) || 0,
+      yearsToWork: document.querySelector('input[name="yearsToWork"]:checked')?.value || '',
+      biggestChallenge: document.querySelector('[name="biggestChallenge"]').value.trim(),
+    };
+
+    /* Store in sessionStorage for the assessment hub to pick up */
+    sessionStorage.setItem('practiceProfile', JSON.stringify(data));
+
+    /* Check for VIP access */
+    const isVip = sessionStorage.getItem('vipAccess') === 'true';
+    if (isVip) {
+      data.vipCode = sessionStorage.getItem('vipCode');
+    }
+
+    /* Navigate to assessment hub */
+    window.location.href = 'assessment_hub.html';
+  });
+
+  /* Init */
+  updateProgress();
+</script>
+
+</body>
+</html>
