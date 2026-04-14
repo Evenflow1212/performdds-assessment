@@ -238,6 +238,76 @@
     line-height: 1.6;
   }
 
+  /* ── CHALLENGE CHECKBOXES ── */
+  .challenge-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .challenge-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+    font-size: 0.9rem;
+    color: var(--text);
+    user-select: none;
+  }
+  .challenge-option:hover {
+    border-color: var(--blue-light);
+    background: rgba(53,116,183,0.04);
+  }
+  .challenge-option input[type="checkbox"] {
+    display: none;
+  }
+  .challenge-option .check-box {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    font-size: 13px;
+    color: transparent;
+  }
+  .challenge-option input:checked ~ .check-box {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: white;
+  }
+  .challenge-option input:checked ~ .check-text {
+    color: var(--blue);
+    font-weight: 500;
+  }
+  @media (max-width: 600px) {
+    .challenge-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── IDK TOGGLE (daily averages) ── */
+  .idk-wrap { position: relative; }
+  .idk-wrap input[type="number"] { transition: opacity 0.2s; }
+  .idk-wrap.unknown input[type="number"] { opacity: 0.3; pointer-events: none; }
+  .idk-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .idk-toggle input[type="checkbox"] { accent-color: var(--blue); }
+
   /* Short inputs side by side */
   .q-row {
     display: grid;
@@ -594,20 +664,6 @@
         </select>
       </div>
 
-      <div class="q-group">
-        <label class="q-label">Estimated annual collections</label>
-        <div class="q-hint">A rough range is fine — this helps us contextualize your data</div>
-        <select class="q-input q-tracked" name="annualCollections">
-          <option value="">Select a range...</option>
-          <option value="under500k">Under $500,000</option>
-          <option value="500k-750k">$500,000 – $750,000</option>
-          <option value="750k-1m">$750,000 – $1,000,000</option>
-          <option value="1m-1.5m">$1,000,000 – $1,500,000</option>
-          <option value="1.5m-2m">$1,500,000 – $2,000,000</option>
-          <option value="2m-3m">$2,000,000 – $3,000,000</option>
-          <option value="over3m">Over $3,000,000</option>
-        </select>
-      </div>
     </div>
 
     <!-- ═══ SECTION: PAYOR MIX ═══ -->
@@ -626,7 +682,7 @@
             <span class="slider-label">In-Network PPO</span>
             <span class="slider-value" id="ppoVal">0%</span>
           </div>
-          <input type="range" min="0" max="100" value="0" id="ppoSlider" class="mix-slider" data-target="ppoVal">
+          <input type="range" min="0" max="100" value="0" step="5" id="ppoSlider" class="mix-slider" data-target="ppoVal">
         </div>
 
         <div class="slider-group">
@@ -634,7 +690,7 @@
             <span class="slider-label">HMO</span>
             <span class="slider-value" id="hmoVal">0%</span>
           </div>
-          <input type="range" min="0" max="100" value="0" id="hmoSlider" class="mix-slider" data-target="hmoVal">
+          <input type="range" min="0" max="100" value="0" step="5" id="hmoSlider" class="mix-slider" data-target="hmoVal">
         </div>
 
         <div class="slider-group">
@@ -642,7 +698,7 @@
             <span class="slider-label">Medicaid / Government</span>
             <span class="slider-value" id="govVal">0%</span>
           </div>
-          <input type="range" min="0" max="100" value="0" id="govSlider" class="mix-slider" data-target="govVal">
+          <input type="range" min="0" max="100" value="0" step="5" id="govSlider" class="mix-slider" data-target="govVal">
         </div>
 
         <div class="slider-group">
@@ -650,7 +706,7 @@
             <span class="slider-label">FFS / Out of Network</span>
             <span class="slider-value" id="ffsVal">0%</span>
           </div>
-          <input type="range" min="0" max="100" value="0" id="ffsSlider" class="mix-slider" data-target="ffsVal">
+          <input type="range" min="0" max="100" value="0" step="5" id="ffsSlider" class="mix-slider" data-target="ffsVal">
         </div>
 
         <div class="mix-visual">
@@ -685,11 +741,11 @@
           </div>
         </div>
         <div class="q-group">
-          <label class="q-label">How many hygienists?</label>
-          <div class="q-hint">Currently employed</div>
+          <label class="q-label">Total hygiene days per week?</label>
+          <div class="q-hint">Count each day a hygienist works as one. Example: 2 hygienists × 4 days = 8</div>
           <div class="q-number-wrap">
-            <input type="number" class="q-input q-tracked" name="numHygienists" placeholder="2" min="0" max="15">
-            <span class="q-unit">hygienists</span>
+            <input type="number" class="q-input q-tracked" name="numHygienists" placeholder="8" min="0" max="40">
+            <span class="q-unit">days / week</span>
           </div>
         </div>
       </div>
@@ -709,6 +765,72 @@
           <div class="q-number-wrap">
             <input type="number" class="q-input q-tracked" name="associateDays" placeholder="8" min="1" max="24">
             <span class="q-unit">days / month</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-row">
+        <div class="q-group">
+          <label class="q-label">Your daily production average</label>
+          <div class="q-hint">What you personally produce on a typical day</div>
+          <div class="idk-wrap" id="docDailyWrap">
+            <div class="q-number-wrap">
+              <span class="q-unit" style="order:-1">$</span>
+              <input type="number" class="q-input" name="docDailyAvg" placeholder="3,500" min="0" max="50000" step="100">
+              <span class="q-unit">/ day</span>
+            </div>
+            <label class="idk-toggle"><input type="checkbox" onchange="toggleIdk(this,'docDailyWrap','docDailyAvg')"> I don't know</label>
+          </div>
+        </div>
+        <div class="q-group">
+          <label class="q-label">Hygiene daily production average</label>
+          <div class="q-hint">Average production per hygienist per day</div>
+          <div class="idk-wrap" id="hygDailyWrap">
+            <div class="q-number-wrap">
+              <span class="q-unit" style="order:-1">$</span>
+              <input type="number" class="q-input" name="hygDailyAvg" placeholder="1,200" min="0" max="10000" step="50">
+              <span class="q-unit">/ day</span>
+            </div>
+            <label class="idk-toggle"><input type="checkbox" onchange="toggleIdk(this,'hygDailyWrap','hygDailyAvg')"> I don't know</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">How many crowns do you average per month?</label>
+        <div class="idk-wrap" id="crownsWrap">
+          <div class="q-number-wrap">
+            <input type="number" class="q-input" name="crownsPerMonth" placeholder="25" min="0" max="200">
+            <span class="q-unit">crowns / month</span>
+          </div>
+          <label class="idk-toggle"><input type="checkbox" onchange="toggleIdk(this,'crownsWrap','crownsPerMonth')"> I don't know</label>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Do you have a daily production goal that's realistic and that your team talks about every day?</label>
+        <div class="q-toggle-row">
+          <div class="q-toggle-group">
+            <input type="radio" name="hasProductionGoal" id="goalYes" value="yes">
+            <label for="goalYes">Yes</label>
+            <input type="radio" name="hasProductionGoal" id="goalNo" value="no">
+            <label for="goalNo">No</label>
+            <input type="radio" name="hasProductionGoal" id="goalSort" value="sort_of">
+            <label for="goalSort">Sort of</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">As the month goes on, do you know whether you're ahead or behind your goals?</label>
+        <div class="q-toggle-row">
+          <div class="q-toggle-group">
+            <input type="radio" name="knowsIfAhead" id="aheadYes" value="yes">
+            <label for="aheadYes">Yes</label>
+            <input type="radio" name="knowsIfAhead" id="aheadNo" value="no">
+            <label for="aheadNo">No</label>
+            <input type="radio" name="knowsIfAhead" id="aheadSome" value="sometimes">
+            <label for="aheadSome">Sometimes</label>
           </div>
         </div>
       </div>
@@ -762,9 +884,22 @@
       </div>
 
       <div class="q-group">
-        <label class="q-label">What is your biggest challenge right now?</label>
-        <div class="q-hint">Be as specific as you like — this helps us focus the assessment on what matters most to you</div>
-        <textarea class="q-input q-tracked" name="biggestChallenge" placeholder="e.g. Staff turnover, declining new patients, overhead too high, insurance reimbursement rates, want to grow but not sure how..."></textarea>
+        <label class="q-label">What are your biggest concerns right now?</label>
+        <div class="q-hint">Check all that apply</div>
+        <div class="challenge-grid">
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="more_profitable"><span class="check-box">&#10003;</span><span class="check-text">I want to be more profitable</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="more_busy"><span class="check-box">&#10003;</span><span class="check-text">I want to be busier</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="pay_staff_more"><span class="check-box">&#10003;</span><span class="check-text">I want to pay my staff more</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="owner_bonus"><span class="check-box">&#10003;</span><span class="check-text">I want to take home more</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="more_control"><span class="check-box">&#10003;</span><span class="check-text">I want more control over my practice</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="staff_issues"><span class="check-box">&#10003;</span><span class="check-text">My staff is driving me crazy</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="overhead_high"><span class="check-box">&#10003;</span><span class="check-text">My overhead is too high</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="insurance_rates"><span class="check-box">&#10003;</span><span class="check-text">Insurance reimbursements are killing me</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="new_patients"><span class="check-box">&#10003;</span><span class="check-text">I need more new patients</span></label>
+          <label class="challenge-option"><input type="checkbox" name="concerns" value="exit_plan"><span class="check-box">&#10003;</span><span class="check-text">I'm thinking about selling or retiring</span></label>
+        </div>
+        <label class="q-label" style="font-size:0.9rem; margin-top:8px;">Anything else on your mind?</label>
+        <textarea class="q-input" name="biggestChallenge" placeholder="Optional — tell us more about what's going on..."></textarea>
       </div>
     </div>
 
@@ -779,6 +914,20 @@
 
 <script>
   /* ── Payor Mix Sliders ── */
+  function toggleIdk(cb, wrapId, inputName) {
+    const wrap = document.getElementById(wrapId);
+    const input = document.querySelector('[name="' + inputName + '"]');
+    if (cb.checked) {
+      wrap.classList.add('unknown');
+      input.value = '';
+      input.dataset.idk = '1';
+    } else {
+      wrap.classList.remove('unknown');
+      delete input.dataset.idk;
+      input.focus();
+    }
+  }
+
   const sliders = document.querySelectorAll('.mix-slider');
   const totalBar = document.getElementById('sliderTotalBar');
   const totalValue = document.getElementById('sliderTotalValue');
@@ -827,7 +976,6 @@
       !!document.querySelector('[name="yearsOwned"]').value,
       !!document.querySelector('[name="ownerAge"]').value,
       !!document.querySelector('[name="pmSoftware"]').value,
-      !!document.querySelector('[name="annualCollections"]').value,
       getMixTotal() === 100,
       !!document.querySelector('[name="doctorDays"]').value,
       !!document.querySelector('[name="numHygienists"]').value,
@@ -863,7 +1011,6 @@
       yearsOwned: parseInt(document.querySelector('[name="yearsOwned"]').value) || 0,
       ownerAge: parseInt(document.querySelector('[name="ownerAge"]').value) || 0,
       pmSoftware: document.querySelector('[name="pmSoftware"]').value,
-      annualCollections: document.querySelector('[name="annualCollections"]').value,
       payorMix: {
         ppo: parseInt(document.getElementById('ppoSlider').value),
         hmo: parseInt(document.getElementById('hmoSlider').value),
@@ -877,6 +1024,12 @@
       opsActive: parseInt(document.querySelector('[name="opsActive"]').value) || 0,
       opsTotal: parseInt(document.querySelector('[name="opsTotal"]').value) || 0,
       yearsToWork: document.querySelector('input[name="yearsToWork"]:checked')?.value || '',
+      docDailyAvg: document.querySelector('[name="docDailyAvg"]').dataset.idk ? 'idk' : (parseInt(document.querySelector('[name="docDailyAvg"]').value) || null),
+      hygDailyAvg: document.querySelector('[name="hygDailyAvg"]').dataset.idk ? 'idk' : (parseInt(document.querySelector('[name="hygDailyAvg"]').value) || null),
+      crownsPerMonth: document.querySelector('[name="crownsPerMonth"]').dataset.idk ? 'idk' : (parseInt(document.querySelector('[name="crownsPerMonth"]').value) || null),
+      hasProductionGoal: document.querySelector('input[name="hasProductionGoal"]:checked')?.value || '',
+      knowsIfAhead: document.querySelector('input[name="knowsIfAhead"]:checked')?.value || '',
+      concerns: [...document.querySelectorAll('input[name="concerns"]:checked')].map(c => c.value),
       biggestChallenge: document.querySelector('[name="biggestChallenge"]').value.trim(),
     };
 
