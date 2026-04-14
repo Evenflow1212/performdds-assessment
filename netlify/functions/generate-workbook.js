@@ -1554,11 +1554,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         const replacement = `<c r="${ref}" s="${style}"/>`;
         return re.test(xml) ? xml.replace(re, replacement) : xml;
       }
-      xml = clearCell(xml, 'D27', '639');  /* Jodi Kalik → blank */
-      xml = clearCell(xml, 'D28', '639');  /* Liesa Mcghee → blank */
+      /* Only clear D27/D28 if Pass 1 didn't write hygienist names there */
+      const ecCollector = _cellCollector['Employee Costs'] || {};
+      if (!ecCollector['D27']) xml = clearCell(xml, 'D27', '639');  /* Jodi Kalik → blank */
+      if (!ecCollector['D28']) xml = clearCell(xml, 'D28', '639');  /* Liesa Mcghee → blank */
       xml = clearCell(xml, 'D35', '659');  /* As CA law → blank */
 
-      console.log('Pass 2 sheet6: cleared template placeholder names (D27, D28, D35)');
+      console.log('Pass 2 sheet6: cleared template placeholders (D27 skipped=' + !!ecCollector['D27'] + ', D28 skipped=' + !!ecCollector['D28'] + ')');
       return xml;
     }
   };
@@ -2252,6 +2254,47 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
           sv(wsHS, 'F16', Math.round(prodMonths * 21));  /* ~21 working days/month */
         }
 
+        /* ── Hygiene Schedule GRID: derive recent-past data from production codes ── */
+        /* When the hub form didn't provide schedule data, estimate from procedure counts */
+        const hsCollector = _cellCollector['Hygiene Schedule'] || {};
+        const hygVisitsTotal = prophyQtyHS + perioMaintQtyHS + srpQtyHS;
+        const workingDaysTotal = prodMonths > 0 ? Math.round(prodMonths * 21) : 252;
+        const hygPtsPerDay = workingDaysTotal > 0 ? Math.round(hygVisitsTotal / workingDaysTotal) : 0;
+        /* Estimate hygienists from volume (8 pts/hygienist/day typical) */
+        const estRDHCount = Math.max(1, Math.round(hygPtsPerDay / 8));
+
+        /* RDH SCHEDULED per day (row 7): C=Mon, E=Tue, G=Wed, I=Thu, K=Fri */
+        if (!(hygieneData && hygieneData.rdhPerDay)) {
+          const rdhDayCols = ['C','E','G','I','K'];
+          rdhDayCols.forEach(col => {
+            if (!hsCollector[col + '7']) sv(wsHS, col + '7', estRDHCount);
+          });
+        }
+
+        /* Recent past (rows 10-12): fill appt/seen with estimated daily volume
+           Cols: C=mon appt, D=mon seen, E=tue appt, F=tue seen, G=wed appt, etc. */
+        if (!(hygieneData && hygieneData.recentPast) && hygPtsPerDay > 0) {
+          const apptColsHS = ['C','E','G','I','K','M']; /* appt per day Mon-Sat */
+          const seenColsHS = ['D','F','H','J','L','N']; /* seen per day Mon-Sat */
+          for (let r = 10; r <= 12; r++) {
+            for (let d = 0; d < 5; d++) { /* Mon-Fri */
+              if (!hsCollector[apptColsHS[d] + r]) sv(wsHS, apptColsHS[d] + r, hygPtsPerDay);
+              if (!hsCollector[seenColsHS[d] + r]) sv(wsHS, seenColsHS[d] + r, Math.round(hygPtsPerDay * 0.85)); /* ~85% show rate */
+            }
+            /* Saturday — 0 unless practice works Saturdays */
+            if (!hsCollector['M' + r]) sv(wsHS, 'M' + r, 0);
+            if (!hsCollector['N' + r]) sv(wsHS, 'N' + r, 0);
+          }
+        }
+
+        /* N51: patients per hygiene day — use calculated value instead of default 8 */
+        if (!(hygieneData && hygieneData.ptsPerHygDay) && hygPtsPerDay > 0) {
+          sv(wsHS, 'N51', hygPtsPerDay); /* override the default 8 with actual */
+        }
+
+        console.log('Hygiene Schedule GRID: ' + hygVisitsTotal + ' total visits, ' +
+          hygPtsPerDay + ' pts/day, ' + estRDHCount + ' RDH estimated');
+
         console.log('Hygiene Schedule POTENTIAL: activePatients=' + activePatientEstHS +
           ' npPerMonth=' + npPerMonthHS + ' prophy=' + prophyQtyHS +
           ' perioMaint=' + perioMaintQtyHS + ' srp=' + srpQtyHS);
@@ -2299,9 +2342,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       const staffWages = Math.round(totalPayrollWages * 0.60);
       const hygWages = Math.round(totalPayrollWages * 0.40);
 
-      /* Estimate typical positions — assume avg $20/hr staff, $40/hr hygienist */
+      /* Estimate typical positions — assume avg $20/hr staff, $50/hr hygienist */
       const avgStaffRate = 20;
-      const avgHygRate = 40;
+      const avgHygRate = 50;
       const hoursPerMonth = 160; /* full time */
 
       /* Estimate number of staff from wages: monthly wages / (rate * hours) */
