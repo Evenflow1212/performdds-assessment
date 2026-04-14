@@ -1183,16 +1183,16 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   let _pass2ContentTypes = null;
   if (_originalContentTypes) {
     let ct = _originalContentTypes;
-    if (!ct.includes('sheet9.xml')) {
+    if (hasSheet9 && !ct.includes('sheet9.xml')) {
       ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
     }
-    if (!ct.includes('sheet10.xml')) {
+    if (hasSheet10 && !ct.includes('sheet10.xml')) {
       ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet10.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
     }
-    if (!ct.includes('sheet11.xml')) {
+    if (hasSheet11 && !ct.includes('sheet11.xml')) {
       ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet11.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
     }
-    if (!ct.includes('sheet12.xml')) {
+    if (hasSheet12 && !ct.includes('sheet12.xml')) {
       ct = ct.replace(/<\/Types>/, '<Override PartName="/xl/worksheets/sheet12.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
     }
     if (!ct.includes('Extension="jpeg"') && !ct.includes('Extension="jpg"')) {
