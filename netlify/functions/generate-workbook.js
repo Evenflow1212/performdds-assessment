@@ -120,20 +120,54 @@ function parsePL(text) {
 /* ─── P&L categorization ─── */
 function plCategory(item) {
   const l = item.toLowerCase();
-  if (/payroll.*(wage|salar)|\bwages?\b|\bsalary\b|\bsalaries\b/i.test(l)) return 'H';
-  if (/payroll.*tax/i.test(l)) return 'H';
-  if (/payroll.*fee/i.test(l)) return 'H';
-  if (/uniform|laundry/i.test(l)) return 'H';
-  if (/dental.*suppl|job.*suppl/i.test(l)) return 'F';
-  if (/advertis|marketing/i.test(l)) return 'K';
-  if (/^rent|lease/i.test(l)) return 'J';
-  if (/repair|maintenance/i.test(l)) return 'J';
-  if (/office.*suppl|software/i.test(l)) return 'L';
+  /* P&L Input columns: B=Associates, C=Hygienist, D=Specialists, E=Lab,
+     F=Dental Supplies, G=Specialist Supplies, H=Staff Costs, I=Staff Bonus,
+     J=Rent & Parking, K=Marketing, L=Office Supplies, M=Other,
+     N=Salary/Wages (primary), O=Owner/Add-Back */
+
+  /* EXCLUDED — non-cash items */
+  if (/depreciat|amortiz/i.test(l)) return null;
+
+  /* Owner add-backs (column O) */
   if (/car.*truck/i.test(l)) return 'O';
   if (/meal|entertainment|dining/i.test(l)) return 'O';
   if (/travel\b/i.test(l)) return 'O';
   if (/401k|retirement/i.test(l)) return 'O';
-  if (/depreciat|amortiz/i.test(l)) return null; // EXCLUDED
+
+  /* Associates, Hygienists, Specialists (columns B, C, D) */
+  if (/\bassociate\b/i.test(l)) return 'B';
+  if (/\bhygien/i.test(l)) return 'C';
+  if (/\bspecialist|specialty\b/i.test(l) && !/suppl/i.test(l)) return 'D';
+
+  /* Lab (column E) */
+  if (/\blab\b|laboratory/i.test(l)) return 'E';
+
+  /* Dental Supplies (column F) */
+  if (/dental.*suppl|job.*suppl/i.test(l)) return 'F';
+
+  /* Specialist Supplies (column G) */
+  if (/specialist.*suppl/i.test(l)) return 'G';
+
+  /* Wages & Staff Costs (column H) */
+  if (/payroll.*(wage|salar)|\bwages?\b|\bsalary\b|\bsalaries\b/i.test(l)) return 'H';
+  if (/payroll.*tax/i.test(l)) return 'H';
+  if (/payroll.*fee/i.test(l)) return 'H';
+  if (/uniform|laundry/i.test(l)) return 'H';
+
+  /* Staff Bonus (column I) */
+  if (/\bbonus\b/i.test(l)) return 'I';
+
+  /* Rent & Parking (column J) */
+  if (/^rent|lease/i.test(l)) return 'J';
+  if (/repair|maintenance/i.test(l)) return 'J';
+
+  /* Marketing (column K) */
+  if (/advertis|marketing/i.test(l)) return 'K';
+
+  /* Office Supplies (column L) */
+  if (/office.*suppl|software/i.test(l)) return 'L';
+
+  /* Everything else → Other (column M) */
   return 'M';
 }
 
@@ -2208,9 +2242,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
             });
           });
         }
-        /* RDH scheduled per day (row 7: C, E, G, I) */
+        /* RDH scheduled per day (row 7: C=Mon, E=Tue, G=Wed, I=Thu, K=Fri, M=Sat) */
         if (hygieneData.rdhPerDay) {
-          const rdhCols = ['C','E','G','I'];
+          const rdhCols = ['C','E','G','I','K','M'];
           hygieneData.rdhPerDay.forEach((val, i) => {
             if (i < rdhCols.length) sv(wsHS, rdhCols[i] + '7', val || 0);
           });
@@ -2484,6 +2518,21 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     }
 
     console.log('Employee Costs: done');
+  }
+
+  /* ═══ TARGETS & GOAL ═══ */
+  /* Template layout: Row 7 headers, Row 8=general dentist, Row 9=associate,
+     Row 10=hygiene, Rows 11-16=specialists. Col C=Days Worked. */
+  if (practiceProfile) {
+    if (practiceProfile.doctorDays) sv(wsTG, 'C8', practiceProfile.doctorDays);
+    if (practiceProfile.hasAssociate === true || practiceProfile.hasAssociate === 'yes') {
+      if (practiceProfile.associateDays) sv(wsTG, 'C9', practiceProfile.associateDays);
+    }
+    if (practiceProfile.numHygienists) {
+      /* numHygienists from questionnaire = hygiene days per week; multiply by ~4.3 for monthly */
+      sv(wsTG, 'C10', practiceProfile.numHygienists);
+    }
+    console.log('Targets & Goal: populated from practiceProfile (docDays=' + (practiceProfile.doctorDays||0) + ', assocDays=' + (practiceProfile.associateDays||0) + ', hygDays=' + (practiceProfile.numHygienists||0) + ')');
   }
 
   /* ═══ P&L INPUT ═══ */
@@ -2934,7 +2983,7 @@ exports.handler = async function(event) {
   if (!prodText) return {statusCode:400, headers:{'Access-Control-Allow-Origin':'*'}, body:JSON.stringify({error:'prodText required'})};
 
   try {
-    console.log('Building workbook from pre-parsed data...');
+    console.log('Building workbook from pre-parsed data... practiceProfile=' + (practiceProfile ? 'present' : 'NULL'));
     const result = await buildXlsx(prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, plImageB64, practiceProfile);
 
     return {
