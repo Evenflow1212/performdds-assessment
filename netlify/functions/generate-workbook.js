@@ -2637,226 +2637,216 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
     /* ═══ PRACTICE PROFILE (first extra sheet — becomes first tab via reorder) ═══ */
     if (practiceProfile) {
-      const wsProfile = wbNewSheets.addWorksheet('Practice Profile');
+      const wsP = wbNewSheets.addWorksheet('Practice Profile');
 
-      /* Column widths — generous layout with gutter columns */
-      wsProfile.getColumn('A').width = 2.5;
-      wsProfile.getColumn('B').width = 30;
-      wsProfile.getColumn('C').width = 32;
-      wsProfile.getColumn('D').width = 4;
-      wsProfile.getColumn('E').width = 30;
-      wsProfile.getColumn('F').width = 32;
-      wsProfile.getColumn('G').width = 2.5;
+      /* ── Layout: single wide table B:E, no D gutter ── */
+      wsP.getColumn('A').width = 3;
+      wsP.getColumn('B').width = 34;
+      wsP.getColumn('C').width = 30;
+      wsP.getColumn('D').width = 34;
+      wsP.getColumn('E').width = 30;
+      wsP.getColumn('F').width = 3;
 
-      /* Print / view settings */
-      wsProfile.properties.showGridLines = false;
-      wsProfile.properties.tabColor = { argb: 'FF1B3A5C' };
+      wsP.views = [{ showGridLines: false }];
+      wsP.properties.tabColor = { argb: 'FF2B5797' };
 
-      /* ── Colour palette ── */
-      const navy       = 'FF1B3A5C';
-      const teal       = 'FF0E7C6B';
-      const lightTeal  = 'FFE6F5F2';
-      const midGrey    = 'FF5A6A7A';
-      const darkText   = 'FF1E293B';
-      const lightBg    = 'FFF8FAFC';
-      const hdrBg      = 'FF1B3A5C';
-      const hdrText    = 'FFFFFFFF';
-      const stripeBg   = 'FFF1F5F9';
-      const borderClr  = 'FFD0D7DE';
+      /* ── Palette ── */
+      const _accent  = 'FF2B5797';   /* PerformDDS blue */
+      const _accent2 = 'FF3A7BD5';   /* lighter accent */
+      const _dark    = 'FF1E293B';
+      const _mid     = 'FF64748B';
+      const _light   = 'FFF8FAFC';
+      const _stripe  = 'FFF1F5F9';
+      const _border  = 'FFE2E8F0';
+      const _white   = 'FFFFFFFF';
 
-      /* ── Font definitions ── */
-      const titleFont    = { name: 'Candara', size: 20, bold: true, color: { argb: hdrText } };
-      const subtitleFont = { name: 'Candara', size: 11, color: { argb: 'FFCBD5E1' } };
-      const sectionFont  = { name: 'Candara', size: 12, bold: true, color: { argb: teal } };
-      const labelFont    = { name: 'Candara', size: 11, bold: true, color: { argb: midGrey } };
-      const valFont      = { name: 'Candara', size: 11, color: { argb: darkText } };
-      const valFontBold  = { name: 'Candara', size: 11, bold: true, color: { argb: darkText } };
-      const checkFont    = { name: 'Candara', size: 11, color: { argb: teal } };
-      const footerFont   = { name: 'Candara', size: 9, italic: true, color: { argb: 'FF94A3B8' } };
+      /* ── Fonts ── */
+      const fTitle = { name: 'Candara', size: 18, bold: true, color: { argb: _white } };
+      const fSub   = { name: 'Candara', size: 10, color: { argb: 'FFB0C4DE' } };
+      const fSect  = { name: 'Candara', size: 11, bold: true, color: { argb: _accent } };
+      const fLabel = { name: 'Candara', size: 10, color: { argb: _mid } };
+      const fVal   = { name: 'Candara', size: 10, bold: true, color: { argb: _dark } };
+      const fCheck = { name: 'Candara', size: 10, color: { argb: _dark } };
+      const fNote  = { name: 'Candara', size: 10, italic: true, color: { argb: _mid } };
+      const fFoot  = { name: 'Candara', size: 8, italic: true, color: { argb: 'FFA0AEC0' } };
 
-      /* ── Shared border/fill styles ── */
-      const thinBorder   = { style: 'thin', color: { argb: borderClr } };
-      const rowBorder    = { bottom: thinBorder };
-      const sectionFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightTeal } };
-      const altFill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: stripeBg } };
+      /* ── Fills ── */
+      const fillBanner  = { type: 'pattern', pattern: 'solid', fgColor: { argb: _accent } };
+      const fillSection = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2F7' } };
+      const fillStripe  = { type: 'pattern', pattern: 'solid', fgColor: { argb: _stripe } };
+      const fillWhite   = { type: 'pattern', pattern: 'solid', fgColor: { argb: _white } };
 
-      /* ── Helper: section header spanning B-F ── */
-      function sectionHeader(ws, row, text) {
-        for (const col of ['B','C','D','E','F']) {
-          const c = ws.getCell(col + row);
-          c.fill = sectionFill;
-          c.border = { bottom: { style: 'medium', color: { argb: teal } } };
+      /* ── Borders ── */
+      const bdrBot   = { bottom: { style: 'thin', color: { argb: _border } } };
+      const bdrAccent = { bottom: { style: 'medium', color: { argb: _accent } } };
+
+      /* ── Helpers ── */
+      const allCols = ['A','B','C','D','E','F'];
+      const dataCols = ['B','C','D','E'];
+
+      function fillRow(ws, row, fill, border) {
+        for (const c of allCols) {
+          const cell = ws.getCell(c + row);
+          if (fill) cell.fill = fill;
+          if (border) cell.border = border;
         }
+      }
+
+      function sectionHdr(ws, row, text) {
+        fillRow(ws, row, fillSection, bdrAccent);
         const c = ws.getCell('B' + row);
         c.value = text;
-        c.font = sectionFont;
-        ws.getRow(row).height = 26;
+        c.font = fSect;
+        c.alignment = { vertical: 'middle' };
+        ws.getRow(row).height = 28;
       }
 
-      /* ── Helper: label + value row with optional striping ── */
-      let _rowParity = 0;
-      function labelVal(ws, row, bCol, cCol, label, value) {
-        const isAlt = (_rowParity % 2 === 1);
-        for (const col of [bCol, cCol]) {
-          const c = ws.getCell(col + row);
-          if (isAlt) c.fill = altFill;
-          c.border = rowBorder;
-          c.alignment = { vertical: 'center' };
+      let _parity = 0;
+      function dataRow(ws, row, label1, val1, label2, val2) {
+        const bg = (_parity % 2 === 0) ? fillWhite : fillStripe;
+        fillRow(ws, row, bg, bdrBot);
+        ws.getCell('B' + row).value = label1;
+        ws.getCell('B' + row).font = fLabel;
+        ws.getCell('B' + row).alignment = { vertical: 'middle' };
+        ws.getCell('C' + row).value = val1 || '';
+        ws.getCell('C' + row).font = fVal;
+        ws.getCell('C' + row).alignment = { vertical: 'middle' };
+        if (label2) {
+          ws.getCell('D' + row).value = label2;
+          ws.getCell('D' + row).font = fLabel;
+          ws.getCell('D' + row).alignment = { vertical: 'middle' };
+          ws.getCell('E' + row).value = val2 || '';
+          ws.getCell('E' + row).font = fVal;
+          ws.getCell('E' + row).alignment = { vertical: 'middle' };
         }
-        const lc = ws.getCell(bCol + row);
-        lc.value = label;
-        lc.font = labelFont;
-        const vc = ws.getCell(cCol + row);
-        vc.value = value;
-        vc.font = valFontBold;
-        ws.getRow(row).height = 22;
-        _rowParity++;
+        ws.getRow(row).height = 24;
+        _parity++;
       }
 
-      /* ═══════════ BUILD THE SHEET ═══════════ */
+      /* ═══ ROW 1-2: Title banner ═══ */
+      fillRow(wsP, 1, fillBanner, null);
+      fillRow(wsP, 2, fillBanner, null);
+      wsP.mergeCells('B1:E1');
+      wsP.getCell('B1').value = practiceName || practiceProfile.website || 'Practice Assessment';
+      wsP.getCell('B1').font = fTitle;
+      wsP.getCell('B1').alignment = { vertical: 'middle' };
+      wsP.getRow(1).height = 44;
 
-      /* ── Title banner (dark navy) ── */
-      for (const col of ['A','B','C','D','E','F','G']) {
-        wsProfile.getCell(col + '1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: hdrBg } };
-        wsProfile.getCell(col + '2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: hdrBg } };
-      }
-      const titleCell = wsProfile.getCell('B1');
-      titleCell.value = (practiceName || practiceProfile.website || 'Practice Assessment');
-      titleCell.font = titleFont;
-      titleCell.alignment = { vertical: 'middle' };
-      wsProfile.mergeCells('B1:F1');
-      wsProfile.getRow(1).height = 40;
+      wsP.mergeCells('B2:E2');
+      wsP.getCell('B2').value = 'Practice Profile  |  Dental AI Toolkit Assessment';
+      wsP.getCell('B2').font = fSub;
+      wsP.getCell('B2').alignment = { vertical: 'top' };
+      wsP.getRow(2).height = 20;
 
-      const subCell = wsProfile.getCell('B2');
-      subCell.value = 'Practice Profile — Dental AI Toolkit Assessment';
-      subCell.font = subtitleFont;
-      subCell.alignment = { vertical: 'top' };
-      wsProfile.mergeCells('B2:F2');
-      wsProfile.getRow(2).height = 22;
-
-      /* Spacer */
-      wsProfile.getRow(3).height = 10;
+      /* Row 3: spacer */
+      wsP.getRow(3).height = 8;
 
       let r = 4;
 
-      /* ── Practice Basics ── */
-      sectionHeader(wsProfile, r, 'PRACTICE BASICS');
-      r++;
-      _rowParity = 0;
-      labelVal(wsProfile, r, 'B', 'C', 'Zip Code', practiceProfile.zipCode || '—');
-      labelVal(wsProfile, r, 'E', 'F', 'Practice Website', practiceProfile.website || '—');
-      r++;
-      labelVal(wsProfile, r, 'B', 'C', 'Years Owned', practiceProfile.yearsOwned ? practiceProfile.yearsOwned + ' years' : '—');
-      labelVal(wsProfile, r, 'E', 'F', 'Owner Age', practiceProfile.ownerAge ? practiceProfile.ownerAge + ' years old' : '—');
-      r++;
+      /* ═══ PRACTICE BASICS ═══ */
+      sectionHdr(wsP, r, 'PRACTICE BASICS'); r++;
+      _parity = 0;
+      dataRow(wsP, r, 'Zip Code', practiceProfile.zipCode || '—', 'Practice Website', practiceProfile.website || '—'); r++;
+      dataRow(wsP, r, 'Years Owned', practiceProfile.yearsOwned ? practiceProfile.yearsOwned + ' years' : '—', 'Owner Age', practiceProfile.ownerAge ? practiceProfile.ownerAge + ' years old' : '—'); r++;
       const softwareNames = { dentrix: 'Dentrix', eaglesoft: 'Eaglesoft', opendental: 'Open Dental', other: 'Other' };
-      labelVal(wsProfile, r, 'B', 'C', 'Practice Software', softwareNames[practiceProfile.pmSoftware] || practiceProfile.pmSoftware || '—');
-      r += 2;
+      dataRow(wsP, r, 'Practice Management Software', softwareNames[practiceProfile.pmSoftware] || practiceProfile.pmSoftware || '—', null, null); r++;
+      r++; /* spacer */
 
-      /* ── Payor Mix ── */
-      sectionHeader(wsProfile, r, 'PAYOR MIX');
-      r++;
-      _rowParity = 0;
+      /* ═══ PAYOR MIX ═══ */
+      sectionHdr(wsP, r, 'PAYOR MIX'); r++;
+      _parity = 0;
       const mix = practiceProfile.payorMix || {};
-      labelVal(wsProfile, r, 'B', 'C', 'In-Network PPO', (mix.ppo || 0) + '%');
-      labelVal(wsProfile, r, 'E', 'F', 'HMO', (mix.hmo || 0) + '%');
+      dataRow(wsP, r, 'In-Network PPO', (mix.ppo || 0) + '%', 'HMO', (mix.hmo || 0) + '%'); r++;
+      dataRow(wsP, r, 'Medicaid / Government', (mix.gov || 0) + '%', 'Fee-for-Service / OON', (mix.ffs || 0) + '%'); r++;
       r++;
-      labelVal(wsProfile, r, 'B', 'C', 'Medicaid / Government', (mix.gov || 0) + '%');
-      labelVal(wsProfile, r, 'E', 'F', 'FFS / Out of Network', (mix.ffs || 0) + '%');
-      r += 2;
 
-      /* ── Schedule & Team ── */
-      sectionHeader(wsProfile, r, 'SCHEDULE & TEAM');
+      /* ═══ SCHEDULE & TEAM ═══ */
+      sectionHdr(wsP, r, 'SCHEDULE & TEAM'); r++;
+      _parity = 0;
+      dataRow(wsP, r, 'Doctor Days per Month', practiceProfile.doctorDays ? practiceProfile.doctorDays + ' days' : '—', 'Hygiene Days per Week', practiceProfile.numHygienists ? practiceProfile.numHygienists + ' days' : '—'); r++;
+      const assocText = practiceProfile.hasAssociate ? ('Yes  —  ' + (practiceProfile.associateDays || 0) + ' days per month') : 'No';
+      dataRow(wsP, r, 'Has Associate Doctor', assocText, 'Operatories Active', (practiceProfile.opsActive || '—') + ' of ' + (practiceProfile.opsTotal || '—') + ' total'); r++;
       r++;
-      _rowParity = 0;
-      labelVal(wsProfile, r, 'B', 'C', 'Doctor Days / Month', practiceProfile.doctorDays ? practiceProfile.doctorDays + ' days' : '—');
-      labelVal(wsProfile, r, 'E', 'F', 'Hygiene Days / Week', practiceProfile.numHygienists ? practiceProfile.numHygienists + ' days' : '—');
-      r++;
-      labelVal(wsProfile, r, 'B', 'C', 'Has Associate', practiceProfile.hasAssociate ? 'Yes — ' + (practiceProfile.associateDays || 0) + ' days/month' : 'No');
-      labelVal(wsProfile, r, 'E', 'F', 'Operatories Active', (practiceProfile.opsActive || '—') + ' of ' + (practiceProfile.opsTotal || '—') + ' total');
-      r += 2;
 
-      /* ── Daily Production & Benchmarks ── */
-      sectionHeader(wsProfile, r, 'DAILY PRODUCTION & BENCHMARKS');
-      r++;
-      _rowParity = 0;
-      const docAvg = practiceProfile.docDailyAvg === 'idk' ? "Doesn't know" : (practiceProfile.docDailyAvg ? '$' + Number(practiceProfile.docDailyAvg).toLocaleString() + '/day' : '—');
-      const hygAvg = practiceProfile.hygDailyAvg === 'idk' ? "Doesn't know" : (practiceProfile.hygDailyAvg ? '$' + Number(practiceProfile.hygDailyAvg).toLocaleString() + '/day' : '—');
-      labelVal(wsProfile, r, 'B', 'C', 'Doctor Daily Average', docAvg);
-      labelVal(wsProfile, r, 'E', 'F', 'Hygiene Daily Average', hygAvg);
-      r++;
-      const crowns = practiceProfile.crownsPerMonth === 'idk' ? "Doesn't know" : (practiceProfile.crownsPerMonth ? practiceProfile.crownsPerMonth + ' / month' : '—');
-      labelVal(wsProfile, r, 'B', 'C', 'Crowns Per Month', crowns);
-      r++;
+      /* ═══ DAILY PRODUCTION & BENCHMARKS ═══ */
+      sectionHdr(wsP, r, 'DAILY PRODUCTION & BENCHMARKS'); r++;
+      _parity = 0;
+      const docAvg = practiceProfile.docDailyAvg === 'idk' ? "Doesn't know" : (practiceProfile.docDailyAvg ? '$' + Number(practiceProfile.docDailyAvg).toLocaleString() + ' / day' : '—');
+      const hygAvg = practiceProfile.hygDailyAvg === 'idk' ? "Doesn't know" : (practiceProfile.hygDailyAvg ? '$' + Number(practiceProfile.hygDailyAvg).toLocaleString() + ' / day' : '—');
+      dataRow(wsP, r, 'Doctor Daily Average', docAvg, 'Hygiene Daily Average', hygAvg); r++;
+      const crowns = practiceProfile.crownsPerMonth === 'idk' ? "Doesn't know" : (practiceProfile.crownsPerMonth || '—');
+      dataRow(wsP, r, 'Crowns per Month', crowns, null, null); r++;
       const goalMap = { yes: 'Yes', no: 'No', sort_of: 'Sort of' };
       const aheadMap = { yes: 'Yes', no: 'No', sometimes: 'Sometimes' };
-      labelVal(wsProfile, r, 'B', 'C', 'Has Daily Production Goal', goalMap[practiceProfile.hasProductionGoal] || '—');
-      labelVal(wsProfile, r, 'E', 'F', 'Knows If Ahead/Behind Goals', aheadMap[practiceProfile.knowsIfAhead] || '—');
-      r += 2;
-
-      /* ── Goals & Vision ── */
-      sectionHeader(wsProfile, r, 'GOALS & VISION');
+      dataRow(wsP, r, 'Has Daily Production Goal', goalMap[practiceProfile.hasProductionGoal] || '—', 'Tracks If Ahead/Behind', aheadMap[practiceProfile.knowsIfAhead] || '—'); r++;
       r++;
-      _rowParity = 0;
-      const yearsMap = { '1-5': '1–5 years', '5-10': '5–10 years', '10-15': '10–15 years', 'not-on-radar': 'Not on my radar' };
-      labelVal(wsProfile, r, 'B', 'C', 'Years to Continue Working', yearsMap[practiceProfile.yearsToWork] || practiceProfile.yearsToWork || '—');
-      r += 2;
 
-      /* ── Concerns ── */
+      /* ═══ GOALS & VISION ═══ */
+      sectionHdr(wsP, r, 'GOALS & VISION'); r++;
+      _parity = 0;
+      const yearsMap = { '1-5': '1 – 5 years', '5-10': '5 – 10 years', '10-15': '10 – 15 years', 'not-on-radar': 'Not on my radar' };
+      dataRow(wsP, r, 'Years to Continue Practicing', yearsMap[practiceProfile.yearsToWork] || practiceProfile.yearsToWork || '—', null, null); r++;
+      r++;
+
+      /* ═══ TOP CONCERNS ═══ */
       const concerns = practiceProfile.concerns || [];
       if (concerns.length > 0) {
-        sectionHeader(wsProfile, r, 'TOP CONCERNS');
-        r++;
+        sectionHdr(wsP, r, 'TOP CONCERNS'); r++;
         const concernLabels = {
           more_profitable: 'Want to be more profitable',
           more_busy: 'Want to be busier',
           pay_staff_more: 'Want to pay staff more',
           owner_bonus: 'Want to take home more',
-          more_control: 'Want more control over practice',
+          more_control: 'Want more control over the practice',
           staff_issues: 'Staff issues',
-          overhead_high: 'Overhead too high',
+          overhead_high: 'Overhead is too high',
           insurance_rates: 'Insurance reimbursements too low',
           new_patients: 'Need more new patients',
           exit_plan: 'Considering selling or retiring'
         };
-        for (let ci = 0; ci < concerns.length; ci++) {
-          const c = concerns[ci];
-          const cell = wsProfile.getCell('B' + r);
-          cell.value = '  ✓   ' + (concernLabels[c] || c);
-          cell.font = checkFont;
-          cell.alignment = { vertical: 'center' };
-          if (ci % 2 === 1) cell.fill = altFill;
-          cell.border = rowBorder;
-          wsProfile.getRow(r).height = 22;
+        /* Two-column concern layout */
+        for (let ci = 0; ci < concerns.length; ci += 2) {
+          const bg = ((ci / 2) % 2 === 0) ? fillWhite : fillStripe;
+          fillRow(wsP, r, bg, bdrBot);
+          /* Left concern */
+          wsP.mergeCells('B' + r + ':C' + r);
+          wsP.getCell('B' + r).value = '\u2713  ' + (concernLabels[concerns[ci]] || concerns[ci]);
+          wsP.getCell('B' + r).font = fCheck;
+          wsP.getCell('B' + r).alignment = { vertical: 'middle' };
+          /* Right concern (if exists) */
+          if (ci + 1 < concerns.length) {
+            wsP.mergeCells('D' + r + ':E' + r);
+            wsP.getCell('D' + r).value = '\u2713  ' + (concernLabels[concerns[ci + 1]] || concerns[ci + 1]);
+            wsP.getCell('D' + r).font = fCheck;
+            wsP.getCell('D' + r).alignment = { vertical: 'middle' };
+          }
+          wsP.getRow(r).height = 24;
           r++;
         }
         r++;
       }
 
-      /* ── Free-form challenge ── */
+      /* ═══ ADDITIONAL NOTES ═══ */
       if (practiceProfile.biggestChallenge) {
-        sectionHeader(wsProfile, r, 'ADDITIONAL NOTES');
-        r++;
-        const noteCell = wsProfile.getCell('B' + r);
-        noteCell.value = practiceProfile.biggestChallenge;
-        noteCell.font = valFont;
-        noteCell.alignment = { wrapText: true, vertical: 'top' };
-        wsProfile.mergeCells('B' + r + ':F' + r);
-        wsProfile.getRow(r).height = 60;
+        sectionHdr(wsP, r, 'ADDITIONAL NOTES'); r++;
+        wsP.mergeCells('B' + r + ':E' + r);
+        const nc = wsP.getCell('B' + r);
+        nc.value = practiceProfile.biggestChallenge;
+        nc.font = fNote;
+        nc.alignment = { wrapText: true, vertical: 'top' };
+        nc.border = bdrBot;
+        wsP.getRow(r).height = 50;
         r++;
       }
 
-      /* ── Footer ── */
+      /* ═══ Footer ═══ */
       r++;
-      for (const col of ['A','B','C','D','E','F','G']) {
-        wsProfile.getCell(col + r).border = { top: { style: 'thin', color: { argb: borderClr } } };
-      }
-      const footerCell = wsProfile.getCell('B' + r);
-      footerCell.value = 'Generated by Dental AI Toolkit  •  ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      footerCell.font = footerFont;
-      wsProfile.getRow(r).height = 20;
+      fillRow(wsP, r, null, { top: { style: 'thin', color: { argb: _border } } });
+      wsP.getCell('B' + r).value = 'Generated by Dental AI Toolkit  \u2022  ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      wsP.getCell('B' + r).font = fFoot;
+      wsP.getRow(r).height = 18;
 
-      console.log('Practice Profile sheet: written (enhanced formatting)');
+      console.log('Practice Profile sheet: written (v2 redesign)');
     }
 
     /* P&L Raw Import */
