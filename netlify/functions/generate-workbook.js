@@ -785,6 +785,26 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         }
 
         workbookXml = workbookXml.replace(sheetsPattern, `<sheets>${sheetsContent}</sheets>`);
+
+        /* ── Reorder: move Practice Profile sheet to FIRST tab position ── */
+        if (hasSheet9 && extraSheetNames && extraSheetNames[0] === 'Practice Profile') {
+          const reorderMatch = workbookXml.match(/<sheets>([\s\S]*?)<\/sheets>/);
+          if (reorderMatch) {
+            let inner = reorderMatch[1];
+            /* Find the Practice Profile <sheet> entry */
+            const ppPattern = /<sheet[^>]*name="Practice Profile"[^>]*\/>/;
+            const ppMatch = inner.match(ppPattern);
+            if (ppMatch) {
+              /* Remove it from current position, prepend it */
+              inner = inner.replace(ppPattern, '');
+              inner = ppMatch[0] + inner;
+              workbookXml = workbookXml.replace(/<sheets>[\s\S]*?<\/sheets>/, `<sheets>${inner}</sheets>`);
+              console.log('Workbook.xml: moved Practice Profile to first tab');
+            }
+          }
+        }
+        _pass2WorkbookXml = workbookXml;
+
         templateZip.file('xl/workbook.xml', workbookXml);
       }
     }
@@ -851,6 +871,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
      JSZip .file(path, content) writes do NOT persist for .file(path).async() reads
      on the same loaded zip — we MUST keep the JS variable and use it in the fresh zip. */
   let _pass2StylesXml = null;
+  let _pass2WorkbookXml = null;  /* Reordered workbook.xml — Practice Profile moved to first tab */
   let _swotStyles = null;  /* SWOT style indices — set during Pass 2, used for SWOT XML generation */
 
   if (stylesSource) {
@@ -1751,6 +1772,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       continue;
     }
 
+    /* Replace workbook.xml with reordered version FROM JS VARIABLE (Practice Profile first) */
+    if (filePath === 'xl/workbook.xml' && _pass2WorkbookXml) {
+      freshZip.file(filePath, _pass2WorkbookXml);
+      console.log('Fresh zip: replaced workbook.xml (reordered tabs) FROM JS VARIABLE');
+      continue;
+    }
+
     /* Replace theme.xml with Candara-normalized version FROM JS VARIABLE */
     if (filePath === 'xl/theme/theme1.xml' && _pass2ThemeXml) {
       freshZip.file(filePath, _pass2ThemeXml);
@@ -2606,55 +2634,114 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   if (needsExtraSheets) {
     const wbNewSheets = new ExcelJS.Workbook();
 
-    /* ═══ PRACTICE PROFILE (first extra sheet) ═══ */
+    /* ═══ PRACTICE PROFILE (first extra sheet — becomes first tab via reorder) ═══ */
     if (practiceProfile) {
       const wsProfile = wbNewSheets.addWorksheet('Practice Profile');
 
-      /* Column widths */
-      wsProfile.getColumn('A').width = 3;
-      wsProfile.getColumn('B').width = 38;
-      wsProfile.getColumn('C').width = 35;
-      wsProfile.getColumn('D').width = 3;
-      wsProfile.getColumn('E').width = 38;
-      wsProfile.getColumn('F').width = 35;
+      /* Column widths — generous layout with gutter columns */
+      wsProfile.getColumn('A').width = 2.5;
+      wsProfile.getColumn('B').width = 30;
+      wsProfile.getColumn('C').width = 32;
+      wsProfile.getColumn('D').width = 4;
+      wsProfile.getColumn('E').width = 30;
+      wsProfile.getColumn('F').width = 32;
+      wsProfile.getColumn('G').width = 2.5;
 
-      /* Title */
-      const titleCell = wsProfile.getCell('B1');
-      titleCell.value = 'Practice Profile — ' + (practiceName || practiceProfile.website || 'Assessment');
-      titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF1A1A2E' } };
-      titleCell.border = { bottom: { style: 'medium', color: { argb: 'FF3574B7' } } };
-      wsProfile.mergeCells('B1:F1');
-      wsProfile.getRow(1).height = 32;
-      wsProfile.getRow(2).height = 10;
+      /* Print / view settings */
+      wsProfile.properties.showGridLines = false;
+      wsProfile.properties.tabColor = { argb: 'FF1B3A5C' };
 
-      const hdrFont = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF3574B7' } };
-      const hdrFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
-      const labelFont = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF4A5568' } };
-      const valFont = { name: 'Calibri', size: 10, color: { argb: 'FF1A1A2E' } };
+      /* ── Colour palette ── */
+      const navy       = 'FF1B3A5C';
+      const teal       = 'FF0E7C6B';
+      const lightTeal  = 'FFE6F5F2';
+      const midGrey    = 'FF5A6A7A';
+      const darkText   = 'FF1E293B';
+      const lightBg    = 'FFF8FAFC';
+      const hdrBg      = 'FF1B3A5C';
+      const hdrText    = 'FFFFFFFF';
+      const stripeBg   = 'FFF1F5F9';
+      const borderClr  = 'FFD0D7DE';
 
-      function sectionHeader(ws, row, col, text) {
-        const c = ws.getCell(col + row);
+      /* ── Font definitions ── */
+      const titleFont    = { name: 'Candara', size: 20, bold: true, color: { argb: hdrText } };
+      const subtitleFont = { name: 'Candara', size: 11, color: { argb: 'FFCBD5E1' } };
+      const sectionFont  = { name: 'Candara', size: 12, bold: true, color: { argb: teal } };
+      const labelFont    = { name: 'Candara', size: 11, bold: true, color: { argb: midGrey } };
+      const valFont      = { name: 'Candara', size: 11, color: { argb: darkText } };
+      const valFontBold  = { name: 'Candara', size: 11, bold: true, color: { argb: darkText } };
+      const checkFont    = { name: 'Candara', size: 11, color: { argb: teal } };
+      const footerFont   = { name: 'Candara', size: 9, italic: true, color: { argb: 'FF94A3B8' } };
+
+      /* ── Shared border/fill styles ── */
+      const thinBorder   = { style: 'thin', color: { argb: borderClr } };
+      const rowBorder    = { bottom: thinBorder };
+      const sectionFill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightTeal } };
+      const altFill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: stripeBg } };
+
+      /* ── Helper: section header spanning B-F ── */
+      function sectionHeader(ws, row, text) {
+        for (const col of ['B','C','D','E','F']) {
+          const c = ws.getCell(col + row);
+          c.fill = sectionFill;
+          c.border = { bottom: { style: 'medium', color: { argb: teal } } };
+        }
+        const c = ws.getCell('B' + row);
         c.value = text;
-        c.font = hdrFont;
-        c.fill = hdrFill;
-        c.border = { bottom: { style: 'thin', color: { argb: 'FF3574B7' } } };
-        ws.getRow(row).height = 22;
+        c.font = sectionFont;
+        ws.getRow(row).height = 26;
       }
+
+      /* ── Helper: label + value row with optional striping ── */
+      let _rowParity = 0;
       function labelVal(ws, row, bCol, cCol, label, value) {
+        const isAlt = (_rowParity % 2 === 1);
+        for (const col of [bCol, cCol]) {
+          const c = ws.getCell(col + row);
+          if (isAlt) c.fill = altFill;
+          c.border = rowBorder;
+          c.alignment = { vertical: 'center' };
+        }
         const lc = ws.getCell(bCol + row);
         lc.value = label;
         lc.font = labelFont;
         const vc = ws.getCell(cCol + row);
         vc.value = value;
-        vc.font = valFont;
+        vc.font = valFontBold;
+        ws.getRow(row).height = 22;
+        _rowParity++;
       }
 
-      let r = 3;
+      /* ═══════════ BUILD THE SHEET ═══════════ */
+
+      /* ── Title banner (dark navy) ── */
+      for (const col of ['A','B','C','D','E','F','G']) {
+        wsProfile.getCell(col + '1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: hdrBg } };
+        wsProfile.getCell(col + '2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: hdrBg } };
+      }
+      const titleCell = wsProfile.getCell('B1');
+      titleCell.value = (practiceName || practiceProfile.website || 'Practice Assessment');
+      titleCell.font = titleFont;
+      titleCell.alignment = { vertical: 'middle' };
+      wsProfile.mergeCells('B1:F1');
+      wsProfile.getRow(1).height = 40;
+
+      const subCell = wsProfile.getCell('B2');
+      subCell.value = 'Practice Profile — Dental AI Toolkit Assessment';
+      subCell.font = subtitleFont;
+      subCell.alignment = { vertical: 'top' };
+      wsProfile.mergeCells('B2:F2');
+      wsProfile.getRow(2).height = 22;
+
+      /* Spacer */
+      wsProfile.getRow(3).height = 10;
+
+      let r = 4;
 
       /* ── Practice Basics ── */
-      sectionHeader(wsProfile, r, 'B', 'PRACTICE BASICS');
-      sectionHeader(wsProfile, r, 'E', '');
+      sectionHeader(wsProfile, r, 'PRACTICE BASICS');
       r++;
+      _rowParity = 0;
       labelVal(wsProfile, r, 'B', 'C', 'Zip Code', practiceProfile.zipCode || '—');
       labelVal(wsProfile, r, 'E', 'F', 'Practice Website', practiceProfile.website || '—');
       r++;
@@ -2666,9 +2753,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       r += 2;
 
       /* ── Payor Mix ── */
-      sectionHeader(wsProfile, r, 'B', 'PAYOR MIX');
-      sectionHeader(wsProfile, r, 'E', '');
+      sectionHeader(wsProfile, r, 'PAYOR MIX');
       r++;
+      _rowParity = 0;
       const mix = practiceProfile.payorMix || {};
       labelVal(wsProfile, r, 'B', 'C', 'In-Network PPO', (mix.ppo || 0) + '%');
       labelVal(wsProfile, r, 'E', 'F', 'HMO', (mix.hmo || 0) + '%');
@@ -2678,9 +2765,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       r += 2;
 
       /* ── Schedule & Team ── */
-      sectionHeader(wsProfile, r, 'B', 'SCHEDULE & TEAM');
-      sectionHeader(wsProfile, r, 'E', '');
+      sectionHeader(wsProfile, r, 'SCHEDULE & TEAM');
       r++;
+      _rowParity = 0;
       labelVal(wsProfile, r, 'B', 'C', 'Doctor Days / Month', practiceProfile.doctorDays ? practiceProfile.doctorDays + ' days' : '—');
       labelVal(wsProfile, r, 'E', 'F', 'Hygiene Days / Week', practiceProfile.numHygienists ? practiceProfile.numHygienists + ' days' : '—');
       r++;
@@ -2688,10 +2775,10 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       labelVal(wsProfile, r, 'E', 'F', 'Operatories Active', (practiceProfile.opsActive || '—') + ' of ' + (practiceProfile.opsTotal || '—') + ' total');
       r += 2;
 
-      /* ── Daily Production ── */
-      sectionHeader(wsProfile, r, 'B', 'DAILY PRODUCTION & BENCHMARKS');
-      sectionHeader(wsProfile, r, 'E', '');
+      /* ── Daily Production & Benchmarks ── */
+      sectionHeader(wsProfile, r, 'DAILY PRODUCTION & BENCHMARKS');
       r++;
+      _rowParity = 0;
       const docAvg = practiceProfile.docDailyAvg === 'idk' ? "Doesn't know" : (practiceProfile.docDailyAvg ? '$' + Number(practiceProfile.docDailyAvg).toLocaleString() + '/day' : '—');
       const hygAvg = practiceProfile.hygDailyAvg === 'idk' ? "Doesn't know" : (practiceProfile.hygDailyAvg ? '$' + Number(practiceProfile.hygDailyAvg).toLocaleString() + '/day' : '—');
       labelVal(wsProfile, r, 'B', 'C', 'Doctor Daily Average', docAvg);
@@ -2707,9 +2794,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       r += 2;
 
       /* ── Goals & Vision ── */
-      sectionHeader(wsProfile, r, 'B', 'GOALS & VISION');
-      sectionHeader(wsProfile, r, 'E', '');
+      sectionHeader(wsProfile, r, 'GOALS & VISION');
       r++;
+      _rowParity = 0;
       const yearsMap = { '1-5': '1–5 years', '5-10': '5–10 years', '10-15': '10–15 years', 'not-on-radar': 'Not on my radar' };
       labelVal(wsProfile, r, 'B', 'C', 'Years to Continue Working', yearsMap[practiceProfile.yearsToWork] || practiceProfile.yearsToWork || '—');
       r += 2;
@@ -2717,7 +2804,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       /* ── Concerns ── */
       const concerns = practiceProfile.concerns || [];
       if (concerns.length > 0) {
-        sectionHeader(wsProfile, r, 'B', 'TOP CONCERNS');
+        sectionHeader(wsProfile, r, 'TOP CONCERNS');
         r++;
         const concernLabels = {
           more_profitable: 'Want to be more profitable',
@@ -2731,10 +2818,15 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
           new_patients: 'Need more new patients',
           exit_plan: 'Considering selling or retiring'
         };
-        for (const c of concerns) {
+        for (let ci = 0; ci < concerns.length; ci++) {
+          const c = concerns[ci];
           const cell = wsProfile.getCell('B' + r);
-          cell.value = '✓  ' + (concernLabels[c] || c);
-          cell.font = valFont;
+          cell.value = '  ✓   ' + (concernLabels[c] || c);
+          cell.font = checkFont;
+          cell.alignment = { vertical: 'center' };
+          if (ci % 2 === 1) cell.fill = altFill;
+          cell.border = rowBorder;
+          wsProfile.getRow(r).height = 22;
           r++;
         }
         r++;
@@ -2742,7 +2834,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
       /* ── Free-form challenge ── */
       if (practiceProfile.biggestChallenge) {
-        sectionHeader(wsProfile, r, 'B', 'ADDITIONAL NOTES');
+        sectionHeader(wsProfile, r, 'ADDITIONAL NOTES');
         r++;
         const noteCell = wsProfile.getCell('B' + r);
         noteCell.value = practiceProfile.biggestChallenge;
@@ -2753,13 +2845,17 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
         r++;
       }
 
-      /* Footer */
+      /* ── Footer ── */
       r++;
+      for (const col of ['A','B','C','D','E','F','G']) {
+        wsProfile.getCell(col + r).border = { top: { style: 'thin', color: { argb: borderClr } } };
+      }
       const footerCell = wsProfile.getCell('B' + r);
-      footerCell.value = 'Collected via Dental AI Toolkit questionnaire — ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      footerCell.font = { name: 'Calibri', size: 8, italic: true, color: { argb: 'FF94A3B8' } };
+      footerCell.value = 'Generated by Dental AI Toolkit  •  ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      footerCell.font = footerFont;
+      wsProfile.getRow(r).height = 20;
 
-      console.log('Practice Profile sheet: written');
+      console.log('Practice Profile sheet: written (enhanced formatting)');
     }
 
     /* P&L Raw Import */
