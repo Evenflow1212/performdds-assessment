@@ -1198,6 +1198,109 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
 
+    /* === Enhanced styles for Practice Profile + SWOT 2x2 matrix === */
+    {
+      const _fmE = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
+      const _flE = stylesXml.match(/<fills[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fills>/);
+      const _brE = stylesXml.match(/<borders[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/borders>/);
+      const _xfE = stylesXml.match(/<cellXfs[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
+      if (_fmE && _flE && _brE && _xfE) {
+        const efi = parseInt(_fmE[1]);
+        const efli = parseInt(_flE[1]);
+        const ebri = parseInt(_brE[1]);
+        const exi = parseInt(_xfE[1]);
+
+        /* 6 new fonts */
+        const EF_HERO = efi;         /* 28pt white bold — PP banner title */
+        const EF_STAT_VAL = efi+1;   /* 20pt navy bold — hero stat value */
+        const EF_STAT_LBL = efi+2;   /* 8pt grey uppercase letter-spaced — hero stat label */
+        const EF_CONCERN = efi+3;    /* 11pt white bold — concern pill */
+        const EF_CHALLENGE = efi+4;  /* 13pt italic dark grey — biggest challenge quote */
+        const EF_SWOT_HERO = efi+5;  /* 26pt white bold — SWOT title */
+        const enhFonts =
+          '<font><b/><sz val="28"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="20"/><color rgb="FF1E3A5F"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="8"/><color rgb="FF64748B"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +
+          '<font><i/><sz val="13"/><color rgb="FF475569"/><name val="Candara"/></font>' +
+          '<font><b/><sz val="26"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>';
+        stylesXml = stylesXml.replace(_fmE[0], `<fonts count="${efi + 6}">${_fmE[2]}${enhFonts}</fonts>`);
+
+        /* 4 new fills */
+        const EFL_NAVY_DEEP = efli;    /* deeper navy for banner */
+        const EFL_GOLD = efli+1;       /* gold accent strip */
+        const EFL_CONCERN = efli+2;    /* concern pill blue */
+        const EFL_CHALLENGE = efli+3;  /* cream for challenge quote */
+        const enhFills =
+          '<fill><patternFill patternType="solid"><fgColor rgb="FF0A1628"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFC9A84C"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FF3574B7"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFFEFBF0"/><bgColor indexed="64"/></patternFill></fill>';
+        stylesXml = stylesXml.replace(_flE[0], `<fills count="${efli + 4}">${_flE[2]}${enhFills}</fills>`);
+
+        /* 6 new borders for the SWOT 2x2 matrix (full-cell borders per quadrant color) */
+        const EB_QS = ebri;       /* green quadrant */
+        const EB_QW = ebri+1;     /* red quadrant */
+        const EB_QO = ebri+2;     /* blue quadrant */
+        const EB_QT = ebri+3;     /* amber quadrant */
+        const EB_CHALLENGE = ebri+4; /* gold-accent left border for challenge quote */
+        const EB_GOLD_BOTTOM = ebri+5; /* thick gold bottom border for banner */
+        const enhBorders =
+          '<border><left style="medium"><color rgb="FF10B981"/></left><right style="medium"><color rgb="FF10B981"/></right><top style="medium"><color rgb="FF10B981"/></top><bottom style="medium"><color rgb="FF10B981"/></bottom><diagonal/></border>' +
+          '<border><left style="medium"><color rgb="FFEF4444"/></left><right style="medium"><color rgb="FFEF4444"/></right><top style="medium"><color rgb="FFEF4444"/></top><bottom style="medium"><color rgb="FFEF4444"/></bottom><diagonal/></border>' +
+          '<border><left style="medium"><color rgb="FF3574B7"/></left><right style="medium"><color rgb="FF3574B7"/></right><top style="medium"><color rgb="FF3574B7"/></top><bottom style="medium"><color rgb="FF3574B7"/></bottom><diagonal/></border>' +
+          '<border><left style="medium"><color rgb="FFF59E0B"/></left><right style="medium"><color rgb="FFF59E0B"/></right><top style="medium"><color rgb="FFF59E0B"/></top><bottom style="medium"><color rgb="FFF59E0B"/></bottom><diagonal/></border>' +
+          '<border><left style="thick"><color rgb="FFC9A84C"/></left><right/><top/><bottom/><diagonal/></border>' +
+          '<border><left/><right/><top/><bottom style="thick"><color rgb="FFC9A84C"/></bottom><diagonal/></border>';
+        stylesXml = stylesXml.replace(_brE[0], `<borders count="${ebri + 6}">${_brE[2]}${enhBorders}</borders>`);
+
+        /* 12 new cellXfs */
+        const EX_HERO_TITLE = exi;       /* banner title — 28pt white bold on deep navy, gold-bottom */
+        const EX_HERO_SUB = exi+1;       /* banner subtitle — light on deep navy */
+        const EX_STAT_VAL = exi+2;       /* hero stat value — 20pt navy bold */
+        const EX_STAT_LBL = exi+3;       /* hero stat label — 8pt grey uppercase */
+        const EX_CONCERN = exi+4;        /* concern pill — white bold on blue fill */
+        const EX_CHALLENGE = exi+5;      /* challenge quote — italic dark grey on cream, gold left border */
+        const EX_GOLD_STRIP = exi+6;     /* thin gold accent strip */
+        const EX_SWOT_HERO = exi+7;      /* SWOT title — 26pt white bold on deep navy */
+        const EX_SWOT_Q_S = exi+8;       /* SWOT quadrant body — green-bordered card */
+        const EX_SWOT_Q_W = exi+9;       /* red */
+        const EX_SWOT_Q_O = exi+10;      /* blue */
+        const EX_SWOT_Q_T = exi+11;      /* amber */
+        const enhXfs =
+          `<xf numFmtId="0" fontId="${EF_HERO}" fillId="${EFL_NAVY_DEEP}" borderId="${EB_GOLD_BOTTOM}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_SUB}" fillId="${EFL_NAVY_DEEP}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>` +
+          `<xf numFmtId="0" fontId="${EF_STAT_VAL}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${EF_STAT_LBL}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>` +
+          `<xf numFmtId="0" fontId="${EF_CONCERN}" fillId="${EFL_CONCERN}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${EF_CHALLENGE}" fillId="${EFL_CHALLENGE}" borderId="${EB_CHALLENGE}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="center" indent="1"/></xf>` +
+          `<xf numFmtId="0" fontId="0" fillId="${EFL_GOLD}" borderId="0" xfId="0" applyFill="1"/>` +
+          `<xf numFmtId="0" fontId="${EF_SWOT_HERO}" fillId="${EFL_NAVY_DEEP}" borderId="${EB_GOLD_BOTTOM}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="0" fillId="0" borderId="${EB_QS}" xfId="0" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top" indent="1"/></xf>` +
+          `<xf numFmtId="0" fontId="0" fillId="0" borderId="${EB_QW}" xfId="0" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top" indent="1"/></xf>` +
+          `<xf numFmtId="0" fontId="0" fillId="0" borderId="${EB_QO}" xfId="0" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top" indent="1"/></xf>` +
+          `<xf numFmtId="0" fontId="0" fillId="0" borderId="${EB_QT}" xfId="0" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top" indent="1"/></xf>`;
+        stylesXml = stylesXml.replace(_xfE[0], `<cellXfs count="${exi + 12}">${_xfE[2]}${enhXfs}</cellXfs>`);
+
+        /* Merge enhanced indices into _ppStyles + _swotStyles */
+        _ppStyles.EX_HERO_TITLE = EX_HERO_TITLE;
+        _ppStyles.EX_HERO_SUB = EX_HERO_SUB;
+        _ppStyles.EX_STAT_VAL = EX_STAT_VAL;
+        _ppStyles.EX_STAT_LBL = EX_STAT_LBL;
+        _ppStyles.EX_CONCERN = EX_CONCERN;
+        _ppStyles.EX_CHALLENGE = EX_CHALLENGE;
+        _ppStyles.EX_GOLD_STRIP = EX_GOLD_STRIP;
+        if (_swotStyles) {
+          _swotStyles.EX_SWOT_HERO = EX_SWOT_HERO;
+          _swotStyles.EX_SWOT_Q_S = EX_SWOT_Q_S;
+          _swotStyles.EX_SWOT_Q_W = EX_SWOT_Q_W;
+          _swotStyles.EX_SWOT_Q_O = EX_SWOT_Q_O;
+          _swotStyles.EX_SWOT_Q_T = EX_SWOT_Q_T;
+        }
+        console.log('Pass 2: added enhanced PP+SWOT styles (6 fonts, 4 fills, 6 borders, 12 xfs starting at xf=' + exi + ')');
+      }
+    }
+
     /* === Add Batting Average box styles === */
     /* Bold-bordered box in Production Worksheet G38:G39 (column G only).
        Re-parse counts (SWOT additions may have changed them). */
@@ -1790,54 +1893,148 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     }
   }
 
-  /* === Generate SWOT sheet XML directly (bypasses ExcelJS style contamination) === */
+  /* === Generate SWOT sheet XML — 2x2 matrix layout === */
   if (swotData && _swotStyles) {
+    const SS = _swotStyles;
     let swotRows = '';
     let sr = 1;
+    const merges = [];
+    /* Column layout:
+       A(3) | B-D (left quadrant) | E (3 gap) | F-H (right quadrant) | I(3)
+       Row layout:
+         1: Hero title (B:H merged) — 72pt deep navy with gold bottom
+         2: Subtitle (B:H) — 26pt deep navy
+         3: Gold accent strip (B:H) — 6pt
+         4: spacer — 22pt
+         5: S header (B:D merged), W header (F:H merged) — 42pt each, colored fill
+         6..N: S bullets in B:D, W bullets in F:H
+         N+1: spacer
+         N+2: O header, T header
+         N+3..M: O bullets, T bullets
+         M+1: spacer + footer */
+    const _title = 'SWOT Analysis \u2014 ' + (practiceName || 'Practice');
 
-    /* Title row */
-    swotRows += `<row r="${sr}" ht="40" customHeight="1"><c r="B${sr}" s="${_swotStyles.SX_TITLE}" t="inlineStr"><is><t>${escapeXml('SWOT Analysis \u2014 ' + (practiceName || 'Practice'))}</t></is></c></row>`;
+    /* Row 1: Hero title */
+    {
+      let r = `<row r="${sr}" ht="72" customHeight="1">`;
+      r += `<c r="A${sr}" s="${SS.EX_SWOT_HERO}"/>`;
+      r += `<c r="B${sr}" s="${SS.EX_SWOT_HERO}" t="inlineStr"><is><t>${escapeXml(_title)}</t></is></c>`;
+      for (const c of ['C','D','E','F','G','H']) r += `<c r="${c}${sr}" s="${SS.EX_SWOT_HERO}"/>`;
+      r += `<c r="I${sr}" s="${SS.EX_SWOT_HERO}"/>`;
+      r += `</row>`;
+      swotRows += r;
+      merges.push(`<mergeCell ref="B${sr}:H${sr}"/>`);
+    }
     sr++;
-    swotRows += `<row r="${sr}" ht="12" customHeight="1"/>`;
+    /* Row 2: Subtitle */
+    {
+      let r = `<row r="${sr}" ht="26" customHeight="1">`;
+      r += `<c r="A${sr}" s="${_ppStyles ? _ppStyles.EX_HERO_SUB : SS.SX_FOOT}"/>`;
+      r += `<c r="B${sr}" s="${_ppStyles ? _ppStyles.EX_HERO_SUB : SS.SX_FOOT}" t="inlineStr"><is><t>${escapeXml('Strategic assessment of practice strengths, weaknesses, opportunities, and threats')}</t></is></c>`;
+      for (const c of ['C','D','E','F','G','H']) r += `<c r="${c}${sr}" s="${_ppStyles ? _ppStyles.EX_HERO_SUB : SS.SX_FOOT}"/>`;
+      r += `<c r="I${sr}" s="${_ppStyles ? _ppStyles.EX_HERO_SUB : SS.SX_FOOT}"/>`;
+      r += `</row>`;
+      swotRows += r;
+      merges.push(`<mergeCell ref="B${sr}:H${sr}"/>`);
+    }
+    sr++;
+    /* Row 3: gold accent strip */
+    if (_ppStyles && _ppStyles.EX_GOLD_STRIP !== undefined) {
+      let r = `<row r="${sr}" ht="6" customHeight="1">`;
+      for (const c of ['A','B','C','D','E','F','G','H','I']) r += `<c r="${c}${sr}" s="${_ppStyles.EX_GOLD_STRIP}"/>`;
+      r += `</row>`;
+      swotRows += r;
+    } else {
+      swotRows += `<row r="${sr}" ht="6" customHeight="1"/>`;
+    }
+    sr++;
+    /* Row 4: spacer */
+    swotRows += `<row r="${sr}" ht="22" customHeight="1"/>`;
     sr++;
 
-    const swotSections = [
-      { title: 'STRENGTHS',     items: swotData.strengths || [],     xf: _swotStyles.SX_S },
-      { title: 'WEAKNESSES',    items: swotData.weaknesses || [],    xf: _swotStyles.SX_W },
-      { title: 'OPPORTUNITIES', items: swotData.opportunities || [], xf: _swotStyles.SX_O },
-      { title: 'THREATS',       items: swotData.threats || [],       xf: _swotStyles.SX_T }
-    ];
-
-    for (const sec of swotSections) {
-      /* Section header */
-      swotRows += `<row r="${sr}" ht="30" customHeight="1"><c r="B${sr}" s="${sec.xf}" t="inlineStr"><is><t>${escapeXml(sec.title)}</t></is></c></row>`;
+    /* Helper to render a pair of quadrants (left + right) side-by-side */
+    const renderQuadrantPair = (leftTitle, leftItems, leftHdrXf, leftBodyXf,
+                                rightTitle, rightItems, rightHdrXf, rightBodyXf) => {
+      /* Header row */
+      {
+        let r = `<row r="${sr}" ht="42" customHeight="1">`;
+        r += `<c r="A${sr}"/>`;
+        r += `<c r="B${sr}" s="${leftHdrXf}" t="inlineStr"><is><t>${escapeXml(leftTitle)}</t></is></c>`;
+        r += `<c r="C${sr}" s="${leftHdrXf}"/>`;
+        r += `<c r="D${sr}" s="${leftHdrXf}"/>`;
+        r += `<c r="E${sr}"/>`;
+        r += `<c r="F${sr}" s="${rightHdrXf}" t="inlineStr"><is><t>${escapeXml(rightTitle)}</t></is></c>`;
+        r += `<c r="G${sr}" s="${rightHdrXf}"/>`;
+        r += `<c r="H${sr}" s="${rightHdrXf}"/>`;
+        r += `<c r="I${sr}"/>`;
+        r += `</row>`;
+        swotRows += r;
+        merges.push(`<mergeCell ref="B${sr}:D${sr}"/>`);
+        merges.push(`<mergeCell ref="F${sr}:H${sr}"/>`);
+      }
       sr++;
-      /* Bullet items */
-      for (const item of sec.items) {
-        swotRows += `<row r="${sr}" ht="28" customHeight="1"><c r="B${sr}" s="${_swotStyles.SX_BUL}" t="inlineStr"><is><t>${escapeXml('\u2022  ' + item)}</t></is></c></row>`;
+      /* Body rows — one row per bullet, padded to equal height between sides */
+      const n = Math.max(leftItems.length, rightItems.length, 1);
+      for (let i = 0; i < n; i++) {
+        const lItem = leftItems[i] ? '\u2022  ' + leftItems[i] : '';
+        const rItem = rightItems[i] ? '\u2022  ' + rightItems[i] : '';
+        let r = `<row r="${sr}" ht="34" customHeight="1">`;
+        r += `<c r="A${sr}"/>`;
+        r += `<c r="B${sr}" s="${leftBodyXf}" t="inlineStr"><is><t>${escapeXml(lItem)}</t></is></c>`;
+        r += `<c r="C${sr}" s="${leftBodyXf}"/>`;
+        r += `<c r="D${sr}" s="${leftBodyXf}"/>`;
+        r += `<c r="E${sr}"/>`;
+        r += `<c r="F${sr}" s="${rightBodyXf}" t="inlineStr"><is><t>${escapeXml(rItem)}</t></is></c>`;
+        r += `<c r="G${sr}" s="${rightBodyXf}"/>`;
+        r += `<c r="H${sr}" s="${rightBodyXf}"/>`;
+        r += `<c r="I${sr}"/>`;
+        r += `</row>`;
+        swotRows += r;
+        merges.push(`<mergeCell ref="B${sr}:D${sr}"/>`);
+        merges.push(`<mergeCell ref="F${sr}:H${sr}"/>`);
         sr++;
       }
-      /* Spacer */
+      /* Spacer between row-pairs */
       swotRows += `<row r="${sr}" ht="16" customHeight="1"/>`;
       sr++;
-    }
+    };
+
+    renderQuadrantPair(
+      'STRENGTHS',      swotData.strengths || [],     SS.SX_S, SS.EX_SWOT_Q_S,
+      'WEAKNESSES',     swotData.weaknesses || [],    SS.SX_W, SS.EX_SWOT_Q_W
+    );
+    renderQuadrantPair(
+      'OPPORTUNITIES',  swotData.opportunities || [], SS.SX_O, SS.EX_SWOT_Q_O,
+      'THREATS',        swotData.threats || [],       SS.SX_T, SS.EX_SWOT_Q_T
+    );
 
     /* Footer */
     sr++;
     const _dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    swotRows += `<row r="${sr}"><c r="B${sr}" s="${_swotStyles.SX_FOOT}" t="inlineStr"><is><t>${escapeXml('Generated by Perform DDS Assessment System \u2014 ' + _dateStr)}</t></is></c></row>`;
+    swotRows += `<row r="${sr}" ht="20" customHeight="1"><c r="B${sr}" s="${SS.SX_FOOT}" t="inlineStr"><is><t>${escapeXml('Generated by Perform DDS Assessment System \u2014 ' + _dateStr)}</t></is></c></row>`;
 
     const swotSheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>' +
       '<sheetFormatPr defaultRowHeight="15"/>' +
-      '<cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="90" customWidth="1"/></cols>' +
+      '<cols>' +
+        '<col min="1" max="1" width="3" customWidth="1"/>' +
+        '<col min="2" max="2" width="20" customWidth="1"/>' +
+        '<col min="3" max="3" width="20" customWidth="1"/>' +
+        '<col min="4" max="4" width="20" customWidth="1"/>' +
+        '<col min="5" max="5" width="3" customWidth="1"/>' +
+        '<col min="6" max="6" width="20" customWidth="1"/>' +
+        '<col min="7" max="7" width="20" customWidth="1"/>' +
+        '<col min="8" max="8" width="20" customWidth="1"/>' +
+        '<col min="9" max="9" width="3" customWidth="1"/>' +
+      '</cols>' +
       '<sheetData>' + swotRows + '</sheetData>' +
+      `<mergeCells count="${merges.length}">${merges.join('')}</mergeCells>` +
       '</worksheet>';
 
-    /* SWOT sheet number depends on how many ExcelJS sheets precede it */
     const swotSheetNum = _swotTargetSheetNum || 11;
     _pass2SheetFixes['xl/worksheets/sheet' + swotSheetNum + '.xml'] = swotSheetXml;
-    console.log('Pass 2: generated SWOT XML directly for sheet' + swotSheetNum + ' (' + swotSheetXml.length + ' chars, ' + sr + ' rows, styles: ' + JSON.stringify(_swotStyles) + ')');
+    console.log('Pass 2: generated SWOT 2x2 matrix for sheet' + swotSheetNum + ' (' + swotSheetXml.length + ' chars, ' + sr + ' rows, ' + merges.length + ' merges)');
   }
 
   /* === Generate Practice Profile sheet XML directly (bypasses ExcelJS style contamination) === */
@@ -1909,15 +2106,77 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       return r;
     };
 
-    /* Row 1: Title banner */
-    ppRows += bannerRow(pr, PS.PX_BANNER, pp.website || practiceName || 'Practice Assessment', 44);
+    /* Row 1: Hero title banner — deep navy, 28pt white bold, gold accent bottom */
+    {
+      const row = pr;
+      let r = `<row r="${row}" ht="72" customHeight="1">`;
+      r += ppCellEmpty('A', row, PS.EX_HERO_TITLE);
+      r += ppCell('B', row, PS.EX_HERO_TITLE, practiceName || pp.website || 'Practice Assessment');
+      for (const c of ['C','D','E','F']) r += ppCellEmpty(c, row, PS.EX_HERO_TITLE);
+      r += `</row>`;
+      ppRows += r;
+    }
     pr++;
-    /* Row 2: Subtitle */
-    ppRows += bannerRow(pr, PS.PX_SUB, 'Practice Profile  |  Dental AI Toolkit Assessment', 20);
+    /* Row 2: Subtitle on same deep navy */
+    {
+      const row = pr;
+      let r = `<row r="${row}" ht="26" customHeight="1">`;
+      r += ppCellEmpty('A', row, PS.EX_HERO_SUB);
+      r += ppCell('B', row, PS.EX_HERO_SUB, (pp.website ? pp.website + '  \u2022  ' : '') + 'Practice Profile Assessment');
+      for (const c of ['C','D','E','F']) r += ppCellEmpty(c, row, PS.EX_HERO_SUB);
+      r += `</row>`;
+      ppRows += r;
+    }
     pr++;
-    /* Row 3: spacer */
-    ppRows += `<row r="${pr}" ht="8" customHeight="1"/>`;
+    /* Row 3: Thin gold accent strip */
+    {
+      const row = pr;
+      let r = `<row r="${row}" ht="6" customHeight="1">`;
+      for (const c of ['A','B','C','D','E','F']) r += ppCellEmpty(c, row, PS.EX_GOLD_STRIP);
+      r += `</row>`;
+      ppRows += r;
+    }
     pr++;
+    /* Row 4: generous spacer */
+    ppRows += `<row r="${pr}" ht="22" customHeight="1"/>`; pr++;
+
+    /* ═══ HERO STATS STRIP — three big numbers at-a-glance ═══ */
+    {
+      const _statNames = { dentrix: 'Dentrix', eaglesoft: 'Eaglesoft', opendental: 'Open Dental', other: 'Other' };
+      const s1v = pp.zipCode || '\u2014';
+      const s2v = _statNames[pp.pmSoftware] || pp.pmSoftware || '\u2014';
+      const s3v = pp.yearsOwned ? pp.yearsOwned + ' yr' : '\u2014';
+      const s4v = (pp.opsActive && pp.opsTotal) ? (pp.opsActive + ' / ' + pp.opsTotal) : ((pp.opsActive || pp.opsTotal) || '\u2014');
+      /* Values row */
+      {
+        const row = pr;
+        let r = `<row r="${row}" ht="36" customHeight="1">`;
+        r += ppCellEmpty('A', row, PS.EX_STAT_VAL);
+        r += ppCell('B', row, PS.EX_STAT_VAL, s1v);
+        r += ppCell('C', row, PS.EX_STAT_VAL, s2v);
+        r += ppCell('D', row, PS.EX_STAT_VAL, s3v);
+        r += ppCell('E', row, PS.EX_STAT_VAL, s4v);
+        r += ppCellEmpty('F', row, PS.EX_STAT_VAL);
+        r += `</row>`;
+        ppRows += r;
+      }
+      pr++;
+      /* Labels row */
+      {
+        const row = pr;
+        let r = `<row r="${row}" ht="18" customHeight="1">`;
+        r += ppCellEmpty('A', row, PS.EX_STAT_LBL);
+        r += ppCell('B', row, PS.EX_STAT_LBL, 'ZIP CODE');
+        r += ppCell('C', row, PS.EX_STAT_LBL, 'SOFTWARE');
+        r += ppCell('D', row, PS.EX_STAT_LBL, 'YEARS OWNED');
+        r += ppCell('E', row, PS.EX_STAT_LBL, 'OPERATORIES');
+        r += ppCellEmpty('F', row, PS.EX_STAT_LBL);
+        r += `</row>`;
+        ppRows += r;
+      }
+      pr++;
+      ppRows += `<row r="${pr}" ht="20" customHeight="1"/>`; pr++;
+    }
 
     /* ═══ PRACTICE BASICS ═══ */
     ppRows += sectRow(pr, 'PRACTICE BASICS'); pr++;
@@ -1980,33 +2239,36 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         new_patients: 'Need more new patients',
         exit_plan: 'Considering selling or retiring'
       };
+      /* Render concerns as blue pill rows — one per row, wider cell */
       for (let ci = 0; ci < concerns.length; ci += 2) {
         const leftText = '\u2713  ' + (concernLabels[concerns[ci]] || concerns[ci]);
         const rightText = (ci + 1 < concerns.length) ? '\u2713  ' + (concernLabels[concerns[ci + 1]] || concerns[ci + 1]) : null;
-        let r = `<row r="${pr}" ht="24" customHeight="1">`;
-        r += ppCellEmpty('A', pr, PS.PX_CHECK);
-        r += ppCell('B', pr, PS.PX_CHECK, leftText);
-        r += ppCellEmpty('C', pr, PS.PX_CHECK);
-        r += rightText ? ppCell('D', pr, PS.PX_CHECK, rightText) : ppCellEmpty('D', pr, PS.PX_CHECK);
-        r += ppCellEmpty('E', pr, PS.PX_CHECK);
+        let r = `<row r="${pr}" ht="30" customHeight="1">`;
+        r += ppCellEmpty('A', pr, PS.EX_CONCERN);
+        r += ppCell('B', pr, PS.EX_CONCERN, leftText);
+        r += ppCellEmpty('C', pr, PS.EX_CONCERN);
+        r += rightText ? ppCell('D', pr, PS.EX_CONCERN, rightText) : ppCellEmpty('D', pr, PS.PX_CHECK);
+        r += ppCellEmpty('E', pr, rightText ? PS.EX_CONCERN : PS.PX_CHECK);
         r += ppCellEmpty('F', pr, PS.PX_CHECK);
         r += '</row>';
         ppRows += r;
+        /* Spacer between concern rows for breathing room */
+        pr++;
+        ppRows += `<row r="${pr}" ht="6" customHeight="1"/>`;
         pr++;
       }
       pr++;
     }
 
-    /* ═══ ADDITIONAL NOTES ═══ */
+    /* ═══ BIGGEST CHALLENGE — styled as a quote card ═══ */
     if (pp.biggestChallenge) {
-      ppRows += sectRow(pr, 'ADDITIONAL NOTES'); pr++;
-      let r = `<row r="${pr}" ht="50" customHeight="1">`;
-      r += ppCellEmpty('A', pr, PS.PX_NOTE);
-      r += ppCell('B', pr, PS.PX_NOTE, pp.biggestChallenge);
-      r += ppCellEmpty('C', pr, PS.PX_NOTE);
-      r += ppCellEmpty('D', pr, PS.PX_NOTE);
-      r += ppCellEmpty('E', pr, PS.PX_NOTE);
-      r += ppCellEmpty('F', pr, PS.PX_NOTE);
+      ppRows += sectRow(pr, 'IN THEIR OWN WORDS'); pr++;
+      ppRows += `<row r="${pr}" ht="10" customHeight="1"/>`; pr++;
+      let r = `<row r="${pr}" ht="66" customHeight="1">`;
+      r += ppCellEmpty('A', pr, PS.EX_CHALLENGE);
+      r += ppCell('B', pr, PS.EX_CHALLENGE, '\u201C' + pp.biggestChallenge + '\u201D');
+      for (const c of ['C','D','E']) r += ppCellEmpty(c, pr, PS.EX_CHALLENGE);
+      r += ppCellEmpty('F', pr, PS.EX_CHALLENGE);
       r += '</row>';
       ppRows += r;
       pr++;
@@ -2017,14 +2279,37 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     const _ppDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     ppRows += `<row r="${pr}"><c r="B${pr}" s="${PS.PX_FOOT}" t="inlineStr"><is><t>${escapeXml('Generated by Dental AI Toolkit  \u2022  ' + _ppDateStr)}</t></is></c></row>`;
 
-    /* Merge cells for banner (B1:E1, B2:E2) and notes */
-    let ppMerges = '<mergeCells count="2"><mergeCell ref="B1:E1"/><mergeCell ref="B2:E2"/></mergeCells>';
+    /* Merge cells: banner spans B:E on rows 1 + 2, gold strip row 3 is full (but no merge needed per-cell),
+       hero stats rows 5 + 6 use B/C/D/E each (no merges). Challenge quote spans B:E on its row. */
+    const _ppMergeList = ['<mergeCell ref="B1:E1"/>', '<mergeCell ref="B2:E2"/>'];
+    /* Challenge merge: find its row by scanning rendered content markers */
+    /* Easier: capture the challenge row number during generation */
+    /* Rebuild merges list by regex-parsing the concern rows (B:C and D:E) for each concern pair */
+    {
+      /* Find all concern-pair rows we rendered (ht="30" style=EX_CONCERN) so we can merge B:C and D:E on each */
+      const concernRowRe = new RegExp(`<row r="(\\d+)" ht="30" customHeight="1"><c r="A\\d+" s="${PS.EX_CONCERN}"/>`, 'g');
+      let cm;
+      while ((cm = concernRowRe.exec(ppRows)) !== null) {
+        const rn = cm[1];
+        _ppMergeList.push(`<mergeCell ref="B${rn}:C${rn}"/>`);
+        /* Right-pair merge only added if D has EX_CONCERN style (it's a paired row) */
+        const after = ppRows.substr(cm.index + cm[0].length, 400);
+        if (after.includes(`r="D${rn}" s="${PS.EX_CONCERN}"`)) {
+          _ppMergeList.push(`<mergeCell ref="D${rn}:E${rn}"/>`);
+        }
+      }
+      /* Find challenge quote row (ht="66" with EX_CHALLENGE style) */
+      const challengeRe = new RegExp(`<row r="(\\d+)" ht="66" customHeight="1"><c r="A\\d+" s="${PS.EX_CHALLENGE}"/>`);
+      const chm = ppRows.match(challengeRe);
+      if (chm) _ppMergeList.push(`<mergeCell ref="B${chm[1]}:E${chm[1]}"/>`);
+    }
+    const ppMerges = `<mergeCells count="${_ppMergeList.length}">${_ppMergeList.join('')}</mergeCells>`;
 
     const ppSheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
       '<sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>' +
       '<sheetFormatPr defaultRowHeight="15"/>' +
-      '<cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="34" customWidth="1"/><col min="3" max="3" width="30" customWidth="1"/><col min="4" max="4" width="34" customWidth="1"/><col min="5" max="5" width="30" customWidth="1"/><col min="6" max="6" width="3" customWidth="1"/></cols>' +
+      '<cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="32" customWidth="1"/><col min="3" max="3" width="28" customWidth="1"/><col min="4" max="4" width="32" customWidth="1"/><col min="5" max="5" width="28" customWidth="1"/><col min="6" max="6" width="3" customWidth="1"/></cols>' +
       '<sheetData>' + ppRows + '</sheetData>' +
       ppMerges +
       '</worksheet>';
@@ -3547,7 +3832,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v36-mergecells-count-fix',
+      _version: 'v37-pp-swot-redesign',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
