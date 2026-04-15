@@ -1609,6 +1609,34 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         console.log('Pass 2 sheet1: mergeCells count reconciled to ' + actualCount);
       }
 
+      /* ── CRITICAL: Excel requires <c> cells within a row to appear in column
+         order (A, B, C, ..., Z, AA, AB). Cell injection (Pass 1 sv() + Pass 2
+         G27/G28 fixes) doesn't guarantee this. Excel's recovery dialog fires
+         and strips misordered cells otherwise. Sort cells within rows 27, 28,
+         39, 40 (our manipulation targets). */
+      function colToNum(col) {
+        let n = 0;
+        for (let i = 0; i < col.length; i++) n = n * 26 + (col.charCodeAt(i) - 64);
+        return n;
+      }
+      function sortRowCells(xml, rowNum) {
+        const rowRe = new RegExp(`(<row\\s[^>]*r="${rowNum}"[^>]*>)([\\s\\S]*?)(<\\/row>)`, 's');
+        const m = xml.match(rowRe);
+        if (!m) return xml;
+        const cellRe = /<c\s[^>]*r="([A-Z]+)\d+"[^/>]*(?:\/>|>[\s\S]*?<\/c>)/g;
+        const cells = [];
+        let cm;
+        while ((cm = cellRe.exec(m[2])) !== null) {
+          cells.push({ col: colToNum(cm[1]), xml: cm[0] });
+        }
+        /* Stable sort by column number */
+        cells.sort((a, b) => a.col - b.col);
+        const sortedBody = cells.map(c => c.xml).join('');
+        return xml.replace(rowRe, m[1] + sortedBody + m[3]);
+      }
+      [27, 28, 39, 40].forEach(rn => { xml = sortRowCells(xml, rn); });
+      console.log('Pass 2 sheet1: sorted cells within rows 27, 28, 39, 40 to satisfy Excel column-order requirement');
+
       return xml;
     },
     'xl/worksheets/sheet4.xml': (xml) => {
@@ -3834,7 +3862,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v37b-pp-swot-redesign',
+      _version: 'v38-cell-column-order',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
