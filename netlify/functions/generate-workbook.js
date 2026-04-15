@@ -196,13 +196,13 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   const codeTotal = (prefix) => codes.filter(c => c.code.startsWith(prefix)).reduce((s,c) => s + c.total, 0);
   const exactQty = (code) => { const f = codes.find(c => c.code === code); return f ? f.qty : 0; };
 
-  /* NP flow (D0150 = comp exams) */
-  const compExams = exactQty('D0150');
+  /* NP flow (D0150 = comp exams) — prefix match for sub-codes like D0150.1 */
+  const compExams = codeQty('D0150');
   const npPerMonth = prodMonths > 0 ? Math.round(compExams / prodMonths) : 0;
 
-  /* Active patient estimate (prophy + perio maint per year) */
-  const prophyQty = exactQty('D1110') + exactQty('D1120');
-  const perioMaintQty = exactQty('D4910');
+  /* Active patient estimate (prophy + perio maint per year) — use prefix match for sub-codes */
+  const prophyQty = codeQty('D1110') + codeQty('D1120');
+  const perioMaintQty = codeQty('D4910');
   const activePatientEst = Math.round((prophyQty + perioMaintQty) / (prodMonths / 12));
 
   /* Hygiene production */
@@ -211,8 +211,8 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   for (const hc of hygCodes) { hygProd += codeTotal(hc); }
   const hygPct = totalProd > 0 ? (hygProd / totalProd * 100) : 0;
 
-  /* Perio metrics */
-  const srpQty = exactQty('D4341') + exactQty('D4342');
+  /* Perio metrics — use prefix match for sub-codes (D4341.1, D4342.1, etc.) */
+  const srpQty = codeQty('D4341') + codeQty('D4342');
   const perioRatio = prophyQty > 0 ? (srpQty / prophyQty * 100) : 0;
 
   /* Specialty production (endo, oral surgery, implants, ortho, perio surgery) */
@@ -224,7 +224,7 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   const specPct = totalProd > 0 ? (specTotal / totalProd * 100) : 0;
 
   /* Panorex */
-  const hasPanorex = exactQty('D0330') > 0;
+  const hasPanorex = codeQty('D0330') > 0;
 
   /* P&L-derived metrics */
   let staffCostPct = 0, labPct = 0, supplyPct = 0, netIncomePct = 0;
@@ -380,7 +380,7 @@ function baseCode(code) { return code.replace(/\.\d+$/, ''); }
  * For sheets 1-8: direct regex injection preserving styles.
  * For sheets 9-10: resolve shared strings to inline strings.
  */
-async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData, practiceName, extraSheetNames) {
+async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData, practiceName, extraSheetNames, practiceProfile) {
   const templateZip = await JSZip.loadAsync(templateBuf);
 
   /* ─── Preserve template's original styles.xml and Content_Types ─── */
@@ -881,6 +881,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   let _pass2StylesXml = null;
   /* _pass2WorkbookXml declared earlier (line ~654) to avoid temporal dead zone */
   let _swotStyles = null;  /* SWOT style indices — set during Pass 2, used for SWOT XML generation */
+  let _ppStyles = null;    /* Practice Profile style indices — set during Pass 2, used for PP XML generation */
 
   if (stylesSource) {
     let stylesXml = stylesSource;
@@ -1118,6 +1119,85 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       }
     }
 
+    /* === Add Practice Profile styles to template styles.xml === */
+    /* Similar approach to SWOT: append fonts, fills, borders, cellXfs.
+       Re-parse current counts since SWOT additions changed them. */
+    {
+      const _fmP = stylesXml.match(/<fonts[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fonts>/);
+      const _flP = stylesXml.match(/<fills[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/fills>/);
+      const _brP = stylesXml.match(/<borders[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/borders>/);
+      const _xfP = stylesXml.match(/<cellXfs[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
+
+      if (_fmP && _flP && _brP && _xfP) {
+        const pfi = parseInt(_fmP[1]);
+        const pfli = parseInt(_flP[1]);
+        const pbri = parseInt(_brP[1]);
+        const pxi = parseInt(_xfP[1]);
+
+        /* 8 new fonts */
+        const PF_TITLE = pfi, PF_SUB = pfi+1, PF_SECT = pfi+2, PF_LBL = pfi+3, PF_VAL = pfi+4, PF_CHECK = pfi+5, PF_NOTE = pfi+6, PF_FOOT = pfi+7;
+        const ppFonts =
+          '<font><b/><sz val="18"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +   /* TITLE: white bold 18pt */
+          '<font><sz val="10"/><color rgb="FFB0C4DE"/><name val="Candara"/></font>' +       /* SUB: light blue 10pt */
+          '<font><b/><sz val="12"/><color rgb="FF2B5797"/><name val="Candara"/></font>' +   /* SECT: blue bold 12pt */
+          '<font><sz val="10"/><color rgb="FF64748B"/><name val="Candara"/></font>' +       /* LBL: grey 10pt */
+          '<font><b/><sz val="10"/><color rgb="FF1E293B"/><name val="Candara"/></font>' +   /* VAL: dark bold 10pt */
+          '<font><sz val="10"/><color rgb="FF1E293B"/><name val="Candara"/></font>' +       /* CHECK: dark 10pt */
+          '<font><i/><sz val="10"/><color rgb="FF64748B"/><name val="Candara"/></font>' +   /* NOTE: grey italic 10pt */
+          '<font><i/><sz val="8"/><color rgb="FFA0AEC0"/><name val="Candara"/></font>';     /* FOOT: light grey italic 8pt */
+        stylesXml = stylesXml.replace(_fmP[0],
+          `<fonts count="${pfi + 8}">${_fmP[2]}${ppFonts}</fonts>`);
+
+        /* 3 new fills: navy banner, light grey section, stripe */
+        const PFL_BANNER = pfli, PFL_SECT = pfli+1, PFL_STRIPE = pfli+2;
+        const ppFills =
+          '<fill><patternFill patternType="solid"><fgColor rgb="FF2B5797"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFEEF2F7"/><bgColor indexed="64"/></patternFill></fill>' +
+          '<fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/><bgColor indexed="64"/></patternFill></fill>';
+        stylesXml = stylesXml.replace(_flP[0],
+          `<fills count="${pfli + 3}">${_flP[2]}${ppFills}</fills>`);
+
+        /* 2 new borders: accent bottom (medium blue), thin bottom (grey) */
+        const PBR_ACCENT = pbri, PBR_THIN = pbri+1;
+        const ppBorders =
+          '<border><left/><right/><top/><bottom style="medium"><color rgb="FF2B5797"/></bottom><diagonal/></border>' +
+          '<border><left/><right/><top/><bottom style="thin"><color rgb="FFE2E8F0"/></bottom><diagonal/></border>';
+        stylesXml = stylesXml.replace(_brP[0],
+          `<borders count="${pbri + 2}">${_brP[2]}${ppBorders}</borders>`);
+
+        /* 10 new cellXfs */
+        const PX_BANNER = pxi;      /* navy fill, white bold 18pt */
+        const PX_SUB = pxi+1;       /* navy fill, light blue 10pt */
+        const PX_SECT = pxi+2;      /* light grey fill, blue bold, accent border */
+        const PX_LBL = pxi+3;       /* no fill, grey label, thin border */
+        const PX_VAL = pxi+4;       /* no fill, dark bold value, thin border */
+        const PX_LBL_S = pxi+5;     /* stripe fill, grey label, thin border */
+        const PX_VAL_S = pxi+6;     /* stripe fill, dark bold value, thin border */
+        const PX_CHECK = pxi+7;     /* no fill, dark check text, thin border */
+        const PX_NOTE = pxi+8;      /* no fill, grey italic note */
+        const PX_FOOT = pxi+9;      /* no fill, light grey italic 8pt */
+
+        const ppXfs =
+          `<xf numFmtId="0" fontId="${PF_TITLE}" fillId="${PFL_BANNER}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_SUB}" fillId="${PFL_BANNER}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="top"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_SECT}" fillId="${PFL_SECT}" borderId="${PBR_ACCENT}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_LBL}" fillId="0" borderId="${PBR_THIN}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_VAL}" fillId="0" borderId="${PBR_THIN}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_LBL}" fillId="${PFL_STRIPE}" borderId="${PBR_THIN}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_VAL}" fillId="${PFL_STRIPE}" borderId="${PBR_THIN}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_CHECK}" fillId="0" borderId="${PBR_THIN}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_NOTE}" fillId="0" borderId="${PBR_THIN}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>` +
+          `<xf numFmtId="0" fontId="${PF_FOOT}" fillId="0" borderId="0" xfId="0" applyFont="1"/>`;
+        stylesXml = stylesXml.replace(_xfP[0],
+          `<cellXfs count="${pxi + 10}">${_xfP[2]}${ppXfs}</cellXfs>`);
+
+        _ppStyles = { PX_BANNER, PX_SUB, PX_SECT, PX_LBL, PX_VAL, PX_LBL_S, PX_VAL_S, PX_CHECK, PX_NOTE, PX_FOOT };
+        console.log('Pass 2: added Practice Profile styles — fonts ' + pfi + '-' + (pfi+7) + ', fills ' + pfli + '-' + (pfli+2) + ', borders ' + pbri + '-' + (pbri+1) + ', xfs ' + pxi + '-' + (pxi+9));
+      } else {
+        console.warn('Pass 2: could not parse styles.xml for Practice Profile additions');
+      }
+    }
+
     /* === Add Batting Average box styles === */
     /* Bold-bordered box in Production Worksheet G38:G39 (column G only).
        Re-parse counts (SWOT additions may have changed them). */
@@ -1311,7 +1391,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       nRows.forEach(r => { xml = swapStyle(xml, 'N'+r, '428'); });
       console.log('Pass 2 sheet1: fixed ' + eRows.length + ' E-cells, ' + gRows.length + ' G-cells, ' + nRows.length + ' N-cells');
 
-      /* ── Batting Average box: column G only (G38 title, G39 value) ── */
+      /* ── Batting Average box: column G only (G39 title, G40 value) ── */
       /* Template has merged F38:G38 .. F41:G41.  We remove those merges
          so the box lives in column G alone (width ≈23 → more square).       */
 
@@ -1333,38 +1413,63 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         return xml;
       }
 
-      /* 3. Insert styled cells into G38 and G39.
-            G38/G39 don't exist as separate <c> elements (hidden by merge),
-            so we insert them after the F38/F39 cells. */
+      /* 3. Insert styled cells into G39 and G40 (moved down 1 row from G38/G39).
+            G39/G40 don't exist as separate <c> elements (hidden by merge),
+            so we insert them after the F39/F40 cells. */
       const baTitle = _baStyles ? String(_baStyles.BA_XF_TITLE) : '402';
       const baValue = _baStyles ? String(_baStyles.BA_XF_VALUE) : '411';
 
-      /* Strip old F38/F39 BA styles (reset to template default empty) */
-      xml = baReplace(xml, 'F38', '49', null);
+      /* Strip old F39/F40 BA styles (reset to template default empty) */
       xml = baReplace(xml, 'F39', '52', null);
+      xml = baReplace(xml, 'F40', '52', null);
 
-      /* Insert G38 after F38 cell */
-      xml = xml.replace(
-        /(<c r="F38"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
-        `$1<c r="G38" s="${baTitle}" t="inlineStr"><is><t>BATTING AVERAGE</t></is></c>`
-      );
       /* Insert G39 after F39 cell */
       xml = xml.replace(
         /(<c r="F39"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
-        `$1<c r="G39" s="${baValue}" t="inlineStr"><is><t>${_battingAvgText}</t></is></c>`
+        `$1<c r="G39" s="${baTitle}" t="inlineStr"><is><t>BATTING AVERAGE</t></is></c>`
+      );
+      /* Insert G40 after F40 cell */
+      xml = xml.replace(
+        /(<c r="F40"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
+        `$1<c r="G40" s="${baValue}" t="inlineStr"><is><t>${_battingAvgText}</t></is></c>`
       );
 
       /* 4. Set row heights so the box is more square and text isn't clipped */
-      xml = xml.replace(/<row\s([^>]*r="38"[^>]*)>/, (m, attrs) => {
+      xml = xml.replace(/<row\s([^>]*r="39"[^>]*)>/, (m, attrs) => {
         attrs = attrs.replace(/\bht="[^"]*"/, '').replace(/\bcustomHeight="[^"]*"/, '');
         return `<row ${attrs.trim()} ht="25" customHeight="1">`;
       });
-      xml = xml.replace(/<row\s([^>]*r="39"[^>]*)>/, (m, attrs) => {
+      xml = xml.replace(/<row\s([^>]*r="40"[^>]*)>/, (m, attrs) => {
         attrs = attrs.replace(/\bht="[^"]*"/, '').replace(/\bcustomHeight="[^"]*"/, '');
         return `<row ${attrs.trim()} ht="40" customHeight="1">`;
       });
 
-      console.log('Pass 2 sheet1: injected BA box in G38:G39 (' + _battingAvgText + ') styles: title=' + baTitle + ' value=' + baValue);
+      console.log('Pass 2 sheet1: injected BA box in G39:G40 (' + _battingAvgText + ') styles: title=' + baTitle + ' value=' + baValue);
+
+      /* ── Row 28: Un-merge HYGIENE SUMMARY (B28:G28 → B28:C28) and add G28 total ── */
+      /* Remove the wide B28:G28 merge so G28 can hold the hygiene total */
+      xml = xml.replace(/<mergeCell ref="B28:G28"\/>/g, '');
+      /* Add a narrower merge B28:F28 so the label stays visible but G28 is free */
+      const mc28Match = xml.match(/<mergeCells[^>]*count="(\d+)"/);
+      if (mc28Match) {
+        /* Insert new B28:F28 merge and update count */
+        xml = xml.replace(/<\/mergeCells>/, '<mergeCell ref="B28:F28"/></mergeCells>');
+        /* We removed one merge (B28:G28) and added one (B28:F28) so count stays same */
+      }
+      /* Insert G28 cell with the hygiene total value using currency style.
+         Find the row 28 element and add G28 after the last cell in it. */
+      const hygTotalVal = (_cellCollector['Production Worksheet'] || {})['G28'];
+      if (hygTotalVal !== undefined) {
+        /* Try to insert G28 into row 28 — find the last cell in row 28 and add after it */
+        if (xml.match(/<row\s[^>]*r="28"[^>]*>/)) {
+          /* Row 28 exists — insert G28 before </row> for row 28 */
+          xml = xml.replace(
+            /(<row\s[^>]*r="28"[^>]*>[\s\S]*?)(<\/row>)/,
+            `$1<c r="G28" s="411" t="n"><v>${hygTotalVal}</v></c>$2`
+          );
+          console.log('Pass 2 sheet1: added G28 hygiene total = ' + hygTotalVal);
+        }
+      }
 
       return xml;
     },
@@ -1702,6 +1807,182 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     console.log('Pass 2: generated SWOT XML directly for sheet' + swotSheetNum + ' (' + swotSheetXml.length + ' chars, ' + sr + ' rows, styles: ' + JSON.stringify(_swotStyles) + ')');
   }
 
+  /* === Generate Practice Profile sheet XML directly (bypasses ExcelJS style contamination) === */
+  if (practiceProfile && _ppStyles) {
+    const pp = practiceProfile;
+    let ppRows = '';
+    let pr = 1;
+    const PS = _ppStyles;
+
+    /* Helper: generate a cell element */
+    const ppCell = (col, row, style, text) =>
+      `<c r="${col}${row}" s="${style}" t="inlineStr"><is><t>${escapeXml(text || '')}</t></is></c>`;
+    const ppCellEmpty = (col, row, style) =>
+      `<c r="${col}${row}" s="${style}"/>`;
+
+    /* Helper: full-width banner row (B-E cells with same style) */
+    const bannerRow = (row, style, text, height) => {
+      let r = `<row r="${row}" ht="${height}" customHeight="1">`;
+      r += ppCellEmpty('A', row, style);
+      r += ppCell('B', row, style, text);
+      r += ppCellEmpty('C', row, style);
+      r += ppCellEmpty('D', row, style);
+      r += ppCellEmpty('E', row, style);
+      r += ppCellEmpty('F', row, style);
+      r += `</row>`;
+      return r;
+    };
+
+    /* Helper: section header row */
+    const sectRow = (row, text) => {
+      let r = `<row r="${row}" ht="28" customHeight="1">`;
+      for (const c of ['A','B','C','D','E','F']) r += (c === 'B') ? ppCell(c, row, PS.PX_SECT, text) : ppCellEmpty(c, row, PS.PX_SECT);
+      r += '</row>';
+      return r;
+    };
+
+    /* Helper: data row with label/value pairs */
+    let _ppParity = 0;
+    const dataRowXml = (row, lbl1, val1, lbl2, val2) => {
+      const sl = (_ppParity % 2 === 0) ? PS.PX_LBL : PS.PX_LBL_S;
+      const sv = (_ppParity % 2 === 0) ? PS.PX_VAL : PS.PX_VAL_S;
+      let r = `<row r="${row}" ht="24" customHeight="1">`;
+      r += ppCellEmpty('A', row, sl);
+      r += ppCell('B', row, sl, lbl1);
+      r += ppCell('C', row, sv, val1 || '\u2014');
+      r += (lbl2) ? ppCell('D', row, sl, lbl2) : ppCellEmpty('D', row, sl);
+      r += (val2) ? ppCell('E', row, sv, val2 || '\u2014') : ppCellEmpty('E', row, sv);
+      r += ppCellEmpty('F', row, sl);
+      r += '</row>';
+      _ppParity++;
+      return r;
+    };
+
+    /* Row 1: Title banner */
+    ppRows += bannerRow(pr, PS.PX_BANNER, pp.website || practiceName || 'Practice Assessment', 44);
+    pr++;
+    /* Row 2: Subtitle */
+    ppRows += bannerRow(pr, PS.PX_SUB, 'Practice Profile  |  Dental AI Toolkit Assessment', 20);
+    pr++;
+    /* Row 3: spacer */
+    ppRows += `<row r="${pr}" ht="8" customHeight="1"/>`;
+    pr++;
+
+    /* ═══ PRACTICE BASICS ═══ */
+    ppRows += sectRow(pr, 'PRACTICE BASICS'); pr++;
+    _ppParity = 0;
+    const softwareNames = { dentrix: 'Dentrix', eaglesoft: 'Eaglesoft', opendental: 'Open Dental', other: 'Other' };
+    ppRows += dataRowXml(pr, 'Zip Code', pp.zipCode || '\u2014', 'Practice Website', pp.website || '\u2014'); pr++;
+    ppRows += dataRowXml(pr, 'Years Owned', pp.yearsOwned ? pp.yearsOwned + ' years' : '\u2014', 'Owner Age', pp.ownerAge ? pp.ownerAge + ' years old' : '\u2014'); pr++;
+    ppRows += dataRowXml(pr, 'Practice Management Software', softwareNames[pp.pmSoftware] || pp.pmSoftware || '\u2014', null, null); pr++;
+    pr++; /* spacer */
+
+    /* ═══ PAYOR MIX ═══ */
+    ppRows += sectRow(pr, 'PAYOR MIX'); pr++;
+    _ppParity = 0;
+    const mix = pp.payorMix || {};
+    ppRows += dataRowXml(pr, 'In-Network PPO', (mix.ppo || 0) + '%', 'HMO', (mix.hmo || 0) + '%'); pr++;
+    ppRows += dataRowXml(pr, 'Medicaid / Government', (mix.gov || 0) + '%', 'Fee-for-Service / OON', (mix.ffs || 0) + '%'); pr++;
+    pr++;
+
+    /* ═══ SCHEDULE & TEAM ═══ */
+    ppRows += sectRow(pr, 'SCHEDULE & TEAM'); pr++;
+    _ppParity = 0;
+    ppRows += dataRowXml(pr, 'Doctor Days per Month', pp.doctorDays ? pp.doctorDays + ' days' : '\u2014', 'Hygiene Days per Week', pp.numHygienists ? pp.numHygienists + ' days' : '\u2014'); pr++;
+    const assocText = pp.hasAssociate ? ('Yes  \u2014  ' + (pp.associateDays || 0) + ' days per month') : 'No';
+    ppRows += dataRowXml(pr, 'Has Associate Doctor', assocText, 'Operatories Active', (pp.opsActive || '\u2014') + ' of ' + (pp.opsTotal || '\u2014') + ' total'); pr++;
+    pr++;
+
+    /* ═══ DAILY PRODUCTION & BENCHMARKS ═══ */
+    ppRows += sectRow(pr, 'DAILY PRODUCTION & BENCHMARKS'); pr++;
+    _ppParity = 0;
+    const docAvg = pp.docDailyAvg === 'idk' ? "Doesn't know" : (pp.docDailyAvg ? '$' + Number(pp.docDailyAvg).toLocaleString() + ' / day' : '\u2014');
+    const hygAvg = pp.hygDailyAvg === 'idk' ? "Doesn't know" : (pp.hygDailyAvg ? '$' + Number(pp.hygDailyAvg).toLocaleString() + ' / day' : '\u2014');
+    ppRows += dataRowXml(pr, 'Doctor Daily Average', docAvg, 'Hygiene Daily Average', hygAvg); pr++;
+    const crowns = pp.crownsPerMonth === 'idk' ? "Doesn't know" : (pp.crownsPerMonth || '\u2014');
+    ppRows += dataRowXml(pr, 'Crowns per Month', crowns, null, null); pr++;
+    const goalMap = { yes: 'Yes', no: 'No', sort_of: 'Sort of' };
+    const aheadMap = { yes: 'Yes', no: 'No', sometimes: 'Sometimes' };
+    ppRows += dataRowXml(pr, 'Has Daily Production Goal', goalMap[pp.hasProductionGoal] || '\u2014', 'Tracks If Ahead/Behind', aheadMap[pp.knowsIfAhead] || '\u2014'); pr++;
+    pr++;
+
+    /* ═══ GOALS & VISION ═══ */
+    ppRows += sectRow(pr, 'GOALS & VISION'); pr++;
+    _ppParity = 0;
+    const yearsMap = { '1-5': '1 \u2013 5 years', '5-10': '5 \u2013 10 years', '10-15': '10 \u2013 15 years', 'not-on-radar': 'Not on my radar' };
+    ppRows += dataRowXml(pr, 'Years to Continue Practicing', yearsMap[pp.yearsToWork] || pp.yearsToWork || '\u2014', null, null); pr++;
+    pr++;
+
+    /* ═══ TOP CONCERNS ═══ */
+    const concerns = pp.concerns || [];
+    if (concerns.length > 0) {
+      ppRows += sectRow(pr, 'TOP CONCERNS'); pr++;
+      const concernLabels = {
+        more_profitable: 'Want to be more profitable',
+        more_busy: 'Want to be busier',
+        pay_staff_more: 'Want to pay staff more',
+        owner_bonus: 'Want to take home more',
+        more_control: 'Want more control over the practice',
+        staff_issues: 'Staff issues',
+        overhead_high: 'Overhead is too high',
+        insurance_rates: 'Insurance reimbursements too low',
+        new_patients: 'Need more new patients',
+        exit_plan: 'Considering selling or retiring'
+      };
+      for (let ci = 0; ci < concerns.length; ci += 2) {
+        const leftText = '\u2713  ' + (concernLabels[concerns[ci]] || concerns[ci]);
+        const rightText = (ci + 1 < concerns.length) ? '\u2713  ' + (concernLabels[concerns[ci + 1]] || concerns[ci + 1]) : null;
+        let r = `<row r="${pr}" ht="24" customHeight="1">`;
+        r += ppCellEmpty('A', pr, PS.PX_CHECK);
+        r += ppCell('B', pr, PS.PX_CHECK, leftText);
+        r += ppCellEmpty('C', pr, PS.PX_CHECK);
+        r += rightText ? ppCell('D', pr, PS.PX_CHECK, rightText) : ppCellEmpty('D', pr, PS.PX_CHECK);
+        r += ppCellEmpty('E', pr, PS.PX_CHECK);
+        r += ppCellEmpty('F', pr, PS.PX_CHECK);
+        r += '</row>';
+        ppRows += r;
+        pr++;
+      }
+      pr++;
+    }
+
+    /* ═══ ADDITIONAL NOTES ═══ */
+    if (pp.biggestChallenge) {
+      ppRows += sectRow(pr, 'ADDITIONAL NOTES'); pr++;
+      let r = `<row r="${pr}" ht="50" customHeight="1">`;
+      r += ppCellEmpty('A', pr, PS.PX_NOTE);
+      r += ppCell('B', pr, PS.PX_NOTE, pp.biggestChallenge);
+      r += ppCellEmpty('C', pr, PS.PX_NOTE);
+      r += ppCellEmpty('D', pr, PS.PX_NOTE);
+      r += ppCellEmpty('E', pr, PS.PX_NOTE);
+      r += ppCellEmpty('F', pr, PS.PX_NOTE);
+      r += '</row>';
+      ppRows += r;
+      pr++;
+    }
+
+    /* ═══ Footer ═══ */
+    pr++;
+    const _ppDateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    ppRows += `<row r="${pr}"><c r="B${pr}" s="${PS.PX_FOOT}" t="inlineStr"><is><t>${escapeXml('Generated by Dental AI Toolkit  \u2022  ' + _ppDateStr)}</t></is></c></row>`;
+
+    /* Merge cells for banner (B1:E1, B2:E2) and notes */
+    let ppMerges = '<mergeCells count="2"><mergeCell ref="B1:E1"/><mergeCell ref="B2:E2"/></mergeCells>';
+
+    const ppSheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>' +
+      '<sheetFormatPr defaultRowHeight="15"/>' +
+      '<cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="34" customWidth="1"/><col min="3" max="3" width="30" customWidth="1"/><col min="4" max="4" width="34" customWidth="1"/><col min="5" max="5" width="30" customWidth="1"/><col min="6" max="6" width="3" customWidth="1"/></cols>' +
+      '<sheetData>' + ppRows + '</sheetData>' +
+      ppMerges +
+      '</worksheet>';
+
+    /* Practice Profile is always sheet9 (first extra sheet, reordered to first tab) */
+    _pass2SheetFixes['xl/worksheets/sheet9.xml'] = ppSheetXml;
+    console.log('Pass 2: generated Practice Profile XML directly for sheet9 (' + ppSheetXml.length + ' chars, ' + pr + ' rows)');
+  }
+
   /* Remove sharedStrings.xml (template has none — ExcelJS injects one) */
   if (fixZip.file('xl/sharedStrings.xml')) {
     fixZip.remove('xl/sharedStrings.xml');
@@ -2011,6 +2292,36 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   if (srpAgg.qty > 0) {
     sv(wsPW, 'D24', srpAgg.qty);
     sv(wsPW, 'F24', Math.round(srpAgg.total/srpAgg.qty*100)/100);
+  }
+
+  /* Row 27: Laser production total — aggregate codes with "laser" in description */
+  {
+    let laserQty = 0, laserTotal = 0;
+    for (const c of codes) {
+      if (/laser/i.test(c.desc)) {
+        laserQty += c.qty;
+        laserTotal += c.total;
+      }
+    }
+    if (laserQty > 0) {
+      sv(wsPW, 'D27', laserQty);
+      sv(wsPW, 'F27', Math.round(laserTotal / laserQty * 100) / 100);
+      sv(wsPW, 'G27', laserTotal);
+      console.log('Laser production (row 27): qty=' + laserQty + ' total=$' + laserTotal.toFixed(2));
+    }
+  }
+
+  /* Row 28: Hygiene Summary total — sum of all hygiene production (rows 21-27) */
+  {
+    let hygTotal = 0;
+    for (let hr = 21; hr <= 27; hr++) {
+      if (leftAgg[hr]) hygTotal += leftAgg[hr].total;
+    }
+    hygTotal += srpAgg.total; /* row 24 SRP */
+    /* Add laser total (row 27, not in leftAgg) */
+    for (const c of codes) { if (/laser/i.test(c.desc)) hygTotal += c.total; }
+    sv(wsPW, 'G28', hygTotal);
+    console.log('Hygiene Summary total (G28): $' + hygTotal.toFixed(2));
   }
 
   for (const [row, agg] of Object.entries(rightAgg)) {
@@ -2329,12 +2640,13 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       /* ── Hygiene Schedule POTENTIAL section: derive from production data ── */
       /* These values feed the formulas in F40-F42, H40-H43, H44, N45-N48 */
       {
-        const exactQtyHS = (code) => { const f = codes.find(c => c.code === code); return f ? f.qty : 0; };
-        const prophyQtyHS = exactQtyHS('D1110') + exactQtyHS('D1120');
-        const perioMaintQtyHS = exactQtyHS('D4910');
-        const srpQtyHS = exactQtyHS('D4341') + exactQtyHS('D4342');
+        /* Use prefix matching to aggregate sub-codes (D1110 + D1110.1, D4342.1 + D4342.2, etc.) */
+        const codeQtyHS = (prefix) => codes.filter(c => c.code === prefix || c.code.startsWith(prefix + '.')).reduce((s,c) => s + c.qty, 0);
+        const prophyQtyHS = codeQtyHS('D1110') + codeQtyHS('D1120');
+        const perioMaintQtyHS = codeQtyHS('D4910');
+        const srpQtyHS = codeQtyHS('D4341') + codeQtyHS('D4342');
         const activePatientEstHS = prodMonths > 0 ? Math.round((prophyQtyHS + perioMaintQtyHS) / (prodMonths / 12)) : 0;
-        const compExamsHS = exactQtyHS('D0150');
+        const compExamsHS = codeQtyHS('D0150');
         const npPerMonthHS = prodMonths > 0 ? Math.round(compExamsHS / prodMonths) : 0;
 
         /* N39: active patients (only if hub form didn't already provide it) */
@@ -2391,21 +2703,58 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
           console.log('Hygiene Schedule: wrote RDH SCHEDULED = ' + estRDHCount + '/day (Mon-Fri)');
         }
 
-        /* Recent past (rows 10-12): fill appt/seen with estimated daily volume
-           Cols: C=mon appt, D=mon seen, E=tue appt, F=tue seen, G=wed appt, etc.
-           MUST overwrite — zero-filling already put 0 in these cells */
-        const hasRealRecentPast = hygieneData && Array.isArray(hygieneData.recentPast) && hygieneData.recentPast.length > 0 && hygieneData.recentPast.some(w => w.data && w.data.some(v => v > 0));
+        /* Helper: check if a grid section has real (non-zero) data from the form */
+        const hasRealGrid = (arr) => Array.isArray(arr) && arr.length > 0 && arr.some(w => w.data && w.data.some(v => v > 0));
+
+        const apptColsHS = ['C','E','G','I','K','M']; /* appt per day Mon-Sat */
+        const seenColsHS = ['D','F','H','J','L','N']; /* seen/conf/booked per day Mon-Sat */
+
+        /* Recent past (rows 10-12): fill appt/seen with estimated daily volume */
+        const hasRealRecentPast = hasRealGrid(hygieneData && hygieneData.recentPast);
         if (!hasRealRecentPast && hygPtsPerDay > 0) {
-          const apptColsHS = ['C','E','G','I','K','M']; /* appt per day Mon-Sat */
-          const seenColsHS = ['D','F','H','J','L','N']; /* seen per day Mon-Sat */
           for (let r = 10; r <= 12; r++) {
             for (let d = 0; d < 5; d++) { /* Mon-Fri */
               sv(wsHS, apptColsHS[d] + r, hygPtsPerDay);
               sv(wsHS, seenColsHS[d] + r, Math.round(hygPtsPerDay * 0.85)); /* ~85% show rate */
             }
-            /* Saturday stays 0 */
           }
           console.log('Hygiene Schedule: wrote recent past grid — ' + hygPtsPerDay + ' appt, ' + Math.round(hygPtsPerDay * 0.85) + ' seen per day');
+        }
+
+        /* Next 7 days (rows 19-20): fill schd/conf with estimated daily volume */
+        const hasRealNext7 = hasRealGrid(hygieneData && hygieneData.next7Days);
+        if (!hasRealNext7 && hygPtsPerDay > 0) {
+          for (let r = 19; r <= 20; r++) {
+            for (let d = 0; d < 5; d++) {
+              sv(wsHS, apptColsHS[d] + r, hygPtsPerDay);
+              sv(wsHS, seenColsHS[d] + r, Math.round(hygPtsPerDay * 0.90)); /* ~90% confirmed */
+            }
+          }
+          console.log('Hygiene Schedule: wrote next 7 days grid — ' + hygPtsPerDay + ' schd, ' + Math.round(hygPtsPerDay * 0.90) + ' conf per day');
+        }
+
+        /* Near future (rows 25-27): fill appt/booked with estimated daily volume */
+        const hasRealNearFuture = hasRealGrid(hygieneData && hygieneData.nearFuture);
+        if (!hasRealNearFuture && hygPtsPerDay > 0) {
+          for (let r = 25; r <= 27; r++) {
+            for (let d = 0; d < 5; d++) {
+              sv(wsHS, apptColsHS[d] + r, hygPtsPerDay);
+              sv(wsHS, seenColsHS[d] + r, Math.round(hygPtsPerDay * 0.75)); /* ~75% booked ahead */
+            }
+          }
+          console.log('Hygiene Schedule: wrote near future grid — ' + hygPtsPerDay + ' appt, ' + Math.round(hygPtsPerDay * 0.75) + ' booked per day');
+        }
+
+        /* Far future (rows 34-35): fill appt/booked with estimated daily volume */
+        const hasRealFarFuture = hasRealGrid(hygieneData && hygieneData.futureFuture);
+        if (!hasRealFarFuture && hygPtsPerDay > 0) {
+          for (let r = 34; r <= 35; r++) {
+            for (let d = 0; d < 5; d++) {
+              sv(wsHS, apptColsHS[d] + r, hygPtsPerDay);
+              sv(wsHS, seenColsHS[d] + r, Math.round(hygPtsPerDay * 0.60)); /* ~60% booked far out */
+            }
+          }
+          console.log('Hygiene Schedule: wrote far future grid — ' + hygPtsPerDay + ' appt, ' + Math.round(hygPtsPerDay * 0.60) + ' booked per day');
         }
 
         /* N51: patients per hygiene day — use calculated value instead of default 8 */
@@ -3138,7 +3487,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   const elapsed = injStart - t0;
   console.log('Time before injection:', elapsed, 'ms');
 
-  const injResult = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData || null, practiceName, extraSheetNames || []);
+  const injResult = await injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Buf, swotData || null, practiceName, extraSheetNames || [], practiceProfile);
   const finalBuf = injResult.buf;
   const _injDiag = injResult._diag;
   const injTime = Date.now() - injStart;
@@ -3157,7 +3506,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v33-safety-net',
+      _version: 'v34-hygiene-grid-fix',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
