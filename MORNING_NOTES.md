@@ -1,73 +1,129 @@
-# Morning Notes — Overnight Session
-
-**For:** Dave
-**Session start:** Apr 14, ~10 PM
-**Live site:** https://dentalpracticeassessments.com
-
----
+# Status Notes — Overnight → Midday Session (April 15, 2026)
 
 ## TL;DR
 
-Two commits shipped to `main` overnight. Both deployed to Netlify.
+The assessment tool now produces a **beautiful one-page web report** in addition to the Excel workbook. This is the strategic pivot we agreed on: the web report is the primary deliverable; the Excel becomes a data companion.
 
-1. **v35** — fixed the sheet1.xml XML corruption that was causing "We found a problem with some content" + practice profile field name mismatches + concerns char-by-char split. (This was the work we did together before you went to bed.)
-2. **UX polish** — replaced the ugly blocking `alert()` on generation failure with an inline error panel, hid developer debug info from the user-facing summary grid, added a "What happens next?" block with a Calendly CTA on the completion screen, and added a gentle nudge for users who land on the assessment hub without filling out the questionnaire first.
+**Four major things shipped to production today:**
+1. **v35** — fixed the XML corruption that caused Excel's "We found a problem with some content" recovery dialog (duplicate `t=` attributes + duplicate cell refs).
+2. **v36** — fixed the `<mergeCells count=>` mismatch after v35's merge removals (same recovery dialog, different cause).
+3. **v38** — fixed cell column-ordering (D27 was appearing before A27; G28 was appearing after AA28). Excel requires strict column order within each row.
+4. **v39** — the big one. Added a full HTML Executive Report as a new deliverable. The assessment tool now returns both an `.xlsx` AND a complete `.html` report. The result screen has a new primary button: **"✨ View Your Report Online"**. Excel download is still available as a secondary option.
 
----
-
-## What changed (detail)
-
-### Commit `1dc984b` — v35: XML corruption + practice profile fixes
-`netlify/functions/generate-workbook.js`:
-- **Sheet1 XML corruption (BUG 1)** — the root cause was duplicate XML attributes. The G27/F27 replacement regexes captured existing attrs via `$1` (which already contained `t="s"`) and appended their own `t="n"`, producing `<c ... t="s" t="n">` → Excel recovery error. Also duplicate cell refs for G28/G39/G40 when the template already had those cells. **Fix:** strip existing `t=` from captured attrs before appending, and remove any pre-existing G28/G39/G40 cells before inserting new ones. XML-escape `_battingAvgText` just in case.
-- **Concerns char-split (BUG 2)** — `pp.concerns` arrived from the client as a comma-separated string but the loop treated it as an array, iterating over characters. Added normalization: `if (typeof pp.concerns === 'string') pp.concerns = pp.concerns.split(',').map(s=>s.trim()).filter(Boolean)`.
-- **Practice Profile field names (BUG 3)** — client was sending `pp.zip`, `pp.software`, `pp.payorPPO`, `pp.activeOps`, `pp.totalOps`; server was reading `pp.zipCode`, `pp.pmSoftware`, `pp.payorMix.ppo`, etc. Added a normalization block at the top of the Practice Profile generator that maps both conventions. No client-side change needed.
-- **Version string (BUG 4)** — bumped to `v35-xml-corruption-fix`.
-
-### Commit `a46b40c` — Assessment hub UX polish
-`assessment_hub.html`:
-- **Inline error panel** replaces `alert('Error generating workbook: ' + err.message)`. New red-bordered callout appears below the Generate button with a friendly message; the raw error detail shows in a smaller monospace block underneath. Scrolls into view automatically.
-- **Summary grid cleanup** — removed the `Diag` stat (`xfs=769 ss=false p2null=false...` — developer debug), renamed stats to consultant language (`Codes Found` → `Codes Analyzed`, `P&L Parsed` → `P&L Analysis`), removed the `Yes ✅`/`Partial`/`Not uploaded` mix in favor of `Included`/`Skipped`/`Not entered`. Also removed the version string from the user-facing grid.
-- **Completion "next steps" block** — a subtle gradient card below the download button reading *"What happens next? Your workbook surfaces 200+ KPIs from your practice. The fastest way to turn those numbers into action: book a 30-minute consultation..."* with a **📅 Book Your Review Call** button pointing to `https://calendly.com/davidorr/dental-assessment-review`. **You'll need to update that Calendly URL if it's not correct** — see the "Things to check" section below.
-- **Profile guard** — on page load, if `sessionStorage.getItem('practiceProfile')` is missing, a friendly yellow callout appears at the top pointing the user back to `questionnaire.html`. Dismissable via `?skipIntake=1` in the URL (so you can still go directly to the hub while testing).
-- **Practice-name prefill** — if the questionnaire collected `practiceName` / `name`, the field in Step 1 is pre-filled.
+All live at https://dentalpracticeassessments.com right now.
 
 ---
 
-## What I did NOT do (and why)
+## What the new HTML report actually delivers
 
-- **Did not rebuild the landing page.** The existing `landing.html` is clean, modern, and well-designed — navy + blue + gold palette, Poppins/Montserrat, hero with stats and sample output preview, features / how-it-works / what-you-get / methodology / testimonials / CTA sections. No urgent content issues. You'll want to look at this yourself when you're ready to iterate on messaging.
-- **Did not touch `generate-workbook.js` beyond v35.** That file is 3538 lines of fragile two-pass template logic with known JSZip read-back bugs. Any change there needs careful testing. Your CLAUDE.md explicitly warns about regex safety rules, formula overwrite rules, etc.
-- **Did not add email capture.** I considered adding "email me this workbook" but that needs a real email-sending backend (SendGrid/Postmark/etc.) and credentials, which I don't have. The Calendly CTA on the completion screen is the lighter-weight version.
-- **Did not change the brand name.** You mentioned "Dental AI Toolkit" is provisional — I left all references alone.
-- **Did not run a full end-to-end test on the live site.** I deployed both commits but didn't submit a real assessment from the browser. I reviewed the Netlify function logs from the past 2 days — no errors, all clean invocations. The last real invocation was Apr 13 at 11:36 AM (pre-v35). You should test end-to-end first thing.
+Run through the assessment once yourself to see it, but here's a text summary of what the Pigneri test generated:
+
+**Hero banner:** "$598,948 total annual opportunity identified"
+
+**Six-card health scorecard** (color-coded green/amber/red vs industry benchmarks):
+- Annual Production: $1,641,230
+- Collection Rate: **81.8%** (vs target 97%+) 🟡
+- Hygiene % of Production: **20.3%** (vs target 30-33%) 🟡
+- Doctor Avg $/Day: $5,498 (16 days/mo)
+- Hygiene Avg $/Day: $802 (8 days/week)
+- Overhead %: — (P&L parser didn't populate expenses for this test — see Open Questions)
+
+**Top 3 opportunity cards**, each with a specific $ number and a plain-English explanation:
+1. Collection rate opportunity: **$248,885/yr** — "Current collection rate is 81.8% vs a 97% industry benchmark. Closing that gap at current production levels would recover roughly $248,885 in annual collections."
+2. Hygiene production gap: **$191,731/yr** — "Hygiene is 20.3% of production vs a 30-33% target..."
+3. Doctor production lift (15%): **$158,331/yr** — "A 15% short-term lift is realistic with tighter scheduling..."
+
+**Goal setting matrix** (exactly the 3-column layout you described):
+
+| Metric | Current | Short-term (+15%) | Fully Optimized (+30%) |
+|---|---|---|---|
+| Doctor $/Day | $5,498 | $6,322 | $7,147 |
+| Hygiene $/Day | $802 | $1,002 (+$200) | $1,202 (+$400) |
+| Annual Doctor Production | $1,056k | $1,214k | $1,372k |
+| Annual Hygiene Production | $333k | $417k | $500k |
+| **Total Annual Production** | **$1,641k** | **$1,883k** | **$2,124k** |
+
+**Production mix charts** (Chart.js): horizontal bar by category + donut showing Doctor/Hygiene/Specialty split.
+
+**Financial scorecard** (6 cards): P&L revenue, expenses, profit margin, staff cost %, patient AR 90+, insurance AR 90+.
+
+**SWOT 2x2** — reuses your existing auto-generated insights, presented in a true quadrant layout with color-coded borders (green/red/blue/amber).
+
+**Practice profile recap** — 15 rows summarizing what the dentist told you in the questionnaire.
+
+**CTA block** — "This is a snapshot. Your practice deserves a movie." → book-a-call button. This is the funnel seam from paid assessment → ongoing coaching.
+
+**Visual DNA:** dark navy #1a2332 + orange accent #e8872a + gold accent strip — same palette as your existing Pigneri dashboard on performdds.com. Intentional: when clients upgrade from assessment → coaching, the visual language continues unbroken.
+
+**Print-friendly:** the report has print CSS that hides the buttons and produces a clean PDF when the user hits Cmd+P → Save as PDF (or the "Download as PDF" button that triggers `window.print()`).
 
 ---
 
-## Things to check / decide this morning
+## What I learned that changed my strategy
 
-1. **Calendly URL** — I used `https://calendly.com/davidorr/dental-assessment-review` as a placeholder. **If that isn't your actual booking link, edit `assessment_hub.html` and search for `calendly.com` — there's one occurrence on the completion screen.** Same goes if you want to use Cal.com, SavvyCal, TidyCal, a Google Forms intake, or anything else.
-2. **Test end-to-end on https://dentalpracticeassessments.com.** Use the Pigneri PDFs from `~/Desktop/data for dentrix assessment from pigneri/`. The workbook should open cleanly in Excel with no recovery dialog.
-3. **Practice profile field audit.** If you still see `Zip Code: —`, `Payor Mix: 0%`, or similar on the Practice Profile sheet, it means the client is sending yet another field name I didn't anticipate. Open DevTools → Network → find the `generate-workbook` call → inspect the request payload. Send me the `practiceProfile` object and I'll map the new names.
-4. **Calendly-not-booked fallback.** If you want a "prefer email?" secondary CTA next to the Calendly button, it's a 5-minute add.
+Earlier today you logged me into https://performdds.com/pigneri (Pigneri / PerformDDS) and I discovered something big:
 
----
+**Your existing client dashboard is literally a static HTML file in this repo** — `pigneri-dashboard.html` (114KB). The Squarespace `/pigneri` page just iframes `https://evenflow1212.github.io/performdds-assessment/pigneri-dashboard.html`, which GitHub Pages serves from this same git repo.
 
-## Code state
+Implication: I didn't need to rebuild the dashboard. I just needed to build an **assessment-specific variant** using the same visual language. That's what v39's HTML report is — a snapshot version for prospects, whereas the `/clientname` dashboards are ongoing trend versions for paying clients.
 
-- `main` branch on github.com/Evenflow1212/performdds-assessment is at `a46b40c`.
-- Netlify auto-deployed both commits.
-- Working tree is clean in the main repo; there's a worktree at `.claude/worktrees/nostalgic-ellis` on branch `claude/nostalgic-ellis` that's 1 commit behind main (not important — can delete anytime).
-- `CLAUDE_CODE_HANDOFF.md` and `test-output-v29.xlsx` are untracked — left alone.
+This means:
+- **One codebase, one repo, one deploy** covers the full customer journey (prospect → assessment → client dashboard).
+- The "Data Upload" button that's aspirational on the client dashboards is exactly where the assessment tool plugs in — someday the assessment tool's output could become the client's starting dashboard automatically.
+- No AWS needed. GitHub Pages + Netlify Functions + Chart.js + static HTML is the right shape. Fast, free, maintainable.
 
 ---
 
-## Honest scope note
+## Commits shipped today
 
-I know you hoped I'd build a lot more overnight. The realistic truth: the existing codebase is in decent shape and the highest-leverage overnight moves were the targeted UX fixes I did make, plus verifying v35 is solid. A full landing-page rebuild or PDF-deliverable system would've meant risky changes I couldn't test without you. I stayed conservative on purpose — better to wake up to a working site with real polish than to a half-built big swing that broke something.
+- `1dc984b` — v35: XML corruption + practice profile field names
+- `a46b40c` — UX polish: inline errors, summary grid cleanup, book-a-call CTA, profile guard
+- `1b490f5` — v36: mergeCells count fix + `.gitignore` + PHI cleanup from public repo (force-push)
+- `84318fb` — v37: PP + SWOT redesign (hero stats, gold accent, pill concerns, 2x2 SWOT)
+- `723aa89` — v37b: scope fix for PF_SUB
+- `592206e` — v38: cell column-ordering fix
+- `c8b7620` — **v39: HTML Executive Report as primary deliverable** ← today's big one
 
-**Next session's big-swing candidates:** PDF deliverable generation (export workbook findings as a branded client-facing PDF), email-capture + workbook-emailing, actual Calendly integration vs. a simple mailto fallback, brand redesign once you settle on a name.
+---
 
-Sleep well. Ping me anytime.
+## Things you should look at when you're back
+
+1. **Open the Pigneri report tab** — it's already loaded in Chrome from my test. Scroll through the whole thing. If it looks good, you're done. If there are layout issues, ugly spots, missing sections, tell me.
+2. **Try generating your own assessment** from the live site. The "View Your Report Online" button should open the same kind of report.
+3. **Print the report to PDF** — Cmd+P → Save as PDF. This is the "Download as PDF" button's path. Print CSS should produce a clean output.
+
+---
+
+## Open questions I want your input on
+
+1. **Overhead % shows "—" in the Pigneri test** because the P&L parser isn't populating `totalExpenses`. The field is in the data but the parser only sets `totalIncome` consistently. This is pre-existing (not a v39 regression), but it means one of the most important KPIs on the report is missing. Want me to look into the P&L parser next?
+
+2. **Calendly URL** — still a placeholder: `https://calendly.com/davidorr/dental-assessment-review`. What's the real URL?
+
+3. **The CTA copy** — I wrote "This is a snapshot. Your practice deserves a movie. Paying clients get this same analysis tracked monthly with trend lines, goal tracking, and a one-on-one coaching relationship." Is that the right pitch? Should it be different for prospects vs existing clients who paid for a one-time assessment?
+
+4. **Data Upload button** on performdds.com client dashboards is currently aspirational (no backend behind it). Do you want the assessment tool eventually to populate a client dashboard directly? That's the natural next step — paid assessment becomes month 0 of ongoing coaching.
+
+5. **PDF export quality** — `window.print()` → Save as PDF gives OK results but has gotchas (page breaks through charts, etc.). For Nordstrom quality, the next step would be a proper server-side Puppeteer render that produces a pixel-perfect multi-page PDF. That's a medium-sized piece of work — want it in this sprint or can it wait?
+
+6. **"Batting Average" discrepancy** — the live Pigneri dashboard shows **17.5** but the Excel workbook shows **4.9 to 1**. I think these are different calcs. Can you explain the difference and which one should appear on the assessment report?
+
+7. **Google Drive / email data sources** — you mentioned I could pull from those. I didn't today; it would be more useful once the assessment report is solid. Worth exploring next session to see what other report types dentists send you that we could parse.
+
+---
+
+## Scope note
+
+What I did NOT attempt today:
+- Migration to AWS / Render / Fly (not needed yet; the GitHub Pages + Netlify stack is fine)
+- Rebuild the client-side dashboard (it's already great)
+- Full PDF rendering via Puppeteer (leaving as follow-up)
+- Extract domain-model JSON from the workbook formulas (would have been useful for "Phase 1 archaeology" — skipped because v39 computes everything directly from parsed data, which is simpler and lets us iterate faster)
+
+Everything I did was in pursuit of the core pivot: **making the web report the primary deliverable**. That's live.
+
+---
 
 — Claude
+
+*Generated April 15, 2026. v39 live at dentalpracticeassessments.com.*
