@@ -2375,13 +2375,19 @@ async function generate() {
     } else if (plImageB64) {
       console.warn('P&L image too large for server payload (' + Math.round(plImageB64.length/1024) + 'KB), skipping');
     }
+    console.log('Payload keys:', Object.keys(payload), 'prodText len:', prodText?.length, 'collText len:', collText?.length, 'plText len:', plText?.length);
+    console.log('practiceProfile:', JSON.stringify(practiceProfile)?.substring(0, 200));
     const resp = await fetch('/.netlify/functions/generate-workbook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const data = await resp.json();
-    if (!data.success) throw new Error(data.error || 'Generation failed');
+    console.log('Response status:', resp.status, resp.statusText);
+    const respText = await resp.text();
+    console.log('Response body (first 500):', respText.substring(0, 500));
+    let data;
+    try { data = JSON.parse(respText); } catch(e) { throw new Error('Non-JSON response (HTTP ' + resp.status + '): ' + respText.substring(0, 200)); }
+    if (!data.success) throw new Error(data.error || data.errorMessage || 'Generation failed (no error detail)');
     /* Server produces complete workbook via JSZip template injection + ExcelJS sheets 9-10 */
     generatedWorkbook = data.xlsxB64;
     const sv = data.summary?._version || 'unknown';
