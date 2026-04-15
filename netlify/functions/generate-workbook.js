@@ -651,6 +651,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   /* Track which extra sheets (9-12) were created — declared here so Content_Types
      registration (in Pass 2) can reference them even when sheets9to10Buf is null */
   let hasSheet9 = false, hasSheet10 = false, hasSheet11 = false, hasSheet12 = false;
+  let _pass2WorkbookXml = null;  /* Reordered workbook.xml — declared early for same reason as hasSheet vars */
 
   /* Process sheets 9-10 from ExcelJS workbook (if present) */
   if (sheets9to10Buf) {
@@ -871,7 +872,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
      JSZip .file(path, content) writes do NOT persist for .file(path).async() reads
      on the same loaded zip — we MUST keep the JS variable and use it in the fresh zip. */
   let _pass2StylesXml = null;
-  let _pass2WorkbookXml = null;  /* Reordered workbook.xml — Practice Profile moved to first tab */
+  /* _pass2WorkbookXml declared earlier (line ~654) to avoid temporal dead zone */
   let _swotStyles = null;  /* SWOT style indices — set during Pass 2, used for SWOT XML generation */
 
   if (stylesSource) {
