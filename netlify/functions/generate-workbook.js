@@ -839,12 +839,19 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     }
   }
 
+  /* ═══ PRE-PASS 1: Log template sheet inventory ═══ */
+  const templateSheetFiles = Object.keys(templateZip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort();
+  console.log('PRE-PASS1 template sheets:', templateSheetFiles.length, ':', templateSheetFiles.join(', '));
+  console.log('PRE-PASS1 hasSheet flags: 9=' + hasSheet9 + ' 10=' + hasSheet10 + ' 11=' + hasSheet11 + ' 12=' + hasSheet12);
+
   /* ═══ PASS 1: Generate the xlsx from templateZip ═══ */
   const pass1Buf = await templateZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   console.log('Pass 1 output:', pass1Buf.length, 'bytes');
 
   /* ═══ POST-PASS 1 VERIFICATION: check if contamination occurred ═══ */
   const pass1Zip = await JSZip.loadAsync(pass1Buf);
+  const pass1SheetFiles = Object.keys(pass1Zip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort();
+  console.log('POST-PASS1 sheets:', pass1SheetFiles.length, ':', pass1SheetFiles.join(', '));
   const pass1Styles = await pass1Zip.file('xl/styles.xml')?.async('string');
   const p1Xfs = pass1Styles?.match(/cellXfs count="(\d+)"/);
   const p1HasSS = !!pass1Zip.file('xl/sharedStrings.xml');
@@ -1791,6 +1798,40 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     const content = await pass1Zip.file(filePath)?.async('nodebuffer');
     if (content) freshZip.file(filePath, content);
   }
+
+  /* ── Safety net: add any _pass2SheetFixes entries NOT already in freshZip ── */
+  /* This covers sheets created by ExcelJS that may not have survived pass1 generation */
+  for (const [fixPath, fixContent] of Object.entries(_pass2SheetFixes)) {
+    if (!freshZip.file(fixPath)) {
+      freshZip.file(fixPath, fixContent);
+      console.log('Fresh zip SAFETY NET: added missing', fixPath, '(' + fixContent.length + ' chars)');
+    }
+  }
+
+  /* ── Safety net: ensure workbook.xml uses our reordered version ── */
+  if (_pass2WorkbookXml && freshZip.file('xl/workbook.xml')) {
+    const currentWb = await freshZip.file('xl/workbook.xml')?.async('string');
+    if (currentWb && !currentWb.includes('Practice Profile') && _pass2WorkbookXml.includes('Practice Profile')) {
+      freshZip.file('xl/workbook.xml', _pass2WorkbookXml);
+      console.log('Fresh zip SAFETY NET: re-applied _pass2WorkbookXml (was missing Practice Profile entry)');
+    }
+  }
+
+  /* ── Safety net: ensure wbRels uses our version (no sharedStrings, correct extra sheet refs) ── */
+  if (_pass2WbRels) {
+    freshZip.file('xl/_rels/workbook.xml.rels', _pass2WbRels);
+    console.log('Fresh zip SAFETY NET: force-applied _pass2WbRels');
+  }
+
+  /* ── Safety net: ensure Content_Types includes all extra sheets ── */
+  if (_pass2ContentTypes) {
+    freshZip.file('[Content_Types].xml', _pass2ContentTypes);
+    console.log('Fresh zip SAFETY NET: force-applied _pass2ContentTypes');
+  }
+
+  /* ── Log final sheet inventory ── */
+  const freshSheetFiles = Object.keys(freshZip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f)).sort();
+  console.log('Fresh zip sheet files:', freshSheetFiles.join(', '));
 
   const finalBuf = await freshZip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
   console.log('Fresh zip final output:', finalBuf.length, 'bytes');
@@ -2958,6 +2999,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
     /* ═══ SWOT ANALYSIS (sheet 11) — 2×2 matrix layout ═══ */
     if (swotData) {
+      try {
       const wsSW = wbNewSheets.addWorksheet('SWOT Analysis');
 
       /* Layout: A=gutter, B-C=left quadrant, D=gutter, E-F=right quadrant, G=gutter */
@@ -3067,6 +3109,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       wsSW.getRow(fRow).height = 18;
 
       console.log('SWOT Analysis: written 2x2 layout (' + swotData.strengths.length + 'S, ' + swotData.weaknesses.length + 'W, ' + swotData.opportunities.length + 'O, ' + swotData.threats.length + 'T)');
+      } catch (swotErr) {
+        console.error('SWOT Analysis ExcelJS FAILED:', swotErr.message, swotErr.stack?.slice(0, 300));
+      }
     }
 
     /* Collect sheet names in order for dynamic registration */
@@ -3080,6 +3125,12 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
     sheets9to10Buf = await wbNewSheets.xlsx.writeBuffer();
     console.log('Extra sheets ExcelJS buffer written:', sheets9to10Buf.byteLength, 'bytes');
+    /* Diagnostic: verify how many sheets are in the ExcelJS buffer */
+    try {
+      const _diagZip = await JSZip.loadAsync(sheets9to10Buf);
+      const _diagSheets = Object.keys(_diagZip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f));
+      console.log('ExcelJS buffer sheet count:', _diagSheets.length, 'files:', _diagSheets.join(', '));
+    } catch(e) { console.log('ExcelJS buffer diag failed:', e.message); }
   }
 
   /* Now inject collected cell values into template, along with sheets 9-10 if present */
@@ -3106,7 +3157,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v32-profile-redesign',
+      _version: 'v33-safety-net',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
