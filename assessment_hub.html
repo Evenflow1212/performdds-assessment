@@ -2464,7 +2464,7 @@ async function generate() {
       { val: s.plParsed ? 'Included' : (plText ? 'Partial' : 'Skipped'), lbl: 'P&L Analysis' },
       { val: employeeCosts ? 'Included' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
       { val: hygieneData ? 'Included' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
-      { val: '10 tabs', lbl: 'Workbook Size' },
+      { val: '12 tabs', lbl: 'Workbook Size' },
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     _generating = false;

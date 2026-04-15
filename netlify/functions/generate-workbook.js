@@ -1492,6 +1492,18 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         console.log('Pass 2 sheet1: moved hygiene SUM to G28, G27 now =D27*F27 (laser)');
       }
 
+      /* ── CRITICAL: recompute <mergeCells count="N"> to match the actual number
+         of <mergeCell> entries. Excel refuses to open (shows "We found a problem
+         with some content" recovery dialog) when the declared count mismatches.
+         v35 removed 4 F:G merges + swapped B28:G28→B28:F28; count must reflect that. */
+      {
+        const actualCount = (xml.match(/<mergeCell\s[^>]*ref="[^"]+"\s*\/>/g) || []).length;
+        xml = xml.replace(/<mergeCells\s+count="\d+"/, '<mergeCells count="' + actualCount + '"');
+        /* If all merges were somehow removed, strip the empty container */
+        if (actualCount === 0) xml = xml.replace(/<mergeCells[^>]*>\s*<\/mergeCells>/, '');
+        console.log('Pass 2 sheet1: mergeCells count reconciled to ' + actualCount);
+      }
+
       return xml;
     },
     'xl/worksheets/sheet4.xml': (xml) => {
@@ -3535,7 +3547,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v35-xml-corruption-fix',
+      _version: 'v36-mergecells-count-fix',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }

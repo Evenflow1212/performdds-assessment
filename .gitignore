@@ -1,0 +1,16 @@
+# Test data / real practice PDFs — may contain PHI; never commit
+test-data/pigneri-pdfs/
+test-data/**/*.pdf
+*-test.xlsx
+test-output-*.xlsx
+
+# Local worktrees
+.claude/worktrees/
+
+# macOS
+.DS_Store
+
+# Misc local files
+main
+CLAUDE_CODE_HANDOFF.md
+MORNING_NOTES.md
