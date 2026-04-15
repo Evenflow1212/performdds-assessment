@@ -422,7 +422,29 @@
     border: 1.5px solid #6ee7b7;
     color: #064e3b;
   }
+  .callout.error {
+    background: #fef2f2;
+    border: 1.5px solid #fca5a5;
+    color: #7f1d1d;
+  }
   .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+
+  /* INLINE ERROR PANEL (replaces blocking alert on generation failure) */
+  .error-panel {
+    display: none;
+    background: #fef2f2;
+    border: 1.5px solid #fca5a5;
+    border-left: 4px solid #dc2626;
+    border-radius: var(--radius-sm);
+    padding: 18px 22px;
+    margin: 18px 0;
+    color: #7f1d1d;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+  .error-panel.visible { display: block; animation: cardFadeIn 0.3s ease; }
+  .error-panel h4 { font-family: 'Montserrat', sans-serif; font-size: 0.95rem; font-weight: 800; margin-bottom: 6px; color: #991b1b; letter-spacing: 0.02em; }
+  .error-panel .err-detail { font-family: 'Menlo','SF Mono',monospace; font-size: 0.78rem; background: rgba(127,29,29,0.08); padding: 8px 10px; border-radius: 4px; margin-top: 8px; word-break: break-word; }
 
   /* DATE BADGE */
   .date-badge {
@@ -1264,6 +1286,11 @@
         <button class="btn btn-secondary" onclick="prevStep(8)">← Back</button>
         <button class="btn btn-generate" onclick="generate()" id="generateBtn">Generate Workbook ✦</button>
       </div>
+      <div class="error-panel" id="genError" role="alert" aria-live="polite">
+        <h4>Something went wrong generating your workbook</h4>
+        <div id="genErrorMsg">Please double-check your uploaded files and try again. If the problem persists, contact us and we'll sort it out.</div>
+        <div class="err-detail" id="genErrorDetail" style="display:none;"></div>
+      </div>
     </div>
   </div>
 
@@ -1278,13 +1305,22 @@
   <!-- RESULT -->
   <div class="result-card" id="resultCard">
     <div class="result-icon">✅</div>
-    <h2>Your Workbook is Ready</h2>
-    <p>The assessment workbook has been generated and is ready to download.</p>
+    <h2>Your Assessment is Ready</h2>
+    <p>We've analyzed your reports and built a custom practice workbook covering production, collections, AR, hygiene, and overhead.</p>
     <div class="summary-grid" id="summaryGrid"></div>
     <button class="btn btn-generate" onclick="downloadWorkbook()" style="display:inline-flex;align-items:center;gap:8px;">
-      ⬇ Download Workbook
+      ⬇ Download Your Workbook
     </button>
-    <div style="margin-top:16px;">
+
+    <div style="margin-top:32px;padding:24px;background:linear-gradient(135deg,#f8fafc 0%,#eff6ff 100%);border:1px solid var(--border);border-radius:var(--radius-sm);text-align:left;">
+      <h3 style="font-family:'Montserrat',sans-serif;font-size:1.05rem;font-weight:800;color:var(--navy);margin-bottom:10px;letter-spacing:0.01em;">What happens next?</h3>
+      <p style="font-size:0.88rem;color:var(--text-muted);line-height:1.6;margin-bottom:16px;">Your workbook surfaces 200+ KPIs from your practice. The fastest way to turn those numbers into action: book a 30-minute consultation where we walk through your results together, pinpoint the highest-leverage opportunities, and map out what to fix first.</p>
+      <a href="https://calendly.com/davidorr/dental-assessment-review" target="_blank" rel="noopener" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;">
+        📅 Book Your Review Call
+      </a>
+    </div>
+
+    <div style="margin-top:20px;">
       <button class="skip-link" onclick="resetAll()">Start a new assessment</button>
     </div>
   </div>
@@ -2267,10 +2303,30 @@ function ppParseSharedStrings(ssXml) {
 }
 
 let _generating = false;
+function showGenError(message, detail) {
+  const panel = document.getElementById('genError');
+  const msgEl = document.getElementById('genErrorMsg');
+  const detEl = document.getElementById('genErrorDetail');
+  if (msgEl) msgEl.textContent = message || 'Please double-check your uploaded files and try again. If the problem persists, contact us and we\u2019ll sort it out.';
+  if (detEl) {
+    if (detail) { detEl.textContent = detail; detEl.style.display = 'block'; }
+    else { detEl.style.display = 'none'; }
+  }
+  if (panel) {
+    panel.classList.add('visible');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+function hideGenError() {
+  const panel = document.getElementById('genError');
+  if (panel) panel.classList.remove('visible');
+}
+
 async function generate() {
   if (_generating) { console.warn('Generate already in progress, ignoring duplicate click'); return; }
+  hideGenError();
   if (!files[1] || !files[2]) {
-    alert('Please upload both the Production Report (Step 1) and the Collections Summary (Step 2) before generating.');
+    showGenError('Please upload both the Production Report (Step 1) and the Collections Summary (Step 2) before generating.');
     return;
   }
   _generating = true;
@@ -2401,21 +2457,24 @@ async function generate() {
     document.getElementById('resultCard').classList.add('visible');
     const s = data.summary || {};
     document.getElementById('summaryGrid').innerHTML = [
-      { val: s.codesFound || '—', lbl: 'Codes Found' },
+      { val: s.codesFound || '—', lbl: 'Codes Analyzed' },
       { val: s.totalProduction ? '$' + Number(s.totalProduction).toLocaleString() : '—', lbl: 'Total Production' },
-      { val: s.months ? s.months + ' months' : '—', lbl: 'Period' },
+      { val: s.months ? s.months + ' months' : '—', lbl: 'Period Covered' },
       { val: s.netCollections ? '$' + Number(s.netCollections).toLocaleString() : '—', lbl: 'Net Collections' },
-      { val: s.plParsed ? 'Yes ✅' : (plText ? 'Partial' : 'Not uploaded'), lbl: 'P&L Parsed' },
-      { val: employeeCosts ? 'Yes ✅' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
-      { val: hygieneData ? 'Yes ✅' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
-      { val: s._version || '?', lbl: 'Engine' },
-      { val: s._injDiag ? `xfs=${s._injDiag.finalXfs} ss=${s._injDiag.finalHasSS} p2null=${s._injDiag.pass2StylesNull} p2len=${s._injDiag.pass2StylesLen} orig=${s._injDiag.origStylesLen} p1=${s._injDiag.p1Xfs}` : '?', lbl: 'Diag' },
-    ].map(item => `<div class="summary-stat"><div class="val" style="font-size:11px;word-break:break-all">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
+      { val: s.plParsed ? 'Included' : (plText ? 'Partial' : 'Skipped'), lbl: 'P&L Analysis' },
+      { val: employeeCosts ? 'Included' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
+      { val: hygieneData ? 'Included' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
+      { val: '10 tabs', lbl: 'Workbook Size' },
+    ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
     document.getElementById('step8').classList.add('visible');
-    alert('Error generating workbook: ' + err.message + '\n\nPlease check your files and try again.');
+    console.error('Generation error:', err);
+    showGenError(
+      'We hit an error while building your workbook. Double-check your uploaded PDFs are the correct reports and try again \u2014 or contact us and we\u2019ll help sort it out.',
+      err && err.message ? err.message : String(err)
+    );
   }
 }
 
@@ -2456,6 +2515,34 @@ function resetAll() {
 populateDates();
 updateSubtitles();
 populateHygieneDates();
+
+/* Pre-fill practice name from questionnaire, if present */
+(function prefillPracticeName() {
+  try {
+    const pp = JSON.parse(sessionStorage.getItem('practiceProfile') || 'null');
+    if (pp && (pp.practiceName || pp.name) && !document.getElementById('practiceName').value) {
+      document.getElementById('practiceName').value = pp.practiceName || pp.name;
+    }
+  } catch(e) {}
+})();
+
+/* Guard: if the user arrives here without completing the questionnaire, nudge them back.
+   Skip the nudge if they've already started uploading or if ?skipIntake=1 is present. */
+(function profileGuard() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('skipIntake') === '1') return;
+    const pp = sessionStorage.getItem('practiceProfile');
+    if (pp) return;
+    const container = document.querySelector('.wrap') || document.body;
+    if (!container) return;
+    const notice = document.createElement('div');
+    notice.className = 'callout warn';
+    notice.style.marginBottom = '20px';
+    notice.innerHTML = '<div class="callout-icon">\u2139\ufe0f</div><div>For the most complete assessment, <a href="questionnaire.html" style="color:#78350f;font-weight:700;text-decoration:underline;">fill out the 2-minute practice profile</a> first. You can continue without it, but your workbook will be missing context.</div>';
+    container.insertBefore(notice, container.firstChild);
+  } catch(e) {}
+})();
 
 /* Restore step from URL hash on refresh */
 (function() {
