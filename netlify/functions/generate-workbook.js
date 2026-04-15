@@ -614,6 +614,10 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
     templateZip.file(xmlPath, xml);
   }
 
+  /* Track which extra sheets (9-12) were created — declared here so Content_Types
+     registration (in Pass 2) can reference them even when sheets9to10Buf is null */
+  let hasSheet9 = false, hasSheet10 = false, hasSheet11 = false, hasSheet12 = false;
+
   /* Process sheets 9-10 from ExcelJS workbook (if present) */
   if (sheets9to10Buf) {
     const excelZip = await JSZip.loadAsync(sheets9to10Buf);
@@ -649,7 +653,6 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
     /* Map ExcelJS sheets → template sheet9, sheet10, sheet11, sheet12 */
     const targetSheetNums = [9, 10, 11, 12];
-    let hasSheet9 = false, hasSheet10 = false, hasSheet11 = false, hasSheet12 = false;
     for (let idx = 0; idx < excelSheetFiles.length && idx < 4; idx++) {
       const srcPath = excelSheetFiles[idx];
       const targetNum = targetSheetNums[idx];
