@@ -1423,15 +1423,21 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       xml = baReplace(xml, 'F39', '52', null);
       xml = baReplace(xml, 'F40', '52', null);
 
+      /* Remove any pre-existing G39/G40 cells so we don't create duplicates */
+      xml = xml.replace(/<c\s[^>]*r="G39"[^/>]*(?:\/>|>[\s\S]*?<\/c>)/gs, '');
+      xml = xml.replace(/<c\s[^>]*r="G40"[^/>]*(?:\/>|>[\s\S]*?<\/c>)/gs, '');
+
+      const _baText = escapeXml(String(_battingAvgText || 'N/A'));
+
       /* Insert G39 after F39 cell */
       xml = xml.replace(
-        /(<c r="F39"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
+        /(<c\s[^>]*r="F39"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
         `$1<c r="G39" s="${baTitle}" t="inlineStr"><is><t>BATTING AVERAGE</t></is></c>`
       );
       /* Insert G40 after F40 cell */
       xml = xml.replace(
-        /(<c r="F40"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
-        `$1<c r="G40" s="${baValue}" t="inlineStr"><is><t>${_battingAvgText}</t></is></c>`
+        /(<c\s[^>]*r="F40"[^/>]*(?:\/>|>[\s\S]*?<\/c>))/s,
+        `$1<c r="G40" s="${baValue}" t="inlineStr"><is><t>${_baText}</t></is></c>`
       );
 
       /* 4. Set row heights so the box is more square and text isn't clipped */
@@ -1448,19 +1454,26 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
       /* ── Row 27: Convert from hygiene SUM row to laser data row ── */
       /* Template has G27=SUM(G21:G26) and F27=IFERROR(G27/G5,0) — these are summary
-         formulas. Replace G27 with =D27*F27 (laser total) and F27 with laser avg fee. */
+         formulas. Replace G27 with =D27*F27 (laser total) and F27 with laser avg fee.
+         Strip any existing t="..." from captured attrs to avoid duplicate attributes. */
+      function stripT(attrs) {
+        return attrs.replace(/\st="[^"]*"/g, '');
+      }
       xml = xml.replace(
-        /<c([^>]*r="G27"[^>]*)>[\s\S]*?<\/c>/,
-        '<c$1><f>D27*F27</f><v></v></c>'
+        /<c(\s[^>]*r="G27"[^>]*)(?:\/>|>[\s\S]*?<\/c>)/,
+        (m, attrs) => `<c${stripT(attrs)}><f>D27*F27</f></c>`
       );
       /* F27: replace IFERROR formula with the laser avg fee value from _cellCollector */
       {
         const laserAvgFee = (_cellCollector['Production Worksheet'] || {})['F27'];
-        if (laserAvgFee !== undefined) {
-          xml = xml.replace(
-            /<c([^>]*r="F27"[^>]*)>[\s\S]*?<\/c>/,
-            `<c$1 t="n"><v>${laserAvgFee}</v></c>`
-          );
+        if (laserAvgFee !== undefined && laserAvgFee !== null && laserAvgFee !== '') {
+          const num = Number(laserAvgFee);
+          if (isFinite(num)) {
+            xml = xml.replace(
+              /<c(\s[^>]*r="F27"[^>]*)(?:\/>|>[\s\S]*?<\/c>)/,
+              (m, attrs) => `<c${stripT(attrs)} t="n"><v>${num}</v></c>`
+            );
+          }
         }
       }
 
@@ -1468,11 +1481,13 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
       xml = xml.replace(/<mergeCell ref="B28:G28"\/>/g, '');
       /* Add narrower merge B28:F28 */
       xml = xml.replace(/<\/mergeCells>/, '<mergeCell ref="B28:F28"/></mergeCells>');
+      /* Remove any pre-existing G28 cell so we don't duplicate */
+      xml = xml.replace(/<c\s[^>]*r="G28"[^/>]*(?:\/>|>[\s\S]*?<\/c>)/gs, '');
       /* Insert G28 cell with =SUM(G21:G27) into row 28 */
-      if (xml.match(/<row\s[^>]*r="28"[^>]*>/)) {
+      if (xml.match(/<row\s[^>]*r="28"[^>]*>[\s\S]*?<\/row>/)) {
         xml = xml.replace(
           /(<row\s[^>]*r="28"[^>]*>[\s\S]*?)(<\/row>)/,
-          '$1<c r="G28" s="427"><f>SUM(G21:G27)</f><v></v></c>$2'
+          '$1<c r="G28" s="427"><f>SUM(G21:G27)</f></c>$2'
         );
         console.log('Pass 2 sheet1: moved hygiene SUM to G28, G27 now =D27*F27 (laser)');
       }
@@ -1817,6 +1832,23 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   console.log('Practice Profile raw XML check: practiceProfile=' + !!practiceProfile + ' _ppStyles=' + JSON.stringify(_ppStyles));
   if (practiceProfile && _ppStyles) {
     const pp = practiceProfile;
+    /* Normalize field names — client sends different names than server originally expected */
+    if (!pp.zipCode && pp.zip) pp.zipCode = pp.zip;
+    if (!pp.pmSoftware && pp.software) pp.pmSoftware = pp.software;
+    if (!pp.opsActive && pp.activeOps) pp.opsActive = pp.activeOps;
+    if (!pp.opsTotal && pp.totalOps) pp.opsTotal = pp.totalOps;
+    if (!pp.payorMix) {
+      pp.payorMix = {
+        ppo: pp.payorPPO || 0,
+        hmo: pp.payorHMO || 0,
+        gov: pp.payorGov || 0,
+        ffs: pp.payorFFS || 0
+      };
+    }
+    /* Concerns may arrive as comma-separated string — normalize to array */
+    if (typeof pp.concerns === 'string') {
+      pp.concerns = pp.concerns.split(',').map(s => s.trim()).filter(Boolean);
+    }
     let ppRows = '';
     let pr = 1;
     const PS = _ppStyles;
@@ -3503,7 +3535,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v34-hygiene-grid-fix',
+      _version: 'v35-xml-corruption-fix',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
