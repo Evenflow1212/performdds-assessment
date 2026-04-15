@@ -1308,9 +1308,14 @@
     <h2>Your Assessment is Ready</h2>
     <p>We've analyzed your reports and built a custom practice workbook covering production, collections, AR, hygiene, and overhead.</p>
     <div class="summary-grid" id="summaryGrid"></div>
-    <button class="btn btn-generate" onclick="downloadWorkbook()" style="display:inline-flex;align-items:center;gap:8px;">
-      ⬇ Download Your Workbook
-    </button>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+      <button class="btn btn-generate" onclick="viewOnlineReport()" id="viewReportBtn" style="display:inline-flex;align-items:center;gap:8px;">
+        ✨ View Your Report Online
+      </button>
+      <button class="btn btn-secondary" onclick="downloadWorkbook()" style="display:inline-flex;align-items:center;gap:8px;">
+        ⬇ Download Excel Workbook
+      </button>
+    </div>
 
     <div style="margin-top:32px;padding:24px;background:linear-gradient(135deg,#f8fafc 0%,#eff6ff 100%);border:1px solid var(--border);border-radius:var(--radius-sm);text-align:left;">
       <h3 style="font-family:'Montserrat',sans-serif;font-size:1.05rem;font-weight:800;color:var(--navy);margin-bottom:10px;letter-spacing:0.01em;">What happens next?</h3>
@@ -1333,6 +1338,7 @@ let software = 'dentrix';
 let files = { 1: null, 2: null, 3: null, 4: null, 5: null };
 let skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
 let generatedWorkbook = null;
+let generatedReportHtml = null;  /* HTML report b64 from server */
 
 function calcDates() {
   const now = new Date();
@@ -2446,6 +2452,10 @@ async function generate() {
     if (!data.success) throw new Error(data.error || data.errorMessage || 'Generation failed (no error detail)');
     /* Server produces complete workbook via JSZip template injection + ExcelJS sheets 9-10 */
     generatedWorkbook = data.xlsxB64;
+    generatedReportHtml = data.reportHtmlB64 || null;
+    /* Hide the "View Online Report" button if the server didn't produce one */
+    const vrBtn = document.getElementById('viewReportBtn');
+    if (vrBtn) vrBtn.style.display = generatedReportHtml ? 'inline-flex' : 'none';
     const sv = data.summary?._version || 'unknown';
     console.log('Workbook received. Version:', sv, 'Size:', Math.round(generatedWorkbook.length / 1024), 'KB');
     console.log('Debug:', JSON.stringify(data.summary?._debug || {}));
@@ -2487,10 +2497,32 @@ function downloadWorkbook() {
   link.click();
 }
 
+/* Open the HTML report in a new tab via blob URL so the user can view / share / print-to-PDF */
+function viewOnlineReport() {
+  if (!generatedReportHtml) {
+    showGenError('The online report was not produced by the server. Please try regenerating.');
+    return;
+  }
+  try {
+    const binStr = atob(generatedReportHtml);
+    const bytes = new Uint8Array(binStr.length);
+    for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+    /* Revoke after a generous delay so the new tab has time to load */
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    console.error('viewOnlineReport failed', e);
+    showGenError('Could not open the online report: ' + (e && e.message ? e.message : String(e)));
+  }
+}
+
 function resetAll() {
   files = { 1: null, 2: null, 3: null, 4: null, 5: null };
   skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
   generatedWorkbook = null;
+  generatedReportHtml = null;
   document.getElementById('resultCard').classList.remove('visible');
   document.getElementById('practiceName').value = '';
   [1,2,3,4,5].forEach(n => {

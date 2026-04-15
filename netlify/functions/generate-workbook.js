@@ -3851,8 +3851,24 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
   console.log('Injection complete in', injTime, 'ms, total:', totalTime, 'ms, output:', finalBuf.length, 'bytes');
   console.log('Injection diagnostics:', JSON.stringify(_injDiag));
 
+  /* Build the HTML assessment report from the same parsed data */
+  let reportHtmlB64 = null;
+  try {
+    const reportHtml = buildAssessmentReport({
+      prodData, collData, plData, hygieneData, employeeCosts, practiceProfile,
+      arPatient, arInsurance, swotData, practiceName,
+      totalProd, collTotal, engineVersion: 'v39-html-report',
+      years, prodMonths
+    });
+    reportHtmlB64 = Buffer.from(reportHtml, 'utf8').toString('base64');
+    console.log('HTML report generated:', reportHtml.length, 'chars,', Math.round(reportHtmlB64.length/1024), 'KB b64');
+  } catch (e) {
+    console.error('HTML report generation failed (non-fatal):', e.message);
+  }
+
   return {
     xlsxB64: finalBuf.toString('base64'),
+    reportHtmlB64,
     summary: {
       codesFound: codes.length,
       totalProduction: totalProd.toFixed(2),
@@ -3862,12 +3878,355 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v38-cell-column-order',
+      _version: 'v39-html-report',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
     }
   };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   ASSESSMENT REPORT (HTML) — populates assessment-report-template.html
+   with KPIs computed from parsed PDF data + practice profile.
+
+   Output is a standalone HTML file the dentist can view online,
+   download as PDF (browser print), or share via blob URL.
+   ───────────────────────────────────────────────────────────────── */
+let _cachedReportTemplate = null;
+function loadReportTemplate() {
+  if (_cachedReportTemplate) return _cachedReportTemplate;
+  const candidates = [
+    path.resolve(__dirname, '..', '..', 'assessment-report-template.html'),
+    path.resolve(__dirname, 'assessment-report-template.html'),
+    path.resolve(process.cwd(), 'assessment-report-template.html'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      _cachedReportTemplate = fs.readFileSync(p, 'utf8');
+      console.log('Report template loaded from:', p, '(' + _cachedReportTemplate.length + ' chars)');
+      return _cachedReportTemplate;
+    }
+  }
+  throw new Error('assessment-report-template.html not found in any expected location');
+}
+
+function htmlEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function buildAssessmentReport(data) {
+  const {
+    prodData, collData, plData, hygieneData, employeeCosts, practiceProfile,
+    arPatient, arInsurance, swotData, practiceName, totalProd, collTotal,
+    engineVersion, years, prodMonths
+  } = data;
+
+  const codes = prodData?.codes || [];
+  const pp = practiceProfile || {};
+
+  /* Normalize practice profile field names (same as the PP sheet does) */
+  const zipCode = pp.zipCode || pp.zip || '';
+  const website = pp.website || '';
+  const pmSoftware = pp.pmSoftware || pp.software || '';
+  const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
+  const opsActive = pp.opsActive || pp.activeOps || null;
+  const opsTotal = pp.opsTotal || pp.totalOps || null;
+  const doctorDays = Number(pp.doctorDays) || 16;  /* days per month */
+  const hygieneDaysPerWeek = Number(pp.numHygienists) || Number(pp.hygieneDays) || 0;
+
+  /* ──── Categorize production into hygiene / specialty / doctor ──── */
+  const hygCodes = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0150','D0140','D0274'];
+  const perioCodes = ['D4260','D4261','D4263','D4273','D4275','D4341','D4342','D4910'];
+  const endoCodes = ['D3310','D3320','D3330','D3346','D3347','D3348'];
+  const surgCodes = ['D7140','D7210','D7220','D7230','D7240','D7250'];
+  const orthoCodes = ['D8080','D8090','D8010','D8020','D8030','D8040','D8070'];
+  const cosmeticCodes = ['D9972','D9974','D2960','D2961','D2962'];
+  const startsWithAny = (code, prefixes) => prefixes.some(p => code.startsWith(p));
+
+  let prodHyg = 0, prodPerio = 0, prodEndo = 0, prodSurg = 0, prodOrtho = 0, prodCosmetic = 0, prodOther = 0;
+  codes.forEach(c => {
+    const code = (c.code || '').toUpperCase();
+    const val = c.total || 0;
+    if (hygCodes.includes(code) || startsWithAny(code, ['D1110','D1120','D4910','D4346','D4381'])) prodHyg += val;
+    else if (perioCodes.includes(code) || startsWithAny(code, ['D4260','D4261','D4263','D4273','D4275','D4341','D4342'])) prodPerio += val;
+    else if (endoCodes.includes(code) || startsWithAny(code, ['D33'])) prodEndo += val;
+    else if (surgCodes.includes(code) || startsWithAny(code, ['D72'])) prodSurg += val;
+    else if (orthoCodes.includes(code) || startsWithAny(code, ['D80'])) prodOrtho += val;
+    else if (cosmeticCodes.includes(code)) prodCosmetic += val;
+    else prodOther += val;  /* = doctor general dentistry: fillings, crowns, etc. */
+  });
+
+  /* Annualize if prodMonths != 12 */
+  const annualFactor = prodMonths && prodMonths !== 12 ? (12 / prodMonths) : 1;
+  const annualProd = totalProd * annualFactor;
+  const annualCollections = (collTotal || 0) * annualFactor;
+  const annualHyg = prodHyg * annualFactor;
+  const annualSpecialty = (prodPerio + prodEndo + prodSurg + prodOrtho + prodCosmetic) * annualFactor;
+  const annualDoctor = (totalProd - prodHyg - prodPerio - prodEndo - prodSurg - prodOrtho - prodCosmetic) * annualFactor;
+
+  /* ──── Daily averages ──── */
+  const docDailyAvg = doctorDays > 0 ? annualDoctor / (doctorDays * 12) : 0;
+  const hygDaysPerYear = hygieneDaysPerWeek * 52;
+  const hygDailyAvg = hygDaysPerYear > 0 ? annualHyg / hygDaysPerYear : 0;
+
+  /* ──── Benchmarks ──── */
+  const collectionRate = annualProd > 0 ? (annualCollections / annualProd) * 100 : 0;
+  const hygPct = annualProd > 0 ? (prodHyg / totalProd) * 100 : 0;
+  const plExpenses = plData?.totalExpenses || 0;
+  const plIncome = plData?.totalIncome || 0;
+  const overheadPct = plIncome > 0 ? (plExpenses / plIncome) * 100 : 0;
+  const profitPct = 100 - overheadPct;
+
+  /* Staff cost % of collections (if we have employee costs + collections) */
+  let staffCostPct = null;
+  if (employeeCosts && annualCollections > 0) {
+    const staffAnnual = (() => {
+      let total = 0;
+      for (const k in employeeCosts) {
+        if (k.startsWith('ec_rate_') || k.startsWith('ec_hrs_')) continue;
+        if (k === 'ec_staff_benefits' || k === 'ec_hyg_benefits') total += (Number(employeeCosts[k]) || 0) * 12;
+      }
+      /* rough annualized wages */
+      const roles = ['om','f1','f2','b1','b2','b3','h1','h2'];
+      for (const r of roles) {
+        const rate = Number(employeeCosts['ec_rate_' + r]) || 0;
+        const hrs = Number(employeeCosts['ec_hrs_' + r]) || 0;
+        total += rate * hrs * 12;
+      }
+      return total;
+    })();
+    staffCostPct = (staffAnnual / annualCollections) * 100;
+  }
+
+  /* ──── Goal matrix (current / short-term +15% / long-term +30%) ──── */
+  const gCurrentDocDaily = docDailyAvg;
+  const gCurrentHygDaily = hygDailyAvg;
+  const gCurrentAnnual = annualProd;
+
+  const gShortDocDaily = docDailyAvg * 1.15;
+  const gShortHygDaily = hygDailyAvg + 200;  /* Dave's rule: "add a couple hundred bucks" */
+  const gShortAnnual = (gShortDocDaily * doctorDays * 12) + (gShortHygDaily * hygDaysPerYear) + annualSpecialty;
+
+  const gLongDocDaily = docDailyAvg * 1.30;
+  const gLongHygDaily = hygDailyAvg + 400;
+  const gLongAnnual = (gLongDocDaily * doctorDays * 12) + (gLongHygDaily * hygDaysPerYear) + annualSpecialty;
+
+  /* ──── Opportunities (top 3 by $) ──── */
+  const opps = [];
+
+  /* Opp 1: Collection rate lift */
+  if (collectionRate > 0 && collectionRate < 95) {
+    const target = 0.97;
+    const gap = annualProd * target - annualCollections;
+    if (gap > 5000) opps.push({
+      icon: '💰', value: gap, title: 'Collection rate opportunity',
+      body: `Current collection rate is ${collectionRate.toFixed(1)}% vs a 97% industry benchmark. Closing that gap at current production levels would recover roughly $${Math.round(gap).toLocaleString()} in annual collections.`
+    });
+  }
+
+  /* Opp 2: Hygiene capacity gap */
+  if (hygPct < 30 && annualProd > 0) {
+    const targetHyg = annualProd * 0.32;
+    const hygGap = targetHyg - annualHyg;
+    if (hygGap > 5000) opps.push({
+      icon: '🦷', value: hygGap, title: 'Hygiene production gap',
+      body: `Hygiene is ${hygPct.toFixed(1)}% of production vs a 30-33% target. Growing hygiene to the benchmark could add up to $${Math.round(hygGap).toLocaleString()} annually — and each new hygiene patient opens a doctor-diagnosed treatment pipeline.`
+    });
+  }
+
+  /* Opp 3: Overhead reduction */
+  if (overheadPct > 65 && plIncome > 0) {
+    const targetOverhead = 0.60;
+    const savings = plIncome * (overheadPct/100 - targetOverhead);
+    if (savings > 5000) opps.push({
+      icon: '📉', value: savings, title: 'Overhead reduction',
+      body: `Overhead is ${overheadPct.toFixed(1)}% of income vs a 60% target for a well-run practice. Bringing it closer to benchmark could free up $${Math.round(savings).toLocaleString()} in additional profit annually.`
+    });
+  }
+
+  /* Opp 4: Staff cost optimization */
+  if (staffCostPct != null && staffCostPct > 22 && annualCollections > 0) {
+    const savings = annualCollections * (staffCostPct/100 - 0.20);
+    if (savings > 5000) opps.push({
+      icon: '👥', value: savings, title: 'Staff cost optimization',
+      body: `Staff costs are ${staffCostPct.toFixed(1)}% of collections vs a 20% benchmark. Right-sizing toward benchmark could free approximately $${Math.round(savings).toLocaleString()} per year without cutting people — often a mix of schedule optimization and hygiene productivity.`
+    });
+  }
+
+  /* Opp 5: Doctor production lift */
+  const docLift = annualDoctor * 0.15;
+  if (docLift > 10000) opps.push({
+    icon: '📈', value: docLift, title: 'Doctor production lift (15%)',
+    body: `A 15% short-term lift in doctor production is realistic with tighter scheduling and better case presentation — roughly $${Math.round(docLift).toLocaleString()} per year at current day counts.`
+  });
+
+  /* Sort by value, take top 3 */
+  opps.sort((a, b) => b.value - a.value);
+  const topOpps = opps.slice(0, 3);
+  const totalOpportunity = topOpps.reduce((s, o) => s + o.value, 0);
+
+  /* ──── Helpers for rendering ──── */
+  const fmt$ = n => n != null && isFinite(n) ? '$' + Math.round(n).toLocaleString() : '—';
+  const fmt$k = n => n != null && isFinite(n) ? '$' + Math.round(n/1000).toLocaleString() + 'k' : '—';
+
+  /* Score status: compare value against a target, return 'good'/'warn'/'bad' */
+  const statusVs = (val, target, higherIsBetter, warnPct = 0.90) => {
+    if (val == null || !isFinite(val) || target == null) return '';
+    const ratio = val / target;
+    if (higherIsBetter) return ratio >= 1 ? 'good' : (ratio >= warnPct ? 'warn' : 'bad');
+    return ratio <= 1 ? 'good' : (ratio <= (2 - warnPct) ? 'warn' : 'bad');
+  };
+
+  /* ──── Scorecard cards ──── */
+  const scorecardCards = [
+    { lbl: 'Annual Production', val: fmt$(annualProd), bench: prodMonths ? `Based on ${prodMonths}mo, annualized` : '', status: '' },
+    { lbl: 'Collection Rate', val: collectionRate > 0 ? collectionRate.toFixed(1) + '%' : '—', bench: 'Target <strong>97%+</strong>', status: statusVs(collectionRate, 97, true) },
+    { lbl: 'Hygiene % of Production', val: hygPct > 0 ? hygPct.toFixed(1) + '%' : '—', bench: 'Target <strong>30–33%</strong>', status: statusVs(hygPct, 30, true) },
+    { lbl: 'Doctor Avg $/Day', val: fmt$(docDailyAvg), bench: `${doctorDays} days/mo`, status: '' },
+    { lbl: 'Hygiene Avg $/Day', val: fmt$(hygDailyAvg), bench: `${hygieneDaysPerWeek} days/week`, status: '' },
+    { lbl: 'Overhead %', val: overheadPct > 0 ? overheadPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤60%</strong>', status: statusVs(overheadPct, 60, false) },
+  ];
+  const scorecardHtml = scorecardCards.map(c => `
+    <div class="score-card ${c.status}">
+      <div class="lbl">${htmlEscape(c.lbl)}</div>
+      <div class="val">${c.val}</div>
+      ${c.bench ? `<div class="bench">${c.bench}</div>` : ''}
+    </div>
+  `).join('');
+
+  /* ──── Opportunity cards ──── */
+  const oppHtml = topOpps.length ? topOpps.map(o => `
+    <div class="opp-card">
+      <div class="opp-icon">${o.icon}</div>
+      <div class="opp-value">${fmt$(o.value)}</div>
+      <div class="opp-unit">per year</div>
+      <div class="opp-title">${htmlEscape(o.title)}</div>
+      <div class="opp-body">${htmlEscape(o.body)}</div>
+    </div>
+  `).join('') : '<div style="color:#8899aa">No major opportunities identified — practice appears to be performing close to benchmarks across the board.</div>';
+
+  /* ──── Goal matrix rows ──── */
+  const goalRows = [
+    { label: 'Doctor $/Day', c: docDailyAvg, s: gShortDocDaily, l: gLongDocDaily, fmt: fmt$ },
+    { label: 'Hygiene $/Day', c: hygDailyAvg, s: gShortHygDaily, l: gLongHygDaily, fmt: fmt$ },
+    { label: 'Annual Doctor Production', c: annualDoctor, s: gShortDocDaily * doctorDays * 12, l: gLongDocDaily * doctorDays * 12, fmt: fmt$k },
+    { label: 'Annual Hygiene Production', c: annualHyg, s: gShortHygDaily * hygDaysPerYear, l: gLongHygDaily * hygDaysPerYear, fmt: fmt$k },
+  ];
+  const goalRowsHtml = goalRows.map(r => `
+    <tr>
+      <td class="row-label">${htmlEscape(r.label)}</td>
+      <td><span class="val current">${r.fmt(r.c)}</span></td>
+      <td><span class="val short">${r.fmt(r.s)}</span></td>
+      <td><span class="val long">${r.fmt(r.l)}</span></td>
+    </tr>
+  `).join('') + `
+    <tr class="total">
+      <td>Total Annual Production</td>
+      <td><span class="val current">${fmt$k(gCurrentAnnual)}</span></td>
+      <td><span class="val short">${fmt$k(gShortAnnual)}</span></td>
+      <td><span class="val long">${fmt$k(gLongAnnual)}</span></td>
+    </tr>
+  `;
+
+  /* ──── Financial cards ──── */
+  const financialCards = [
+    { lbl: 'Annual Revenue (P&L)', val: fmt$(plIncome), bench: plData ? 'From P&L statement' : 'P&L not uploaded' },
+    { lbl: 'Annual Expenses', val: fmt$(plExpenses), bench: '' },
+    { lbl: 'Profit Margin', val: profitPct > 0 ? profitPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≥35%</strong>', status: statusVs(profitPct, 35, true) },
+    { lbl: 'Staff Cost / Collections', val: staffCostPct != null ? staffCostPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤22%</strong>', status: staffCostPct != null ? statusVs(staffCostPct, 22, false) : '' },
+    { lbl: 'Patient AR (90+ days)', val: fmt$(arPatient?.over90 || arPatient?.d90plus), bench: arPatient?.total ? `of ${fmt$(arPatient.total)} total` : '' },
+    { lbl: 'Insurance AR (90+ days)', val: fmt$(arInsurance?.over90 || arInsurance?.d90plus), bench: arInsurance?.total ? `of ${fmt$(arInsurance.total)} total` : '' },
+  ];
+  const financialHtml = financialCards.map(c => `
+    <div class="score-card ${c.status || ''}">
+      <div class="lbl">${htmlEscape(c.lbl)}</div>
+      <div class="val">${c.val}</div>
+      ${c.bench ? `<div class="bench">${c.bench}</div>` : ''}
+    </div>
+  `).join('');
+
+  /* ──── SWOT lists ──── */
+  const swotLi = items => (items && items.length ? items.map(i => `<li>${htmlEscape(i)}</li>`).join('') : '<li style="color:#8899aa">—</li>');
+
+  /* ──── Practice profile rows ──── */
+  const softwareNames = { dentrix: 'Dentrix', eaglesoft: 'Eaglesoft', opendental: 'Open Dental', other: 'Other' };
+  const profileRows = [
+    ['Practice Name', practiceName],
+    ['Website', website],
+    ['Zip Code', zipCode],
+    ['Practice Management Software', softwareNames[pmSoftware] || pmSoftware],
+    ['Years Owned', pp.yearsOwned ? pp.yearsOwned + ' years' : ''],
+    ['Owner Age', pp.ownerAge ? pp.ownerAge + ' years old' : ''],
+    ['Operatories', (opsActive && opsTotal) ? `${opsActive} active of ${opsTotal}` : ''],
+    ['Doctor Days / Month', doctorDays ? doctorDays + ' days' : ''],
+    ['Hygiene Days / Week', hygieneDaysPerWeek ? hygieneDaysPerWeek + ' days' : ''],
+    ['In-Network PPO', (mix.ppo || 0) + '%'],
+    ['HMO', (mix.hmo || 0) + '%'],
+    ['Medicaid / Gov', (mix.gov || 0) + '%'],
+    ['Fee-for-Service', (mix.ffs || 0) + '%'],
+    ['Has Associate Doctor', pp.hasAssociate ? `Yes (${pp.associateDays || 0} days/mo)` : 'No'],
+    ['Crowns / Month', pp.crownsPerMonth || ''],
+  ].filter(r => r[1] !== '' && r[1] != null);
+  const profileHtml = profileRows.map(r => `
+    <div class="profile-row"><span class="k">${htmlEscape(r[0])}</span><span class="v">${htmlEscape(r[1])}</span></div>
+  `).join('');
+
+  /* ──── Chart data for production bar + pie ──── */
+  const prodCategories = [
+    { label: 'General Dentistry', value: annualDoctor },
+    { label: 'Hygiene', value: annualHyg },
+    { label: 'Perio', value: prodPerio * annualFactor },
+    { label: 'Endo', value: prodEndo * annualFactor },
+    { label: 'Oral Surgery', value: prodSurg * annualFactor },
+    { label: 'Ortho', value: prodOrtho * annualFactor },
+    { label: 'Cosmetic', value: prodCosmetic * annualFactor },
+  ].filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+  const prodSplit = [
+    { label: 'Doctor', value: annualDoctor },
+    { label: 'Hygiene', value: annualHyg },
+    { label: 'Specialty', value: annualSpecialty },
+  ].filter(c => c.value > 0);
+
+  const reportJson = {
+    productionByCategory: prodCategories.map(c => ({ label: c.label, value: Math.round(c.value) })),
+    productionSplit: prodSplit.map(c => ({ label: c.label, value: Math.round(c.value) })),
+  };
+
+  /* ──── Populate template ──── */
+  const periodLabel = prodMonths
+    ? `Based on ${prodMonths} months of production data` + (years && years.length ? ` (${years.join(', ')})` : '')
+    : 'Based on uploaded reports';
+  const generatedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  let template = loadReportTemplate();
+
+  const replacements = {
+    practiceName: htmlEscape(practiceName || 'Practice Assessment'),
+    periodLabel: htmlEscape(periodLabel),
+    generatedDate: htmlEscape(generatedDate),
+    totalOpportunity: fmt$(totalOpportunity),
+    excelDownloadLink: '#',  /* client will wire this up */
+    scorecardCards: scorecardHtml,
+    opportunityCards: oppHtml,
+    goalRows: goalRowsHtml,
+    financialCards: financialHtml,
+    swotStrengths: swotLi(swotData?.strengths),
+    swotWeaknesses: swotLi(swotData?.weaknesses),
+    swotOpportunities: swotLi(swotData?.opportunities),
+    swotThreats: swotLi(swotData?.threats),
+    profileRows: profileHtml,
+    engineVersion: htmlEscape(engineVersion || ''),
+    reportJson: JSON.stringify(reportJson),
+  };
+
+  for (const [key, val] of Object.entries(replacements)) {
+    template = template.split('{{' + key + '}}').join(val);
+  }
+
+  return template;
 }
 
 /* ─── Handler ─── */
@@ -3888,7 +4247,7 @@ exports.handler = async function(event) {
     return {
       statusCode: 200,
       headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},
-      body: JSON.stringify({ success: true, xlsxB64: result.xlsxB64, summary: result.summary })
+      body: JSON.stringify({ success: true, xlsxB64: result.xlsxB64, reportHtmlB64: result.reportHtmlB64, summary: result.summary })
     };
   } catch(err) {
     console.error('Error:', err.message, err.stack?.slice(0,500));

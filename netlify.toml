@@ -6,7 +6,7 @@
 
 [functions."generate-workbook"]
   timeout = 26
-  included_files = ["Blank_Assessment_Template.xlsx", "netlify/functions/Blank_Assessment_Template.xlsx"]
+  included_files = ["Blank_Assessment_Template.xlsx", "netlify/functions/Blank_Assessment_Template.xlsx", "assessment-report-template.html", "netlify/functions/assessment-report-template.html"]
 
 [functions."parse-pdf"]
   timeout = 26
