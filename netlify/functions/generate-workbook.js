@@ -1210,21 +1210,23 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         const ebri = parseInt(_brE[1]);
         const exi = parseInt(_xfE[1]);
 
-        /* 6 new fonts */
+        /* 7 new fonts */
         const EF_HERO = efi;         /* 28pt white bold — PP banner title */
         const EF_STAT_VAL = efi+1;   /* 20pt navy bold — hero stat value */
         const EF_STAT_LBL = efi+2;   /* 8pt grey uppercase letter-spaced — hero stat label */
         const EF_CONCERN = efi+3;    /* 11pt white bold — concern pill */
         const EF_CHALLENGE = efi+4;  /* 13pt italic dark grey — biggest challenge quote */
         const EF_SWOT_HERO = efi+5;  /* 26pt white bold — SWOT title */
+        const EF_HERO_SUB_LIGHT = efi+6; /* 11pt light-on-navy — banner subtitle */
         const enhFonts =
           '<font><b/><sz val="28"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +
           '<font><b/><sz val="20"/><color rgb="FF1E3A5F"/><name val="Candara"/></font>' +
           '<font><b/><sz val="8"/><color rgb="FF64748B"/><name val="Candara"/></font>' +
           '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +
           '<font><i/><sz val="13"/><color rgb="FF475569"/><name val="Candara"/></font>' +
-          '<font><b/><sz val="26"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>';
-        stylesXml = stylesXml.replace(_fmE[0], `<fonts count="${efi + 6}">${_fmE[2]}${enhFonts}</fonts>`);
+          '<font><b/><sz val="26"/><color rgb="FFFFFFFF"/><name val="Candara"/></font>' +
+          '<font><sz val="11"/><color rgb="FFB0C4DE"/><name val="Candara"/></font>';
+        stylesXml = stylesXml.replace(_fmE[0], `<fonts count="${efi + 7}">${_fmE[2]}${enhFonts}</fonts>`);
 
         /* 4 new fills */
         const EFL_NAVY_DEEP = efli;    /* deeper navy for banner */
@@ -1269,7 +1271,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
         const EX_SWOT_Q_T = exi+11;      /* amber */
         const enhXfs =
           `<xf numFmtId="0" fontId="${EF_HERO}" fillId="${EFL_NAVY_DEEP}" borderId="${EB_GOLD_BOTTOM}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>` +
-          `<xf numFmtId="0" fontId="${PF_SUB}" fillId="${EFL_NAVY_DEEP}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>` +
+          `<xf numFmtId="0" fontId="${EF_HERO_SUB_LIGHT}" fillId="${EFL_NAVY_DEEP}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" indent="1"/></xf>` +
           `<xf numFmtId="0" fontId="${EF_STAT_VAL}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
           `<xf numFmtId="0" fontId="${EF_STAT_LBL}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>` +
           `<xf numFmtId="0" fontId="${EF_CONCERN}" fillId="${EFL_CONCERN}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
@@ -3832,7 +3834,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v37-pp-swot-redesign',
+      _version: 'v37b-pp-swot-redesign',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
