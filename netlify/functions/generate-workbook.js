@@ -2637,6 +2637,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
 
     /* ═══ PRACTICE PROFILE (first extra sheet — becomes first tab via reorder) ═══ */
     if (practiceProfile) {
+      try {
       const wsP = wbNewSheets.addWorksheet('Practice Profile');
 
       /* ── Layout: single wide table B:E, no D gutter ── */
@@ -2847,6 +2848,9 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       wsP.getRow(r).height = 18;
 
       console.log('Practice Profile sheet: written (v2 redesign)');
+      } catch (ppErr) {
+        console.error('Practice Profile FAILED:', ppErr.message, ppErr.stack?.slice(0, 300));
+      }
     }
 
     /* P&L Raw Import */
@@ -2952,65 +2956,117 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       }
     }
 
-    /* ═══ SWOT ANALYSIS (sheet 11) ═══ */
+    /* ═══ SWOT ANALYSIS (sheet 11) — 2×2 matrix layout ═══ */
     if (swotData) {
-      const wsSWOT = wbNewSheets.addWorksheet('SWOT Analysis');
+      const wsSW = wbNewSheets.addWorksheet('SWOT Analysis');
 
-      /* Column widths */
-      wsSWOT.getColumn('A').width = 3;
-      wsSWOT.getColumn('B').width = 85;
+      /* Layout: A=gutter, B-C=left quadrant, D=gutter, E-F=right quadrant, G=gutter */
+      wsSW.getColumn('A').width = 2.5;
+      wsSW.getColumn('B').width = 3;    /* colour bar */
+      wsSW.getColumn('C').width = 58;   /* content */
+      wsSW.getColumn('D').width = 2;    /* centre gutter */
+      wsSW.getColumn('E').width = 3;    /* colour bar */
+      wsSW.getColumn('F').width = 58;   /* content */
+      wsSW.getColumn('G').width = 2.5;
 
-      /* Title — PerformDDS blue, Calibri (matches hub Montserrat feel in Excel) */
-      const titleCell = wsSWOT.getCell('B1');
-      titleCell.value = 'SWOT Analysis — ' + (practiceName || 'Practice');
-      titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF1A1A2E' } };
-      titleCell.border = { bottom: { style: 'medium', color: { argb: 'FF3574B7' } } };
-      wsSWOT.getRow(1).height = 32;
-      wsSWOT.getRow(2).height = 10; /* spacer */
+      wsSW.views = [{ showGridLines: false }];
+      wsSW.properties.tabColor = { argb: 'FF2B5797' };
 
-      let row = 3;
+      const _sw = {
+        accent: 'FF2B5797',
+        white: 'FFFFFFFF',
+        dark: 'FF1E293B',
+        mid: 'FF64748B',
+        border: 'FFE2E8F0',
+        green: 'FF059669', greenLt: 'FFECFDF5', greenBar: 'FF10B981',
+        red: 'FFDC2626',   redLt: 'FFFEF2F2',   redBar: 'FFEF4444',
+        blue: 'FF2563EB',  blueLt: 'FFEFF6FF',   blueBar: 'FF3B82F6',
+        amber: 'FFD97706', amberLt: 'FFFFFBEB',  amberBar: 'FFF59E0B'
+      };
 
-      /* SWOT section palette — modernized to match hub accent colors */
-      const sections = [
-        { title: 'STRENGTHS', items: swotData.strengths, color: 'FF10B981', bgColor: 'FFECFDF5', borderColor: 'FF10B981' },
-        { title: 'WEAKNESSES', items: swotData.weaknesses, color: 'FFEF4444', bgColor: 'FFFEF2F2', borderColor: 'FFEF4444' },
-        { title: 'OPPORTUNITIES', items: swotData.opportunities, color: 'FF3574B7', bgColor: 'FFEFF6FF', borderColor: 'FF3574B7' },
-        { title: 'THREATS', items: swotData.threats, color: 'FFF59E0B', bgColor: 'FFFFFBEB', borderColor: 'FFF59E0B' }
-      ];
+      /* ── Title banner ── */
+      for (const c of ['A','B','C','D','E','F','G']) {
+        wsSW.getCell(c + '1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: _sw.accent } };
+        wsSW.getCell(c + '2').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: _sw.accent } };
+      }
+      wsSW.mergeCells('B1:F1');
+      wsSW.getCell('B1').value = 'SWOT Analysis  \u2014  ' + (practiceName || 'Practice');
+      wsSW.getCell('B1').font = { name: 'Candara', size: 18, bold: true, color: { argb: _sw.white } };
+      wsSW.getCell('B1').alignment = { vertical: 'middle' };
+      wsSW.getRow(1).height = 44;
 
-      for (const section of sections) {
+      wsSW.mergeCells('B2:F2');
+      wsSW.getCell('B2').value = 'Strategic overview generated from practice data';
+      wsSW.getCell('B2').font = { name: 'Candara', size: 10, color: { argb: 'FFB0C4DE' } };
+      wsSW.getCell('B2').alignment = { vertical: 'top' };
+      wsSW.getRow(2).height = 20;
+
+      wsSW.getRow(3).height = 8; /* spacer */
+
+      /* ── Helper: write one SWOT quadrant ── */
+      function writeQuadrant(ws, startRow, barCol, contentCol, title, items, barColor, bgColor, titleColor) {
+        const hdrFont = { name: 'Candara', size: 11, bold: true, color: { argb: titleColor } };
+        const itemFont = { name: 'Candara', size: 10, color: { argb: _sw.dark } };
+        const barFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: barColor } };
+        const bgFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+
+        let r = startRow;
+
         /* Section header */
-        const hdrCell = wsSWOT.getCell('B' + row);
-        hdrCell.value = section.title;
-        hdrCell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: section.color }, letterSpacing: 0.05 };
-        hdrCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: section.bgColor } };
-        hdrCell.border = { bottom: { style: 'thin', color: { argb: section.borderColor } }, left: { style: 'thick', color: { argb: section.color } } };
-        wsSWOT.getRow(row).height = 24;
-        row++;
+        ws.getCell(barCol + r).fill = barFill;
+        ws.getCell(contentCol + r).value = title;
+        ws.getCell(contentCol + r).font = hdrFont;
+        ws.getCell(contentCol + r).fill = bgFill;
+        ws.getCell(contentCol + r).alignment = { vertical: 'middle' };
+        ws.getCell(contentCol + r).border = { bottom: { style: 'medium', color: { argb: barColor } } };
+        ws.getCell(barCol + r).border = { bottom: { style: 'medium', color: { argb: barColor } } };
+        ws.getRow(r).height = 28;
+        r++;
 
-        /* Bullet items */
-        for (const item of section.items) {
-          const bulletCell = wsSWOT.getCell('B' + row);
-          bulletCell.value = '•  ' + item;
-          bulletCell.font = { name: 'Calibri', size: 10 };
-          bulletCell.alignment = { wrapText: true, vertical: 'top', indent: 1 };
-          bulletCell.border = { left: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
-          wsSWOT.getRow(row).height = 20;
-          row++;
+        /* Items */
+        for (let i = 0; i < items.length; i++) {
+          ws.getCell(barCol + r).fill = barFill;
+          const cell = ws.getCell(contentCol + r);
+          cell.value = '\u2022  ' + items[i];
+          cell.font = itemFont;
+          cell.alignment = { wrapText: true, vertical: 'top' };
+          cell.border = { bottom: { style: 'thin', color: { argb: _sw.border } } };
+          ws.getRow(r).height = 28;
+          r++;
         }
 
-        /* Spacer row between sections */
-        wsSWOT.getRow(row).height = 12;
-        row++;
+        return r;  /* return next available row */
       }
 
-      /* Footer */
-      row++;
-      const footerCell = wsSWOT.getCell('B' + row);
-      footerCell.value = 'Generated by Perform DDS Assessment System — ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      footerCell.font = { name: 'Calibri', size: 8, italic: true, color: { argb: 'FF94A3B8' } };
+      /* ── Row 4: Strengths (left) + Weaknesses (right) ── */
+      const maxSW = Math.max(swotData.strengths.length, swotData.weaknesses.length);
+      const sEnd = writeQuadrant(wsSW, 4, 'B', 'C', 'STRENGTHS', swotData.strengths, _sw.greenBar, _sw.greenLt, _sw.green);
+      const wEnd = writeQuadrant(wsSW, 4, 'E', 'F', 'WEAKNESSES', swotData.weaknesses, _sw.redBar, _sw.redLt, _sw.red);
 
-      console.log('SWOT Analysis: written (' + swotData.strengths.length + 'S, ' + swotData.weaknesses.length + 'W, ' + swotData.opportunities.length + 'O, ' + swotData.threats.length + 'T)');
+      /* Pad shorter quadrant so they end at the same row */
+      const topEnd = Math.max(sEnd, wEnd);
+
+      /* Spacer row */
+      const gapRow = topEnd;
+      wsSW.getRow(gapRow).height = 12;
+
+      /* ── Opportunities (left) + Threats (right) ── */
+      const oStart = gapRow + 1;
+      const oEnd = writeQuadrant(wsSW, oStart, 'B', 'C', 'OPPORTUNITIES', swotData.opportunities, _sw.blueBar, _sw.blueLt, _sw.blue);
+      const tEnd = writeQuadrant(wsSW, oStart, 'E', 'F', 'THREATS', swotData.threats, _sw.amberBar, _sw.amberLt, _sw.amber);
+
+      const botEnd = Math.max(oEnd, tEnd);
+
+      /* ── Footer ── */
+      const fRow = botEnd + 1;
+      for (const c of ['A','B','C','D','E','F','G']) {
+        wsSW.getCell(c + fRow).border = { top: { style: 'thin', color: { argb: _sw.border } } };
+      }
+      wsSW.getCell('B' + fRow).value = 'Generated by Dental AI Toolkit  \u2022  ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      wsSW.getCell('B' + fRow).font = { name: 'Candara', size: 8, italic: true, color: { argb: 'FFA0AEC0' } };
+      wsSW.getRow(fRow).height = 18;
+
+      console.log('SWOT Analysis: written 2x2 layout (' + swotData.strengths.length + 'S, ' + swotData.weaknesses.length + 'W, ' + swotData.opportunities.length + 'O, ' + swotData.threats.length + 'T)');
     }
 
     /* Collect sheet names in order for dynamic registration */
@@ -3050,7 +3106,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v31-batting-box',
+      _version: 'v32-profile-redesign',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
