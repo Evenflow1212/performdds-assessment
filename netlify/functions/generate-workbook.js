@@ -1446,29 +1446,35 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
 
       console.log('Pass 2 sheet1: injected BA box in G39:G40 (' + _battingAvgText + ') styles: title=' + baTitle + ' value=' + baValue);
 
-      /* ── Row 28: Un-merge HYGIENE SUMMARY (B28:G28 → B28:C28) and add G28 total ── */
-      /* Remove the wide B28:G28 merge so G28 can hold the hygiene total */
-      xml = xml.replace(/<mergeCell ref="B28:G28"\/>/g, '');
-      /* Add a narrower merge B28:F28 so the label stays visible but G28 is free */
-      const mc28Match = xml.match(/<mergeCells[^>]*count="(\d+)"/);
-      if (mc28Match) {
-        /* Insert new B28:F28 merge and update count */
-        xml = xml.replace(/<\/mergeCells>/, '<mergeCell ref="B28:F28"/></mergeCells>');
-        /* We removed one merge (B28:G28) and added one (B28:F28) so count stays same */
-      }
-      /* Insert G28 cell with the hygiene total value using currency style.
-         Find the row 28 element and add G28 after the last cell in it. */
-      const hygTotalVal = (_cellCollector['Production Worksheet'] || {})['G28'];
-      if (hygTotalVal !== undefined) {
-        /* Try to insert G28 into row 28 — find the last cell in row 28 and add after it */
-        if (xml.match(/<row\s[^>]*r="28"[^>]*>/)) {
-          /* Row 28 exists — insert G28 before </row> for row 28 */
+      /* ── Row 27: Convert from hygiene SUM row to laser data row ── */
+      /* Template has G27=SUM(G21:G26) and F27=IFERROR(G27/G5,0) — these are summary
+         formulas. Replace G27 with =D27*F27 (laser total) and F27 with laser avg fee. */
+      xml = xml.replace(
+        /<c([^>]*r="G27"[^>]*)>[\s\S]*?<\/c>/,
+        '<c$1><f>D27*F27</f><v></v></c>'
+      );
+      /* F27: replace IFERROR formula with the laser avg fee value from _cellCollector */
+      {
+        const laserAvgFee = (_cellCollector['Production Worksheet'] || {})['F27'];
+        if (laserAvgFee !== undefined) {
           xml = xml.replace(
-            /(<row\s[^>]*r="28"[^>]*>[\s\S]*?)(<\/row>)/,
-            `$1<c r="G28" s="411" t="n"><v>${hygTotalVal}</v></c>$2`
+            /<c([^>]*r="F27"[^>]*)>[\s\S]*?<\/c>/,
+            `<c$1 t="n"><v>${laserAvgFee}</v></c>`
           );
-          console.log('Pass 2 sheet1: added G28 hygiene total = ' + hygTotalVal);
         }
+      }
+
+      /* ── Row 28: Un-merge B28:G28, add G28 with hygiene SUM formula ── */
+      xml = xml.replace(/<mergeCell ref="B28:G28"\/>/g, '');
+      /* Add narrower merge B28:F28 */
+      xml = xml.replace(/<\/mergeCells>/, '<mergeCell ref="B28:F28"/></mergeCells>');
+      /* Insert G28 cell with =SUM(G21:G27) into row 28 */
+      if (xml.match(/<row\s[^>]*r="28"[^>]*>/)) {
+        xml = xml.replace(
+          /(<row\s[^>]*r="28"[^>]*>[\s\S]*?)(<\/row>)/,
+          '$1<c r="G28" s="427"><f>SUM(G21:G27)</f><v></v></c>$2'
+        );
+        console.log('Pass 2 sheet1: moved hygiene SUM to G28, G27 now =D27*F27 (laser)');
       }
 
       return xml;
@@ -1808,6 +1814,7 @@ async function injectValuesIntoTemplate(templateBuf, sheetNameMap, sheets9to10Bu
   }
 
   /* === Generate Practice Profile sheet XML directly (bypasses ExcelJS style contamination) === */
+  console.log('Practice Profile raw XML check: practiceProfile=' + !!practiceProfile + ' _ppStyles=' + JSON.stringify(_ppStyles));
   if (practiceProfile && _ppStyles) {
     const pp = practiceProfile;
     let ppRows = '';
@@ -2294,7 +2301,11 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     sv(wsPW, 'F24', Math.round(srpAgg.total/srpAgg.qty*100)/100);
   }
 
-  /* Row 27: Laser production total — aggregate codes with "laser" in description */
+  /* Row 27: Laser production — write D27 (qty) only.
+     Template G27 has =SUM(G21:G26) (hygiene subtotal) and F27 has =IFERROR(G27/G5,0).
+     These are the hygiene summary formulas — DO NOT overwrite them.
+     Laser qty goes in D27; G26 already captures laser via D26*F26 if mapped,
+     but laser codes aren't in LEFT table, so we write D27 for reference only. */
   {
     let laserQty = 0, laserTotal = 0;
     for (const c of codes) {
@@ -2306,22 +2317,8 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     if (laserQty > 0) {
       sv(wsPW, 'D27', laserQty);
       sv(wsPW, 'F27', Math.round(laserTotal / laserQty * 100) / 100);
-      sv(wsPW, 'G27', laserTotal);
-      console.log('Laser production (row 27): qty=' + laserQty + ' total=$' + laserTotal.toFixed(2));
+      console.log('Laser production (row 27): qty=' + laserQty + ' avg=$' + (laserTotal/laserQty).toFixed(2) + ' total=$' + laserTotal.toFixed(2));
     }
-  }
-
-  /* Row 28: Hygiene Summary total — sum of all hygiene production (rows 21-27) */
-  {
-    let hygTotal = 0;
-    for (let hr = 21; hr <= 27; hr++) {
-      if (leftAgg[hr]) hygTotal += leftAgg[hr].total;
-    }
-    hygTotal += srpAgg.total; /* row 24 SRP */
-    /* Add laser total (row 27, not in leftAgg) */
-    for (const c of codes) { if (/laser/i.test(c.desc)) hygTotal += c.total; }
-    sv(wsPW, 'G28', hygTotal);
-    console.log('Hygiene Summary total (G28): $' + hygTotal.toFixed(2));
   }
 
   for (const [row, agg] of Object.entries(rightAgg)) {
