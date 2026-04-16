@@ -608,7 +608,7 @@
     <p>This takes about 3 minutes. Your answers help us calibrate the assessment to your specific practice and goals.</p>
   </div>
 
-  <form id="questionnaireForm" autocomplete="off">
+  <form id="questionnaireForm" autocomplete="off" novalidate>
 
     <!-- ═══ SECTION: PRACTICE BASICS ═══ -->
     <div class="q-section">
@@ -626,7 +626,7 @@
         <div class="q-group">
           <label class="q-label">Practice Website</label>
           <div class="q-hint">Optional — helps us understand your market presence</div>
-          <input type="url" class="q-input q-tracked" name="website" placeholder="e.g. www.yourpractice.com">
+          <input type="text" class="q-input q-tracked" name="website" placeholder="e.g. www.yourpractice.com">
         </div>
       </div>
 
@@ -933,10 +933,19 @@
   const totalValue = document.getElementById('sliderTotalValue');
   const totalHint = document.getElementById('sliderTotalHint');
 
-  function updateSliders() {
+  function updateSliders(e) {
+    /* Clamp the moved slider so the combined total can't exceed 100%. */
+    if (e && e.target) {
+      const changed = e.target;
+      let otherSum = 0;
+      sliders.forEach(s => { if (s !== changed) otherSum += parseInt(s.value) || 0; });
+      const roomLeft = Math.max(0, 100 - otherSum);
+      if ((parseInt(changed.value) || 0) > roomLeft) changed.value = roomLeft;
+    }
+
     let total = 0;
     sliders.forEach(s => {
-      const val = parseInt(s.value);
+      const val = parseInt(s.value) || 0;
       total += val;
       document.getElementById(s.dataset.target).textContent = val + '%';
     });
@@ -945,11 +954,8 @@
     if (total === 100) {
       totalBar.classList.add('valid');
       totalHint.textContent = 'Perfect!';
-    } else if (total > 100) {
-      totalBar.classList.add('over');
-      totalHint.textContent = 'Total exceeds 100% — please adjust';
     } else {
-      totalHint.textContent = (100 - total) + '% remaining';
+      totalHint.textContent = (100 - total) + '% remaining — reduce one slider to grow another';
     }
     /* Update visual bar */
     document.getElementById('mixSegPpo').style.width = document.getElementById('ppoSlider').value + '%';
