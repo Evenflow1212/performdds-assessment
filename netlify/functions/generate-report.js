@@ -382,9 +382,33 @@ function computeReportData(input) {
   /* ──── KPI benchmarks ──── */
   const collectionRate = annualProd > 0 ? (annualCollections / annualProd) * 100 : null;
   const hygPct = annualProd > 0 ? (prodHyg / totalProd) * 100 : null;
-  const plExpenses = plData?.totalExpense || plData?.totalExpenses || 0;
+  const plExpensesRaw = plData?.totalExpense || plData?.totalExpenses || 0;
   const plIncome = plData?.totalIncome || 0;
+
+  /* Adjust expenses for overhead % per Dave's methodology:
+     subtract owner add-backs (car/truck, meals/entertainment, travel, 401k)
+     and patient reimbursements (refunds, not operational expenses).
+     Everything else — including associate/hygienist/specialist pay — stays,
+     because those are real operational costs of running the practice. */
+  let ownerAddBacks = 0;
+  let patientReimbursements = 0;
+  const ownerAddBackItems = [];
+  if (plData?.items) {
+    for (const item of plData.items) {
+      if (item.section === 'Income' || item.section === 'COGS') continue;
+      const cat = plCategory(item.item);
+      if (cat === 'O') {
+        ownerAddBacks += item.amount;
+        ownerAddBackItems.push({ item: item.item, amount: item.amount });
+      }
+      if (/patient.*reimburs|refund/i.test(item.item)) {
+        patientReimbursements += item.amount;
+      }
+    }
+  }
+  const plExpenses = Math.max(0, plExpensesRaw - ownerAddBacks - patientReimbursements);
   const overheadPct = (plIncome > 0 && plExpenses > 0) ? (plExpenses / plIncome) * 100 : null;
+  const overheadRawPct = (plIncome > 0 && plExpensesRaw > 0) ? (plExpensesRaw / plIncome) * 100 : null;
   const profitPct = overheadPct != null ? 100 - overheadPct : null;
 
   /* Staff cost % of collections */
@@ -525,8 +549,13 @@ function computeReportData(input) {
 
     financials: {
       plIncome,
-      plExpenses,
-      overheadPct,
+      plExpenses,                 /* adjusted: raw - owner add-backs - reimbursements */
+      plExpensesRaw,              /* straight from the P&L */
+      ownerAddBacks,              /* total subtracted for owner perks */
+      ownerAddBackItems,          /* line-by-line so Dave can see what was pulled */
+      patientReimbursements,      /* refunds subtracted */
+      overheadPct,                /* adjusted (the one on the scorecard) */
+      overheadRawPct,             /* raw, unadjusted — shown as a secondary number */
       profitPct,
       netIncome: plData?.netIncome != null ? plData.netIncome : null,
       staffCostPct,
@@ -598,7 +627,12 @@ function renderReportHtml(data) {
     scorecardCards.push({ lbl: 'Combined Doctor $/Day', val: fmt$(kpis.combinedDocDailyAvg), bench: `${goals.totalDocDaysPerYear} total doctor-days/yr`, status: '' });
   }
   scorecardCards.push({ lbl: 'Hygiene Avg $/Day', val: fmt$(kpis.hygDailyAvg), bench: `${practice.hygieneDaysPerWeek} days/week`, status: '' });
-  scorecardCards.push({ lbl: 'Overhead %', val: (kpis.overheadPct != null && kpis.overheadPct > 0) ? kpis.overheadPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤60%</strong>', status: statusVs(kpis.overheadPct, 60, false) });
+  /* Overhead bench: show raw overhead alongside adjusted when we did any add-back. */
+  const addBackTotal = (financials.ownerAddBacks || 0) + (financials.patientReimbursements || 0);
+  const overheadBench = addBackTotal > 0
+    ? `Target <strong>≤60%</strong> · raw ${financials.overheadRawPct ? financials.overheadRawPct.toFixed(1) : '—'}%, less $${Math.round(addBackTotal).toLocaleString()} add-backs`
+    : 'Target <strong>≤60%</strong>';
+  scorecardCards.push({ lbl: 'Overhead %', val: (kpis.overheadPct != null && kpis.overheadPct > 0) ? kpis.overheadPct.toFixed(1) + '%' : '—', bench: overheadBench, status: statusVs(kpis.overheadPct, 60, false) });
 
   const scorecardHtml = scorecardCards.map(c => `
     <div class="score-card ${c.status}">

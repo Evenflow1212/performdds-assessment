@@ -824,7 +824,7 @@
       </div>
       <div class="callout success">
         <div class="callout-icon">📊</div>
-        <div>The <strong>TOTALS row</strong> at the bottom of this report shows total Charges and Payments for the full period. That's what populates the Financial Overview in your workbook.</div>
+        <div>The <strong>TOTALS row</strong> at the bottom of this report shows total Charges and Payments for the full period. That's what drives your Collection Rate and related KPIs.</div>
       </div>
       <div class="upload-zone" id="upload2" onclick="document.getElementById('file2').click()">
         <input type="file" id="file2" accept=".pdf" onchange="handleFile(2, this)">
@@ -1271,22 +1271,22 @@
     <div class="step-header">
       <div class="step-num">8</div>
       <div>
-        <div class="step-title">Generate Assessment Workbook</div>
-        <div class="step-subtitle">Review your uploads and generate your Excel workbook</div>
+        <div class="step-title">Generate Assessment Report</div>
+        <div class="step-subtitle">Review your uploads and generate your HTML report</div>
       </div>
     </div>
     <div class="step-body">
       <div id="review-list" style="margin-bottom:24px;"></div>
       <div class="callout info">
         <div class="callout-icon">⏱️</div>
-        <div>Generating your workbook takes approximately <strong>up to 60 seconds</strong>. Claude AI reads your reports and populates all 10 tabs of the assessment template.</div>
+        <div>Generating your report takes approximately <strong>up to 60 seconds</strong>. Claude AI reads your reports, computes every KPI, and builds your assessment.</div>
       </div>
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(8)">← Back</button>
-        <button class="btn btn-generate" onclick="generate()" id="generateBtn">Generate Workbook ✦</button>
+        <button class="btn btn-generate" onclick="generate()" id="generateBtn">Generate Report ✦</button>
       </div>
       <div class="error-panel" id="genError" role="alert" aria-live="polite">
-        <h4>Something went wrong generating your workbook</h4>
+        <h4>Something went wrong generating your report</h4>
         <div id="genErrorMsg">Please double-check your uploaded files and try again. If the problem persists, contact us and we'll sort it out.</div>
         <div class="err-detail" id="genErrorDetail" style="display:none;"></div>
       </div>
@@ -2017,7 +2017,7 @@ async function generate() {
     document.getElementById('step8').classList.add('visible');
     console.error('Generation error:', err);
     showGenError(
-      'We hit an error while building your workbook. Double-check your uploaded PDFs are the correct reports and try again \u2014 or contact us and we\u2019ll help sort it out.',
+      'We hit an error while building your report. Double-check your uploaded PDFs are the correct reports and try again \u2014 or contact us and we\u2019ll help sort it out.',
       err && err.message ? err.message : String(err)
     );
   }
@@ -2164,7 +2164,7 @@ populateHygieneDates();
     const notice = document.createElement('div');
     notice.className = 'callout warn';
     notice.style.marginBottom = '20px';
-    notice.innerHTML = '<div class="callout-icon">\u2139\ufe0f</div><div>For the most complete assessment, <a href="questionnaire.html" style="color:#78350f;font-weight:700;text-decoration:underline;">fill out the 2-minute practice profile</a> first. You can continue without it, but your workbook will be missing context.</div>';
+    notice.innerHTML = '<div class="callout-icon">\u2139\ufe0f</div><div>For the most complete assessment, <a href="questionnaire.html" style="color:#78350f;font-weight:700;text-decoration:underline;">fill out the 2-minute practice profile</a> first. You can continue without it, but your report will be missing context.</div>';
     container.insertBefore(notice, container.firstChild);
   } catch(e) {}
 })();
