@@ -766,6 +766,16 @@
             <input type="number" class="q-input q-tracked" name="associateDays" placeholder="8" min="1" max="24">
             <span class="q-unit">days / month</span>
           </div>
+          <label class="q-label" style="margin-top:16px;">Associate daily production average</label>
+          <div class="q-hint">What your associate produces on a typical day</div>
+          <div class="idk-wrap" id="assocDailyWrap">
+            <div class="q-number-wrap">
+              <span class="q-unit" style="order:-1">$</span>
+              <input type="number" class="q-input" name="assocDailyAvg" placeholder="2,500" min="0" max="50000" step="100">
+              <span class="q-unit">/ day</span>
+            </div>
+            <label class="idk-toggle"><input type="checkbox" onchange="toggleIdk(this,'assocDailyWrap','assocDailyAvg')"> I don't know</label>
+          </div>
         </div>
       </div>
 
@@ -1031,6 +1041,7 @@
       opsTotal: parseInt(document.querySelector('[name="opsTotal"]').value) || 0,
       yearsToWork: document.querySelector('input[name="yearsToWork"]:checked')?.value || '',
       docDailyAvg: document.querySelector('[name="docDailyAvg"]').dataset.idk ? 'idk' : (parseInt(document.querySelector('[name="docDailyAvg"]').value) || null),
+      assocDailyAvg: (() => { const el = document.querySelector('[name="assocDailyAvg"]'); if (!el) return null; return el.dataset.idk ? 'idk' : (parseInt(el.value) || null); })(),
       hygDailyAvg: document.querySelector('[name="hygDailyAvg"]').dataset.idk ? 'idk' : (parseInt(document.querySelector('[name="hygDailyAvg"]').value) || null),
       crownsPerMonth: document.querySelector('[name="crownsPerMonth"]').dataset.idk ? 'idk' : (parseInt(document.querySelector('[name="crownsPerMonth"]').value) || null),
       hasProductionGoal: document.querySelector('input[name="hasProductionGoal"]:checked')?.value || '',
@@ -1079,7 +1090,7 @@
       const setByName = (n, v) => { const el = document.querySelector('[name="' + n + '"]'); if (el && v != null) el.value = v; };
       ['zipCode','website','yearsOwned','ownerAge','pmSoftware',
        'doctorDays','numHygienists','associateDays','opsActive','opsTotal',
-       'docDailyAvg','hygDailyAvg','crownsPerMonth','biggestChallenge']
+       'docDailyAvg','assocDailyAvg','hygDailyAvg','crownsPerMonth','biggestChallenge']
         .forEach(k => setByName(k, pp[k]));
       /* Sliders for payor mix — fire input so clamp/total UI updates */
       const mix = pp.payorMix || {};

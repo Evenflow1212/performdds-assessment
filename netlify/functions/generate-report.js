@@ -371,21 +371,32 @@ function computeReportData(input) {
   const totalDocDaysYr = ownerDaysYr + associateDaysYr;
   const surveyDocDaily = pp.docDailyAvg && pp.docDailyAvg !== 'idk' ? Number(pp.docDailyAvg) : null;
 
+  const surveyAssocDaily = pp.assocDailyAvg && pp.assocDailyAvg !== 'idk' ? Number(pp.assocDailyAvg) : null;
+
   let ownerDocDailyAvg = null;
   let associateDocDailyAvg = null;
-  let hasOwnerSplit = false;  /* true only when the survey gave us a real owner $/day value */
+  let hasOwnerSplit = false;  /* true → show Owner + Associate + Combined cards */
   const combinedDocDailyAvg = totalDocDaysYr > 0 ? annualDoctor / totalDocDaysYr : null;
 
-  if (surveyDocDaily && surveyDocDaily > 0 && ownerDaysYr > 0 && associateDaysYr > 0) {
-    /* We have a trustworthy per-owner $/day AND an associate exists → split. */
+  if (associateDaysYr > 0 && surveyDocDaily > 0 && surveyAssocDaily > 0) {
+    /* Both survey values given — use them directly, no derivation. */
+    ownerDocDailyAvg = surveyDocDaily;
+    associateDocDailyAvg = surveyAssocDaily;
+    hasOwnerSplit = true;
+  } else if (associateDaysYr > 0 && surveyDocDaily > 0 && ownerDaysYr > 0) {
+    /* Owner $/day given; derive associate from remainder. */
     ownerDocDailyAvg = surveyDocDaily;
     const assocAnnual = annualDoctor - (ownerDocDailyAvg * ownerDaysYr);
     associateDocDailyAvg = assocAnnual > 0 ? assocAnnual / associateDaysYr : null;
     hasOwnerSplit = !!(associateDocDailyAvg && associateDocDailyAvg > 0);
+  } else if (associateDaysYr > 0 && surveyAssocDaily > 0 && ownerDaysYr > 0) {
+    /* Associate $/day given; derive owner from remainder. */
+    associateDocDailyAvg = surveyAssocDaily;
+    const ownerAnnual = annualDoctor - (associateDocDailyAvg * associateDaysYr);
+    ownerDocDailyAvg = ownerAnnual > 0 ? ownerAnnual / ownerDaysYr : null;
+    hasOwnerSplit = !!(ownerDocDailyAvg && ownerDocDailyAvg > 0);
   } else {
-    /* No reliable split available. Show combined $/day as the owner value; leave associate null.
-       We can't responsibly split owner vs associate production without either a survey-provided
-       owner $/day OR per-provider PDF data (not parsed yet). */
+    /* No reliable split available — show combined only. */
     ownerDocDailyAvg = combinedDocDailyAvg;
     associateDocDailyAvg = null;
   }
@@ -641,8 +652,8 @@ function renderReportHtml(data) {
      — we can't reliably split owner vs associate production without either survey input
      or per-provider PDF data. */
   if (kpis.hasOwnerSplit) {
-    scorecardCards.push({ lbl: 'Owner Doctor $/Day', val: fmt$(kpis.ownerDocDailyAvg), bench: `${practice.doctorDays} days/mo &middot; ${practice.doctorDays * 12} days/yr · from survey`, status: '' });
-    scorecardCards.push({ lbl: 'Associate $/Day', val: fmt$(kpis.associateDocDailyAvg), bench: `${practice.associateDaysPerMonth} days/mo &middot; ${practice.associateDaysPerMonth * 12} days/yr · derived`, status: '' });
+    scorecardCards.push({ lbl: 'Owner Doctor $/Day', val: fmt$(kpis.ownerDocDailyAvg), bench: `${practice.doctorDays} days/mo &middot; ${practice.doctorDays * 12} days/yr`, status: '' });
+    scorecardCards.push({ lbl: 'Associate $/Day', val: fmt$(kpis.associateDocDailyAvg), bench: `${practice.associateDaysPerMonth} days/mo &middot; ${practice.associateDaysPerMonth * 12} days/yr`, status: '' });
     scorecardCards.push({ lbl: 'Combined Doctor $/Day', val: fmt$(kpis.combinedDocDailyAvg), bench: `${goals.totalDocDaysPerYear} total doctor-days/yr`, status: '' });
   } else {
     const hasAssoc = practice.associateDaysPerMonth > 0;
