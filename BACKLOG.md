@@ -25,8 +25,14 @@ When one gets picked up, move it near the top and flip the status.
     - Rule of thumb: a 100% FFS or heavily-FFS practice typically tops out at 20–25 new patients/month.
     - If `ffs ≥ 70% AND npPerMonth ≥ 30` → add a **Strength** bullet celebrating that the practice is thriving out-of-network, which is hard to pull off.
     - Still fire the PPO "consider this" nudge regardless of NP flow, but with a **caveat** built into the language: "we know it's not easy to earn a living out of network; if being out-of-network is core to the practice identity, skip this — just something to consider." So the bullet reads less like a prescription and more like an option.
+  - **Phrasing — stay generic for v1** (answer to Q3): don't name specific PPO carriers in the SWOT text. Keep it "high-paying PPOs" and let the consultation call do the naming. Revisit once we build per-state reimbursement intelligence (see follow-up below).
 - _open questions_ — remaining questions in chat; Dave answering one at a time
 - _status_ — idea (2026-04-16, Dave answered Q1 + Q2)
+
+### Per-state PPO reimbursement intelligence
+- _why_ — Once we want to name specific PPOs in the SWOT ("join Delta Premier and Aetna, they pay best in your market"), we need a lookup: for this state/region, which carriers pay above average. Until we have that data, the SWOT has to stay generic ("high-paying PPOs") and leave the carrier selection to the consulting call.
+- _how_ — Could start with a manually-curated JSON of carriers-per-state ranked by typical reimbursement tier. Over time, could be fed by aggregated data from Dave's client base (anonymized). Could also consider third-party sources if any exist (most are paid subscriptions).
+- _status_ — idea (2026-04-16) — gating specific-PPO naming in the payor-mix SWOT rule above.
 
 ### Teach: Crown value methodology
 - _why_ — Dave mentioned that crown VALUE (not just count) is a key signal for identifying high-cosmetic/boutique practices. Low crown count + high crown value = high-cosmetic. High crown count + low crown value = something else. The distinction matters for both PPO-suggestion logic (above) and general practice profiling.
