@@ -2097,31 +2097,120 @@ function downloadCsv() {
 }
 
 /* ─── Debug Workbook (Excel) ───────────────────────────────────
-   Client-side multi-sheet workbook built with SheetJS. Every KPI
-   shows its formula and inputs so Dave can verify the math end-to-end
-   instead of staring at a single number on the Report. */
-function downloadDebugXlsx() {
+   Template-driven workbook (see CLAUDE.md "Debug Workbook for Dave's
+   eyes only"). We fetch Blank_Assessment_Template.xlsx, mutate specific
+   cells, and append additional detail sheets — so Dave sees the
+   familiar 8-sheet layout PLUS a deep-dive view of every KPI + source.
+   Styles/formulas in the template survive because we never rebuild the
+   file, we only change cell values. */
+async function downloadDebugXlsx() {
   if (!generatedData) return;
   if (typeof XLSX === 'undefined') { alert('Excel library did not load — try refreshing.'); return; }
   const d = generatedData;
   const money = n => (n == null || !isFinite(n)) ? '' : Math.round(n);
   const pct = n => (n == null || !isFinite(n)) ? '' : Number(n).toFixed(2) + '%';
 
-  const wb = XLSX.utils.book_new();
+  /* Load the template — this is the 8-sheet skeleton Dave is used to reading.
+     If the fetch fails (shouldn't in prod; could in a dev preview), fall back
+     to the old from-scratch workbook so the button still works. */
+  let wb;
+  try {
+    const resp = await fetch('/Blank_Assessment_Template.xlsx');
+    if (!resp.ok) throw new Error('template fetch returned ' + resp.status);
+    const bytes = await resp.arrayBuffer();
+    wb = XLSX.read(bytes, { type: 'array', cellStyles: true, cellFormula: true });
+  } catch (e) {
+    console.warn('Template-based Debug Workbook unavailable, building from scratch:', e);
+    wb = XLSX.utils.book_new();
+  }
+
+  /* Helper: set a cell value, creating the cell object if it doesn't exist.
+     Drops any cached rendered text (w) and — if we're replacing a formula
+     with a literal value — drops the formula (f) too so Excel shows the
+     new value instead of recalculating the old formula. */
+  const setCell = (ws, addr, value, type) => {
+    if (value == null || value === '' || (typeof value === 'number' && !isFinite(value))) return;
+    if (!ws[addr]) ws[addr] = {};
+    ws[addr].t = type || (typeof value === 'number' ? 'n' : 's');
+    ws[addr].v = value;
+    delete ws[addr].w;
+    delete ws[addr].f;
+  };
+
+  /* ═══ POPULATE TEMPLATE SHEETS ═══ */
+  const p = d.practice || {};
+  const prod = d.production || {};
+  const coll = d.collections || {};
+  const fin = d.financials || {};
+  const ar = d.ar || {};
+  const months = d.period?.prodMonths || 12;
+  const sod = fin.sourcesOfDollars || {};
+  const sodD = sod.dollars || {};
+
+  /* Practice name lives on Production Worksheet!D4 — other sheets
+     reference it via ='Production Worksheet'!D4. Setting it here
+     cascades automatically. */
+  const pws = wb.Sheets['Production Worksheet'];
+  if (pws) setCell(pws, 'D4', p.name || '');
+
+  /* Financial Overview — the sheet Dave screenshotted first. Covers:
+     historical production/collection (we only have current period, so
+     populate the TOTAL row for the most recent year column), P&L vs
+     practice vs ADA code comparison, AR aging, collections by payor. */
+  const fo = wb.Sheets['Financial Overview'];
+  if (fo) {
+    /* Historical: only current-period totals available. Overwrite the
+       G-column (most recent year) sum formula with literal annualized prod
+       and H-column with literal annualized collections. Other years blank
+       — that's honest about what we have. */
+    setCell(fo, 'G20', Math.round(prod.annualized || prod.total || 0));
+    setCell(fo, 'H20', Math.round(coll.annualized || coll.total || 0));
+    setCell(fo, 'G21', months);
+    setCell(fo, 'H21', months);
+
+    /* P&L vs practice reports vs ADA code — monthly averages */
+    setCell(fo, 'D25', fin.plIncome ? Math.round(fin.plIncome / 12) : 0);
+    setCell(fo, 'D27', months ? Math.round(prod.total / months) : 0);
+
+    /* AR aging — matches Hub parsed structure: current / d3160 / d6190 / d90plus / total */
+    const arP = ar.patient || {};
+    const arI = ar.insurance || {};
+    setCell(fo, 'D32', arP.total ?? 0);
+    setCell(fo, 'E32', arP.current ?? 0);
+    setCell(fo, 'F32', arP.d3160 ?? 0);
+    setCell(fo, 'G32', arP.d6190 ?? 0);
+    setCell(fo, 'H32', arP.d90plus ?? 0);
+    setCell(fo, 'D33', arI.total ?? 0);
+    setCell(fo, 'E33', arI.current ?? 0);
+    setCell(fo, 'F33', arI.d3160 ?? 0);
+    setCell(fo, 'G33', arI.d6190 ?? 0);
+    setCell(fo, 'H33', arI.d90plus ?? 0);
+
+    /* Collections by payment/payor type (row 44) — from Sources of Dollars */
+    setCell(fo, 'B44', Math.round(sodD.patientCreditCard || 0));
+    setCell(fo, 'C44', Math.round(sodD.patientCheck || 0));
+    setCell(fo, 'D44', Math.round(sodD.patientCash || 0));
+    setCell(fo, 'E44', Math.round(sodD.insurance || 0));
+    setCell(fo, 'F44', Math.round(sodD.government || 0));  /* capitation column — gov bucket is closest */
+    setCell(fo, 'G44', Math.round(sodD.thirdPartyFinance || 0));
+    /* H44 (dentical) left 0 — specific to CA Medicaid, no separate bucket in canonical data */
+  }
+
+  /* ═══ APPEND DETAIL SHEETS (the old from-scratch view, as a deep-dive) ═══
+     Dave keeps every KPI with its formula and inputs visible. These land
+     as additional tabs AFTER the 8 template tabs. */
   const addSheet = (name, rows) => {
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    /* auto-ish column widths based on max string length per col */
     const cols = (rows[0] || []).map((_, ci) => ({
       wch: Math.min(60, Math.max(10, ...rows.map(r => String(r[ci] ?? '').length + 2)))
     }));
     ws['!cols'] = cols;
-    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));  /* Excel sheet-name cap */
+    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
   };
 
-  /* ── Sheet 1: Practice Profile ── */
-  const p = d.practice || {};
+  /* ── Deep-dive sheet: Practice Profile ── */
   const mix = p.payorMix || {};
-  addSheet('Practice Profile', [
+  addSheet('Practice Profile (detail)', [
     ['Field', 'Value', 'Source'],
     ['Name', p.name || '', 'user input, step 1 of Hub'],
     ['Website', p.website || '', 'questionnaire.html'],
@@ -2146,11 +2235,8 @@ function downloadDebugXlsx() {
     ['Years Covered', (d.period?.years || []).join(', '), 'from Production PDF'],
   ]);
 
-  /* ── Sheet 2: KPIs with Sources (THE money sheet) ── */
+  /* ── Deep-dive sheet: KPIs with Sources (THE money sheet) ── */
   const k = d.kpis || {};
-  const prod = d.production || {};
-  const coll = d.collections || {};
-  const fin = d.financials || {};
   const kpiRows = [
     ['KPI', 'Value', 'Formula', 'Inputs Used'],
     ['Total Production (from PDFs)', money(prod.total), 'sum of all code.total', `${(prod.codes || []).length} codes parsed`],
@@ -2250,7 +2336,6 @@ function downloadDebugXlsx() {
   addSheet('Financials', finRows);
 
   /* ── Sources of Dollars (where collections come from) ── */
-  const sod = fin.sourcesOfDollars || {};
   const sodDollars = sod.dollars || {};
   const sodPct = sod.percent || {};
   const sodRows = [
