@@ -12,6 +12,36 @@ When one gets picked up, move it near the top and flip the status.
 
 ---
 
+## The Goals tab — synthesis layer
+
+### Rebuild the Goals tab properly (currently a stub)
+- _why_ — This is where all the analysis becomes actionable. The Goals tab is where Current → Interim → Long-term production targets live, per-provider and for hygiene. Right now the implementation is a simple "current × 1.15" / "current × 1.30" projection on combined doctor $/day and hygiene $/day. It doesn't use the richer data we already have or could derive. Done right, it's the single most useful page in the whole report.
+- _how_ — Pull inputs from three sources and synthesize:
+  1. **Current baselines**: P&L expenses, production-by-code totals (per provider once we have per-provider PDFs — see the owner/associate split item).
+  2. **Ceiling/potential** from the hygiene schedule math (which we need to actually port into generate-report.js — it lives in the old workbook logic and hasn't been migrated). Specifically: hard active-patient estimate from procedure counts (prophy × 2 + perio × 4 + SRP × 6), then potential appointments at compliance rates (adult prophy 80%, perio maint 5× per person per year, SRP/deep cleaning 30% of active), then **days required per month = (total hygiene visits needed ÷ patients per hygienist per day)**.
+  3. **Survey answers**: current hygiene days per week, current doctor days, new upcoming question for patients-per-hygienist-per-day (see separate item below).
+
+  **Goal-setting logic**:
+  - Doctor $/Day interim: current + $250–$300/day (or +15%, whichever is cleaner). Long-term: interim + another $250–$300/day (or +15% more).
+  - Add ~1 ortho case/month (~$5,000) to both goal tiers as a specific line item.
+  - Hygiene days: push toward "days required per month." Interim = halfway between current and required. Long-term = closer to (or at) required.
+  - Hygiene $/Day: current + $200 interim, +$400 long-term (Dave's existing rule, already in code).
+
+  **Killer finding to surface explicitly**: "You say you have X hygiene days/week. Based on your active patient base and standard compliance, you should have Y. Gap = Z unserved patient-visits per month." That single line is a credibility check AND a quantified opportunity.
+
+- _dependencies_ — owner/associate PDF split (for per-provider goal tiers), port hygiene schedule active-patient math from the old Excel logic, new survey question on patients-per-hygienist-per-day.
+- _status_ — idea / spec partial (2026-04-16, Dave explained it in detail)
+
+### Survey addition: patients per hygienist per day
+- _why_ — This is a crucial denominator for the "days required per month" calculation (see Goals tab item above). Medicaid/HMO hygienists typically see 10/day; PPO hygienists should be ~8/day. Without this number we can't compute hygiene capacity properly, and the days-required math has to fall back to a guess.
+- _how_ — Add one question to questionnaire.html right next to the existing "how many hygiene days per week" question. Number input, placeholder 8, with a short helper hint about the 8-vs-10 distinction. Save as `practiceProfile.patientsPerHygienistPerDay` (or similar). Feed into the Goals tab's hygiene-days-required calculation.
+- _status_ — idea (2026-04-16)
+
+### Survey vs reality credibility checks
+- _why_ — Dave floated this as "interesting but not sure how valuable": compare what the dentist SAYS in the survey to what the DATA shows. Examples: stated hygiene days/week vs. calculated days-required; stated crown count/month vs. actual CDT D27xx counts from production; stated new-patient volume vs. D0150 count. Gaps are either (a) data the dentist doesn't know about themselves (useful finding), or (b) a read on how accurate their self-perception is (coaching tell).
+- _how_ — For each survey field that has a corresponding derivable metric, compute both and show the delta. Could be a small callout section on the Report, or a hidden "Reality Check" section in the Debug Workbook, or both. Keep tone non-confrontational ("here's what the numbers show vs. what you reported" not "you're wrong").
+- _status_ — idea (2026-04-16), Dave uncertain on value
+
 ## SWOT rules (content quality)
 
 ### Payor-mix SWOT: out-of-network practices should consider high-paying PPOs
