@@ -60,6 +60,11 @@ When one gets picked up, move it near the top and flip the status.
 
 ## Survey (questionnaire.html) improvements
 
+### Bug: Enter key in any survey field submits the whole form → jumps to the Hub prematurely
+- _why_ — Dave hit Return after typing a zip code and the questionnaire submitted, dropping him onto the production-PDF upload step with a half-filled survey. Every HTML form does this by default (Enter in any input inside a `<form>` triggers submit), and our payor-mix sliders / text inputs all inherit it. Bad UX — users type + Enter as a "commit my entry" reflex, not a "submit the whole thing" signal.
+- _how_ — Easiest: add a keydown listener on the form that calls `preventDefault` when `key === 'Enter'` AND the active element isn't a textarea or the actual Continue button. Alternative: set `onkeydown="return event.key !== 'Enter'"` on every text input (uglier). Either way, keep Enter working inside the `biggestChallenge` textarea (multiline is fine) and on the Continue button itself.
+- _status_ — known (2026-04-16) — Dave flagged; fix in next iteration
+
 ### Goals & Vision questions → Opportunities when absent
 - _why_ — The questionnaire already asks `hasProductionGoal` (yes/no/sort-of) and `knowsIfAhead` (yes/no/sometimes). These are powerful signals the current Report doesn't use. If a dentist admits they don't have production goals, or don't know whether they're ahead or behind mid-month, that's a foundational gap — EVERY other KPI conversation is downstream of "are you measuring anything." The assessment should surface this explicitly with its own Opportunity bullet and its own lesson link.
 - _how_ — In generateSWOT (or a new dedicated rule), when `hasProductionGoal ∈ {"no", "sort_of"}` OR `knowsIfAhead ∈ {"no", "sometimes"}`, add an **Opportunity** bullet along the lines of: "Without a clearly stated production goal and a weekly/monthly tracking rhythm, every other improvement in this report is hard to sustain — there's no destination to measure progress against. Building out goals + scorekeeping is typically the first 30 days of coaching." Attach a lesson link (Opening Numbers Ritual + Scorekeeping from the knowledge base).
