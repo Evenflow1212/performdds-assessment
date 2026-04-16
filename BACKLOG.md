@@ -119,7 +119,17 @@ _(Dave said: mathematical correctness first, visual polish later — nothing her
 
 ## Deferred from earlier in this session
 
-- **Owner vs Associate $/Day split** — currently just showing Combined because we can't derive per-provider production without parsing per-provider PDFs. Revisit when we pick up Phase 3 (better PDF extraction).
+- **Owner vs Associate $/Day split** — Dave has a clean solution (2026-04-16): when `hasAssociate = yes` in the survey, the Hub's Step 1 (Production) should accept **one production-by-code PDF per general dentist provider** (owner's + each associate's), not one combined PDF. Each PDF's total gets tagged to that provider, then:
+  - Owner $/Day = (owner's annualized production) / (owner days per year)
+  - Associate $/Day = (associate's annualized production) / (associate days per year)
+  - Combined still reported, but now derived cleanly from the pieces instead of guessed.
+  **Implementation sketch**:
+  - Questionnaire already asks `hasAssociate`. Carry that flag into the Hub.
+  - Hub Step 1 conditionally renders: one upload slot if solo, N upload slots (labeled "Dr. Owner production", "Associate 1 production", etc.) if has associate. User can enter names.
+  - Backend `parseProduction` already produces `{codes, months, years}` per PDF — just call it once per uploaded file and keep the results tagged by provider.
+  - `computeReportData` uses the tagged totals to split doctor $/day cleanly. Drop the dormant survey-based derivation logic.
+  - Non-GP specialty production (endo/surg/ortho/perio) can stay in the "whose bucket?" column as-is — the split is only needed for the general-dentist cards. Hygiene always stays pooled.
+  Ready to implement once Dave greenlights — clear spec, no open questions.
 - **Overhead methodology review** — Dave said "I'm trying to understand what 87% overhead means right now, let's come back to that later." Current code subtracts owner add-backs (car, meals, travel, 401k) and patient reimbursements from expenses. Worth revisiting whether that matches Dave's teaching methodology exactly.
 - **Review & Edit step (Phase 2 from the refactor plan)** — a screen between "server returned data" and "view report" where Dave (or the dentist) can override any extracted/computed value before the Report generates. Replaces what the old Excel workbook was doing as a "working canvas."
 
