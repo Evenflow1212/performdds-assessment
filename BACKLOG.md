@@ -26,6 +26,7 @@ When one gets picked up, move it near the top and flip the status.
     - If `ffs ≥ 70% AND npPerMonth ≥ 30` → add a **Strength** bullet celebrating that the practice is thriving out-of-network, which is hard to pull off.
     - Still fire the PPO "consider this" nudge regardless of NP flow, but with a **caveat** built into the language: "we know it's not easy to earn a living out of network; if being out-of-network is core to the practice identity, skip this — just something to consider." So the bullet reads less like a prescription and more like an option.
   - **Phrasing — stay generic for v1** (answer to Q3): don't name specific PPO carriers in the SWOT text. Keep it "high-paying PPOs" and let the consultation call do the naming. Revisit once we build per-state reimbursement intelligence (see follow-up below).
+  - **Quadrant assignment** (answer to Q4): clean separation — low new-patient count goes in **Weakness** (the symptom), adding a PPO goes in **Opportunity** (the lever). They reference the same underlying issue but belong in their own quadrants.
 - _open questions_ — remaining questions in chat; Dave answering one at a time
 - _status_ — idea (2026-04-16, Dave answered Q1 + Q2)
 
