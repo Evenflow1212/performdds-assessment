@@ -132,7 +132,14 @@ function plCategory(item) {
 }
 
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile) {
+  /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
+  const pp = practiceProfile || {};
+  const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
+  const ffsPct = Number(mix.ffs || 0);
+  const ppoPct = Number(mix.ppo || 0);
+  const govPct = Number(mix.gov || 0);
+  const hmoPct = Number(mix.hmo || 0);
   const strengths = [], weaknesses = [], opportunities = [], threats = [];
 
   const { codes, months: prodMonths } = prodData;
@@ -261,6 +268,36 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     opportunities.push('Focused AR management could recover a significant portion of the $' + Math.round(ar90Plus).toLocaleString() + ' in 90+ day receivables');
   }
 
+  /* ── Payor-mix rules (survey-driven, simplified v1) ─────────────────────
+     Full spec in BACKLOG.md: cosmetic/boutique exemption and per-state PPO
+     intelligence come later. This v1 fires when a practice is heavily FFS
+     and new-patient flow is soft — the common impediment case. */
+  if (ffsPct >= 70) {
+    if (npPerMonth > 0 && npPerMonth < 20) {
+      weaknesses.push('New patient flow is low (' + npPerMonth + '/month) while the practice runs at ' + ffsPct + '% out-of-network. Being out of network is an impediment to new-patient acquisition in most markets.');
+      opportunities.push('Selectively joining one or two high-paying PPOs would open the practice to more patients without wholesale discounting. Accepting their fee schedule (typically 15–25% below UCR) is the trade-off, which is why carrier selection matters — aim for the top-tier payers in your area. If being out-of-network is core to the practice identity, treat this as something to consider, not a prescription.');
+    } else if (npPerMonth >= 30) {
+      strengths.push('Strong new-patient flow of ' + npPerMonth + '/month despite running at ' + ffsPct + '% out-of-network — earning a living as a largely FFS practice is genuinely hard, and this volume says the brand is working.');
+    }
+  }
+  /* Mixed PPO + government/HMO → growing PPO is structurally hard */
+  if (ppoPct >= 20 && (govPct + hmoPct) >= 20) {
+    weaknesses.push('The practice blends meaningful PPO volume (' + ppoPct + '%) with government/HMO volume (' + (govPct + hmoPct) + '%). Growing the PPO portion is typically hard in this configuration — the pace and style that Medicaid/HMO economics require works against the experience PPO patients expect.');
+  }
+
+  /* ── Goals & Vision rule (survey-driven) ────────────────────────────────
+     When the dentist admits they don't have production goals or don't know
+     mid-month whether they're ahead or behind, that's foundational — every
+     other improvement is downstream of "are you measuring anything." */
+  const hasGoal = pp.hasProductionGoal || '';
+  const knowsIfAhead = pp.knowsIfAhead || '';
+  const goalsGap = (hasGoal === 'no' || hasGoal === 'sort_of') ||
+                   (knowsIfAhead === 'no' || knowsIfAhead === 'sometimes');
+  if (goalsGap) {
+    weaknesses.push('Without a clearly stated production goal and a weekly/monthly tracking rhythm, every other improvement surfaced in this report is hard to sustain — there\'s no destination to measure progress against.');
+    opportunities.push('Building out production goals and a scorekeeping cadence is typically the first 30 days of coaching. It\'s the foundation that makes every other recommendation actionable.');
+  }
+
   /* ── THREATS ── */
   threats.push('A change in ownership or management style can lead to patient and staff attrition');
   if (staffCostPct > 25 && netIncomePct < 20) threats.push('Current overhead levels may prevent the practice from investing in growth');
@@ -356,6 +393,34 @@ function computeReportData(input) {
     else prodOther += val;  /* doctor general dentistry: fillings, crowns, etc. */
   });
 
+  /* ──── Batting Average inputs (knowledge base: kpis/batting-average.yaml) ──── */
+  const VISIT_CODES = ['D1110','D1120','D4910','D4341','D4342','D0150'];
+  const CROWN_CODES = [
+    /* Porcelain / ceramic */
+    'D2740','D2750','D2751','D2752',
+    /* Resin */
+    'D2710','D2712',
+    /* Cast metal / gold */
+    'D2780','D2781','D2782','D2783','D2790','D2791','D2792','D2794',
+    /* Veneers */
+    'D2960','D2961','D2962',
+    /* Implant crowns */
+    'D6058','D6059','D6060','D6061','D6062','D6063','D6064','D6065','D6066','D6067',
+    /* Bridge units (pontics + abutment crowns + cantilever retainers) */
+    'D6210','D6211','D6212','D6214','D6240','D6241','D6242','D6243','D6245','D6250','D6251','D6252','D6253',
+    'D6545','D6548','D6549','D6710','D6720','D6721','D6722','D6740','D6750','D6751','D6752','D6753',
+    'D6780','D6781','D6782','D6783','D6790','D6791','D6792','D6793','D6794',
+  ];
+  const countCodeMatchingQty = (list) => codes
+    .filter(c => list.includes((c.code || '').toUpperCase()))
+    .reduce((s, c) => s + (c.qty || 0), 0);
+  const visitsCount = countCodeMatchingQty(VISIT_CODES);
+  const crownsPreppedCount = countCodeMatchingQty(CROWN_CODES);
+  const exam0120Count = codes
+    .filter(c => (c.code || '').toUpperCase().startsWith('D0120'))
+    .reduce((s, c) => s + (c.qty || 0), 0);
+  const battingAverage = crownsPreppedCount > 0 ? visitsCount / crownsPreppedCount : null;
+
   /* Annualize if prodMonths != 12 */
   const annualFactor = prodMonths && prodMonths !== 12 ? (12 / prodMonths) : 1;
   const annualProd = totalProd * annualFactor;
@@ -434,6 +499,40 @@ function computeReportData(input) {
   const plExpenses = Math.max(0, plExpensesRaw - ownerAddBacks - patientReimbursements);
   const overheadPct = (plIncome > 0 && plExpenses > 0) ? (plExpenses / plIncome) * 100 : null;
   const overheadRawPct = (plIncome > 0 && plExpensesRaw > 0) ? (plExpensesRaw / plIncome) * 100 : null;
+
+  /* ──── Sources of Dollars — where collections come from ──── */
+  /* Categorize income-section P&L items by payment source pattern. Most QB-style P&Ls
+     list patient payment methods explicitly (CC Payments, Check Payments, Cash Payments,
+     Care Credit / Lending Club) and route everything else through a generic "Sales" line
+     that represents insurance-posted revenue. Pattern matching is defensive — unknown
+     line items fall through to "Other". */
+  const sourcesOfDollars = { insurance: 0, patientCreditCard: 0, patientCheck: 0, patientCash: 0, thirdPartyFinance: 0, government: 0, other: 0 };
+  const sourceItems = [];
+  if (plData?.items) {
+    for (const item of plData.items) {
+      if (item.section !== 'Income') continue;
+      const l = (item.item || '').toLowerCase();
+      let bucket = 'other';
+      if (/care\s*credit|lending\s*club|cherry|alphaeon|sunbit|proceed\s*finance/i.test(l)) bucket = 'thirdPartyFinance';
+      else if (/\bcc\b|credit\s*card/i.test(l)) bucket = 'patientCreditCard';
+      else if (/check\s*payment|\bcheck\b/i.test(l)) bucket = 'patientCheck';
+      else if (/cash\s*payment|\bcash\b/i.test(l)) bucket = 'patientCash';
+      else if (/capitation|medicaid|medi[-\s]?cal|medicare|hmo|dmo|dental\s*insurance|insurance\s*pay/i.test(l)) bucket = 'government';
+      else if (/^sales$|^total\s*sales$|insurance\s*income|patient\s*insurance|insurance\s*receipts/i.test(l)) bucket = 'insurance';
+      /* Best-guess default: a bare "Sales" line on a QuickBooks dental P&L is usually insurance-posted revenue */
+      else if (/\bsales\b/i.test(l)) bucket = 'insurance';
+      sourcesOfDollars[bucket] += item.amount;
+      sourceItems.push({ item: item.item, amount: item.amount, bucket });
+    }
+  }
+  const sourcesTotal = Object.values(sourcesOfDollars).reduce((s, v) => s + v, 0);
+  const sourcesPct = {};
+  Object.keys(sourcesOfDollars).forEach(k => {
+    sourcesPct[k] = sourcesTotal > 0 ? (sourcesOfDollars[k] / sourcesTotal) * 100 : 0;
+  });
+  /* Roll up patient-pay methods for a simpler "patient pay" aggregate */
+  const patientPayTotal = sourcesOfDollars.patientCreditCard + sourcesOfDollars.patientCheck + sourcesOfDollars.patientCash;
+  const patientPayPct = sourcesTotal > 0 ? (patientPayTotal / sourcesTotal) * 100 : 0;
   const profitPct = overheadPct != null ? 100 - overheadPct : null;
 
   /* Staff cost % of collections */
@@ -584,6 +683,14 @@ function computeReportData(input) {
       profitPct,
       netIncome: plData?.netIncome != null ? plData.netIncome : null,
       staffCostPct,
+      sourcesOfDollars: {
+        dollars: sourcesOfDollars,
+        percent: sourcesPct,
+        total: sourcesTotal,
+        items: sourceItems,
+        patientPayTotal,
+        patientPayPct,
+      },
     },
 
     ar: {
@@ -603,6 +710,12 @@ function computeReportData(input) {
       overheadPct,
       profitPct,
       staffCostPct,
+      battingAverage,           /* visits ÷ crowns prepped (lower is better; sweet spot 4-6:1) */
+      battingAverageInputs: {
+        visitsCount,
+        crownsPreppedCount,
+        exam0120Count,          /* diagnostic companion for BA — compare to visitsCount when BA is high */
+      },
     },
 
     goals: {
@@ -670,6 +783,27 @@ function renderReportHtml(data) {
     : 'Target <strong>≤60%</strong>';
   scorecardCards.push({ lbl: 'Overhead %', val: (kpis.overheadPct != null && kpis.overheadPct > 0) ? kpis.overheadPct.toFixed(1) + '%' : '—', bench: overheadBench, status: statusVs(kpis.overheadPct, 60, false) });
 
+  /* Batting Average — visits ÷ crowns prepped. Lower is better; sweet spot 4-6:1. */
+  if (kpis.battingAverage != null && kpis.battingAverage > 0) {
+    const ba = kpis.battingAverage;
+    /* Status: green for 4-6:1 sweet spot; warn for 3:1 or under (overtreatment) and 7-9:1; red at 10+:1 */
+    let baStatus = '';
+    if (ba >= 4 && ba <= 6) baStatus = 'good';
+    else if (ba >= 3 && ba < 4) baStatus = 'warn';       /* approaching overtreatment floor */
+    else if (ba < 3) baStatus = 'warn';                   /* too aggressive; possible overtreatment */
+    else if (ba <= 9) baStatus = 'warn';                  /* 7-9, mild underperformance */
+    else baStatus = 'bad';                                 /* 10+, materially under-diagnosing */
+    const baBench = ba < 3
+      ? 'Sweet spot <strong>4–6:1</strong> · under 3:1 can mean overtreatment'
+      : 'Sweet spot <strong>4–6:1</strong> (lower is better)';
+    scorecardCards.push({
+      lbl: 'Batting Average',
+      val: ba.toFixed(1) + ':1',
+      bench: `${baBench} · ${kpis.battingAverageInputs.visitsCount.toLocaleString()} visits · ${kpis.battingAverageInputs.crownsPreppedCount.toLocaleString()} crowns`,
+      status: baStatus,
+    });
+  }
+
   const scorecardHtml = scorecardCards.map(c => `
     <div class="score-card ${c.status}">
       <div class="lbl">${htmlEscape(c.lbl)}</div>
@@ -729,6 +863,28 @@ function renderReportHtml(data) {
     </div>
   `).join('');
 
+  /* ── Sources of Dollars cards + summary sentence ── */
+  const sod = financials.sourcesOfDollars || {};
+  const sodPct = sod.percent || {};
+  const sodDollars = sod.dollars || {};
+  const pctFmt = v => v != null ? v.toFixed(1) + '%' : '—';
+  const sodCards = [
+    { lbl: 'From Insurance', val: pctFmt(sodPct.insurance), bench: fmt$(sodDollars.insurance) },
+    { lbl: 'From Patient Pay', val: pctFmt(sod.patientPayPct), bench: `${fmt$(sod.patientPayTotal)} (CC + check + cash)` },
+    { lbl: 'From 3rd-party Finance', val: pctFmt(sodPct.thirdPartyFinance), bench: fmt$(sodDollars.thirdPartyFinance) },
+    { lbl: 'From Government / HMO', val: pctFmt(sodPct.government), bench: fmt$(sodDollars.government) },
+  ].filter(c => c.val !== '—' || c.bench !== '$0');
+  const sourcesHtml = sod.total > 0 ? sodCards.map(c => `
+    <div class="score-card">
+      <div class="lbl">${htmlEscape(c.lbl)}</div>
+      <div class="val">${c.val}</div>
+      <div class="bench">${c.bench}</div>
+    </div>
+  `).join('') : '<div style="color:#8899aa">P&L income breakdown not available in the uploaded report.</div>';
+  const sourcesSummary = sod.total > 0
+    ? `Of the <strong>${fmt$(sod.total)}</strong> collected over the last ${period.prodMonths || 12} months, approximately <strong>${pctFmt(sodPct.insurance)}</strong> came through insurance, <strong>${pctFmt(sod.patientPayPct)}</strong> directly from patients (credit card, check, cash combined), ${sodPct.thirdPartyFinance > 0 ? `<strong>${pctFmt(sodPct.thirdPartyFinance)}</strong> through third-party finance (Care Credit and similar), ` : ''}and <strong>${pctFmt(sodPct.government)}</strong> from government programs or HMO/capitation.`
+    : '';
+
   /* ── SWOT lists ── */
   const swotLi = items => (items && items.length ? items.map(i => `<li>${htmlEscape(i)}</li>`).join('') : '<li style="color:#8899aa">—</li>');
 
@@ -778,6 +934,8 @@ function renderReportHtml(data) {
     opportunityCards: oppHtml,
     goalRows: goalRowsHtml,
     financialCards: financialHtml,
+    sourcesOfDollarsCards: sourcesHtml,
+    sourcesSummary: sourcesSummary,
     swotStrengths: swotLi(swot.strengths),
     swotWeaknesses: swotLi(swot.weaknesses),
     swotOpportunities: swotLi(swot.opportunities),
@@ -836,7 +994,7 @@ exports.handler = async function(event) {
     }
 
     /* SWOT */
-    const swotData = generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance);
+    const swotData = generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile);
 
     /* Compute canonical data object */
     const data = computeReportData({

@@ -2186,6 +2186,11 @@ function downloadDebugXlsx() {
     ['AR Patient 90+ days', money(d.ar?.patient?.d90plus || d.ar?.patient?.over90), 'from Hub step 4 input', ''],
     ['AR Insurance Total', money(d.ar?.insurance?.total), 'from Hub step 5 input', ''],
     ['AR Insurance 90+ days', money(d.ar?.insurance?.d90plus || d.ar?.insurance?.over90), 'from Hub step 5 input', ''],
+    ['', '', '', ''],
+    ['Batting Average', k.battingAverage != null ? k.battingAverage.toFixed(1) + ':1' : '—', 'visits ÷ crowns prepped', `visits=${k.battingAverageInputs?.visitsCount}, crowns=${k.battingAverageInputs?.crownsPreppedCount}`],
+    ['  └ Visit codes counted', 'D1110, D1120, D4910, D4341, D4342, D0150', '', 'NP comp exam (D0150) included; D0120 periodic exam is diagnostic companion, not a visit'],
+    ['  └ Periodic exams (D0120) — diagnostic only', k.battingAverageInputs?.exam0120Count ?? '—', 'compare to visits when BA is high', 'if D0120 << visits → exams not happening (upstream); if D0120 ≈ visits → diagnosis/presentation weak (downstream)'],
+    ['  └ Sweet spot', '4–6:1', 'lower is better, floor at 3:1', 'under 3:1 may signal overtreatment (critical for buy-side)'],
   ];
   addSheet('KPIs with Sources', kpiRows);
 
@@ -2243,6 +2248,31 @@ function downloadDebugXlsx() {
     ['Staff Cost %', pct(k.staffCostPct), '', '']
   );
   addSheet('Financials', finRows);
+
+  /* ── Sources of Dollars (where collections come from) ── */
+  const sod = fin.sourcesOfDollars || {};
+  const sodDollars = sod.dollars || {};
+  const sodPct = sod.percent || {};
+  const sodRows = [
+    ['Category', 'Amount', '% of Income', 'Note'],
+    ['Insurance (posted as Sales / Insurance Payments)', money(sodDollars.insurance), pct(sodPct.insurance), 'bare "Sales" line in QB dental P&L typically = insurance revenue'],
+    ['Patient — Credit Card', money(sodDollars.patientCreditCard), pct(sodPct.patientCreditCard), ''],
+    ['Patient — Check', money(sodDollars.patientCheck), pct(sodPct.patientCheck), ''],
+    ['Patient — Cash', money(sodDollars.patientCash), pct(sodPct.patientCash), ''],
+    ['Patient Pay (CC + Check + Cash combined)', money(sod.patientPayTotal), pct(sod.patientPayPct), 'rolled up for quick read'],
+    ['3rd-party Finance (Care Credit, Lending Club, Cherry, etc.)', money(sodDollars.thirdPartyFinance), pct(sodPct.thirdPartyFinance), ''],
+    ['Government / Capitation (Medicaid, Medi-Cal, HMO)', money(sodDollars.government), pct(sodPct.government), ''],
+    ['Other (unclassified)', money(sodDollars.other), pct(sodPct.other), 'line items that did not match any pattern — check "source items" below'],
+    ['', '', '', ''],
+    ['Total Income (from P&L)', money(sod.total), '100%', 'sum of all income-section line items'],
+    ['', '', '', ''],
+    ['── Raw source items (for verification) ──', '', '', ''],
+    ['Line Item', 'Amount', 'Bucket', ''],
+  ];
+  (sod.items || []).forEach(it => {
+    sodRows.push([it.item, money(it.amount), it.bucket, '']);
+  });
+  addSheet('Sources of Dollars', sodRows);
 
   /* ── Sheet 5: Opportunities ── */
   const oppRows = [['Rank', 'Title', 'Annual $ Value', 'Rationale']];
