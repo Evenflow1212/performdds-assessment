@@ -175,6 +175,50 @@ _(Dave said: mathematical correctness first, visual polish later — nothing her
 
 ---
 
+## Rescued from the dead session (2026-04-16, bold-bassi worktree)
+
+These items were decided in conversation after the last commit but before an API error ("image exceeds 2000px many-image limit") bricked the session. Recovered from the JSONL on disk.
+
+### Debug Workbook: rebuild as template-driven Excel (Dave-only)
+- _why_ — Dave downloaded the current 7-sheet `downloadDebugXlsx()` output and said "this is not the format I'm used to." He reads the original 12-sheet template layout fast; the flat dump is unreadable to him. The Debug Workbook's whole point is Dave verifying KPI math, so the format matters even though the file never reaches a client.
+- _how_ — Replace `downloadDebugXlsx()` with a **template-driven** approach (fundamentally different from the old pipeline we killed):
+  1. Ship `Blank_Assessment_Template.xlsx` in the repo (restored from git; now committed)
+  2. Client-side: `fetch('/Blank_Assessment_Template.xlsx')` → `XLSX.read(bytes)` via SheetJS (already loaded in Hub)
+  3. **Mutate specific cells only** — `ws['B4'].v = data.practice.name` — no rebuild, no XML surgery. Styles, fonts, merged cells, formulas all survive untouched because the file is never reconstructed.
+  4. `XLSX.write()` → download as `<PracticeName>_Debug_Workbook.xlsx`
+  5. Hard part is the **cell mapping** (which cell holds which value). The old `generate-workbook.js` (deleted in v41 but recoverable from git) had thousands of these — use it as a reference, not a basis.
+- _limitation acknowledged_ — template has 8 real sheets (Production Worksheet, All Codes, Hygiene Schedule, Financial Overview, Targets & Goal, Employee Costs, Budgetary P&L, P&L Input). The 4 additional sheets in the old full workbook (SWOT, Practice Profile, P&L Raw Import, P&L Image) were dynamically added — skip those for v1, or append them as simple extra sheets afterward.
+- _implementation sequence_ — start with **Financial Overview** (the sheet Dave screenshotted). Walk through cell-by-cell, Dave flags gaps, iterate across the other 7 sheets one at a time.
+- _CLAUDE.md rule clarification_ — also committed in this session: the "no Excel" rule was about client deliverables. Debug-for-Dave is explicitly OK.
+- _status_ — spec complete (2026-04-16), template file now committed, ready to implement
+
+### Hub: "Refill Staff/Hygiene" button
+- _why_ — Today Dave needed to repopulate steps 6 & 7 mid-session (his autofill URL silently 404'd because the test folder was renamed). The only option was to paste a dev-console `fetch().then()` snippet into Chrome's console — ugly and loses the invocation if he forgets it. Refreshing the page would lose his uploaded PDFs from steps 1–3.
+- _how_ — Small button on the Hub (maybe on every step, or floating), "Refill Test Data" (dev-only, hidden unless `?dev=1` or on localhost). Clicking it runs the same `fetch('/test-data/{name}-form-data.json')` + `dispatchEvent('input')` loop, just wrapped in a button. Shows toast with count filled.
+- _status_ — idea (2026-04-16)
+
+### Hub: "Run Full Test Assessment" button
+- _why_ — Bigger version of the above. One-click seeds **everything** (questionnaire answers + practice name + all 8 Hub steps) from a named test dataset, so Dave can iterate on report-math changes without retyping 151 fields every test cycle.
+- _how_ — Similar mechanism as Refill, but spans `questionnaire.html` + `assessment_hub.html` via sessionStorage (questionnaire writes `practiceProfile`; Hub reads it). Button would: set sessionStorage, fill Hub form fields, optionally auto-click through to a specific step.
+- _status_ — idea (2026-04-16), dev-only tooling
+
+### Bug: stale `?autofill=pigneri` URL
+- _why_ — Dave's test folder got renamed `pigneri/` → `houston/`, but the `questionnaire.html` landing link (and wherever else it's hardcoded) still says `?autofill=pigneri`. The autofill silently 404s on missing JSON.
+- _how_ — Grep the codebase for `autofill=pigneri`, replace with `houston` (or parameterize). Also: autofill should console.warn on 404 instead of silently failing.
+- _status_ — known (2026-04-16), quick fix
+
+### Validation: Practice Name field sanitization
+- _why_ — Dave typed something like "Thursday, April 16 D.d.s." into the Practice Name box and it became the Debug Workbook filename (`Thursday,_April_16_D.d.s._Debug_Workbook.xlsx`). Low-priority but looks unprofessional in any filename-based artifact.
+- _how_ — Trim whitespace, strip punctuation not safe for filenames, cap length. Gentle — don't block the user, just clean.
+- _status_ — idea (2026-04-16)
+
+### Test data: Pigneri Dental Group AR numbers (for seeding)
+The real AR values from today's Pigneri PDFs, useful for any Run Full Test Assessment automation:
+- Patient — Current: $110,195.68 / 31–60: $1 / 61–90: $183 / Over 90: $9,765.39 / **Total: $120,145.07**
+- Insurance — (numbers in session, re-extract from `004 daves patient aging report.pdf` + `005 daves insurance aging.pdf` when needed)
+
+---
+
 ## Deferred from earlier in this session
 
 - **Owner vs Associate $/Day split** — Dave has a clean solution (2026-04-16): when `hasAssociate = yes` in the survey, the Hub's Step 1 (Production) should accept **one production-by-code PDF per general dentist provider** (owner's + each associate's), not one combined PDF. Each PDF's total gets tagged to that provider, then:

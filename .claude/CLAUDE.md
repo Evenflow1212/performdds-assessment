@@ -89,7 +89,13 @@ The old Excel pipeline is gone entirely:
 - `exceljs` and `jszip` dependencies
 - `WORKBOOK_FIX_NOTES.md`
 
-**Do not re-add Excel output.** The user explicitly does not want clients working in Excel. JSON + HTML + CSV cover every downstream need.
+**Do not re-add client-facing Excel output.** The user explicitly does not want clients working in Excel. Client deliverables stay HTML Report + JSON + CSV.
+
+**Exception — Debug Workbook for Dave's eyes only**: an Excel file populated from the canonical data object is OK as an *internal verification view*, because Dave reads multi-sheet spreadsheets faster than JSON for sanity-checking KPI math. The approach is template-driven (SheetJS `XLSX.read(template)` → mutate specific cells → `XLSX.write()`), NOT the old rebuild-from-scratch pipeline. Styles and formulas survive because we never rebuild the file. Template lives at `Blank_Assessment_Template.xlsx` in the repo root.
+
+## Screenshot convention
+
+When Dave says "the last screenshot" / "my latest screenshot" / "check my screenshot", look in `~/Pictures/screenshots/` and open the most recent file by mtime. **Always check dimensions first** with `sips -g pixelWidth -g pixelHeight` — if the long edge is >2000px, resize before viewing inline. The 2000px "many-image" API limit has bricked sessions before; retina full-screen screenshots exceed it.
 
 ## Dave's working style
 - "Don't ever ask, just do it" — autonomous fixes preferred
