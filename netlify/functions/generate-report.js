@@ -234,7 +234,16 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   if (netIncomePct > 0 && netIncomePct < 15) weaknesses.push('Net income at ' + Math.round(netIncomePct) + '% of collections is below the 30% target');
 
   /* ── OPPORTUNITIES ── */
-  if (perioMaintQty === 0 || perioRatio < 10) opportunities.push('Developing soft tissue management protocols would increase patient care and hygiene revenue');
+  /* Hygiene lift: when hygiene % is below target, offer specific interventions Dave teaches.
+     A formal soft-tissue-management program is the biggest lever; Arestin and laser-
+     assisted periodontal therapy are the next-tier productivity adjuncts. */
+  if (hygPct > 0 && hygPct < 28) {
+    opportunities.push('Hygiene is below target at ' + hygPct.toFixed(1) + '% of production. A formal soft-tissue-management program — clear screening criteria that identify patients transitioning from healthy to periodontal disease and route them into appropriate perio care — is the highest-leverage move to raise both hygiene productivity and standard of care');
+    opportunities.push('Add-on therapies like Arestin (site-specific antibiotic placement) and laser-assisted periodontal treatment expand the hygienist\'s clinical toolkit and materially lift per-visit production');
+  } else if (perioMaintQty === 0 || perioRatio < 10) {
+    /* Hygiene % is OK but perio diagnosis is thin — still worth flagging STM. */
+    opportunities.push('Developing soft tissue management protocols would increase patient care and hygiene revenue');
+  }
   if (hygPct > 0 && hygPct < 28) opportunities.push('Additional hygiene capacity could significantly increase patient flow and production');
   if (specTotal === 0) opportunities.push('Bringing specialists in-house would increase the range of treatment and revenue');
   if (collectionRate > 0 && collectionRate < 95) {
@@ -364,16 +373,21 @@ function computeReportData(input) {
 
   let ownerDocDailyAvg = null;
   let associateDocDailyAvg = null;
+  let hasOwnerSplit = false;  /* true only when the survey gave us a real owner $/day value */
   const combinedDocDailyAvg = totalDocDaysYr > 0 ? annualDoctor / totalDocDaysYr : null;
 
-  if (surveyDocDaily && surveyDocDaily > 0 && ownerDaysYr > 0) {
+  if (surveyDocDaily && surveyDocDaily > 0 && ownerDaysYr > 0 && associateDaysYr > 0) {
+    /* We have a trustworthy per-owner $/day AND an associate exists → split. */
     ownerDocDailyAvg = surveyDocDaily;
-    if (associateDaysYr > 0) {
-      const assocAnnual = annualDoctor - (ownerDocDailyAvg * ownerDaysYr);
-      associateDocDailyAvg = assocAnnual > 0 ? assocAnnual / associateDaysYr : null;
-    }
+    const assocAnnual = annualDoctor - (ownerDocDailyAvg * ownerDaysYr);
+    associateDocDailyAvg = assocAnnual > 0 ? assocAnnual / associateDaysYr : null;
+    hasOwnerSplit = !!(associateDocDailyAvg && associateDocDailyAvg > 0);
   } else {
+    /* No reliable split available. Show combined $/day as the owner value; leave associate null.
+       We can't responsibly split owner vs associate production without either a survey-provided
+       owner $/day OR per-provider PDF data (not parsed yet). */
     ownerDocDailyAvg = combinedDocDailyAvg;
+    associateDocDailyAvg = null;
   }
 
   const hygDaysPerYear = hygieneDaysPerWeek * 52;
@@ -573,6 +587,7 @@ function computeReportData(input) {
       ownerDocDailyAvg,
       associateDocDailyAvg,
       combinedDocDailyAvg,
+      hasOwnerSplit,            /* true → show Owner + Associate + Combined; false → show Combined only */
       hygDailyAvg,
       overheadPct,
       profitPct,
@@ -620,11 +635,25 @@ function renderReportHtml(data) {
     { lbl: 'Annual Production', val: fmt$(kpis.annualProduction), bench: period.prodMonths ? `Based on ${period.prodMonths}mo, annualized` : '', status: '' },
     { lbl: 'Collection Rate', val: (kpis.collectionRate != null && kpis.collectionRate > 0) ? kpis.collectionRate.toFixed(1) + '%' : '—', bench: 'Target <strong>97%+</strong>', status: statusVs(kpis.collectionRate, 97, true) },
     { lbl: 'Hygiene % of Production', val: (kpis.hygienePercent != null && kpis.hygienePercent > 0) ? kpis.hygienePercent.toFixed(1) + '%' : '—', bench: 'Target <strong>30–33%</strong>', status: statusVs(kpis.hygienePercent, 30, true) },
-    { lbl: 'Owner Doctor $/Day', val: fmt$(kpis.ownerDocDailyAvg), bench: `${practice.doctorDays} days/mo &middot; ${practice.doctorDays * 12} days/yr`, status: '' },
   ];
-  if (practice.associateDaysPerMonth > 0) {
-    scorecardCards.push({ lbl: 'Associate $/Day', val: fmt$(kpis.associateDocDailyAvg), bench: `${practice.associateDaysPerMonth} days/mo &middot; ${practice.associateDaysPerMonth * 12} days/yr`, status: '' });
+  /* Doctor $/day: only show Owner + Associate as separate cards when the survey gave us
+     a trustworthy per-owner value AND an associate exists. Otherwise show Combined only
+     — we can't reliably split owner vs associate production without either survey input
+     or per-provider PDF data. */
+  if (kpis.hasOwnerSplit) {
+    scorecardCards.push({ lbl: 'Owner Doctor $/Day', val: fmt$(kpis.ownerDocDailyAvg), bench: `${practice.doctorDays} days/mo &middot; ${practice.doctorDays * 12} days/yr · from survey`, status: '' });
+    scorecardCards.push({ lbl: 'Associate $/Day', val: fmt$(kpis.associateDocDailyAvg), bench: `${practice.associateDaysPerMonth} days/mo &middot; ${practice.associateDaysPerMonth * 12} days/yr · derived`, status: '' });
     scorecardCards.push({ lbl: 'Combined Doctor $/Day', val: fmt$(kpis.combinedDocDailyAvg), bench: `${goals.totalDocDaysPerYear} total doctor-days/yr`, status: '' });
+  } else {
+    const hasAssoc = practice.associateDaysPerMonth > 0;
+    scorecardCards.push({
+      lbl: hasAssoc ? 'Combined Doctor $/Day' : 'Doctor $/Day',
+      val: fmt$(kpis.combinedDocDailyAvg || kpis.ownerDocDailyAvg),
+      bench: hasAssoc
+        ? `${goals.totalDocDaysPerYear} total doctor-days/yr · survey didn't split owner vs associate`
+        : `${practice.doctorDays} days/mo &middot; ${practice.doctorDays * 12} days/yr`,
+      status: '',
+    });
   }
   scorecardCards.push({ lbl: 'Hygiene Avg $/Day', val: fmt$(kpis.hygDailyAvg), bench: `${practice.hygieneDaysPerWeek} days/week`, status: '' });
   /* Overhead bench: show raw overhead alongside adjusted when we did any add-back. */
