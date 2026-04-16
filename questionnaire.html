@@ -1048,12 +1048,74 @@
       data.vipCode = sessionStorage.getItem('vipCode');
     }
 
-    /* Navigate to assessment hub */
-    window.location.href = 'assessment_hub.html';
+    /* Navigate to assessment hub — preserve ?autofill= so staff/hygiene fill too */
+    const qs = new URLSearchParams(location.search);
+    const hubUrl = qs.get('autofill')
+      ? 'assessment_hub.html?' + qs.toString()
+      : 'assessment_hub.html';
+    window.location.href = hubUrl;
   });
 
   /* Init */
   updateProgress();
+
+  /* ─── Dev autofill ─────────────────────────────────────────────
+     Visit /questionnaire.html?autofill=pigneri (or any name) to
+     pre-populate the whole survey from test-data/<name>-form-data.json
+     under the `practiceProfile` key. The query param is preserved
+     when we redirect to assessment_hub.html so staff + hygiene also
+     autofill there.
+     ──────────────────────────────────────────────────────────── */
+  (async function devAutofill() {
+    const params = new URLSearchParams(location.search);
+    const name = params.get('autofill');
+    if (!name) return;
+    try {
+      const resp = await fetch('/test-data/' + encodeURIComponent(name) + '-form-data.json');
+      if (!resp.ok) { console.warn('questionnaire autofill: file not found'); return; }
+      const data = await resp.json();
+      const pp = data.practiceProfile || {};
+      /* Simple text/number fields */
+      const setByName = (n, v) => { const el = document.querySelector('[name="' + n + '"]'); if (el && v != null) el.value = v; };
+      ['zipCode','website','yearsOwned','ownerAge','pmSoftware',
+       'doctorDays','numHygienists','associateDays','opsActive','opsTotal',
+       'docDailyAvg','hygDailyAvg','crownsPerMonth','biggestChallenge']
+        .forEach(k => setByName(k, pp[k]));
+      /* Sliders for payor mix — fire input so clamp/total UI updates */
+      const mix = pp.payorMix || {};
+      const setSlider = (id, v) => { const el = document.getElementById(id); if (el && v != null) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } };
+      setSlider('ppoSlider', mix.ppo);
+      setSlider('hmoSlider', mix.hmo);
+      setSlider('govSlider', mix.gov);
+      setSlider('ffsSlider', mix.ffs);
+      /* Radio: hasAssociate (yes/no) — also triggers the associate-days visibility */
+      if (pp.hasAssociate === true || pp.hasAssociate === 'yes') {
+        const r = document.getElementById('assocYes'); if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      } else if (pp.hasAssociate === false || pp.hasAssociate === 'no') {
+        const r = document.getElementById('assocNo'); if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      }
+      /* Other radio groups by name+value */
+      const setRadio = (n, v) => { if (!v) return; const r = document.querySelector('input[name="' + n + '"][value="' + v + '"]'); if (r) r.checked = true; };
+      setRadio('yearsToWork', pp.yearsToWork);
+      setRadio('hasProductionGoal', pp.hasProductionGoal);
+      setRadio('knowsIfAhead', pp.knowsIfAhead);
+      /* Concerns checkboxes */
+      (pp.concerns || []).forEach(v => {
+        const cb = document.querySelector('input[name="concerns"][value="' + v + '"]');
+        if (cb) cb.checked = true;
+      });
+      updateProgress();
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:12px;right:12px;background:#10b981;color:#fff;padding:10px 16px;border-radius:8px;z-index:9999;font:600 0.85rem system-ui;box-shadow:0 4px 14px rgba(0,0,0,.18);transition:opacity .4s;';
+      banner.textContent = '✓ Survey autofilled from ' + name + ' — review, edit, or click Continue';
+      document.body.appendChild(banner);
+      setTimeout(() => { banner.style.opacity = '0'; }, 5000);
+      setTimeout(() => { banner.remove(); }, 5600);
+    } catch (e) {
+      console.warn('questionnaire autofill failed:', e.message);
+    }
+  })();
+
 </script>
 
 </body>

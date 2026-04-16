@@ -1,5 +1,27 @@
 {
-  "description": "Pigneri practice test data for assessment hub forms (steps 6 & 7)",
+  "description": "Pigneri practice test data — survey (questionnaire.html), employee costs (step 6), hygiene schedule (step 7). Autofilled when either page is loaded with ?autofill=pigneri",
+  "practiceProfile": {
+    "zipCode": "07090",
+    "website": "www.pignieridds.com",
+    "yearsOwned": 15,
+    "ownerAge": 55,
+    "pmSoftware": "dentrix",
+    "payorMix": { "ppo": 40, "hmo": 0, "gov": 0, "ffs": 60 },
+    "doctorDays": 16,
+    "numHygienists": 8,
+    "hasAssociate": true,
+    "associateDays": 8,
+    "opsActive": 6,
+    "opsTotal": 6,
+    "yearsToWork": "10-15",
+    "docDailyAvg": 5000,
+    "hygDailyAvg": 1100,
+    "crownsPerMonth": 25,
+    "hasProductionGoal": "yes",
+    "knowsIfAhead": "sometimes",
+    "concerns": ["more_profitable", "new_patients"],
+    "biggestChallenge": ""
+  },
   "employeeCosts": {
     "ec_name_om": "Maria", "ec_rate_om": "28.00", "ec_hrs_om": "160",
     "ec_name_f1": "Lisa", "ec_rate_f1": "20.00", "ec_hrs_f1": "160",
