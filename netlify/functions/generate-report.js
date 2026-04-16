@@ -647,21 +647,17 @@ function renderReportHtml(data) {
     { lbl: 'Collection Rate', val: (kpis.collectionRate != null && kpis.collectionRate > 0) ? kpis.collectionRate.toFixed(1) + '%' : '—', bench: 'Target <strong>97%+</strong>', status: statusVs(kpis.collectionRate, 97, true) },
     { lbl: 'Hygiene % of Production', val: (kpis.hygienePercent != null && kpis.hygienePercent > 0) ? kpis.hygienePercent.toFixed(1) + '%' : '—', bench: 'Target <strong>30–33%</strong>', status: statusVs(kpis.hygienePercent, 30, true) },
   ];
-  /* Doctor $/day: only show Owner + Associate as separate cards when the survey gave us
-     a trustworthy per-owner value AND an associate exists. Otherwise show Combined only
-     — we can't reliably split owner vs associate production without either survey input
-     or per-provider PDF data. */
-  if (kpis.hasOwnerSplit) {
-    scorecardCards.push({ lbl: 'Owner Doctor $/Day', val: fmt$(kpis.ownerDocDailyAvg), bench: `${practice.doctorDays} days/mo &middot; ${practice.doctorDays * 12} days/yr`, status: '' });
-    scorecardCards.push({ lbl: 'Associate $/Day', val: fmt$(kpis.associateDocDailyAvg), bench: `${practice.associateDaysPerMonth} days/mo &middot; ${practice.associateDaysPerMonth * 12} days/yr`, status: '' });
-    scorecardCards.push({ lbl: 'Combined Doctor $/Day', val: fmt$(kpis.combinedDocDailyAvg), bench: `${goals.totalDocDaysPerYear} total doctor-days/yr`, status: '' });
-  } else {
+  /* Doctor $/day: only one card — Combined — because owner-vs-associate production
+     can't be reliably derived from practice totals alone. The split logic still exists
+     in computeReportData (ownerDocDailyAvg, associateDocDailyAvg, hasOwnerSplit) and
+     will be wired back in once we parse per-provider production from the PDFs. */
+  {
     const hasAssoc = practice.associateDaysPerMonth > 0;
     scorecardCards.push({
       lbl: hasAssoc ? 'Combined Doctor $/Day' : 'Doctor $/Day',
       val: fmt$(kpis.combinedDocDailyAvg || kpis.ownerDocDailyAvg),
       bench: hasAssoc
-        ? `${goals.totalDocDaysPerYear} total doctor-days/yr · survey didn't split owner vs associate`
+        ? `${goals.totalDocDaysPerYear} total doctor-days/yr across owner + associate`
         : `${practice.doctorDays} days/mo &middot; ${practice.doctorDays * 12} days/yr`,
       status: '',
     });
