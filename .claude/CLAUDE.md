@@ -93,7 +93,8 @@ The old Excel pipeline is gone entirely:
 
 ## Dave's working style
 - "Don't ever ask, just do it" — autonomous fixes preferred
-- Cannot push from sandbox — runs git commands in Terminal himself
-- Gets frustrated with back-and-forth; batch changes when possible
-- Values iteration speed — a small bug that ships fast beats a perfect change that takes a day
-- Likes concrete numbers and dollar amounts in explanations, not abstractions
+- **Commit and push directly** from the sandbox for normal changes. Only pause for explicit approval on risky ops (big refactors, force pushes, destructive commands, anything that touches shared state beyond the repo).
+- Batch changes when possible — don't push each tiny tweak individually unless Dave is blocked.
+- Values iteration speed — a small bug that ships fast beats a perfect change that takes a day.
+- Likes concrete numbers and dollar amounts in explanations, not abstractions.
+- When Dave is running through the live tool and hits something broken that's blocking him, fix + push immediately (even if other changes are batched).
