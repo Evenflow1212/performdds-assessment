@@ -42,6 +42,29 @@ When one gets picked up, move it near the top and flip the status.
 - _how_ — For each survey field that has a corresponding derivable metric, compute both and show the delta. Could be a small callout section on the Report, or a hidden "Reality Check" section in the Debug Workbook, or both. Keep tone non-confrontational ("here's what the numbers show vs. what you reported" not "you're wrong").
 - _status_ — idea (2026-04-16), Dave uncertain on value
 
+## Lesson library (on-demand coaching)
+
+### Lesson-per-KPI content library
+- _why_ — Every KPI on the Report that's out of range has a coaching story behind it. Dave has taught most of these lessons many times already — soft tissue management, crown conversion, future booking, batting average, collection process, hygiene optimization, goal-setting, etc. Right now the Report surfaces the number and says "book a call." What if it surfaced the number AND a linked lesson the dentist could watch right then? That turns the Report from a diagnostic into a mini-curriculum. Huge pull for the consultation (they've already heard Dave's voice and now want to go deeper) AND huge value for the dentist who can't immediately book a call.
+- _how_ — Build a mapping: each KPI + condition → lesson ID → lesson content (video URL, transcript, duration). When the Report renders, for every off-target KPI or key opportunity, attach a "🎓 Watch the lesson (3 min)" inline link. Lesson player could be a blob modal or open a new tab.
+  - **Lesson index** lives as a JSON file in the repo (or the private knowledge base).
+  - **Content sources**: Dave already has recorded Zoom lessons (Scorekeeping 720, Retain/Restore/Realign, Bite Wellness, etc. — per the knowledge base) that can seed the first 5–10 lessons. Transcribe, edit down to 3–5 min, publish.
+- _dependencies_ — needs the AI video generation stack below if we want to produce lessons at scale without Dave re-recording each one.
+- _status_ — idea (2026-04-16)
+
+### AI-generated video lessons (Dave's likeness + voice)
+- _why_ — Dave doesn't want to record 50 short videos manually every time a lesson needs an update or a new KPI gets a coaching story. AI likeness+voice synthesis (HeyGen, Synthesia, D-ID, ElevenLabs) lets you write/update a script and regenerate a polished video in minutes. The dentist sees Dave explaining their exact issue — personalized and scalable.
+- _how_ — Evaluate vendors for likeness quality + voice cloning accuracy + pricing at the expected lesson volume. HeyGen and Synthesia are the current leaders for this use case. Process would be: Dave records a one-time training corpus (10–30 min of clean video + audio) → avatar gets trained → lessons produced by writing a script and hitting render. Videos embed directly in the Report via the lesson-per-KPI hook above.
+- _open questions_ — licensing/platform of choice, how to keep videos fresh as KPIs and methodology evolve, what's the right length per lesson (Dave typically teaches in 15–20 min blocks; probably need to compress to 3–5 min for the Report context).
+- _status_ — idea (2026-04-16)
+
+## Survey (questionnaire.html) improvements
+
+### Goals & Vision questions → Opportunities when absent
+- _why_ — The questionnaire already asks `hasProductionGoal` (yes/no/sort-of) and `knowsIfAhead` (yes/no/sometimes). These are powerful signals the current Report doesn't use. If a dentist admits they don't have production goals, or don't know whether they're ahead or behind mid-month, that's a foundational gap — EVERY other KPI conversation is downstream of "are you measuring anything." The assessment should surface this explicitly with its own Opportunity bullet and its own lesson link.
+- _how_ — In generateSWOT (or a new dedicated rule), when `hasProductionGoal ∈ {"no", "sort_of"}` OR `knowsIfAhead ∈ {"no", "sometimes"}`, add an **Opportunity** bullet along the lines of: "Without a clearly stated production goal and a weekly/monthly tracking rhythm, every other improvement in this report is hard to sustain — there's no destination to measure progress against. Building out goals + scorekeeping is typically the first 30 days of coaching." Attach a lesson link (Opening Numbers Ritual + Scorekeeping from the knowledge base).
+- _status_ — idea (2026-04-16) — ties to the Lesson library item above
+
 ## SWOT rules (content quality)
 
 ### Payor-mix SWOT: out-of-network practices should consider high-paying PPOs
