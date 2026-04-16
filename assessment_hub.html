@@ -1342,6 +1342,38 @@ let skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
 let generatedData = null;        /* canonical data object from /generate-report */
 let generatedReportHtml = null;  /* HTML report (plain UTF-8 string) from server */
 
+/* ─── Dev autofill ─────────────────────────────────────────────
+   Visit /assessment_hub.html?autofill=pigneri to auto-populate the
+   Employee Costs (step 6) and Hygiene Schedule (step 7) fields from
+   test-data/<name>-form-data.json. Skips files that don't exist and
+   logs to console. Does not advance steps — user still drives.
+   ──────────────────────────────────────────────────────────── */
+(async function devAutofill() {
+  const params = new URLSearchParams(location.search);
+  const name = params.get('autofill');
+  if (!name) return;
+  try {
+    const resp = await fetch('/test-data/' + encodeURIComponent(name) + '-form-data.json');
+    if (!resp.ok) { console.warn('autofill: /test-data/' + name + '-form-data.json returned', resp.status); return; }
+    const data = await resp.json();
+    const entries = { ...(data.employeeCosts || {}), ...(data.hygieneSchedule || {}) };
+    let filled = 0, missing = 0;
+    for (const [id, val] of Object.entries(entries)) {
+      const el = document.getElementById(id);
+      if (el) { el.value = val; filled++; } else { missing++; }
+    }
+    console.log('autofill(' + name + '):', filled, 'fields filled,', missing, 'IDs not on page');
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:12px;right:12px;background:#10b981;color:#fff;padding:10px 16px;border-radius:8px;z-index:9999;font:600 0.85rem system-ui;box-shadow:0 4px 14px rgba(0,0,0,.18);transition:opacity .4s;';
+    banner.textContent = '✓ Autofilled ' + filled + ' fields from ' + name;
+    document.body.appendChild(banner);
+    setTimeout(() => { banner.style.opacity = '0'; }, 4000);
+    setTimeout(() => { banner.remove(); }, 4600);
+  } catch (e) {
+    console.warn('autofill failed:', e.message);
+  }
+})();
+
 function calcDates() {
   const now = new Date();
   const toDate = new Date(now.getFullYear(), now.getMonth(), 0);
