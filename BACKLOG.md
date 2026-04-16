@@ -12,6 +12,16 @@ When one gets picked up, move it near the top and flip the status.
 
 ---
 
+## SWOT rules (content quality)
+
+### Payor-mix SWOT: out-of-network practices should consider high-paying PPOs
+- _why_ — Being out of network is an impediment for new patient acquisition. Patients increasingly filter their dentist search by what their insurance accepts. A practice that's 100% FFS (or >70% FFS) is leaving new patients on the table — especially anyone whose employer plan routes them to in-network providers. The assessment already captures payor mix on the questionnaire; we should use it.
+- _how_ — In generateSWOT, when payorMix.ffs ≥ 70 (and/or ppo = 0), add an **Opportunity** bullet along the lines of: "At [X]% out of network, the practice may be limiting its new-patient pool. Selectively joining 1–2 high-paying PPOs (e.g., Delta Premier / Aetna / MetLife tiers) would make the practice accessible to more patients without wholesale discounting."
+  - Tier 1 fire at ffs == 100 (stronger language)
+  - Tier 2 fire at ffs ≥ 70 (softer)
+- _open questions_ — see main chat below; Dave wanted to talk these through
+- _status_ — idea (2026-04-16)
+
 ## Market context & competitive intel
 
 ### Google / Yelp review ingestion
