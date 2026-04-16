@@ -673,6 +673,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -1316,6 +1317,9 @@
       </button>
       <button class="btn btn-secondary" onclick="downloadCsv()" style="display:inline-flex;align-items:center;gap:8px;">
         ⬇ Download Data (CSV)
+      </button>
+      <button class="btn btn-secondary" onclick="downloadDebugXlsx()" style="display:inline-flex;align-items:center;gap:8px;" title="Internal math x-ray: every KPI with its formula and inputs visible">
+        🔍 Download Debug Workbook (Excel)
       </button>
     </div>
 
@@ -2090,6 +2094,178 @@ function downloadCsv() {
   const csv = dataToCsv(generatedData);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   downloadBlob(blob, `${practiceFileBase()}_Assessment_Data.csv`);
+}
+
+/* ─── Debug Workbook (Excel) ───────────────────────────────────
+   Client-side multi-sheet workbook built with SheetJS. Every KPI
+   shows its formula and inputs so Dave can verify the math end-to-end
+   instead of staring at a single number on the Report. */
+function downloadDebugXlsx() {
+  if (!generatedData) return;
+  if (typeof XLSX === 'undefined') { alert('Excel library did not load — try refreshing.'); return; }
+  const d = generatedData;
+  const money = n => (n == null || !isFinite(n)) ? '' : Math.round(n);
+  const pct = n => (n == null || !isFinite(n)) ? '' : Number(n).toFixed(2) + '%';
+
+  const wb = XLSX.utils.book_new();
+  const addSheet = (name, rows) => {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    /* auto-ish column widths based on max string length per col */
+    const cols = (rows[0] || []).map((_, ci) => ({
+      wch: Math.min(60, Math.max(10, ...rows.map(r => String(r[ci] ?? '').length + 2)))
+    }));
+    ws['!cols'] = cols;
+    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));  /* Excel sheet-name cap */
+  };
+
+  /* ── Sheet 1: Practice Profile ── */
+  const p = d.practice || {};
+  const mix = p.payorMix || {};
+  addSheet('Practice Profile', [
+    ['Field', 'Value', 'Source'],
+    ['Name', p.name || '', 'user input, step 1 of Hub'],
+    ['Website', p.website || '', 'questionnaire.html'],
+    ['Zip Code', p.zipCode || '', 'questionnaire.html'],
+    ['PM Software', p.pmSoftware || '', 'questionnaire.html'],
+    ['Years Owned', p.yearsOwned ?? '', 'questionnaire.html'],
+    ['Owner Age', p.ownerAge ?? '', 'questionnaire.html'],
+    ['Operatories (active / total)', (p.opsActive || '') + ' / ' + (p.opsTotal || ''), 'questionnaire.html'],
+    ['Doctor Days per Month', p.doctorDays ?? '', 'questionnaire.html'],
+    ['Hygiene Days per Week', p.hygieneDaysPerWeek ?? '', 'questionnaire.html'],
+    ['Has Associate', p.hasAssociate ? 'Yes' : 'No', 'questionnaire.html'],
+    ['Associate Days per Month', p.associateDaysPerMonth || 0, 'questionnaire.html'],
+    ['Payor Mix: PPO', (mix.ppo || 0) + '%', 'questionnaire.html sliders'],
+    ['Payor Mix: HMO', (mix.hmo || 0) + '%', 'questionnaire.html sliders'],
+    ['Payor Mix: Gov', (mix.gov || 0) + '%', 'questionnaire.html sliders'],
+    ['Payor Mix: FFS', (mix.ffs || 0) + '%', 'questionnaire.html sliders'],
+    ['Crowns per Month (stated)', p.crownsPerMonth || '', 'questionnaire.html'],
+    ['', '', ''],
+    ['Engine Version', d.version || '', ''],
+    ['Generated At', d.generatedAt || '', ''],
+    ['Period (months)', d.period?.prodMonths ?? '', 'from Production PDF date range'],
+    ['Years Covered', (d.period?.years || []).join(', '), 'from Production PDF'],
+  ]);
+
+  /* ── Sheet 2: KPIs with Sources (THE money sheet) ── */
+  const k = d.kpis || {};
+  const prod = d.production || {};
+  const coll = d.collections || {};
+  const fin = d.financials || {};
+  const kpiRows = [
+    ['KPI', 'Value', 'Formula', 'Inputs Used'],
+    ['Total Production (from PDFs)', money(prod.total), 'sum of all code.total', `${(prod.codes || []).length} codes parsed`],
+    ['Annual Production', money(k.annualProduction), 'total × (12 / months)', `total=${money(prod.total)}, months=${d.period?.prodMonths}`],
+    ['Net Collections (raw)', money(coll.total), 'payments from Collections PDF (or P&L income if missing)', ''],
+    ['Annual Collections', money(coll.annualized), 'collTotal × (12 / months)', `collTotal=${money(coll.total)}, months=${d.period?.prodMonths}`],
+    ['Collection Rate', pct(k.collectionRate), '(annualCollections / annualProd) × 100', `annualCollections=${money(coll.annualized)}, annualProd=${money(k.annualProduction)}`],
+    ['', '', '', ''],
+    ['Hygiene Production (12mo)', money(prod.byCategory?.hygiene), 'sum of codes in hygCodes list', 'D1110, D1120, D4910, D4341, D4342, D4346, D4381, D0120, D0150, D0140, D0274'],
+    ['Hygiene % of Production', pct(k.hygienePercent), '(hygProduction / totalProduction) × 100', `hyg=${money(prod.byCategory?.hygiene)}, total=${money(prod.total)}`],
+    ['', '', '', ''],
+    ['Doctor Production (12mo)', money(prod.byCategory?.doctor), 'totalProd − hyg − perio − endo − surg − ortho − cosmetic', 'everything not categorized as hygiene or specialty'],
+    ['Combined Doctor $/Day', money(k.combinedDocDailyAvg), 'annualDoctor / totalDoctorDaysPerYear', `annualDoctor=${money(prod.byCategory?.doctor)}, days=${d.goals?.totalDocDaysPerYear}`],
+    ['Owner Doctor $/Day (dormant)', money(k.ownerDocDailyAvg), 'survey value OR combined (fallback)', 'see hasOwnerSplit flag'],
+    ['Associate $/Day (dormant)', money(k.associateDocDailyAvg), 'derivation disabled until per-provider PDFs parsed', ''],
+    ['Has Owner/Assoc Split', k.hasOwnerSplit ? 'Yes' : 'No', 'true when survey gave ≥1 per-provider $/day', ''],
+    ['', '', '', ''],
+    ['Hygiene Days per Year', d.goals?.hygDaysPerYear ?? '', 'hygieneDaysPerWeek × 52', `days/week=${p.hygieneDaysPerWeek}`],
+    ['Hygiene $/Day', money(k.hygDailyAvg), 'annualHyg / hygDaysPerYear', `annualHyg=${money(prod.byCategory?.hygiene)}, days=${d.goals?.hygDaysPerYear}`],
+    ['', '', '', ''],
+    ['P&L Income', money(fin.plIncome), 'TOTAL_INCOME line from P&L PDF', ''],
+    ['P&L Expenses (raw)', money(fin.plExpensesRaw), 'TOTAL_EXPENSE line from P&L PDF', ''],
+    ['Owner Add-Backs', money(fin.ownerAddBacks), 'sum of items categorized as "O" (car/meals/travel/401k)', 'see Financials sheet'],
+    ['Patient Reimbursements', money(fin.patientReimbursements), 'sum of items matching /patient.*reimburs|refund/', ''],
+    ['P&L Expenses (adjusted)', money(fin.plExpenses), 'raw − addBacks − reimbursements', `raw=${money(fin.plExpensesRaw)}, addBacks=${money(fin.ownerAddBacks)}, refunds=${money(fin.patientReimbursements)}`],
+    ['Overhead % (raw)', pct(fin.overheadRawPct), 'plExpensesRaw / plIncome × 100', `expRaw=${money(fin.plExpensesRaw)}, inc=${money(fin.plIncome)}`],
+    ['Overhead % (adjusted, shown on Report)', pct(k.overheadPct), 'plExpenses / plIncome × 100', `expAdj=${money(fin.plExpenses)}, inc=${money(fin.plIncome)}`],
+    ['Profit Margin', pct(k.profitPct), '100 − overheadPct', ''],
+    ['', '', '', ''],
+    ['Staff Cost % of Collections', pct(k.staffCostPct), 'annualStaffCost / annualCollections × 100', 'from employee cost form OR P&L wages fallback'],
+    ['', '', '', ''],
+    ['AR Patient Total', money(d.ar?.patient?.total), 'from Hub step 4 input', ''],
+    ['AR Patient 90+ days', money(d.ar?.patient?.d90plus || d.ar?.patient?.over90), 'from Hub step 4 input', ''],
+    ['AR Insurance Total', money(d.ar?.insurance?.total), 'from Hub step 5 input', ''],
+    ['AR Insurance 90+ days', money(d.ar?.insurance?.d90plus || d.ar?.insurance?.over90), 'from Hub step 5 input', ''],
+  ];
+  addSheet('KPIs with Sources', kpiRows);
+
+  /* ── Sheet 3: Production by Code ── */
+  const codes = (prod.codes || []).slice().sort((a, b) => (b.total || 0) - (a.total || 0));
+  /* Category tagging mirrors computeReportData */
+  const hygCodes = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0150','D0140','D0274'];
+  const perioPrefixes = ['D4260','D4261','D4263','D4273','D4275','D4341','D4342'];
+  const startsWithAny = (code, prefixes) => prefixes.some(pr => code.startsWith(pr));
+  const catOf = (code) => {
+    const c = (code || '').toUpperCase();
+    if (hygCodes.includes(c) || startsWithAny(c, ['D1110','D1120','D4910','D4346','D4381'])) return 'Hygiene';
+    if (startsWithAny(c, perioPrefixes)) return 'Perio';
+    if (startsWithAny(c, ['D33'])) return 'Endo';
+    if (startsWithAny(c, ['D72'])) return 'Oral Surgery';
+    if (startsWithAny(c, ['D80'])) return 'Ortho';
+    if (['D9972','D9974','D2960','D2961','D2962'].includes(c)) return 'Cosmetic';
+    return 'Doctor (general)';
+  };
+  const codeRows = [['Code', 'Description', 'Category', 'Qty', 'Total $', '% of Total', 'Avg $/procedure']];
+  const totalProd = prod.total || 0;
+  codes.forEach(c => {
+    codeRows.push([
+      c.code,
+      c.desc || '',
+      catOf(c.code),
+      c.qty || 0,
+      Math.round(c.total || 0),
+      totalProd > 0 ? ((c.total || 0) / totalProd * 100).toFixed(2) + '%' : '',
+      c.qty > 0 ? Math.round((c.total || 0) / c.qty) : '',
+    ]);
+  });
+  addSheet('Production by Code', codeRows);
+
+  /* ── Sheet 4: Financials (add-back detail) ── */
+  const finRows = [
+    ['Item', 'Amount', 'Treatment', 'Note'],
+    ['P&L Total Income', money(fin.plIncome), 'numerator of overhead', ''],
+    ['P&L Total Expenses (raw)', money(fin.plExpensesRaw), 'starting point for overhead', ''],
+    ['', '', '', ''],
+    ['Subtractions from expenses for adjusted overhead:', '', '', ''],
+    ['Patient Reimbursements', money(fin.patientReimbursements), 'subtracted', 'refunds to patients, not operational'],
+  ];
+  (fin.ownerAddBackItems || []).forEach(item => {
+    finRows.push([item.item, money(item.amount), 'subtracted', 'owner add-back (category "O")']);
+  });
+  finRows.push(
+    ['', '', '', ''],
+    ['Total Add-Backs + Reimbursements', money((fin.ownerAddBacks || 0) + (fin.patientReimbursements || 0)), '', ''],
+    ['Adjusted Expenses', money(fin.plExpenses), 'raw − subtractions', ''],
+    ['', '', '', ''],
+    ['Overhead % (raw)', pct(fin.overheadRawPct), '', ''],
+    ['Overhead % (adjusted)', pct(k.overheadPct), '← this is what the Report scorecard shows', ''],
+    ['Net Income from P&L', money(fin.netIncome), 'as stated on P&L', 'negative = operating loss'],
+    ['Staff Cost %', pct(k.staffCostPct), '', '']
+  );
+  addSheet('Financials', finRows);
+
+  /* ── Sheet 5: Opportunities ── */
+  const oppRows = [['Rank', 'Title', 'Annual $ Value', 'Rationale']];
+  (d.opportunities?.all || []).forEach((o, i) => {
+    oppRows.push([i + 1, o.title || '', money(o.value), o.body || '']);
+  });
+  oppRows.push(['', '', '', '']);
+  oppRows.push(['Top 3 Total', '', money(d.opportunities?.totalValue), 'sum of top 3 by $ value (shown in hero)']);
+  addSheet('Opportunities', oppRows);
+
+  /* ── Sheet 6: SWOT ── */
+  const s = d.swot || {};
+  const max = Math.max((s.strengths || []).length, (s.weaknesses || []).length, (s.opportunities || []).length, (s.threats || []).length);
+  const swotRows = [['Strengths', 'Weaknesses', 'Opportunities', 'Threats']];
+  for (let i = 0; i < max; i++) {
+    swotRows.push([(s.strengths || [])[i] || '', (s.weaknesses || [])[i] || '', (s.opportunities || [])[i] || '', (s.threats || [])[i] || '']);
+  }
+  addSheet('SWOT', swotRows);
+
+  /* Write and download */
+  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  downloadBlob(blob, `${practiceFileBase()}_Debug_Workbook.xlsx`);
 }
 
 /* Open the HTML report in a new tab via blob URL so the user can view / share / print-to-PDF.
