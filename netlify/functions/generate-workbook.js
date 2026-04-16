@@ -3857,7 +3857,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
     const reportHtml = buildAssessmentReport({
       prodData, collData, plData, hygieneData, employeeCosts, practiceProfile,
       arPatient, arInsurance, swotData, practiceName,
-      totalProd, collTotal, engineVersion: 'v39-html-report',
+      totalProd, collTotal, engineVersion: 'v40-report-data-fixes',
       years, prodMonths
     });
     reportHtmlB64 = Buffer.from(reportHtml, 'utf8').toString('base64');
@@ -3878,7 +3878,7 @@ async function buildXlsx(prodText, collText, plText, practiceName, arPatient, ar
       plParsed: plData !== null && plData.items.length > 0,
       arPatientTotal: arPatient?.total || null,
       arInsuranceTotal: arInsurance?.total || null,
-      _version: 'v39-html-report',
+      _version: 'v40-report-data-fixes',
       _debug: { usedInPW: usedInPW.size, directMatch: directMatchCount, unmatchedSample: sampleUnmatched },
       _injDiag,
       _timing: { preInjection: elapsed, injection: injTime, total: totalTime }
@@ -3967,52 +3967,73 @@ function buildAssessmentReport(data) {
   const annualSpecialty = (prodPerio + prodEndo + prodSurg + prodOrtho + prodCosmetic) * annualFactor;
   const annualDoctor = (totalProd - prodHyg - prodPerio - prodEndo - prodSurg - prodOrtho - prodCosmetic) * annualFactor;
 
-  /* ──── Daily averages ──── */
-  const docDailyAvg = doctorDays > 0 ? annualDoctor / (doctorDays * 12) : 0;
-  const hygDaysPerYear = hygieneDaysPerWeek * 52;
-  const hygDailyAvg = hygDaysPerYear > 0 ? annualHyg / hygDaysPerYear : 0;
+  /* ──── Daily averages: split owner / associate / combined ────
+     Pigneri has both an owner (doctorDays/mo) and an associate (associateDays/mo).
+     Without a per-provider production breakdown from the PDF we split like this:
+       - If survey provided docDailyAvg (owner stated $/day), trust that for owner
+         and derive associate = (annualDoctor - owner × ownerDays) / associateDays.
+       - Otherwise, combined avg = annualDoctor / (ownerDays + associateDays). */
+  const associateDaysPerMonth = pp.hasAssociate ? (Number(pp.associateDays) || 0) : 0;
+  const ownerDaysYr = doctorDays * 12;
+  const associateDaysYr = associateDaysPerMonth * 12;
+  const totalDocDaysYr = ownerDaysYr + associateDaysYr;
+  const surveyDocDaily = pp.docDailyAvg && pp.docDailyAvg !== 'idk' ? Number(pp.docDailyAvg) : null;
 
-  /* ──── Benchmarks ──── */
-  const collectionRate = annualProd > 0 ? (annualCollections / annualProd) * 100 : 0;
-  const hygPct = annualProd > 0 ? (prodHyg / totalProd) * 100 : 0;
-  const plExpenses = plData?.totalExpenses || 0;
-  const plIncome = plData?.totalIncome || 0;
-  const overheadPct = plIncome > 0 ? (plExpenses / plIncome) * 100 : 0;
-  const profitPct = 100 - overheadPct;
+  let ownerDocDailyAvg = null;
+  let associateDocDailyAvg = null;
+  const combinedDocDailyAvg = totalDocDaysYr > 0 ? annualDoctor / totalDocDaysYr : null;
 
-  /* Staff cost % of collections (if we have employee costs + collections) */
-  let staffCostPct = null;
-  if (employeeCosts && annualCollections > 0) {
-    const staffAnnual = (() => {
-      let total = 0;
-      for (const k in employeeCosts) {
-        if (k.startsWith('ec_rate_') || k.startsWith('ec_hrs_')) continue;
-        if (k === 'ec_staff_benefits' || k === 'ec_hyg_benefits') total += (Number(employeeCosts[k]) || 0) * 12;
-      }
-      /* rough annualized wages */
-      const roles = ['om','f1','f2','b1','b2','b3','h1','h2'];
-      for (const r of roles) {
-        const rate = Number(employeeCosts['ec_rate_' + r]) || 0;
-        const hrs = Number(employeeCosts['ec_hrs_' + r]) || 0;
-        total += rate * hrs * 12;
-      }
-      return total;
-    })();
-    staffCostPct = (staffAnnual / annualCollections) * 100;
+  if (surveyDocDaily && surveyDocDaily > 0 && ownerDaysYr > 0) {
+    ownerDocDailyAvg = surveyDocDaily;
+    if (associateDaysYr > 0) {
+      const assocAnnual = annualDoctor - (ownerDocDailyAvg * ownerDaysYr);
+      associateDocDailyAvg = assocAnnual > 0 ? assocAnnual / associateDaysYr : null;
+    }
+  } else {
+    ownerDocDailyAvg = combinedDocDailyAvg;
   }
 
-  /* ──── Goal matrix (current / short-term +15% / long-term +30%) ──── */
-  const gCurrentDocDaily = docDailyAvg;
-  const gCurrentHygDaily = hygDailyAvg;
+  const hygDaysPerYear = hygieneDaysPerWeek * 52;
+  const hygDailyAvg = hygDaysPerYear > 0 ? annualHyg / hygDaysPerYear : null;
+
+  /* ──── Benchmarks ──── */
+  const collectionRate = annualProd > 0 ? (annualCollections / annualProd) * 100 : null;
+  const hygPct = annualProd > 0 ? (prodHyg / totalProd) * 100 : null;
+  const plExpenses = plData?.totalExpense || plData?.totalExpenses || 0;  /* parser returns totalExpense (singular) */
+  const plIncome = plData?.totalIncome || 0;
+  const overheadPct = (plIncome > 0 && plExpenses > 0) ? (plExpenses / plIncome) * 100 : null;
+  const profitPct = overheadPct != null ? 100 - overheadPct : null;
+
+  /* Staff cost % of collections. collectEmployeeCosts() returns { staff: [...], hygiene: [...],
+     staffBenefits, staffEmpCostPct, hygBenefits, hygEmpCostPct } — NOT flat ec_* keys. */
+  let staffCostPct = null;
+  if (employeeCosts && annualCollections > 0) {
+    const sumRole = (arr, benefits, empCostPct) => {
+      const wages = (arr || []).reduce((s, p) => s + (Number(p.rate) || 0) * (Number(p.hours) || 0) * 12, 0);
+      const benefitsAnnual = (Number(benefits) || 0) * 12;
+      const empCosts = wages * (Number(empCostPct) || 0);
+      return wages + benefitsAnnual + empCosts;
+    };
+    const staffAnnual =
+      sumRole(employeeCosts.staff, employeeCosts.staffBenefits, employeeCosts.staffEmpCostPct) +
+      sumRole(employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct);
+    if (staffAnnual > 0) staffCostPct = (staffAnnual / annualCollections) * 100;
+  }
+
+  /* ──── Goal matrix (current / short-term +15% / long-term +30%) ────
+     Use combined doctor $/day × combined doctor days for the totals so we're
+     not double-counting the associate's contribution. */
+  const goalDocDaily = combinedDocDailyAvg || 0;  /* combined owner+associate */
+  const goalHygDaily = hygDailyAvg || 0;
   const gCurrentAnnual = annualProd;
 
-  const gShortDocDaily = docDailyAvg * 1.15;
-  const gShortHygDaily = hygDailyAvg + 200;  /* Dave's rule: "add a couple hundred bucks" */
-  const gShortAnnual = (gShortDocDaily * doctorDays * 12) + (gShortHygDaily * hygDaysPerYear) + annualSpecialty;
+  const gShortDocDaily = goalDocDaily * 1.15;
+  const gShortHygDaily = goalHygDaily + 200;  /* Dave's rule: "add a couple hundred bucks" */
+  const gShortAnnual = (gShortDocDaily * totalDocDaysYr) + (gShortHygDaily * hygDaysPerYear) + annualSpecialty;
 
-  const gLongDocDaily = docDailyAvg * 1.30;
-  const gLongHygDaily = hygDailyAvg + 400;
-  const gLongAnnual = (gLongDocDaily * doctorDays * 12) + (gLongHygDaily * hygDaysPerYear) + annualSpecialty;
+  const gLongDocDaily = goalDocDaily * 1.30;
+  const gLongHygDaily = goalHygDaily + 400;
+  const gLongAnnual = (gLongDocDaily * totalDocDaysYr) + (gLongHygDaily * hygDaysPerYear) + annualSpecialty;
 
   /* ──── Opportunities (top 3 by $) ──── */
   const opps = [];
@@ -4072,9 +4093,12 @@ function buildAssessmentReport(data) {
   const fmt$ = n => n != null && isFinite(n) ? '$' + Math.round(n).toLocaleString() : '—';
   const fmt$k = n => n != null && isFinite(n) ? '$' + Math.round(n/1000).toLocaleString() + 'k' : '—';
 
-  /* Score status: compare value against a target, return 'good'/'warn'/'bad' */
+  /* Score status: compare value against a target, return 'good'/'warn'/'bad'.
+     Returns '' (neutral, no color) when value is null, not finite, or zero — because
+     a zero here nearly always means the upstream data was missing, not that the
+     practice is perfect. Only apply color if we have real data. */
   const statusVs = (val, target, higherIsBetter, warnPct = 0.90) => {
-    if (val == null || !isFinite(val) || target == null) return '';
+    if (val == null || !isFinite(val) || val === 0 || target == null) return '';
     const ratio = val / target;
     if (higherIsBetter) return ratio >= 1 ? 'good' : (ratio >= warnPct ? 'warn' : 'bad');
     return ratio <= 1 ? 'good' : (ratio <= (2 - warnPct) ? 'warn' : 'bad');
@@ -4083,12 +4107,26 @@ function buildAssessmentReport(data) {
   /* ──── Scorecard cards ──── */
   const scorecardCards = [
     { lbl: 'Annual Production', val: fmt$(annualProd), bench: prodMonths ? `Based on ${prodMonths}mo, annualized` : '', status: '' },
-    { lbl: 'Collection Rate', val: collectionRate > 0 ? collectionRate.toFixed(1) + '%' : '—', bench: 'Target <strong>97%+</strong>', status: statusVs(collectionRate, 97, true) },
-    { lbl: 'Hygiene % of Production', val: hygPct > 0 ? hygPct.toFixed(1) + '%' : '—', bench: 'Target <strong>30–33%</strong>', status: statusVs(hygPct, 30, true) },
-    { lbl: 'Doctor Avg $/Day', val: fmt$(docDailyAvg), bench: `${doctorDays} days/mo`, status: '' },
-    { lbl: 'Hygiene Avg $/Day', val: fmt$(hygDailyAvg), bench: `${hygieneDaysPerWeek} days/week`, status: '' },
-    { lbl: 'Overhead %', val: overheadPct > 0 ? overheadPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤60%</strong>', status: statusVs(overheadPct, 60, false) },
+    { lbl: 'Collection Rate', val: (collectionRate != null && collectionRate > 0) ? collectionRate.toFixed(1) + '%' : '—', bench: 'Target <strong>97%+</strong>', status: statusVs(collectionRate, 97, true) },
+    { lbl: 'Hygiene % of Production', val: (hygPct != null && hygPct > 0) ? hygPct.toFixed(1) + '%' : '—', bench: 'Target <strong>30–33%</strong>', status: statusVs(hygPct, 30, true) },
+    { lbl: 'Owner Doctor $/Day', val: fmt$(ownerDocDailyAvg), bench: `${doctorDays} days/mo &middot; ${ownerDaysYr} days/yr`, status: '' },
   ];
+  if (associateDaysPerMonth > 0) {
+    scorecardCards.push({
+      lbl: 'Associate $/Day',
+      val: fmt$(associateDocDailyAvg),
+      bench: `${associateDaysPerMonth} days/mo &middot; ${associateDaysYr} days/yr`,
+      status: ''
+    });
+    scorecardCards.push({
+      lbl: 'Combined Doctor $/Day',
+      val: fmt$(combinedDocDailyAvg),
+      bench: `${totalDocDaysYr} total doctor-days/yr`,
+      status: ''
+    });
+  }
+  scorecardCards.push({ lbl: 'Hygiene Avg $/Day', val: fmt$(hygDailyAvg), bench: `${hygieneDaysPerWeek} days/week`, status: '' });
+  scorecardCards.push({ lbl: 'Overhead %', val: (overheadPct != null && overheadPct > 0) ? overheadPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤60%</strong>', status: statusVs(overheadPct, 60, false) });
   const scorecardHtml = scorecardCards.map(c => `
     <div class="score-card ${c.status}">
       <div class="lbl">${htmlEscape(c.lbl)}</div>
@@ -4110,9 +4148,9 @@ function buildAssessmentReport(data) {
 
   /* ──── Goal matrix rows ──── */
   const goalRows = [
-    { label: 'Doctor $/Day', c: docDailyAvg, s: gShortDocDaily, l: gLongDocDaily, fmt: fmt$ },
-    { label: 'Hygiene $/Day', c: hygDailyAvg, s: gShortHygDaily, l: gLongHygDaily, fmt: fmt$ },
-    { label: 'Annual Doctor Production', c: annualDoctor, s: gShortDocDaily * doctorDays * 12, l: gLongDocDaily * doctorDays * 12, fmt: fmt$k },
+    { label: 'Combined Doctor $/Day', c: goalDocDaily, s: gShortDocDaily, l: gLongDocDaily, fmt: fmt$ },
+    { label: 'Hygiene $/Day', c: goalHygDaily, s: gShortHygDaily, l: gLongHygDaily, fmt: fmt$ },
+    { label: 'Annual Doctor Production', c: annualDoctor, s: gShortDocDaily * totalDocDaysYr, l: gLongDocDaily * totalDocDaysYr, fmt: fmt$k },
     { label: 'Annual Hygiene Production', c: annualHyg, s: gShortHygDaily * hygDaysPerYear, l: gLongHygDaily * hygDaysPerYear, fmt: fmt$k },
   ];
   const goalRowsHtml = goalRows.map(r => `
@@ -4133,10 +4171,10 @@ function buildAssessmentReport(data) {
 
   /* ──── Financial cards ──── */
   const financialCards = [
-    { lbl: 'Annual Revenue (P&L)', val: fmt$(plIncome), bench: plData ? 'From P&L statement' : 'P&L not uploaded' },
-    { lbl: 'Annual Expenses', val: fmt$(plExpenses), bench: '' },
-    { lbl: 'Profit Margin', val: profitPct > 0 ? profitPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≥35%</strong>', status: statusVs(profitPct, 35, true) },
-    { lbl: 'Staff Cost / Collections', val: staffCostPct != null ? staffCostPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤22%</strong>', status: staffCostPct != null ? statusVs(staffCostPct, 22, false) : '' },
+    { lbl: 'Annual Revenue (P&L)', val: plIncome > 0 ? fmt$(plIncome) : '—', bench: plData ? 'From P&L statement' : 'P&L not uploaded' },
+    { lbl: 'Annual Expenses', val: plExpenses > 0 ? fmt$(plExpenses) : '—', bench: plExpenses > 0 ? '' : 'Not available in P&L' },
+    { lbl: 'Profit Margin', val: (profitPct != null && profitPct > 0 && profitPct < 100) ? profitPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≥35%</strong>', status: statusVs(profitPct, 35, true) },
+    { lbl: 'Staff Cost / Collections', val: (staffCostPct != null && staffCostPct > 0) ? staffCostPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤22%</strong>', status: statusVs(staffCostPct, 22, false) },
     { lbl: 'Patient AR (90+ days)', val: fmt$(arPatient?.over90 || arPatient?.d90plus), bench: arPatient?.total ? `of ${fmt$(arPatient.total)} total` : '' },
     { lbl: 'Insurance AR (90+ days)', val: fmt$(arInsurance?.over90 || arInsurance?.d90plus), bench: arInsurance?.total ? `of ${fmt$(arInsurance.total)} total` : '' },
   ];
