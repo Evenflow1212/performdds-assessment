@@ -21,8 +21,12 @@ When one gets picked up, move it near the top and flip the status.
   - Tier 2 fire at ffs ≥ 70 (softer)
   - **EXEMPTION**: cosmetic/boutique practices. Signals: high $/day, high crown value, low total patient volume (low prophy count), affluent ZIP. For these, do NOT suggest PPOs — their FFS-only posture is the strategy, not an accident.
   - **Instead for exempted practices**: add a Threat bullet about concentration risk — low patient volume means the practice is highly dependent on a strong economy, and a small number of yes/no decisions can make or break a quarter.
+  - **New patient gating** (answer to Q2):
+    - Rule of thumb: a 100% FFS or heavily-FFS practice typically tops out at 20–25 new patients/month.
+    - If `ffs ≥ 70% AND npPerMonth ≥ 30` → add a **Strength** bullet celebrating that the practice is thriving out-of-network, which is hard to pull off.
+    - Still fire the PPO "consider this" nudge regardless of NP flow, but with a **caveat** built into the language: "we know it's not easy to earn a living out of network; if being out-of-network is core to the practice identity, skip this — just something to consider." So the bullet reads less like a prescription and more like an option.
 - _open questions_ — remaining questions in chat; Dave answering one at a time
-- _status_ — idea (2026-04-16, Dave answered Q1)
+- _status_ — idea (2026-04-16, Dave answered Q1 + Q2)
 
 ### Teach: Crown value methodology
 - _why_ — Dave mentioned that crown VALUE (not just count) is a key signal for identifying high-cosmetic/boutique practices. Low crown count + high crown value = high-cosmetic. High crown count + low crown value = something else. The distinction matters for both PPO-suggestion logic (above) and general practice profiling.
