@@ -1,33 +1,42 @@
 ---
 name: performdds-workbook
 description: >
-  Complete reference for the PerformDDS Practice Assessment Hub and workbook generation system.
-  MANDATORY USE whenever working on: generate-workbook.js, the assessment hub (index.html),
-  Excel workbook output, Employee Costs sheet, Hygiene Schedule sheet, P&L parsing,
-  production codes, collections, AR aging, or any Netlify function changes for dentalpracticeassessments.com.
-  Also use when debugging workbook output (zeros in cells, missing names, formatting issues),
-  running through the hub wizard to test, or deploying changes via git push.
+  Reference for the PerformDDS Practice Assessment pipeline. Use when editing
+  generate-report.js, assessment_hub.html, or assessment-report-template.html;
+  when parsers need changes (parseProduction, parseCollections, parsePL); when
+  adding/adjusting KPIs or SWOT bullets; or when debugging report output.
+  For high-level architecture, see CLAUDE.md.
 ---
 
-# PerformDDS Practice Assessment Workbook — Complete Reference
+# PerformDDS Practice Assessment — Skill Reference
+
+> **v41 note (April 2026):** Excel output was removed. The primary deliverable is an
+> **HTML Executive Report** (`assessment-report-template.html`). Data is also
+> downloadable as JSON and CSV. Sections below that describe cell maps, XLSX
+> styles, the two-pass template injection, or any `xlsxB64` response are
+> **historical only** — kept for reference in case we ever need to recover
+> the old per-cell formatting logic. Ignore anything about `generate-workbook.js`
+> or `Blank_Assessment_Template.xlsx`; those are gone.
 
 ## Project Overview
 
-**What it does:** An 8-step web wizard at `dentalpracticeassessments.com` that accepts 5 Dentrix PDF reports + optional manual form data, sends everything to a Netlify serverless function, and returns a populated Excel assessment workbook.
+**What it does:** An 8-step web wizard at `dentalpracticeassessments.com` accepts Dentrix PDFs + manual form data, Claude extracts the numbers, a Netlify function computes every KPI + SWOT + opportunities, and returns the HTML Executive Report.
 
-**Owner:** Dave Orr (dental practice management consultant)
+**Owner:** Dave Orr (dental practice management consultant).
 
-**Repository:** `github.com/Evenflow1212/performdds-assessment` → auto-deploys to Netlify (~21 seconds)
+**Repository:** `github.com/Evenflow1212/performdds-assessment` → auto-deploys to Netlify (~21 seconds).
 
 ---
 
-## File Locations
+## File Locations (current)
 
 | File | Purpose |
 |------|---------|
-| `/Desktop/performdds/netlify/functions/generate-workbook.js` | Main serverless function (~2700+ lines) — ALL server logic is here |
-| `/Desktop/performdds/index.html` | Hub wizard frontend (redirects to assessment_hub.html) |
-| `/Desktop/performdds/assessment_hub.html` | Full hub wizard with all 8 steps |
+| `netlify/functions/generate-report.js` | Primary serverless function (~810 lines). Parsers, SWOT, KPI math, HTML rendering. |
+| `netlify/functions/parse-pdf.js` | Claude API proxy for PDF text extraction. |
+| `assessment_hub.html` | The Hub — multi-step wizard. Live entry point. |
+| `assessment-report-template.html` | HTML template with `{{placeholders}}` for the Report. |
+| `test-data/verify-generate-report.js` | Synthetic end-to-end smoke test (`node test-data/verify-generate-report.js`). |
 | `/Desktop/performdds/Blank_Assessment_Template.xlsx` | Template workbook that gets populated |
 | `/Desktop/performdds/netlify.toml` | Netlify config |
 | `/Desktop/data for dentrix assessment from pigneri/` | Test PDFs (Pigneri practice) |

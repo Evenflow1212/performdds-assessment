@@ -673,7 +673,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
@@ -1297,8 +1296,8 @@
   <!-- GENERATING STATE -->
   <div class="generating" id="generatingState">
     <div class="spinner"></div>
-    <h3>Building your assessment workbook…</h3>
-    <p>Claude AI is reading your reports and populating all 10 tabs.</p>
+    <h3>Building your assessment report…</h3>
+    <p>Claude AI is reading your reports and computing every KPI.</p>
     <p style="margin-top:8px;font-size:0.8rem;">This usually takes up to 60 seconds.</p>
   </div>
 
@@ -1306,20 +1305,23 @@
   <div class="result-card" id="resultCard">
     <div class="result-icon">✅</div>
     <h2>Your Assessment is Ready</h2>
-    <p>We've analyzed your reports and built a custom practice workbook covering production, collections, AR, hygiene, and overhead.</p>
+    <p>We've analyzed your reports and computed every KPI — production, collections, AR, hygiene, overhead, and opportunity totals.</p>
     <div class="summary-grid" id="summaryGrid"></div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
       <button class="btn btn-generate" onclick="viewOnlineReport()" id="viewReportBtn" style="display:inline-flex;align-items:center;gap:8px;">
         ✨ View Your Report Online
       </button>
-      <button class="btn btn-secondary" onclick="downloadWorkbook()" style="display:inline-flex;align-items:center;gap:8px;">
-        ⬇ Download Excel Workbook
+      <button class="btn btn-secondary" onclick="downloadJson()" style="display:inline-flex;align-items:center;gap:8px;">
+        ⬇ Download Data (JSON)
+      </button>
+      <button class="btn btn-secondary" onclick="downloadCsv()" style="display:inline-flex;align-items:center;gap:8px;">
+        ⬇ Download Data (CSV)
       </button>
     </div>
 
     <div style="margin-top:32px;padding:24px;background:linear-gradient(135deg,#f8fafc 0%,#eff6ff 100%);border:1px solid var(--border);border-radius:var(--radius-sm);text-align:left;">
       <h3 style="font-family:'Montserrat',sans-serif;font-size:1.05rem;font-weight:800;color:var(--navy);margin-bottom:10px;letter-spacing:0.01em;">What happens next?</h3>
-      <p style="font-size:0.88rem;color:var(--text-muted);line-height:1.6;margin-bottom:16px;">Your workbook surfaces 200+ KPIs from your practice. The fastest way to turn those numbers into action: book a 30-minute consultation where we walk through your results together, pinpoint the highest-leverage opportunities, and map out what to fix first.</p>
+      <p style="font-size:0.88rem;color:var(--text-muted);line-height:1.6;margin-bottom:16px;">Your report surfaces every KPI from your practice, ranked by dollar opportunity. The fastest way to turn those numbers into action: book a 30-minute consultation where we walk through your results together, pinpoint the highest-leverage opportunities, and map out what to fix first.</p>
       <a href="https://calendly.com/davidorr/dental-assessment-review" target="_blank" rel="noopener" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;">
         📅 Book Your Review Call
       </a>
@@ -1337,8 +1339,8 @@ let currentStep = 1;
 let software = 'dentrix';
 let files = { 1: null, 2: null, 3: null, 4: null, 5: null };
 let skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
-let generatedWorkbook = null;
-let generatedReportHtml = null;  /* HTML report b64 from server */
+let generatedData = null;        /* canonical data object from /generate-report */
+let generatedReportHtml = null;  /* HTML report (plain UTF-8 string) from server */
 
 function calcDates() {
   const now = new Date();
@@ -1873,440 +1875,6 @@ async function extractProductionFromPdf(file) {
   return lines.join('\n');
 }
 
-/* ─── Client-side P&L image embedding using JSZip ─── */
-async function embedPlImageClientSide(xlsxB64, imageB64) {
-  console.log('embedPlImageClientSide: starting, image size:', Math.round(imageB64.length/1024), 'KB');
-
-  /* Decode the xlsx into a zip */
-  const rawBin = atob(xlsxB64);
-  const uint8 = new Uint8Array(rawBin.length);
-  for (let i = 0; i < rawBin.length; i++) uint8[i] = rawBin.charCodeAt(i);
-  const zip = await JSZip.loadAsync(uint8);
-  console.log('embedPlImageClientSide: zip loaded, files:', Object.keys(zip.files).length);
-
-  /* Determine image type */
-  const isJpeg = imageB64.startsWith('/9j/') || imageB64.startsWith('/9j');
-  const imgExt = isJpeg ? 'jpeg' : 'png';
-  const imgContentType = isJpeg ? 'image/jpeg' : 'image/png';
-
-  /* Add the image binary to xl/media/ */
-  const imgBin = atob(imageB64);
-  const imgUint8 = new Uint8Array(imgBin.length);
-  for (let i = 0; i < imgBin.length; i++) imgUint8[i] = imgBin.charCodeAt(i);
-  zip.file('xl/media/plimage1.' + imgExt, imgUint8);
-  console.log('embedPlImageClientSide: image added to xl/media/, size:', imgUint8.length, 'bytes');
-
-  /* ── Find the P&L Image sheet in workbook.xml ── */
-  const wbXml = await zip.file('xl/workbook.xml').async('string');
-  console.log('embedPlImageClientSide: workbook.xml length:', wbXml.length);
-
-  /* Flexible regex: find <sheet> with name="P&L Image" (XML-encoded as P&amp;L Image)
-     Attributes can appear in any order. Extract r:id separately. */
-  const sheetTag = wbXml.match(/<sheet\b[^/]*?name="P&amp;L Image"[^/]*?\/?>/);
-  if (!sheetTag) {
-    /* Try alternate encoding */
-    const alt = wbXml.match(/<sheet\b[^/]*?name="P&amp;amp;L Image"[^/]*?\/?>/);
-    if (!alt) {
-      console.warn('embedPlImageClientSide: P&L Image sheet NOT FOUND. Sheets in XML:', wbXml.match(/name="[^"]+"/g));
-      return xlsxB64;
-    }
-  }
-  const tagStr = sheetTag ? sheetTag[0] : '';
-  /* Extract r:id from the matched tag (attribute order varies) */
-  const ridMatch = tagStr.match(/r:id="(rId\d+)"/);
-  if (!ridMatch) {
-    console.warn('embedPlImageClientSide: r:id not found in sheet tag:', tagStr);
-    return xlsxB64;
-  }
-  const sheetRId = ridMatch[1];
-  console.log('embedPlImageClientSide: P&L Image sheet rId:', sheetRId);
-
-  /* ── Find the sheet file path from workbook.xml.rels ── */
-  const wbRelsXml = await zip.file('xl/_rels/workbook.xml.rels').async('string');
-  /* Attributes can be in any order: find the Relationship with matching Id */
-  const allRels = wbRelsXml.match(/<Relationship\b[^>]*?>/g) || [];
-  let sheetTarget = null;
-  for (const rel of allRels) {
-    if (rel.includes('Id="' + sheetRId + '"')) {
-      const tMatch = rel.match(/Target="([^"]+)"/);
-      if (tMatch) sheetTarget = tMatch[1];
-    }
-  }
-  if (!sheetTarget) {
-    console.warn('embedPlImageClientSide: target not found for', sheetRId, 'in rels');
-    return xlsxB64;
-  }
-
-  /* Normalize the path — Target can be "worksheets/sheet10.xml" or "/xl/worksheets/sheet10.xml" */
-  let sheetPath = sheetTarget;
-  if (sheetPath.startsWith('/')) sheetPath = sheetPath.substring(1); /* remove leading / */
-  if (!sheetPath.startsWith('xl/')) sheetPath = 'xl/' + sheetPath;
-  console.log('embedPlImageClientSide: sheet path:', sheetPath);
-
-  if (!zip.file(sheetPath)) {
-    console.warn('embedPlImageClientSide: sheet file not found at', sheetPath);
-    /* Try listing worksheet files to find it */
-    const wsFiles = Object.keys(zip.files).filter(f => f.includes('worksheets/'));
-    console.log('Available worksheet files:', wsFiles);
-    return xlsxB64;
-  }
-
-  /* ── Determine a unique drawing number ── */
-  let drawingNum = 1;
-  while (zip.file('xl/drawings/drawing' + drawingNum + '.xml')) drawingNum++;
-  const drawingFile = 'xl/drawings/drawing' + drawingNum + '.xml';
-  const drawingRelsFile = 'xl/drawings/_rels/drawing' + drawingNum + '.xml.rels';
-  console.log('embedPlImageClientSide: using drawing number:', drawingNum);
-
-  /* ── Create the drawing XML ── */
-  const drawingXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" ' +
-    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
-    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-    '<xdr:twoCellAnchor editAs="oneCell">' +
-    '<xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>' +
-    '<xdr:to><xdr:col>10</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>50</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>' +
-    '<xdr:pic>' +
-    '<xdr:nvPicPr><xdr:cNvPr id="2" name="PL Image"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>' +
-    '<xdr:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>' +
-    '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="7143750" cy="9239250"/></a:xfrm>' +
-    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>' +
-    '</xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>';
-  zip.file(drawingFile, drawingXml);
-
-  /* ── Create drawing rels (links drawing → image) ── */
-  const drawingRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" ' +
-    'Target="../media/plimage1.' + imgExt + '"/></Relationships>';
-  zip.file(drawingRelsFile, drawingRelsXml);
-
-  /* ── Modify the sheet XML: add drawing reference ── */
-  let sheetXml = await zip.file(sheetPath).async('string');
-  console.log('embedPlImageClientSide: sheet XML length:', sheetXml.length);
-
-  /* Clear placeholder data */
-  sheetXml = sheetXml.replace(/<sheetData>[\s\S]*?<\/sheetData>/, '<sheetData/>');
-
-  /* Ensure xmlns:r namespace is declared on <worksheet> for r:id to work */
-  const rNs = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
-  if (!sheetXml.includes('xmlns:r=')) {
-    sheetXml = sheetXml.replace('<worksheet', '<worksheet ' + rNs);
-  }
-
-  /* Insert <drawing r:id="rId1"/> before </worksheet> (after pageMargins per OOXML spec) */
-  if (!sheetXml.includes('<drawing')) {
-    sheetXml = sheetXml.replace('</worksheet>', '<drawing r:id="rId1"/></worksheet>');
-  }
-  zip.file(sheetPath, sheetXml);
-  console.log('embedPlImageClientSide: sheet XML updated, new length:', sheetXml.length);
-
-  /* ── Create/update sheet rels (links sheet → drawing) ── */
-  const sheetDir = sheetPath.substring(0, sheetPath.lastIndexOf('/'));
-  const sheetFilename = sheetPath.substring(sheetPath.lastIndexOf('/') + 1);
-  const sheetRelsPath = sheetDir + '/_rels/' + sheetFilename + '.rels';
-
-  /* Find next available rId in sheet rels */
-  let drawingRId = 'rId1';
-  if (zip.file(sheetRelsPath)) {
-    let existingRels = await zip.file(sheetRelsPath).async('string');
-    const usedIds = (existingRels.match(/Id="rId(\d+)"/g) || []).map(m => parseInt(m.match(/\d+/)[0]));
-    const nextId = usedIds.length > 0 ? Math.max(...usedIds) + 1 : 1;
-    drawingRId = 'rId' + nextId;
-    existingRels = existingRels.replace('</Relationships>',
-      '<Relationship Id="' + drawingRId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" ' +
-      'Target="../drawings/drawing' + drawingNum + '.xml"/></Relationships>');
-    zip.file(sheetRelsPath, existingRels);
-    /* Update the drawing reference in sheet XML to use correct rId */
-    sheetXml = sheetXml.replace('r:id="rId1"', 'r:id="' + drawingRId + '"');
-    zip.file(sheetPath, sheetXml);
-  } else {
-    const newRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" ' +
-      'Target="../drawings/drawing' + drawingNum + '.xml"/></Relationships>';
-    zip.file(sheetRelsPath, newRels);
-  }
-  console.log('embedPlImageClientSide: sheet rels created/updated, drawing rId:', drawingRId);
-
-  /* ── Update [Content_Types].xml ── */
-  let ctXml = await zip.file('[Content_Types].xml').async('string');
-  if (!ctXml.includes('Extension="' + imgExt + '"')) {
-    ctXml = ctXml.replace('</Types>',
-      '<Default Extension="' + imgExt + '" ContentType="' + imgContentType + '"/></Types>');
-  }
-  if (!ctXml.includes('/' + drawingFile)) {
-    ctXml = ctXml.replace('</Types>',
-      '<Override PartName="/' + drawingFile + '" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
-  }
-  zip.file('[Content_Types].xml', ctXml);
-  console.log('embedPlImageClientSide: Content_Types updated');
-
-  /* ── Generate the modified xlsx as base64 ── */
-  const outBase64 = await zip.generateAsync({ type: 'base64' });
-  console.log('embedPlImageClientSide: DONE, output size:', Math.round(outBase64.length / 1024), 'KB');
-  return outBase64;
-}
-
-/* ─── Client-side post-processing: merge ExcelJS values into template ZIP ─── */
-async function postProcessClientSide(excelJsB64) {
-  console.log('postProcessClientSide: starting...');
-  const t0 = performance.now();
-
-  /* 1. Fetch original template */
-  const tmplResp = await fetch('/Blank_Assessment_Template.xlsx');
-  if (!tmplResp.ok) throw new Error('Template fetch failed: ' + tmplResp.status);
-  const tmplBuf = await tmplResp.arrayBuffer();
-  console.log('PP: template fetched,', tmplBuf.byteLength, 'bytes in', Math.round(performance.now()-t0), 'ms');
-
-  /* 2. Open both ZIPs */
-  const tmplZip = await JSZip.loadAsync(tmplBuf);
-  const ejsBin = atob(excelJsB64);
-  const ejsArr = new Uint8Array(ejsBin.length);
-  for (let i = 0; i < ejsBin.length; i++) ejsArr[i] = ejsBin.charCodeAt(i);
-  const ejsZip = await JSZip.loadAsync(ejsArr);
-  console.log('PP: both ZIPs loaded in', Math.round(performance.now()-t0), 'ms');
-
-  /* 3. Parse ExcelJS shared strings */
-  const ssFile = ejsZip.file('xl/sharedStrings.xml');
-  const sharedStrings = ssFile ? ppParseSharedStrings(await ssFile.async('string')) : [];
-  console.log('PP: shared strings:', sharedStrings.length);
-
-  /* 4. Create output zip from template */
-  const outZip = new JSZip();
-  for (const [path, file] of Object.entries(tmplZip.files)) {
-    if (file.dir) continue;
-    outZip.file(path, await file.async('uint8array'));
-  }
-  console.log('PP: template files copied in', Math.round(performance.now()-t0), 'ms');
-
-  /* 5. For each template sheet (1-8), overlay ExcelJS cell values */
-  for (let si = 1; si <= 8; si++) {
-    const sheetPath = 'xl/worksheets/sheet' + si + '.xml';
-    const tmplXml = await tmplZip.file(sheetPath).async('string');
-    const ejsFile = ejsZip.file(sheetPath);
-    if (!ejsFile) continue;
-    const ejsXml = await ejsFile.async('string');
-    const cellValues = ppExtractCellValues(ejsXml, sharedStrings);
-    const merged = ppInjectValues(tmplXml, cellValues);
-    outZip.file(sheetPath, merged);
-    console.log('PP: sheet' + si + ':', cellValues.size, 'values injected');
-  }
-
-  /* 6. Add new sheets (9, 10) from ExcelJS — convert shared string refs to inlineStr */
-  for (const si of [9, 10]) {
-    const sheetPath = 'xl/worksheets/sheet' + si + '.xml';
-    const ejsFile = ejsZip.file(sheetPath);
-    if (!ejsFile) continue;
-    let xml = await ejsFile.async('string');
-    xml = xml.replace(/\s*x14ac:dyDescent="[^"]*"/g, '');
-    xml = xml.replace(/\s*xmlns:mc="[^"]*"/g, '');
-    xml = xml.replace(/\s*mc:Ignorable="[^"]*"/g, '');
-    xml = xml.replace(/\s*xmlns:x14ac="[^"]*"/g, '');
-    /* Convert t="s" shared string refs to inlineStr using ExcelJS shared strings */
-    xml = xml.replace(/<c r="([A-Z]+\d+)"([^>]*) t="s"([^>]*)><v>(\d+)<\/v><\/c>/g, function(match, ref, pre, post, idx) {
-      const strVal = sharedStrings[parseInt(idx)] || '';
-      return '<c r="' + ref + '"' + pre + ' t="inlineStr"' + post + '><is><t>' + ppEscXml(strVal) + '</t></is></c>';
-    });
-    outZip.file(sheetPath, xml);
-  }
-
-  /* Copy sheet10 rels */
-  const s10relsPath = 'xl/worksheets/_rels/sheet10.xml.rels';
-  const s10rels = ejsZip.file(s10relsPath);
-  if (s10rels) outZip.file(s10relsPath, await s10rels.async('uint8array'));
-
-  /* Copy drawings and media from ExcelJS */
-  for (const [path, file] of Object.entries(ejsZip.files)) {
-    if (file.dir) continue;
-    if (path.startsWith('xl/drawings/') || path.startsWith('xl/media/')) {
-      outZip.file(path, await file.async('uint8array'));
-    }
-  }
-
-  /* 7. Update workbook.xml: add sheets 9 & 10 */
-  let wbXml = await tmplZip.file('xl/workbook.xml').async('string');
-  /* Find the next available rId by scanning existing rels */
-  let relsXml = await tmplZip.file('xl/_rels/workbook.xml.rels').async('string');
-  const existingIds = relsXml.match(/Id="rId(\d+)"/g) || [];
-  let maxId = 0;
-  existingIds.forEach(m => { const n = parseInt(m.match(/\d+/)[0]); if (n > maxId) maxId = n; });
-  const rId9 = 'rId' + (maxId + 1);
-  const rId10 = 'rId' + (maxId + 2);
-  console.log('PP: using', rId9, 'and', rId10, 'for new sheets (max existing was rId' + maxId + ')');
-  const newSheets =
-    '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Raw Import" sheetId="9" state="visible" r:id="' + rId9 + '"/>' +
-    '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="P&amp;L Image" sheetId="10" state="visible" r:id="' + rId10 + '"/>';
-  wbXml = wbXml.replace('</sheets>', newSheets + '</sheets>');
-  outZip.file('xl/workbook.xml', wbXml);
-
-  /* Update workbook.xml.rels — use absolute paths to match template style */
-  const newRels =
-    '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet9.xml" Id="' + rId9 + '"/>' +
-    '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet10.xml" Id="' + rId10 + '"/>';
-  relsXml = relsXml.replace('</Relationships>', newRels + '</Relationships>');
-  outZip.file('xl/_rels/workbook.xml.rels', relsXml);
-
-  /* Update [Content_Types].xml */
-  let ctXml = await tmplZip.file('[Content_Types].xml').async('string');
-  let newCt =
-    '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-    '<Override PartName="/xl/worksheets/sheet10.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
-  if (!ctXml.includes('drawing+xml'))
-    newCt += '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>';
-  if (!ctXml.includes('image/jpeg'))
-    newCt += '<Default Extension="jpeg" ContentType="image/jpeg"/>';
-  ctXml = ctXml.replace('</Types>', newCt + '</Types>');
-  outZip.file('[Content_Types].xml', ctXml);
-
-  /* 8. SAFETY: verify styles.xml is from template (752 cellXfs), not ExcelJS */
-  const outStylesXml = await outZip.file('xl/styles.xml').async('string');
-  const outXfsM = outStylesXml.match(/cellXfs count="(\d+)"/);
-  const outXfsCount = outXfsM ? parseInt(outXfsM[1]) : 0;
-  const tmplStylesXml = await tmplZip.file('xl/styles.xml').async('string');
-  const tmplXfsM = tmplStylesXml.match(/cellXfs count="(\d+)"/);
-  const tmplXfsCount = tmplXfsM ? parseInt(tmplXfsM[1]) : 0;
-  console.log('PP VERIFY: output cellXfs=' + outXfsCount + ', template cellXfs=' + tmplXfsCount);
-  if (outXfsCount < tmplXfsCount) {
-    /* Only overwrite if output has FEWER styles (ExcelJS contamination).
-       Server may legitimately ADD styles (e.g. strikethrough fonts 752-755). */
-    console.warn('PP VERIFY: styles.xml contaminated (fewer cellXfs)! Re-copying from template...');
-    outZip.file('xl/styles.xml', await tmplZip.file('xl/styles.xml').async('uint8array'));
-  } else if (outXfsCount > tmplXfsCount) {
-    console.log('PP VERIFY: output has', outXfsCount - tmplXfsCount, 'additional cellXfs — server additions preserved');
-  }
-  /* Remove sharedStrings.xml if template doesn't have one (ExcelJS artifact) */
-  if (!tmplZip.file('xl/sharedStrings.xml') && outZip.file('xl/sharedStrings.xml')) {
-    console.warn('PP VERIFY: removing stray sharedStrings.xml');
-    outZip.remove('xl/sharedStrings.xml');
-  }
-  /* Re-copy _rels/.rels, docProps/* from template to prevent ExcelJS contamination */
-  for (const safePath of ['_rels/.rels', 'docProps/app.xml', 'docProps/core.xml']) {
-    const tmplFile = tmplZip.file(safePath);
-    if (tmplFile) outZip.file(safePath, await tmplFile.async('uint8array'));
-  }
-
-  /* 9. Generate final zip as base64 */
-  const finalB64 = await outZip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
-  console.log('PP: complete in', Math.round(performance.now()-t0), 'ms, output:', Math.round(finalB64.length/1024), 'KB');
-  return finalB64;
-}
-
-/* Helper: extract cell values from ExcelJS sheet XML */
-function ppExtractCellValues(sheetXml, sharedStrings) {
-  const cells = new Map();
-  const cellRe = /<c r="([A-Z]+\d+)"([^>]*)>([\s\S]*?)<\/c>/g;
-  let m;
-  while ((m = cellRe.exec(sheetXml)) !== null) {
-    const ref = m[1], attrs = m[2], content = m[3];
-    const vM = content.match(/<v>([\s\S]*?)<\/v>/);
-    const fM = content.match(/<f>([\s\S]*?)<\/f>/);
-    const tM = attrs.match(/t="([^"]+)"/);
-    if (!vM && !fM) continue;
-    let val = vM ? vM[1] : '';
-    const type = tM ? tM[1] : '';
-    if (type === 's' && sharedStrings[parseInt(val)] !== undefined) val = sharedStrings[parseInt(val)];
-    cells.set(ref, { v: val, t: type, f: fM ? fM[1] : null });
-  }
-  return cells;
-}
-
-/* Helper: escape XML special chars */
-function ppEscXml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-/* Helper: inject cell values into template XML preserving styles */
-function ppInjectValues(templateXml, cellValues) {
-  let xml = templateXml;
-  /* Build set of secondary merged cells (all cells in merges EXCEPT the top-left origin).
-     Excel requires only the origin cell to hold content; values in secondary cells trigger repair. */
-  const mergedSecondary = new Set();
-  const mcRe = /<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"\/>/g;
-  let mcM;
-  while ((mcM = mcRe.exec(xml)) !== null) {
-    const c1 = mcM[1], r1 = parseInt(mcM[2]), c2 = mcM[3], r2 = parseInt(mcM[4]);
-    const col1 = c1.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
-    const col2 = c2.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
-    for (let r = r1; r <= r2; r++) {
-      for (let c = col1; c <= col2; c++) {
-        if (r === r1 && c === col1) continue; // skip origin
-        let cs = '';
-        let cc = c;
-        while (cc > 0) { cs = String.fromCharCode(((cc - 1) % 26) + 65) + cs; cc = Math.floor((cc - 1) / 26); }
-        mergedSecondary.add(cs + r);
-      }
-    }
-  }
-  for (const [ref, cell] of cellValues) {
-    /* Skip ALL secondary merged cells — whether they exist in template or not */
-    if (mergedSecondary.has(ref)) continue;
-    const typeAttr = (cell.t === 's' || cell.t === 'str' || (cell.f === null && isNaN(cell.v))) ? ' t="inlineStr"' : '';
-    let inner = '';
-    /* cell.f and cell.v are extracted from ExcelJS XML via regex, so they are
-       already XML-encoded. Only string values (inlineStr) need escaping because
-       shared-string lookup returns decoded text. */
-    if (cell.f) inner += '<f>' + cell.f + '</f>';
-    if (typeAttr.includes('inlineStr')) {
-      inner += '<is><t>' + ppEscXml(cell.v) + '</t></is>';
-    } else if (cell.v !== '' && cell.v !== undefined) {
-      inner += '<v>' + cell.v + '</v>';
-    }
-    const cellRe = new RegExp('<c r="' + ref + '"([^>]*)(?:>((?:(?!</c>)[\\s\\S])*)</c>|/>)');
-    const cm = cellRe.exec(xml);
-    if (cm) {
-      const sM = cm[1].match(/s="(\d+)"/);
-      const styleAttr = sM ? ' s="' + sM[1] + '"' : '';
-      const newCell = inner
-        ? '<c r="' + ref + '"' + styleAttr + typeAttr + '>' + inner + '</c>'
-        : '<c r="' + ref + '"' + styleAttr + typeAttr + '/>';
-      xml = xml.slice(0, cm.index) + newCell + xml.slice(cm.index + cm[0].length);
-    } else {
-      /* Cell doesn't exist in template — insert in correct column order within the row.
-         Excel requires cells sorted by column; appending to end causes "Cell information" repair. */
-      const rowNum = ref.match(/\d+/)[0];
-      const rowRe = new RegExp('(<row r="' + rowNum + '"[^>]*>)([\\s\\S]*?)(</row>)');
-      const rm = rowRe.exec(xml);
-      if (rm) {
-        const newCell = inner
-          ? '<c r="' + ref + '"' + typeAttr + '>' + inner + '</c>'
-          : '<c r="' + ref + '"' + typeAttr + '/>';
-        const newColNum = ref.match(/[A-Z]+/)[0].split('').reduce((n,c) => n*26+c.charCodeAt(0)-64, 0);
-        const rowContent = rm[2];
-        /* Find the right insertion point by scanning existing cells */
-        const existingCells = [];
-        const scanRe = /<c r="([A-Z]+)\d+"[^>]*(?:\/>|>[\s\S]*?<\/c>)/g;
-        let sm;
-        while ((sm = scanRe.exec(rowContent)) !== null) {
-          const cn = sm[1].split('').reduce((n,c) => n*26+c.charCodeAt(0)-64, 0);
-          existingCells.push({ col: cn, end: sm.index + sm[0].length });
-        }
-        let insertPos = 0; // position within rowContent
-        for (const ec of existingCells) {
-          if (ec.col < newColNum) insertPos = ec.end;
-        }
-        const newRowContent = rowContent.slice(0, insertPos) + newCell + rowContent.slice(insertPos);
-        xml = xml.slice(0, rm.index) + rm[1] + newRowContent + rm[3] + xml.slice(rm.index + rm[0].length);
-      }
-    }
-  }
-  return xml;
-}
-
-/* Helper: parse shared strings from ExcelJS */
-function ppParseSharedStrings(ssXml) {
-  const strings = [];
-  const siRe = /<si>([\s\S]*?)<\/si>/g;
-  let m;
-  while ((m = siRe.exec(ssXml)) !== null) {
-    const texts = [];
-    const tRe = /<t[^>]*>([\s\S]*?)<\/t>/g;
-    let tm;
-    while ((tm = tRe.exec(m[1])) !== null) texts.push(tm[1]);
-    strings.push(texts.join(''));
-  }
-  return strings;
-}
 
 let _generating = false;
 function showGenError(message, detail) {
@@ -2360,62 +1928,6 @@ async function generate() {
     console.log('AR Patient:', JSON.stringify(arPatient));
     console.log('AR Insurance:', JSON.stringify(arInsurance));
 
-    /* Step 1b: Render P&L PDF pages to images for the P&L Image tab */
-    let plImageB64 = null;
-    if (files[3]) {
-      try {
-        console.log('Rendering P&L PDF to image...');
-        const plArrayBuf = await files[3].arrayBuffer();
-        const plPdfDoc = await pdfjsLib.getDocument({ data: plArrayBuf }).promise;
-        const numPages = plPdfDoc.numPages;
-        console.log('P&L PDF has', numPages, 'pages');
-        /* Render each page at 1.0x scale (keep small for Netlify payload limit) */
-        const pageCanvases = [];
-        let totalHeight = 0, maxWidth = 0;
-        for (let p = 1; p <= numPages; p++) {
-          const page = await plPdfDoc.getPage(p);
-          const scale = 1.0;
-          const viewport = page.getViewport({ scale });
-          const canvas = document.createElement('canvas');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          const ctx = canvas.getContext('2d');
-          await page.render({ canvasContext: ctx, viewport }).promise;
-          pageCanvases.push(canvas);
-          totalHeight += viewport.height;
-          if (viewport.width > maxWidth) maxWidth = viewport.width;
-        }
-        /* Stitch into one tall image */
-        const stitched = document.createElement('canvas');
-        stitched.width = maxWidth;
-        stitched.height = totalHeight;
-        const sCtx = stitched.getContext('2d');
-        sCtx.fillStyle = '#FFFFFF';
-        sCtx.fillRect(0, 0, maxWidth, totalHeight);
-        let yOff = 0;
-        for (const pc of pageCanvases) {
-          sCtx.drawImage(pc, 0, yOff);
-          yOff += pc.height;
-        }
-        /* Always use JPEG to keep payload under Netlify's 6MB limit */
-        plImageB64 = stitched.toDataURL('image/jpeg', 0.8).split(',')[1];
-        console.log('P&L image rendered as JPEG:', Math.round(plImageB64.length/1024), 'KB');
-        /* If still too large, lower quality further */
-        if (plImageB64.length > 3 * 1024 * 1024) {
-          console.log('Still too large, reducing quality...');
-          plImageB64 = stitched.toDataURL('image/jpeg', 0.5).split(',')[1];
-          console.log('Reduced to:', Math.round(plImageB64.length/1024), 'KB');
-        }
-        /* If STILL too large, skip it */
-        if (plImageB64.length > 4 * 1024 * 1024) {
-          console.warn('P&L image too large even after compression, skipping');
-          plImageB64 = null;
-        }
-      } catch(imgErr) {
-        console.warn('Could not render P&L to image:', imgErr.message);
-      }
-    }
-
     /* Collect hygiene schedule form data (null if skipped) */
     const hygieneData = skipped[7] ? null : collectHygieneSchedule();
     console.log('Hygiene data:', hygieneData ? 'collected' : 'skipped');
@@ -2424,22 +1936,15 @@ async function generate() {
     const employeeCosts = skipped[6] ? null : collectEmployeeCosts();
     console.log('Employee costs:', employeeCosts ? 'collected' : 'skipped');
 
-    /* Step 2: Build workbook from parsed data — include P&L image for server-side embedding */
-    console.log('Step 2: Building workbook from parsed data...');
+    /* Step 2: Build assessment report from parsed data */
+    console.log('Step 2: Building assessment report from parsed data...');
     /* Include questionnaire answers from sessionStorage */
     let practiceProfile = null;
     try { practiceProfile = JSON.parse(sessionStorage.getItem('practiceProfile')); } catch(e) {}
     const payload = { prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, practiceProfile };
-    /* Send P&L image to server for native ExcelJS embedding (avoids JSZip corruption) */
-    if (plImageB64 && plImageB64.length < 3 * 1024 * 1024) {
-      payload.plImageB64 = plImageB64;
-      console.log('Including P&L image in payload:', Math.round(plImageB64.length/1024), 'KB');
-    } else if (plImageB64) {
-      console.warn('P&L image too large for server payload (' + Math.round(plImageB64.length/1024) + 'KB), skipping');
-    }
     console.log('Payload keys:', Object.keys(payload), 'prodText len:', prodText?.length, 'collText len:', collText?.length, 'plText len:', plText?.length);
     console.log('practiceProfile:', JSON.stringify(practiceProfile)?.substring(0, 200));
-    const resp = await fetch('/.netlify/functions/generate-workbook', {
+    const resp = await fetch('/.netlify/functions/generate-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -2450,22 +1955,20 @@ async function generate() {
     let data;
     try { data = JSON.parse(respText); } catch(e) { throw new Error('Non-JSON response (HTTP ' + resp.status + '): ' + respText.substring(0, 200)); }
     if (!data.success) throw new Error(data.error || data.errorMessage || 'Generation failed (no error detail)');
-    /* Server produces complete workbook via JSZip template injection + ExcelJS sheets 9-10 */
-    generatedWorkbook = data.xlsxB64;
-    generatedReportHtml = data.reportHtmlB64 || null;
+    generatedData = data.data;
+    generatedReportHtml = data.reportHtml || null;
     /* Hide the "View Online Report" button if the server didn't produce one */
     const vrBtn = document.getElementById('viewReportBtn');
     if (vrBtn) vrBtn.style.display = generatedReportHtml ? 'inline-flex' : 'none';
-    const sv = data.summary?._version || 'unknown';
-    console.log('Workbook received. Version:', sv, 'Size:', Math.round(generatedWorkbook.length / 1024), 'KB');
-    console.log('Debug:', JSON.stringify(data.summary?._debug || {}));
-    console.log('Timing:', JSON.stringify(data.summary?._timing || {}));
-    console.log('InjDiag:', JSON.stringify(data.summary?._injDiag || {}));
+    const sv = data.summary?.version || 'unknown';
+    console.log('Report received. Version:', sv, 'HTML size:', generatedReportHtml ? Math.round(generatedReportHtml.length / 1024) + 'KB' : 'none');
+    console.log('Timing:', data.summary?.timingMs + 'ms');
 
     _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
     document.getElementById('resultCard').classList.add('visible');
     const s = data.summary || {};
+    const oppTotal = generatedData?.opportunities?.totalValue;
     document.getElementById('summaryGrid').innerHTML = [
       { val: s.codesFound || '—', lbl: 'Codes Analyzed' },
       { val: s.totalProduction ? '$' + Number(s.totalProduction).toLocaleString() : '—', lbl: 'Total Production' },
@@ -2474,7 +1977,7 @@ async function generate() {
       { val: s.plParsed ? 'Included' : (plText ? 'Partial' : 'Skipped'), lbl: 'P&L Analysis' },
       { val: employeeCosts ? 'Included' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
       { val: hygieneData ? 'Included' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
-      { val: '12 tabs', lbl: 'Workbook Size' },
+      { val: oppTotal ? '$' + Math.round(oppTotal).toLocaleString() : '—', lbl: 'Opportunity Identified' },
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     _generating = false;
@@ -2488,26 +1991,84 @@ async function generate() {
   }
 }
 
-function downloadWorkbook() {
-  if (!generatedWorkbook) return;
-  const name = document.getElementById('practiceName').value.trim().replace(/\s+/g, '_') || 'Practice';
-  const link = document.createElement('a');
-  link.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + generatedWorkbook;
-  link.download = `${name}_Assessment_Workbook.xlsx`;
-  link.click();
+function practiceFileBase() {
+  return (document.getElementById('practiceName').value.trim().replace(/\s+/g, '_') || 'Practice');
 }
 
-/* Open the HTML report in a new tab via blob URL so the user can view / share / print-to-PDF */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+function downloadJson() {
+  if (!generatedData) return;
+  const blob = new Blob([JSON.stringify(generatedData, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, `${practiceFileBase()}_Assessment_Data.json`);
+}
+
+/* Flatten the canonical data object into a CSV of Section,Key,Value rows */
+function dataToCsv(d) {
+  const rows = [['Section', 'Key', 'Value']];
+  const esc = v => {
+    if (v == null) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const addRow = (section, key, value) => rows.push([esc(section), esc(key), esc(value)]);
+  const walk = (section, obj) => {
+    if (obj == null || typeof obj !== 'object') { addRow(section, '', obj); return; }
+    for (const [k, v] of Object.entries(obj)) {
+      if (v == null || typeof v !== 'object') addRow(section, k, v);
+      else if (Array.isArray(v)) addRow(section, k, v.length + ' items');
+      else walk(section + '.' + k, v);
+    }
+  };
+  walk('meta', { version: d.version, generatedAt: d.generatedAt });
+  walk('practice', d.practice);
+  walk('period', d.period);
+  walk('kpis', d.kpis);
+  walk('collections', d.collections);
+  walk('financials', d.financials);
+  walk('goals.current', d.goals?.current);
+  walk('goals.shortTerm', d.goals?.shortTerm);
+  walk('goals.longTerm', d.goals?.longTerm);
+  walk('production.byCategory', d.production?.byCategory);
+  /* Opportunities: one row per opp */
+  (d.opportunities?.top3 || []).forEach((o, i) => {
+    addRow('opportunities.top3', `#${i + 1} title`, o.title);
+    addRow('opportunities.top3', `#${i + 1} value`, Math.round(o.value));
+  });
+  addRow('opportunities', 'totalValue', Math.round(d.opportunities?.totalValue || 0));
+  /* SWOT: one row per bullet */
+  (d.swot?.strengths || []).forEach((s, i) => addRow('swot.strengths', `#${i + 1}`, s));
+  (d.swot?.weaknesses || []).forEach((s, i) => addRow('swot.weaknesses', `#${i + 1}`, s));
+  (d.swot?.opportunities || []).forEach((s, i) => addRow('swot.opportunities', `#${i + 1}`, s));
+  (d.swot?.threats || []).forEach((s, i) => addRow('swot.threats', `#${i + 1}`, s));
+  return rows.map(r => r.join(',')).join('\n');
+}
+
+function downloadCsv() {
+  if (!generatedData) return;
+  const csv = dataToCsv(generatedData);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, `${practiceFileBase()}_Assessment_Data.csv`);
+}
+
+/* Open the HTML report in a new tab via blob URL so the user can view / share / print-to-PDF.
+   The server returns reportHtml as a plain UTF-8 string now (no base64). */
 function viewOnlineReport() {
   if (!generatedReportHtml) {
     showGenError('The online report was not produced by the server. Please try regenerating.');
     return;
   }
   try {
-    const binStr = atob(generatedReportHtml);
-    const bytes = new Uint8Array(binStr.length);
-    for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-    const blob = new Blob([bytes], { type: 'text/html;charset=utf-8' });
+    const blob = new Blob([generatedReportHtml], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank', 'noopener');
     /* Revoke after a generous delay so the new tab has time to load */
@@ -2521,7 +2082,7 @@ function viewOnlineReport() {
 function resetAll() {
   files = { 1: null, 2: null, 3: null, 4: null, 5: null };
   skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
-  generatedWorkbook = null;
+  generatedData = null;
   generatedReportHtml = null;
   document.getElementById('resultCard').classList.remove('visible');
   document.getElementById('practiceName').value = '';
