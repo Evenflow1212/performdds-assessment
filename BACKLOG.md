@@ -55,12 +55,28 @@ When one gets picked up, move it near the top and flip the status.
 - _how_ — Could start with a manually-curated JSON of carriers-per-state ranked by typical reimbursement tier. Over time, could be fed by aggregated data from Dave's client base (anonymized). Could also consider third-party sources if any exist (most are paid subscriptions).
 - _status_ — idea (2026-04-16) — gating specific-PPO naming in the payor-mix SWOT rule above.
 
+### Payor-mix SWOT: incompatible-blend rule (PPO + government/HMO)
+- _why_ — A practice with meaningful PPO volume AND meaningful government/HMO volume (Medicaid, Medi-Cal, HMO) faces a structural growth ceiling for its PPO segment. The high-volume / fast-pace / tight-schedule operational tempo required to make Medicaid and HMO economics work is inherently hostile to the PPO patient experience — longer appointments, relationship-oriented front desk, unhurried chair time. You can't optimize a practice for both at once; the environment itself repels PPO growth. Worth flagging so the consultation can surface the strategic choice: commit to one lane.
+- _how_ — In generateSWOT, when both `(payorMix.ppo ≥ ~20%)` AND `(payorMix.gov + payorMix.hmo ≥ ~20%)`, add a **Weakness** (or **Threat**, TBD) bullet: "The practice is blending PPO with government/HMO volume. Growing the PPO portion is typically hard in this configuration — the pace and style a Medicaid/HMO book demands works against the experience PPO patients expect." Tied to an **Opportunity** bullet about choosing a lane.
+- _open questions_ — thresholds for "large mix"? Quadrant (Weakness vs Threat)? Language for the "choose a lane" opportunity? Catch these when Dave is done freeforming.
+- _status_ — idea (2026-04-16)
+
 ### Teach: Crown value methodology
 - _why_ — Dave mentioned that crown VALUE (not just count) is a key signal for identifying high-cosmetic/boutique practices. Low crown count + high crown value = high-cosmetic. High crown count + low crown value = something else. The distinction matters for both PPO-suggestion logic (above) and general practice profiling.
 - _how_ — Capture the lesson when Dave is ready. Likely feeds into a new `kpis/crown-value.yaml` in the knowledge base and a practice-type classifier that uses it.
 - _status_ — waiting on Dave teaching (2026-04-16)
 
 ## Market context & competitive intel
+
+### Website health score from their URL
+- _why_ — The questionnaire already captures the practice website. A lot of practices haven't touched their site in years — it's slow, not mobile-friendly, missing basic SEO hygiene, buried in Google's results. The assessment could score it automatically and surface an objective "your website gets a 52/100" number that makes the problem visible. Pairs with the Google/Yelp review idea and the market-context idea — together they form a "digital presence" section of the assessment.
+- _how_ — Several free/cheap signals to aggregate:
+  - **Google PageSpeed Insights API** (free, returns Lighthouse scores for Performance, Accessibility, Best Practices, SEO — each 0–100).
+  - **Basic SEO checks** via a HEAD/GET on the URL: HTTPS, mobile viewport meta tag, title/description present, schema.org dental-practice markup, canonical URL, robots.txt, sitemap.
+  - **Google SERP position** — trickier, usually requires a paid API (SerpAPI, DataForSEO). Could start with just the Lighthouse + on-page checks and add ranking later.
+  - **Last-updated heuristic** — parse for copyright year, blog post dates, etc. to flag stale sites.
+  Aggregate into a 0–100 composite score + a "here's what's weak" card on the Report.
+- _status_ — idea (2026-04-16)
 
 ### Google / Yelp review ingestion
 - _why_ — Two practices with identical internal numbers can have very different patient-perceived quality. A 4.9-star practice with 300 Google reviews is in a very different place than a 3.1-star practice with 12 reviews and three recent one-stars about wait times. Reviews surface operational patterns that the numbers can't: staff turnover (names disappearing), front-desk tone, insurance billing surprises, treatment-presentation friction. Including them in the Assessment lets the SWOT reflect *what patients actually say* instead of only what the P&L shows.
