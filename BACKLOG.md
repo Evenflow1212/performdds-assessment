@@ -19,8 +19,15 @@ When one gets picked up, move it near the top and flip the status.
 - _how_ — In generateSWOT, when payorMix.ffs ≥ 70 (and/or ppo = 0), add an **Opportunity** bullet along the lines of: "At [X]% out of network, the practice may be limiting its new-patient pool. Selectively joining 1–2 high-paying PPOs (e.g., Delta Premier / Aetna / MetLife tiers) would make the practice accessible to more patients without wholesale discounting."
   - Tier 1 fire at ffs == 100 (stronger language)
   - Tier 2 fire at ffs ≥ 70 (softer)
-- _open questions_ — see main chat below; Dave wanted to talk these through
-- _status_ — idea (2026-04-16)
+  - **EXEMPTION**: cosmetic/boutique practices. Signals: high $/day, high crown value, low total patient volume (low prophy count), affluent ZIP. For these, do NOT suggest PPOs — their FFS-only posture is the strategy, not an accident.
+  - **Instead for exempted practices**: add a Threat bullet about concentration risk — low patient volume means the practice is highly dependent on a strong economy, and a small number of yes/no decisions can make or break a quarter.
+- _open questions_ — remaining questions in chat; Dave answering one at a time
+- _status_ — idea (2026-04-16, Dave answered Q1)
+
+### Teach: Crown value methodology
+- _why_ — Dave mentioned that crown VALUE (not just count) is a key signal for identifying high-cosmetic/boutique practices. Low crown count + high crown value = high-cosmetic. High crown count + low crown value = something else. The distinction matters for both PPO-suggestion logic (above) and general practice profiling.
+- _how_ — Capture the lesson when Dave is ready. Likely feeds into a new `kpis/crown-value.yaml` in the knowledge base and a practice-type classifier that uses it.
+- _status_ — waiting on Dave teaching (2026-04-16)
 
 ## Market context & competitive intel
 
