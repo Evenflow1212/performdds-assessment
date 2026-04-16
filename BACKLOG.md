@@ -68,6 +68,13 @@ When one gets picked up, move it near the top and flip the status.
 
 ## Market context & competitive intel
 
+### Practice management software cost comparison
+- _why_ — PM software is one of the most opaque, rarely-audited opex lines in a dental practice. Dentrix Ascend can run $200+/user/month — a 6-person practice pays ~$14k/year before any other software fees. Open Dental has no per-user licensing and the annual support is a fraction of that. Most dentists never revisit the decision after the initial purchase. The assessment already captures which PM they use (questionnaire → `pmSoftware`); we can surface a dollar-quantified savings Opportunity when they're on an expensive platform.
+- _how_ — Build a small static table of current pricing per platform (Dentrix on-prem, Dentrix Ascend, Eaglesoft, Open Dental, Curve, Carestack, Easy Dental, Practice-Web). Use the practice's `pmSoftware` + approximate user count (staff + hygiene arrays from employee costs form) to estimate their current annual spend. If they're on a high-cost platform, add an **Opportunity** bullet: "Switching to Open Dental could save approximately $X,XXX/year in software costs" with a caveat that migration has switching costs (training time, data conversion, workflow relearn).
+  - **Research action**: WebSearch for current 2025–2026 pricing of each major PM platform when spec'ing this. Prices shift frequently.
+  - **Sensitivity note**: recommending a switch is heavy-handed. Framing should be "worth evaluating" not "you should move."
+- _status_ — idea (2026-04-16)
+
 ### Website health score from their URL
 - _why_ — The questionnaire already captures the practice website. A lot of practices haven't touched their site in years — it's slow, not mobile-friendly, missing basic SEO hygiene, buried in Google's results. The assessment could score it automatically and surface an objective "your website gets a 52/100" number that makes the problem visible. Pairs with the Google/Yelp review idea and the market-context idea — together they form a "digital presence" section of the assessment.
 - _how_ — Several free/cheap signals to aggregate:
