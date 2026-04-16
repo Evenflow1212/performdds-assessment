@@ -27,6 +27,7 @@ When one gets picked up, move it near the top and flip the status.
     - Still fire the PPO "consider this" nudge regardless of NP flow, but with a **caveat** built into the language: "we know it's not easy to earn a living out of network; if being out-of-network is core to the practice identity, skip this — just something to consider." So the bullet reads less like a prescription and more like an option.
   - **Phrasing — stay generic for v1** (answer to Q3): don't name specific PPO carriers in the SWOT text. Keep it "high-paying PPOs" and let the consultation call do the naming. Revisit once we build per-state reimbursement intelligence (see follow-up below).
   - **Quadrant assignment** (answer to Q4): clean separation — low new-patient count goes in **Weakness** (the symptom), adding a PPO goes in **Opportunity** (the lever). They reference the same underlying issue but belong in their own quadrants.
+  - **Dollar quantification** (answer to Q5): rough formula is `10-15 additional new patients/month × PPO patient first-year national average spend`. Need to research the benchmark — what does a new PPO patient typically spend in their first 12 months at a new dentist? Industry research gives us $1,500–$2,500 as a rough range; tighten with a real source before shipping. _Action item_: WebSearch for "PPO new patient first year value dental" when spec'ing this rule, or pull from ADA Health Policy Institute data.
 - _open questions_ — remaining questions in chat; Dave answering one at a time
 - _status_ — idea (2026-04-16, Dave answered Q1 + Q2)
 
