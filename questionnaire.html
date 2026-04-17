@@ -750,6 +750,17 @@
         </div>
       </div>
 
+      <div class="q-row">
+        <div class="q-group">
+          <label class="q-label">Patients per hygienist per day</label>
+          <div class="q-hint">PPO practices typically run 8 / day; Medicaid / HMO practices often run 10 / day. This is a key input for hygiene capacity math.</div>
+          <div class="q-number-wrap">
+            <input type="number" class="q-input q-tracked" name="patientsPerHygienistPerDay" placeholder="8" min="1" max="20">
+            <span class="q-unit">patients / day</span>
+          </div>
+        </div>
+      </div>
+
       <div class="q-group">
         <label class="q-label">Do you have an associate?</label>
         <div class="q-toggle-row">
@@ -1035,6 +1046,7 @@
       },
       doctorDays: parseInt(document.querySelector('[name="doctorDays"]').value) || 0,
       numHygienists: parseInt(document.querySelector('[name="numHygienists"]').value) || 0,
+      patientsPerHygienistPerDay: parseInt(document.querySelector('[name="patientsPerHygienistPerDay"]').value) || 0,
       hasAssociate: document.querySelector('input[name="hasAssociate"]:checked')?.value === 'yes',
       associateDays: parseInt(document.querySelector('[name="associateDays"]').value) || 0,
       opsActive: parseInt(document.querySelector('[name="opsActive"]').value) || 0,
@@ -1089,7 +1101,7 @@
       /* Simple text/number fields */
       const setByName = (n, v) => { const el = document.querySelector('[name="' + n + '"]'); if (el && v != null) el.value = v; };
       ['zipCode','website','yearsOwned','ownerAge','pmSoftware',
-       'doctorDays','numHygienists','associateDays','opsActive','opsTotal',
+       'doctorDays','numHygienists','patientsPerHygienistPerDay','associateDays','opsActive','opsTotal',
        'docDailyAvg','assocDailyAvg','hygDailyAvg','crownsPerMonth','biggestChallenge']
         .forEach(k => setByName(k, pp[k]));
       /* Sliders for payor mix — fire input so clamp/total UI updates */
