@@ -175,6 +175,37 @@ _(Dave said: mathematical correctness first, visual polish later — nothing her
 
 ---
 
+## Report polish — queued during review-page build (2026-04-16 evening)
+
+Dave flagged these while I was mid-build on the internal review page. Not touching them yet; capture-only.
+
+### Hygiene % of Production benchmark is too low
+- _current_ — Report card says "Target 30–33%"
+- _fix_ — raise to **30–35%** baseline; it's regional so ideally the benchmark flexes by ZIP code. Dave said "more like 35%" — may trend higher in affluent / FFS markets.
+- _how_ — hardcoded benchmark lives in `generate-report.js` `renderReportHtml` (search "30-33%" or similar). Bump to 30–35% for v1. ZIP-based adjustment is a follow-up — would need a lookup table (urban/metro = higher hygiene %, rural = lower).
+- _status_ — idea (2026-04-16), easy fix for v1 + gated regional follow-up
+
+### AR display — show full aging breakdown, not just 90+ days
+- _current_ — Report shows two compact cards: "Patient AR (90+ days) $9,765 of $120,145 total" and same for insurance. Only surfaces the 90+ bucket.
+- _fix_ — Show the full aging table for both patient and insurance AR: **current / 30–60 / 60–90 / 90+ / total** in each row. The data is already on `d.ar.patient.{current,d3160,d6190,d90plus,total}` and same for insurance — just render it.
+- _why_ — Dave reads the aging distribution, not just the 90+ number. An AR book with 70% current is very different from one with 70% 60+ even if the 90+ dollar amount looks similar.
+- _how_ — replace the two 90+ cards in `renderReportHtml` (search for "Patient AR (90+") with a small 2×5 table (rows = patient/insurance, columns = buckets + total). Compact styling so it doesn't blow up the scorecard grid.
+- _status_ — idea (2026-04-16)
+
+### Goals table — round $/day figures to nearest $100
+- _current_ — Report shows hygiene $/day Short-term $1,002 / Fully Optimized $1,202 and doctor $4,215 / $4,765 — ugly odd numbers because they're computed as `current + $200` / `current × 1.15`.
+- _fix_ — round all displayed $/day goal figures to the nearest **$100**. $1,002 → $1,000. $1,202 → $1,200. $4,215 → $4,200. $4,765 → $4,800.
+- _how_ — in `generate-report.js` `computeReportData` around the goal-matrix computation, round `gShortDocDaily / gShortHygDaily / gLongDocDaily / gLongHygDaily` to nearest 100 before returning. `Math.round(x / 100) * 100`.
+- _status_ — idea (2026-04-16), one-line fix
+
+### "Where production comes from" — drop donut, keep bar chart only
+- _current_ — two visualizations side-by-side: Production by Category (horizontal bar) + Doctor vs Hygiene vs Specialty (donut)
+- _fix_ — remove the donut. Keep the bar chart. **Add % at the end of each bar** (e.g. "General Dentistry $1,055,000 — 64%").
+- _why_ — Dave doesn't need both; the bar chart already shows the split visually, the donut is redundant.
+- _status_ — idea (2026-04-16)
+
+---
+
 ## Rescued from the dead session (2026-04-16, bold-bassi worktree)
 
 These items were decided in conversation after the last commit but before an API error ("image exceeds 2000px many-image limit") bricked the session. Recovered from the JSONL on disk.

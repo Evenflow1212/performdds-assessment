@@ -1318,8 +1318,8 @@
       <button class="btn btn-secondary" onclick="downloadCsv()" style="display:inline-flex;align-items:center;gap:8px;">
         ⬇ Download Data (CSV)
       </button>
-      <button class="btn btn-secondary" onclick="downloadDebugXlsx()" style="display:inline-flex;align-items:center;gap:8px;" title="Internal math x-ray: every KPI with its formula and inputs visible">
-        🔍 Download Debug Workbook (Excel)
+      <button class="btn btn-secondary" onclick="viewIntakeData()" id="viewIntakeBtn" style="display:inline-flex;align-items:center;gap:8px;" title="Internal — every intake field + every computed KPI in a single review-friendly HTML page">
+        🔎 View Intake Data (Internal)
       </button>
     </div>
 
@@ -1345,6 +1345,7 @@ let files = { 1: null, 2: null, 3: null, 4: null, 5: null };
 let skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
 let generatedData = null;        /* canonical data object from /generate-report */
 let generatedReportHtml = null;  /* HTML report (plain UTF-8 string) from server */
+let generatedReviewHtml = null;  /* Internal HTML review page — Dave's verification view, not a client deliverable */
 
 /* ─── Dev autofill ─────────────────────────────────────────────
    Visit /assessment_hub.html?autofill=pigneri to auto-populate the
@@ -1993,9 +1994,12 @@ async function generate() {
     if (!data.success) throw new Error(data.error || data.errorMessage || 'Generation failed (no error detail)');
     generatedData = data.data;
     generatedReportHtml = data.reportHtml || null;
+    generatedReviewHtml = data.reviewHtml || null;
     /* Hide the "View Online Report" button if the server didn't produce one */
     const vrBtn = document.getElementById('viewReportBtn');
     if (vrBtn) vrBtn.style.display = generatedReportHtml ? 'inline-flex' : 'none';
+    const viBtn = document.getElementById('viewIntakeBtn');
+    if (viBtn) viBtn.style.display = generatedReviewHtml ? 'inline-flex' : 'none';
     const sv = data.summary?.version || 'unknown';
     console.log('Report received. Version:', sv, 'HTML size:', generatedReportHtml ? Math.round(generatedReportHtml.length / 1024) + 'KB' : 'none');
     console.log('Timing:', data.summary?.timingMs + 'ms');
@@ -2666,11 +2670,31 @@ function viewOnlineReport() {
   }
 }
 
+/* Open the internal review page — Dave's verification view of every intake
+   field + computed KPI. Not a client deliverable; replaces the old Debug
+   Workbook Excel download. */
+function viewIntakeData() {
+  if (!generatedReviewHtml) {
+    showGenError('The review page was not produced by the server. Please try regenerating.');
+    return;
+  }
+  try {
+    const blob = new Blob([generatedReviewHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    console.error('viewIntakeData failed', e);
+    showGenError('Could not open the intake review page: ' + (e && e.message ? e.message : String(e)));
+  }
+}
+
 function resetAll() {
   files = { 1: null, 2: null, 3: null, 4: null, 5: null };
   skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
   generatedData = null;
   generatedReportHtml = null;
+  generatedReviewHtml = null;
   document.getElementById('resultCard').classList.remove('visible');
   document.getElementById('practiceName').value = '';
   [1,2,3,4,5].forEach(n => {
