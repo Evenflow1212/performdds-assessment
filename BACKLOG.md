@@ -212,6 +212,18 @@ These items were decided in conversation after the last commit but before an API
 - _how_ — Trim whitespace, strip punctuation not safe for filenames, cap length. Gentle — don't block the user, just clean.
 - _status_ — idea (2026-04-16)
 
+### "Save Progress" button on the Hub
+- _why_ — Right now the Hub lives entirely in the browser's sessionStorage / in-memory JS state. Refresh the page and you lose every uploaded PDF + every typed-in field. A dentist interrupted mid-assessment (takes a call, closes laptop, browser crashes) has to start over — hostile UX that discourages completion. Dave flagged this 2026-04-16 during a live run.
+- _how_ — Server-side persistence (Dave's instinct is right: needs a backend). Options, cheapest → richest:
+  1. **Netlify Blobs** (already on Netlify, no new infra) — key the blob to a generated session UUID, store it in localStorage on the user's device. "Resume" link can be a `?session=<uuid>` URL.
+  2. **Supabase / Firebase** — if we want real accounts, cross-device resume, or admin visibility into in-flight assessments.
+  3. **AWS S3 + DynamoDB** — Dave's mention, most flexible but more to manage.
+  - Data to persist: canonical form state (all 8 steps), uploaded PDF bytes (or their parsed text — PDFs are smaller after text extraction), the practice profile from the questionnaire.
+  - Privacy note: dentist data is sensitive. Whatever backend we pick needs encryption-at-rest and short retention (30 days?) unless Dave turns the account into a real saved profile.
+  - UI: "Save & Continue Later" button on every step, returns a resume link the user can email themselves or bookmark.
+- _dependencies_ — no existing backend-state story; this is the first thing that would require one.
+- _status_ — idea (2026-04-16) — requires server-side infra decision before implementation
+
 ### Test data: Pigneri Dental Group AR numbers (for seeding)
 The real AR values from today's Pigneri PDFs, useful for any Run Full Test Assessment automation:
 - Patient — Current: $110,195.68 / 31–60: $1 / 61–90: $183 / Over 90: $9,765.39 / **Total: $120,145.07**
