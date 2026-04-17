@@ -603,10 +603,14 @@ function computeReportData(input) {
     ...(costPct != null ? { costPct } : {}),
   });
 
+  /* Cost semantics by stream: general dentist / associate / hygiene / cap
+     use `cost` = $ per day (so G = cost × days). Specialties (perio / endo /
+     oralSurg / ortho / other) use `costPct` = fraction of monthly production
+     (so G = costPct × monthly). */
   const targetsInitial = {
     generalDentist: buildTargetsRow(doctorDays, initialGeneralDaily, 0, null),
-    associateGP:    buildTargetsRow(associateDaysPerMonth, initialAssocDaily, null, 700),
-    hygiene:        buildTargetsRow(hygDaysPerMonth, initialHygDaily, null, 600),
+    associateGP:    buildTargetsRow(associateDaysPerMonth, initialAssocDaily, 700, null),
+    hygiene:        buildTargetsRow(hygDaysPerMonth, initialHygDaily, 600, null),
     perioSurgery:   buildTargetsRow(daysFromMonthly(monthlyPerio, 5000), 5000, null, 0.50),
     endo:           buildTargetsRow(daysFromMonthly(monthlyEndo, 5000), 5000, null, 0.50),
     oralSurgery:    buildTargetsRow(daysFromMonthly(monthlySurg, 8000), 8000, null, 0.50),
@@ -622,8 +626,8 @@ function computeReportData(input) {
   const longTermHygDaily = initialHygDaily + 250;
   const targetsLongTerm = {
     generalDentist: buildTargetsRow(doctorDays, longTermGeneralDaily, 0, null),
-    associateGP:    buildTargetsRow(associateDaysPerMonth, initialAssocDaily, null, 700),
-    hygiene:        buildTargetsRow(hygDaysPerMonth, longTermHygDaily, null, 600),
+    associateGP:    buildTargetsRow(associateDaysPerMonth, initialAssocDaily, 700, null),
+    hygiene:        buildTargetsRow(hygDaysPerMonth, longTermHygDaily, 600, null),
     perioSurgery:   buildTargetsRow(targetsInitial.perioSurgery.days, 10000, null, 0.50),
     endo:           buildTargetsRow(targetsInitial.endo.days, 5000, null, 0.50),
     oralSurgery:    buildTargetsRow(targetsInitial.oralSurgery.days, 8000, null, 0.50),

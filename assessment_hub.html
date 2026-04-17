@@ -2328,6 +2328,10 @@ async function downloadDebugXlsx() {
     /* Totals (row 17 monthly, row 18 annual) */
     setCell(tg, 'E17', Math.round(tgt.initialMonthly || 0), FMT.money);
     setCell(tg, 'E18', Math.round(tgt.initialAnnual || 0), FMT.money);
+    /* Specialist cost total G18 = sum of specialty G cells (rows 11-16) */
+    const specialistCostInitial = ['perioSurgery','endo','oralSurgery','ortho','cap','other']
+      .reduce((s, k) => s + ((ini[k]?.costPct || 0) * (ini[k]?.days || 0) * (ini[k]?.daily || 0)), 0);
+    setCell(tg, 'G18', Math.round(specialistCostInitial), FMT.money);
 
     /* Long Term Monthly Goal — rows 22-30 */
     const lt = tgt.longTerm || {};
@@ -2342,6 +2346,9 @@ async function downloadDebugXlsx() {
     writeRow(tg, 30, lt.other);
     setCell(tg, 'E31', Math.round(tgt.longTermMonthly || 0), FMT.money);
     setCell(tg, 'E32', Math.round(tgt.longTermAnnual || 0), FMT.money);
+    const specialistCostLongTerm = ['perioSurgery','endo','oralSurgery','ortho','cap','other']
+      .reduce((s, k) => s + ((lt[k]?.costPct || 0) * (lt[k]?.days || 0) * (lt[k]?.daily || 0)), 0);
+    setCell(tg, 'G32', Math.round(specialistCostLongTerm), FMT.money);
   }
 
   /* ═══ P&L INPUT ═══ foundational numbers. B2 months, H2 total P&L
