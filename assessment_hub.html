@@ -1695,24 +1695,23 @@ async function extractARFromPdf(file, type) {
       }
     }
 
-/* ─── Helper: extract PDF via Claude Vision (for Eaglesoft + other non-Dentrix
-     vendors). Sends the PDF base64 to /.netlify/functions/parse-pdf with the
-     type (production | collections | pl) and software tag. Server returns
-     text already in the pipe-delimited schema our server-side parsers expect. ─── */
+/* ─── Helper: extract PDF text via pdf.js, then normalize via Claude.
+     For Eaglesoft / other non-Dentrix vendors. We extract raw text
+     client-side with pdf.js (free, fast, no rate limits), then POST the
+     TEXT (not PDF bytes) to /.netlify/functions/parse-pdf. Server Claude
+     call consumes ~10× fewer input tokens this way, avoiding the
+     per-minute rate limit that bit parallel full-PDF extraction. ─── */
 async function parseViaClaude(file, type, software) {
-  const buf = await file.arrayBuffer();
-  /* Convert ArrayBuffer → base64 (chunked to avoid call-stack overflow on large PDFs) */
-  const bytes = new Uint8Array(buf);
-  let bin = '';
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-  const pdfBase64 = btoa(bin);
+  /* Step 1 — pdf.js client-side text extraction */
+  const { allRows } = await pdfToTextRows(file);
+  const rawText = allRows.join('\n');
+  console.log(`parseViaClaude: type=${type}, software=${software}, extracted ${rawText.length} chars from ${allRows.length} rows`);
 
-  console.log(`parseViaClaude: type=${type}, software=${software}, ${Math.round(bytes.length / 1024)}KB`);
+  /* Step 2 — Claude normalization to pipe-delimited schema */
   const resp = await fetch('/.netlify/functions/parse-pdf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pdfBase64, type, software })
+    body: JSON.stringify({ rawText, type, software })
   });
   if (!resp.ok) {
     const errText = await resp.text().catch(() => '');
@@ -1720,7 +1719,7 @@ async function parseViaClaude(file, type, software) {
   }
   const data = await resp.json();
   if (!data.success || !data.text) throw new Error(`parse-pdf (${type}/${software}) returned no text: ${JSON.stringify(data).slice(0, 200)}`);
-  console.log(`parseViaClaude: got ${data.text.length} chars for ${type}`);
+  console.log(`parseViaClaude: got ${data.text.length} chars back for ${type}`);
   return data.text;
 }
 

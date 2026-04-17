@@ -89,8 +89,13 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); } catch (e) { return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { pdfBase64, type, software = 'dentrix' } = body;
-  if (!pdfBase64 || !type) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'pdfBase64 and type required' }) };
+  const { pdfBase64, rawText, type, software = 'dentrix' } = body;
+  /* Accept EITHER pdfBase64 (document attachment — expensive input tokens)
+     OR rawText (text already extracted by client-side pdf.js — cheap).
+     Prefer rawText when available to stay well under the per-minute input
+     token rate limit. */
+  if (!pdfBase64 && !rawText) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'pdfBase64 or rawText required' }) };
+  if (!type) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'type required' }) };
 
   /* Prompt lookup: P&L is vendor-agnostic; production/collections dispatch by software. */
   let prompt;
@@ -100,17 +105,25 @@ exports.handler = async function(event) {
   if (!prompt) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: `Invalid type "${type}" or software "${software}"` }) };
 
   try {
-    console.log(`parse-pdf: calling Claude for type=${type}, software=${software}`);
+    const mode = rawText ? 'rawText' : 'pdfBase64';
+    console.log(`parse-pdf: calling Claude for type=${type}, software=${software}, mode=${mode}, size=${rawText ? rawText.length + ' chars' : Math.round(pdfBase64.length * 0.75) + ' bytes'}`);
+
+    /* Build message content: prefer rawText (cheap, fast, no rate-limit hazard).
+       Fall back to PDF document attachment only if no rawText provided. */
+    const content = rawText
+      ? [{ type: 'text', text: prompt + '\n\nRAW TEXT EXTRACTED FROM PDF:\n\n' + rawText }]
+      : [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+          { type: 'text', text: prompt }
+        ];
+
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: TOKEN_LIMITS[type] || 4096,
-        messages: [{ role: 'user', content: [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
-          { type: 'text', text: prompt }
-        ]}]
+        messages: [{ role: 'user', content }]
       })
     });
 
