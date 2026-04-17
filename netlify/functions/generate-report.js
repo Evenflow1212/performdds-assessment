@@ -1263,7 +1263,7 @@ function renderReviewHtml(data, rawTexts = {}) {
     ['Doctor (general)', fmtMoney(cat.doctor), fmtPct(totalProd > 0 ? (cat.doctor || 0) / totalProd * 100 : 0)],
     ['Perio', fmtMoney(cat.perio), fmtPct(totalProd > 0 ? (cat.perio || 0) / totalProd * 100 : 0)],
     ['Endo', fmtMoney(cat.endo), fmtPct(totalProd > 0 ? (cat.endo || 0) / totalProd * 100 : 0)],
-    ['Oral Surgery', fmtMoney(cat.surg), fmtPct(totalProd > 0 ? (cat.surg || 0) / totalProd * 100 : 0)],
+    ['Oral Surgery', fmtMoney(cat.oralSurgery), fmtPct(totalProd > 0 ? (cat.oralSurgery || 0) / totalProd * 100 : 0)],
     ['Ortho', fmtMoney(cat.ortho), fmtPct(totalProd > 0 ? (cat.ortho || 0) / totalProd * 100 : 0)],
     ['Cosmetic', fmtMoney(cat.cosmetic), fmtPct(totalProd > 0 ? (cat.cosmetic || 0) / totalProd * 100 : 0)],
   ];
@@ -1444,7 +1444,7 @@ function renderReviewHtml(data, rawTexts = {}) {
     const storedSum = cat === 'Hygiene' ? (production.byCategory?.hygiene || 0)
       : cat === 'Perio' ? (production.byCategory?.perio || 0)
       : cat === 'Endo'  ? (production.byCategory?.endo || 0)
-      : cat === 'Oral Surgery' ? (production.byCategory?.surg || 0)
+      : cat === 'Oral Surgery' ? (production.byCategory?.oralSurgery || 0)
       : cat === 'Ortho' ? (production.byCategory?.ortho || 0)
       : cat === 'Cosmetic' ? (production.byCategory?.cosmetic || 0)
       : (production.byCategory?.doctor || 0);
