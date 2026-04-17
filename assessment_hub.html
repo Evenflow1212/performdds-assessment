@@ -2280,24 +2280,46 @@ async function downloadDebugXlsx() {
     });
   }
 
-  /* ═══ TARGETS & GOAL ═══ current days + achieved $/day per stream.
-     Long-term block (rows 22-30) left at template defaults until the Goals
-     tab rebuild — see BACKLOG.md "Rebuild the Goals tab properly". */
+  /* ═══ TARGETS & GOAL ═══ fully driven by the backend synthesis.
+     Initial Monthly Target (rows 8-16) and Long Term Monthly Goal (rows 22-30)
+     each have {days, daily} per stream. E (monthly), G (cost), H (% or daily)
+     populate as well — template formulas for E and G compute from these. */
   const tg = wb.Sheets['Targets & Goal'];
-  if (tg) {
-    const docDays = p.doctorDays || 0;
-    const assocDays = p.associateDaysPerMonth || 0;
-    const hygDaysPerMonth = Math.round((p.hygieneDaysPerWeek || 0) * 4.33);
+  const tgt = d.goals?.targets;
+  if (tg && tgt) {
+    const writeRow = (ws, row, data) => {
+      if (!data) return;
+      setCell(ws, `C${row}`, data.days || 0);
+      setCell(ws, `D${row}`, data.daily || 0);
+      /* E column is a formula (=C*D) in the template — leave it to compute.
+         Row 17/18 totals are formulas too. Only populate H (% or daily cost). */
+      if (data.costPct != null) setCell(ws, `H${row}`, data.costPct);
+      else if (data.cost != null) setCell(ws, `H${row}`, data.cost);
+    };
 
-    /* C col = days worked / month, D col = $/day target */
-    setCell(tg, 'C8', docDays);
-    if (k.ownerDocDailyAvg || k.combinedDocDailyAvg) {
-      setCell(tg, 'D8', Math.round(k.ownerDocDailyAvg || k.combinedDocDailyAvg));
-    }
-    setCell(tg, 'C9', assocDays);
-    if (k.associateDocDailyAvg) setCell(tg, 'D9', Math.round(k.associateDocDailyAvg));
-    setCell(tg, 'C10', hygDaysPerMonth);
-    if (k.hygDailyAvg) setCell(tg, 'D10', Math.round(k.hygDailyAvg));
+    /* Initial Monthly Target — rows 8-16 */
+    const ini = tgt.initial || {};
+    writeRow(tg, 8, ini.generalDentist);
+    writeRow(tg, 9, ini.associateGP);
+    writeRow(tg, 10, ini.hygiene);
+    writeRow(tg, 11, ini.perioSurgery);
+    writeRow(tg, 12, ini.endo);
+    writeRow(tg, 13, ini.oralSurgery);
+    writeRow(tg, 14, ini.ortho);
+    writeRow(tg, 15, ini.cap);
+    writeRow(tg, 16, ini.other);
+
+    /* Long Term Monthly Goal — rows 22-30 */
+    const lt = tgt.longTerm || {};
+    writeRow(tg, 22, lt.generalDentist);
+    writeRow(tg, 23, lt.associateGP);
+    writeRow(tg, 24, lt.hygiene);
+    writeRow(tg, 25, lt.perioSurgery);
+    writeRow(tg, 26, lt.endo);
+    writeRow(tg, 27, lt.oralSurgery);
+    writeRow(tg, 28, lt.ortho);
+    writeRow(tg, 29, lt.cap);
+    writeRow(tg, 30, lt.other);
   }
 
   /* ═══ P&L INPUT ═══ foundational numbers. B2 months, H2 total P&L
@@ -2310,14 +2332,32 @@ async function downloadDebugXlsx() {
     setCell(pli, 'H2', Math.round(fin.plIncome || 0));
   }
 
-  /* ═══ HYGIENE SCHEDULE ═══ just the core inputs from the form; per-day
-     scheduled/seen columns left as 0 until Hub exposes that data on `d`. */
+  /* ═══ HYGIENE SCHEDULE ═══ RDH-scheduled-per-day (row 7) + POTENTIAL
+     block (rows 39-53) populated from backend synthesis. Per-day
+     scheduled/seen appt grid left as 0 until Hub collects that input
+     (see BACKLOG "Empties in Hygiene" once Hub exposes week-by-week data). */
   const hs = wb.Sheets['Hygiene Schedule'];
   if (hs) {
     const nHyg = p.numHygienists || 0;
     /* RDH scheduled per day (C7 mon, E7 tue, G7 wed, I7 thu, K7 fri) */
     ['C7', 'E7', 'G7', 'I7'].forEach(addr => setCell(hs, addr, nHyg));
     if (p.hygieneDaysPerWeek >= 5) setCell(hs, 'K7', nHyg);
+
+    /* POTENTIAL block — from hygienePotential on the canonical data object */
+    const hp = d.goals?.hygienePotential;
+    if (hp) {
+      /* Active patient estimate + new patient estimate */
+      setCell(hs, 'N39', hp.activePatientEstimate);                 /* active patient estimate */
+      setCell(hs, 'N40', hp.newPatientsPerMo);                       /* new patient estimate/mo */
+      setCell(hs, 'N41', hp.perioDiseasePct);                        /* perio disease presence */
+      setCell(hs, 'N42', hp.probingPerioPct);                        /* probing perio positive */
+      /* N45-N47 are formulas in the template that reference N39-N42;
+         populating N39-N42 makes N45/46/47/48 auto-compute. */
+      setCell(hs, 'N51', hp.patientsPerHygienistPerDay);             /* patients scheduled per day */
+      /* N53 = (N48/N51)/12 is a formula; auto-computes daysRequiredPerMo */
+      /* Cross-check: also write the hard-estimate from procedures */
+      setCell(hs, 'H47', hp.activePatientEstimate);                  /* overall patient flow "as per software" fallback */
+    }
   }
 
   /* Financial Overview — the sheet Dave screenshotted first. Covers:

@@ -563,6 +563,110 @@ function computeReportData(input) {
   const gLongHygDaily = goalHygDaily + 400;
   const gLongAnnual = (gLongDocDaily * totalDocDaysYr) + (gLongHygDaily * hygDaysPerYear) + annualSpecialty;
 
+  /* ──── Targets & Goal synthesis (per Dave's Pigneri reference workbook) ────
+     Structure: per-stream rows with {days, daily, monthly}. Initial Monthly
+     Target = current capacity with a modest productivity lift. Long Term
+     Monthly Goal = stretch per BACKLOG rules (+$250 hyg/day, +$500 doc/day,
+     etc.). Specialty days auto-derived from actual specialty production
+     ÷ industry daily target. */
+  const codeQtyAnnual = (prefixes) => {
+    const list = Array.isArray(prefixes) ? prefixes : [prefixes];
+    const matches = (codes || []).filter(c =>
+      list.some(pfx => (c.code || '').toUpperCase().startsWith(pfx.toUpperCase()))
+    );
+    const qty = matches.reduce((s, c) => s + (c.qty || 0), 0);
+    return qty * annualFactor;
+  };
+  const monthlyFromAnnual = (d) => Math.round(d / 12);
+  const daysFromMonthly = (monthlyDollars, dailyRate) =>
+    (monthlyDollars > 0 && dailyRate > 0) ? Math.max(1, Math.round(monthlyDollars / dailyRate)) : 0;
+
+  const hygDaysPerMonth = Math.round(hygieneDaysPerWeek * 4);
+  const docDailyCurrent = Math.round(ownerDocDailyAvg || combinedDocDailyAvg || 0);
+  const hygDailyCurrent = Math.round(hygDailyAvg || 0);
+
+  /* Initial Monthly Target daily rates (industry benchmarks + modest lift) */
+  const initialGeneralDaily = Math.max(4500, docDailyCurrent + 250);
+  const initialAssocDaily = 3000;
+  const initialHygDaily = Math.max(1000, hygDailyCurrent + 200);
+  const initialOtherDaily = 20000;
+
+  /* Specialty monthly production from the byCategory split */
+  const monthlyPerio = monthlyFromAnnual(prodPerio * annualFactor);
+  const monthlyEndo = monthlyFromAnnual(prodEndo * annualFactor);
+  const monthlySurg = monthlyFromAnnual(prodSurg * annualFactor);
+  const monthlyOrtho = monthlyFromAnnual(prodOrtho * annualFactor);
+
+  const buildTargetsRow = (days, daily, cost, costPct) => ({
+    days, daily, monthly: days * daily,
+    ...(cost != null ? { cost } : {}),
+    ...(costPct != null ? { costPct } : {}),
+  });
+
+  const targetsInitial = {
+    generalDentist: buildTargetsRow(doctorDays, initialGeneralDaily, 0, null),
+    associateGP:    buildTargetsRow(associateDaysPerMonth, initialAssocDaily, null, 700),
+    hygiene:        buildTargetsRow(hygDaysPerMonth, initialHygDaily, null, 600),
+    perioSurgery:   buildTargetsRow(daysFromMonthly(monthlyPerio, 5000), 5000, null, 0.50),
+    endo:           buildTargetsRow(daysFromMonthly(monthlyEndo, 5000), 5000, null, 0.50),
+    oralSurgery:    buildTargetsRow(daysFromMonthly(monthlySurg, 8000), 8000, null, 0.50),
+    ortho:          buildTargetsRow(daysFromMonthly(monthlyOrtho, 5000), 5000, null, 0),
+    cap:            buildTargetsRow(0, 0, 0, null),
+    other:          buildTargetsRow(0, initialOtherDaily, null, 0.50),
+  };
+  const targetsInitialMonthly = Object.values(targetsInitial).reduce((s, r) => s + r.monthly, 0);
+  const targetsInitialAnnual = targetsInitialMonthly * 12;
+
+  /* Long Term Monthly Goal (stretch) */
+  const longTermGeneralDaily = initialGeneralDaily + 500;
+  const longTermHygDaily = initialHygDaily + 250;
+  const targetsLongTerm = {
+    generalDentist: buildTargetsRow(doctorDays, longTermGeneralDaily, 0, null),
+    associateGP:    buildTargetsRow(associateDaysPerMonth, initialAssocDaily, null, 700),
+    hygiene:        buildTargetsRow(hygDaysPerMonth, longTermHygDaily, null, 600),
+    perioSurgery:   buildTargetsRow(targetsInitial.perioSurgery.days, 10000, null, 0.50),
+    endo:           buildTargetsRow(targetsInitial.endo.days, 5000, null, 0.50),
+    oralSurgery:    buildTargetsRow(targetsInitial.oralSurgery.days, 8000, null, 0.50),
+    ortho:          buildTargetsRow(targetsInitial.ortho.days + 1, 5000, null, 0),  /* +1 ortho day per BACKLOG rule */
+    cap:            buildTargetsRow(0, 9000, 0, null),
+    other:          buildTargetsRow(0, initialOtherDaily, null, 0.50),
+  };
+  const targetsLongTermMonthly = Object.values(targetsLongTerm).reduce((s, r) => s + r.monthly, 0);
+  const targetsLongTermAnnual = targetsLongTermMonthly * 12;
+
+  /* ──── Hygiene Potential (rows 38–53 of the reference workbook) ────
+     Active patient estimate from procedure volume, then potential appts
+     at industry compliance rates, then hygiene-days-required-per-month. */
+  const prophyAnnual = codeQtyAnnual('D1110');
+  const perioMaintAnnual = codeQtyAnnual('D4910');
+  const srpAnnual = codeQtyAnnual(['D4341', 'D4342']);
+  const compExamAnnual = codeQtyAnnual('D0150');
+
+  const patientsFromProphy = prophyAnnual / 2;
+  const patientsFromPerioMaint = perioMaintAnnual / 4;
+  const patientsFromSRP = srpAnnual / 16;
+  const hardActivePatients = patientsFromProphy + patientsFromPerioMaint + patientsFromSRP;
+  const activePatientEstimate = hardActivePatients > 0 ? Math.round(hardActivePatients / 0.80) : 0;
+  const newPatientsPerMo = compExamAnnual > 0 ? Math.round(compExamAnnual / 12) : 0;
+
+  const perioDiseasePct = 0.30;   /* template default; can be overridden in future */
+  const probingPerioPct = 0.10;
+
+  const totalPatientsPerYear = activePatientEstimate + newPatientsPerMo * 12;
+  const potentialAdultProphy = Math.round(totalPatientsPerYear * (1 - perioDiseasePct) * 2 * 0.80);
+  const potentialPerioMaint = Math.round(totalPatientsPerYear * perioDiseasePct * 4 * 0.50);
+  const potentialSRP = Math.round((potentialAdultProphy + potentialPerioMaint) * probingPerioPct * 2 * 0.75);
+  const potentialApptsTotal = potentialAdultProphy + potentialPerioMaint + potentialSRP;
+
+  const patientsPerHygPerDay = Number(pp.patientsPerHygienistPerDay) || 8;
+  const daysRequiredPerMo = patientsPerHygPerDay > 0 && potentialApptsTotal > 0
+    ? Math.round((potentialApptsTotal / patientsPerHygPerDay) / 12)
+    : 0;
+  const capacityGapDays = Math.max(0, daysRequiredPerMo - hygDaysPerMonth);
+  const capacityGapVisitsPerMo = capacityGapDays * patientsPerHygPerDay;
+  const hygVisitValue = hygDailyAvg && patientsPerHygPerDay > 0 ? hygDailyAvg / patientsPerHygPerDay : 145;  /* fallback industry $/visit */
+  const capacityGapAnnualDollars = Math.round(capacityGapVisitsPerMo * 12 * hygVisitValue);
+
   /* ──── Opportunities (top 3 by $) ──── */
   const opps = [];
   if (collectionRate > 0 && collectionRate < 95) {
@@ -724,6 +828,43 @@ function computeReportData(input) {
       longTerm: { docDaily: gLongDocDaily, hygDaily: gLongHygDaily, annual: gLongAnnual },
       totalDocDaysPerYear: totalDocDaysYr,
       hygDaysPerYear,
+
+      /* Per-stream Targets & Goal matrix — mirrors the reference workbook
+         structure (general / associate / hygiene / specialties) with
+         {days, daily, monthly} on each row. Initial = current-capacity
+         lift, Long Term = stretch. */
+      targets: {
+        initial: targetsInitial,
+        initialMonthly: targetsInitialMonthly,
+        initialAnnual: targetsInitialAnnual,
+        longTerm: targetsLongTerm,
+        longTermMonthly: targetsLongTermMonthly,
+        longTermAnnual: targetsLongTermAnnual,
+      },
+
+      /* Hygiene capacity potential — what the practice COULD be doing
+         given its actual patient base (active patient estimate from
+         procedure counts + industry compliance rates). */
+      hygienePotential: {
+        activePatientEstimate,
+        newPatientsPerMo,
+        perioDiseasePct,
+        probingPerioPct,
+        hardActivePatientsFromProcedures: Math.round(hardActivePatients),
+        potentialAppts: {
+          adultProphy: potentialAdultProphy,
+          perioMaint: potentialPerioMaint,
+          srp: potentialSRP,
+          total: potentialApptsTotal,
+        },
+        patientsPerHygienistPerDay: patientsPerHygPerDay,
+        daysRequiredPerMo,
+        currentHygDaysPerMo: hygDaysPerMonth,
+        capacityGapDays,
+        capacityGapVisitsPerMo,
+        capacityGapAnnualDollars,
+        hygVisitValue: Math.round(hygVisitValue),
+      },
     },
 
     opportunities: {
