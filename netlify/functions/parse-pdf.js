@@ -29,37 +29,35 @@ PAYMENTS|[number as positive]`,
   },
 
   eaglesoft: {
-    production: `Eaglesoft "Service codes productivity master" report. This report has 9 columns per row, in this exact order left-to-right:
+    production: `Eaglesoft "Service codes productivity master" report. Extract every procedure code with its quantity and dollar total.
 
-  1. Code (internal Eaglesoft code, e.g. 02740, 4BWH, PANOH)
-  2. ADA Code (starts with D, e.g. D2740 — SOMETIMES BLANK for custom/retail items)
-  3. Description
-  4. Stand Fee (the practice's standard fee)
-  5. Avg Fee (average charged fee)
-  6. This Month Units
-  7. This Month Production
-  8. This Year Units   ← THIS IS QTY (use this, NOT This Month)
-  9. This Year Production   ← THIS IS TOTAL (use this, NOT This Month)
+COLUMN LAYOUT (pdf.js flattens to one line per row; values read left-to-right):
+  [This Year Production] [This Year Units] [Avg Fee] [Stand Fee] [Internal Code] [Description] [ADA Code] [This Month Units] [This Month Production]
 
-CRITICAL: you MUST use columns 8 and 9 (This Year), NOT columns 6 and 7 (This Month). The last two numeric values on each row are always This Year figures. If you see a row with only 4 numbers after the description, those are Stand Fee / Avg Fee / This Year Units / This Year Production (This Month was zero and got collapsed). The This Year values are cumulative-to-date across the full reporting period.
+That's 9 values per row. Use the FIRST two (This Year Production, This Year Units) — NOT the last two (This Month).
 
-For the DATE range, look for a "From EOD: ... To EOD: ..." header line. Convert mm/dd/yy to MM/DD/YYYY (20YY for 2-digit year). If no date range is visible, emit DATES|THIS_YEAR.
+DATE RANGE — emit this as the FIRST line of output, format "DATES|MM/DD/YYYY - MM/DD/YYYY":
+- Priority 1: if a "From EOD: ... To EOD: ..." header exists, use those dates (expand YY to 20YY).
+- Priority 2: if the first line of the report has a "DATE MM/DD/YYYY" stamp (the report-run date) and the report header mentions "This Year" columns, emit DATES|01/01/YYYY - MM/DD/YYYY where YYYY is the year from the stamp and MM/DD/YYYY is the stamp date itself. This treats the period as year-to-date.
+- Priority 3: if you genuinely cannot determine a date range, emit DATES|01/01/2024 - 12/31/2024 as a placeholder — but DO NOT skip extracting the codes. Always return the code data.
 
-For each procedure row:
-- Use the ADA Code column as CODE (must start with D). If the ADA Code column is empty, SKIP that row entirely.
-- Use This Year Units as QTY.
-- Use This Year Production as TOTAL (strip $ and commas; negative values use a minus sign, not parens).
-- If multiple rows share the same ADA code (e.g., D1206 appears under different internal codes), SUM units and production into a single line.
-- Skip rows where This Year Units = 0 AND This Year Production = 0.
-- Sanity check: if your total production across ALL rows is less than $500,000, you are almost certainly reading the wrong column — re-read and use This Year, not This Month.
+PROCEDURE ROWS:
+- Use the ADA Code column (D-prefix, e.g. D0120, D2740) as CODE. If the ADA Code column is blank for a row, SKIP that row.
+- Use This Year Units as QTY (integer).
+- Use This Year Production as TOTAL (strip $ and commas; use minus sign for negatives, not parens).
+- If multiple rows share the same ADA Code (e.g. D1206 under different internal codes), SUM units and production into a single output line.
+- Skip rows where both This Year Units = 0 AND This Year Production = 0.
 
-Return ONLY lines in this format — no other text:
-First line: DATES|MM/DD/YYYY - MM/DD/YYYY
-Then one line per ADA code: CODE|DESCRIPTION|QTY|TOTAL
+CRITICAL OUTPUT RULES:
+- First output line MUST be exactly "DATES|MM/DD/YYYY - MM/DD/YYYY" — one DATES prefix, one date range. Never "DATES|DATES|..." or "DATES|THIS_YEAR".
+- Never write prose explanations or refuse. Always emit the code data. If a field is ambiguous, pick the most plausible value and move on.
+- Pipe-delimited, one row per output line, no headers, no commentary.
+
 Example:
-DATES|01/01/2024 - 12/31/2024
-D0120|Periodic Oral Evaluation|652|41200.00
-D1110|Prophylaxis - Adult|1204|154500.00`,
+DATES|01/01/2026 - 01/16/2026
+D0120|Periodic Oral Eval|169|9066.76
+D1110|Prophylaxis - Adults|129|14045.10
+D2740|Crown Porc/Ceram Subs|15|18948.00`,
 
     collections: `Eaglesoft "Day Sheet" summary report. You need to find the GRAND TOTAL row at the very end of the document — not per-section or per-provider subtotals.
 
