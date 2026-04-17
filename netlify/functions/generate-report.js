@@ -1192,11 +1192,10 @@ function renderReportHtml(data) {
 
 /*
  * renderReviewHtml — internal intake-data review page for Dave's eyes.
- * Renders the canonical data object as a spreadsheet-ish HTML document so
- * he can eyeball every number + formula without the SheetJS/Excel roundtrip
- * hell. Sections mirror the reference workbook. Not a client deliverable.
+ * Tabbed spreadsheet-style HTML: each tab = one audit layer.
+ * rawTexts = { prodText, collText, plText } — optional raw extracted strings for 3-stage P&L audit.
  */
-function renderReviewHtml(data) {
+function renderReviewHtml(data, rawTexts = {}) {
   const esc = htmlEscape;
   const fmtMoney = n => (n == null || !isFinite(n)) ? '—' : '$' + Math.round(Number(n)).toLocaleString();
   const fmtInt   = n => (n == null || !isFinite(n)) ? '—' : Math.round(Number(n)).toLocaleString();
@@ -1390,120 +1389,333 @@ function renderReviewHtml(data) {
       <td class="num">${gPct != null ? fmtPct(gPct) : ''}</td>
     </tr>`;
 
-  const title = esc(practice.name || 'Assessment') + ' — Intake Data Review';
+  /* ─── Code → category helper (mirrors computeReportData logic exactly) ─── */
+  const hygCodes_r  = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0150','D0140','D0274'];
+  const perioCodes_r = ['D4260','D4261','D4263','D4273','D4275','D4341','D4342','D4910'];
+  const endoCodes_r  = ['D3310','D3320','D3330','D3346','D3347','D3348'];
+  const surgCodes_r  = ['D7140','D7210','D7220','D7230','D7240','D7250'];
+  const orthoCodes_r = ['D8080','D8090','D8010','D8020','D8030','D8040','D8070'];
+  const cosmCodes_r  = ['D9972','D9974','D2960','D2961','D2962'];
+  const sw = (code, pfxs) => pfxs.some(p => code.startsWith(p));
+  function getCodeCategory(rawCode) {
+    const c = (rawCode || '').toUpperCase();
+    if (hygCodes_r.includes(c)  || sw(c,['D1110','D1120','D4910','D4346','D4381'])) return 'Hygiene';
+    if (perioCodes_r.includes(c) || sw(c,['D4260','D4261','D4263','D4273','D4275','D4341','D4342'])) return 'Perio';
+    if (endoCodes_r.includes(c)  || sw(c,['D33'])) return 'Endo';
+    if (surgCodes_r.includes(c)  || sw(c,['D72'])) return 'Oral Surgery';
+    if (orthoCodes_r.includes(c) || sw(c,['D80'])) return 'Ortho';
+    if (cosmCodes_r.includes(c)) return 'Cosmetic';
+    return 'Doctor';
+  }
+  const CAT_COLORS = {
+    'Hygiene':     '#d1fae5',
+    'Perio':       '#fef9c3',
+    'Endo':        '#fee2e2',
+    'Oral Surgery':'#fce7f3',
+    'Ortho':       '#e0e7ff',
+    'Cosmetic':    '#f3e8ff',
+    'Doctor':      '#f0f9ff',
+  };
+
+  const title = esc(practice.name || 'Assessment') + ' — Intake Audit';
+
+  /* ─── Build All Codes rows with category column ─── */
+  const codesWithCat = codesSorted.map(c => {
+    const cat = getCodeCategory(c.code);
+    const bg = CAT_COLORS[cat] || '#fff';
+    return `<tr style="background:${bg}">
+      <td class="mono">${esc(c.code)}</td>
+      <td>${esc(c.desc || '')}</td>
+      <td style="font-weight:600;color:#333">${esc(cat)}</td>
+      <td class="num">${fmtInt(c.qty)}</td>
+      <td class="num">${fmtMoney(c.total)}</td>
+      <td class="num">${c.qty > 0 ? fmtMoney((c.total || 0) / c.qty) : '—'}</td>
+      <td class="num">${fmtPct(totalProd > 0 ? (c.total || 0) / totalProd * 100 : 0)}</td>
+    </tr>`;
+  }).join('');
+
+  /* ─── Category subtotal check rows ─── */
+  const catTotals = {};
+  codesSorted.forEach(c => {
+    const cat = getCodeCategory(c.code);
+    catTotals[cat] = (catTotals[cat] || 0) + (c.total || 0);
+  });
+  const catCheckRows = Object.entries(catTotals).map(([cat, sum]) => {
+    const storedSum = cat === 'Hygiene' ? (production.byCategory?.hygiene || 0)
+      : cat === 'Perio' ? (production.byCategory?.perio || 0)
+      : cat === 'Endo'  ? (production.byCategory?.endo || 0)
+      : cat === 'Oral Surgery' ? (production.byCategory?.surg || 0)
+      : cat === 'Ortho' ? (production.byCategory?.ortho || 0)
+      : cat === 'Cosmetic' ? (production.byCategory?.cosmetic || 0)
+      : (production.byCategory?.doctor || 0);
+    const diff = Math.abs(sum - storedSum);
+    const ok = diff < 1;
+    return `<tr style="background:${CAT_COLORS[cat]||'#fff'}">
+      <td style="font-weight:600">${cat}</td>
+      <td class="num">${fmtMoney(sum)}</td>
+      <td class="num">${fmtMoney(storedSum)}</td>
+      <td class="num" style="color:${ok?'#16a34a':'#dc2626'};font-weight:700">${ok ? '✓ match' : '✗ off by ' + fmtMoney(diff)}</td>
+    </tr>`;
+  }).join('');
+
+  /* ─── P&L raw text vs parsed ─── */
+  const rawPL  = rawTexts.plText   ? esc(rawTexts.plText).replace(/\n/g,'<br>') : '<em style="color:#999">Not available (report generated without raw text pass-through)</em>';
+  const rawProd = rawTexts.prodText ? esc(rawTexts.prodText).replace(/\n/g,'<br>') : '<em style="color:#999">Not available</em>';
+  const rawColl = rawTexts.collText ? esc(rawTexts.collText).replace(/\n/g,'<br>') : '<em style="color:#999">Not available</em>';
+
+  /* ─── KPI Math rows ─── */
+  const monthlyPL  = (financials.plIncome || 0) / 12;
+  const monthlyProd2 = period.prodMonths ? (production.total || 0) / period.prodMonths : 0;
+  const monthlyColl2 = period.prodMonths ? (collections.total || 0) / period.prodMonths : 0;
+  const kpiMathRows = [
+    ['Annual Production',    fmtMoney(production.annualized),   `${fmtMoney(production.total)} ÷ ${period.prodMonths}mo × 12`, ''],
+    ['Annual Collections',   fmtMoney(collections.annualized),  `${fmtMoney(collections.total)} ÷ ${period.prodMonths}mo × 12`, ''],
+    ['Collection Rate',      fmtPct(kpis.collectionRate),        `${fmtMoney(collections.total)} ÷ ${fmtMoney(production.total)}`, kpis.collectionRate > 100 ? '⚠ >100% — period mismatch?' : ''],
+    ['Hygiene %',            fmtPct(kpis.hygienePercent),        `${fmtMoney(production.byCategory?.hygiene)} ÷ ${fmtMoney(production.total)}`, ''],
+    ['Owner Doc $/Day',      fmtMoney(kpis.ownerDocDailyAvg),    `annualized doctor prod ÷ owner days/yr`, ''],
+    ['Assoc Doc $/Day',      fmtMoney(kpis.associateDocDailyAvg),'annualized assoc prod ÷ assoc days/yr',  ''],
+    ['Combined Doc $/Day',   fmtMoney(kpis.combinedDocDailyAvg), `${fmtMoney(production.annualized)} − hygiene ÷ total doc days`, ''],
+    ['Hygiene $/Day',        fmtMoney(kpis.hygDailyAvg),         `${fmtMoney(production.byCategory?.hygiene)} × annFactor ÷ hyg days/yr`, ''],
+    ['Overhead %',           fmtPct(kpis.overheadPct),           `adj expenses ${fmtMoney(financials.plExpenses)} ÷ P&L income ${fmtMoney(financials.plIncome)}`, ''],
+    ['Profit %',             fmtPct(kpis.profitPct),             `100% − overhead%`, ''],
+    ['Staff Cost %',         fmtPct(kpis.staffCostPct),          `staff costs ÷ collections`, ''],
+    ['P&L Monthly Income',   fmtMoney(monthlyPL),                `${fmtMoney(financials.plIncome)} ÷ 12`, ''],
+    ['Code-report Monthly',  fmtMoney(monthlyProd2),             `${fmtMoney(production.total)} ÷ ${period.prodMonths}`, ''],
+    ['Coll-report Monthly',  fmtMoney(monthlyColl2),             `${fmtMoney(collections.total)} ÷ ${period.prodMonths}`, ''],
+    ['P&L vs Code Match',    fmtPct(monthlyProd2 > 0 ? monthlyPL/monthlyProd2*100 : null), `P&L monthly ÷ code-report monthly`, monthlyPL > 0 && monthlyProd2 > 0 && Math.abs(monthlyPL/monthlyProd2 - 1) > 0.15 ? '⚠ >15% gap' : ''],
+  ].map(([label, val, formula, warn]) => `<tr>
+    <td>${label}</td>
+    <td class="num" style="font-weight:600">${val}</td>
+    <td class="note" style="font-size:12px">${formula}</td>
+    <td style="color:#dc2626;font-size:12px">${warn}</td>
+  </tr>`).join('');
 
   return `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><title>${title}</title>
 <style>
-  :root { --fg:#1a1a1a; --muted:#666; --border:#d0d0d0; --bg:#fafafa; --row-alt:#f4f4f4; --accent:#1e40af; --header:#0f172a; --red:#dc2626; --green:#16a34a; }
-  * { box-sizing: border-box; }
-  body { margin:0; padding:24px 32px; font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif; color:var(--fg); background:#fff; font-size:14px; line-height:1.4; }
-  h1 { font-size:22px; margin:0 0 4px; color:var(--header); }
-  h2 { font-size:15px; text-transform:uppercase; letter-spacing:.08em; margin:28px 0 8px; padding:8px 12px; background:var(--header); color:#fff; border-radius:4px; }
-  .meta { color:var(--muted); font-size:13px; margin-bottom:8px; }
-  table { border-collapse:collapse; width:100%; margin:0 0 4px; }
-  th, td { border:1px solid var(--border); padding:6px 10px; text-align:left; vertical-align:top; }
-  th { background:var(--bg); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
-  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
-  tbody tr:nth-child(even) { background:var(--row-alt); }
-  .mono { font-family:'SF Mono','Monaco','Menlo',monospace; font-size:13px; }
-  .note { color:var(--muted); font-size:12px; font-style:italic; }
-  .kv td:first-child { width:60%; color:var(--fg); }
-  .kv td:last-child { text-align:right; font-weight:500; font-variant-numeric:tabular-nums; }
-  .twocol { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; background:#e0e7ff; color:var(--accent); }
-  footer { margin-top:32px; padding-top:16px; border-top:1px solid var(--border); color:var(--muted); font-size:12px; }
+  :root{--fg:#1a1a1a;--muted:#666;--border:#d0d0d0;--bg:#f8fafc;--row-alt:#f1f5f9;--accent:#1e40af;--header:#0f172a;--tab-bg:#e2e8f0;--tab-active:#1e40af;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;color:var(--fg);background:var(--bg);font-size:13px;line-height:1.4;}
+  /* ── Tab chrome ── */
+  #tabbar{display:flex;align-items:flex-end;gap:2px;padding:12px 20px 0;background:var(--header);flex-wrap:wrap;}
+  .tab-btn{padding:8px 16px;border:none;border-radius:6px 6px 0 0;background:var(--tab-bg);color:#334155;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border-bottom:3px solid transparent;transition:background .15s;}
+  .tab-btn:hover{background:#cbd5e1;}
+  .tab-btn.active{background:#fff;color:var(--tab-active);border-bottom:3px solid var(--tab-active);}
+  #page-header{padding:10px 24px 8px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#b91c1c;letter-spacing:.04em;}
+  .meta{color:var(--muted);font-size:12px;}
+  /* ── Pane layout ── */
+  .pane{display:none;padding:20px 24px 40px;}
+  .pane.active{display:block;}
+  /* ── Tables ── */
+  table{border-collapse:collapse;width:100%;margin:0 0 20px;}
+  th,td{border:1px solid var(--border);padding:5px 9px;text-align:left;vertical-align:middle;}
+  th{background:#e8edf3;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#475569;position:sticky;top:0;z-index:1;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  tbody tr:hover{background:#f0f4ff!important;}
+  /* ── Misc ── */
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:.08em;margin:20px 0 8px;color:var(--header);border-left:4px solid var(--tab-active);padding-left:10px;}
+  .note{color:var(--muted);font-size:12px;font-style:italic;}
+  .kv td:first-child{width:55%;}
+  .kv td:last-child{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  pre.raw{background:#1e293b;color:#94a3b8;padding:16px;border-radius:6px;overflow:auto;font-size:11px;line-height:1.6;max-height:500px;white-space:pre-wrap;word-break:break-all;}
+  .summary-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;}
+  .card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+  .card .val{font-size:22px;font-weight:700;color:var(--header);}
+  .card .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:2px;}
+  .search-bar{padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;width:260px;margin-bottom:8px;}
+  .sticky-table{overflow:auto;max-height:70vh;}
 </style>
 </head>
 <body>
-  <h1>${title}</h1>
-  <div class="meta">Generated ${esc(data.generatedAt || '')} • Engine v${esc(data.version || '')} • ${esc(period.prodMonths || 0)} months of data (${esc((period.years || []).join(', '))})</div>
-  <div><span class="badge">INTERNAL — NOT A CLIENT DELIVERABLE</span></div>
+<div id="tabbar">
+  <button class="tab-btn active" onclick="showTab('summary')">Summary</button>
+  <button class="tab-btn" onclick="showTab('codes')">Production Codes</button>
+  <button class="tab-btn" onclick="showTab('collections')">Collections &amp; AR</button>
+  <button class="tab-btn" onclick="showTab('pl')">P&amp;L Audit</button>
+  <button class="tab-btn" onclick="showTab('targets')">Targets &amp; Goals</button>
+  <button class="tab-btn" onclick="showTab('kpimath')">KPI Math</button>
+  <button class="tab-btn" onclick="showTab('hygiene')">Hygiene Potential</button>
+  <button class="tab-btn" onclick="showTab('profile')">Practice Profile</button>
+</div>
+<div id="page-header">
+  <strong style="font-size:15px">${title}</strong>
+  <span class="badge">INTERNAL — NOT A CLIENT DELIVERABLE</span>
+  <span class="meta">Generated ${esc(data.generatedAt || '')} • Engine v${esc(data.version || '')} • ${esc(period.prodMonths || 0)} months (${esc((period.years || []).join(', '))})</span>
+</div>
 
-  <h2>Practice Profile</h2>
-  ${painPointsBlock}
-  <table class="kv"><tbody>${profileRows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</tbody></table>
-
-  <h2>Production Overview</h2>
-  <table>
-    <thead><tr><th>Category</th><th class="num">12mo $</th><th class="num">% of total</th></tr></thead>
-    <tbody>${prodCatRows.map(([c, d, p]) => `<tr><td>${c}</td><td class="num">${d}</td><td class="num">${p}</td></tr>`).join('')}
-    <tr style="font-weight:600;background:#eef"><td>TOTAL</td><td class="num">${fmtMoney(totalProd)}</td><td class="num">100%</td></tr>
-    <tr><td>Annualized production</td><td class="num">${fmtMoney(annualProd)}</td><td class="num"></td></tr>
+<!-- ════ TAB: SUMMARY ════ -->
+<div id="pane-summary" class="pane active">
+  <div class="summary-cards">
+    <div class="card"><div class="val">${fmtMoney(production.annualized)}</div><div class="lbl">Annual Production</div></div>
+    <div class="card"><div class="val">${fmtMoney(collections.annualized)}</div><div class="lbl">Annual Collections</div></div>
+    <div class="card"><div class="val">${fmtPct(kpis.collectionRate)}</div><div class="lbl">Collection Rate</div></div>
+    <div class="card"><div class="val">${fmtPct(kpis.hygienePercent)}</div><div class="lbl">Hygiene %</div></div>
+    <div class="card"><div class="val">${fmtMoney(kpis.ownerDocDailyAvg || kpis.combinedDocDailyAvg)}</div><div class="lbl">Doc $/Day</div></div>
+    <div class="card"><div class="val">${fmtMoney(kpis.hygDailyAvg)}</div><div class="lbl">Hyg $/Day</div></div>
+    <div class="card"><div class="val">${fmtPct(kpis.overheadPct)}</div><div class="lbl">Overhead %</div></div>
+    <div class="card"><div class="val">${fmtPct(kpis.profitPct)}</div><div class="lbl">Profit %</div></div>
+    <div class="card"><div class="val">${fmtInt(codesSorted.length)}</div><div class="lbl">Codes Analyzed</div></div>
+    <div class="card"><div class="val">${esc(period.prodMonths || '—')} mo</div><div class="lbl">Period</div></div>
+  </div>
+  <h2>Production by Category</h2>
+  <table style="max-width:500px">
+    <thead><tr><th>Category</th><th class="num">$ (period)</th><th class="num">% of total</th></tr></thead>
+    <tbody>${prodCatRows.map(([c, d, p]) => `<tr style="background:${CAT_COLORS[c.split(' ')[0]] || '#fff'}"><td>${c}</td><td class="num">${d}</td><td class="num">${p}</td></tr>`).join('')}
+    <tr style="font-weight:700;background:#dbeafe"><td>TOTAL</td><td class="num">${fmtMoney(totalProd)}</td><td class="num">100%</td></tr>
+    <tr><td>Annualized (×${(12/(period.prodMonths||12)).toFixed(2)})</td><td class="num">${fmtMoney(annualProd)}</td><td></td></tr>
     </tbody>
   </table>
+  ${painPointsBlock}
+</div>
 
-  <h2>All Codes (${codesSorted.length} codes, sorted by $)</h2>
-  <table>
-    <thead><tr><th>Code</th><th>Description</th><th class="num">Qty</th><th class="num">Total $</th><th class="num">Avg $/proc</th><th class="num">% of prod</th></tr></thead>
-    <tbody>${codesRows}</tbody>
+<!-- ════ TAB: PRODUCTION CODES ════ -->
+<div id="pane-codes" class="pane">
+  <h2>Category Cross-Check — code totals vs. engine buckets</h2>
+  <table style="max-width:600px">
+    <thead><tr><th>Category</th><th class="num">Sum of codes</th><th class="num">Engine bucket</th><th class="num">Match?</th></tr></thead>
+    <tbody>${catCheckRows}</tbody>
   </table>
+  <h2>All Codes (${codesSorted.length} codes — sorted by $, color = category)</h2>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+    <input id="code-search" class="search-bar" placeholder="Filter by code or description…" oninput="filterCodes(this.value)">
+    ${Object.entries(CAT_COLORS).map(([cat,bg])=>`<span style="background:${bg};border:1px solid #ccc;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${cat}</span>`).join('')}
+  </div>
+  <div class="sticky-table">
+    <table id="codes-table">
+      <thead><tr><th>Code</th><th>Description</th><th>Category</th><th class="num">Qty</th><th class="num">Total $</th><th class="num">Avg $/proc</th><th class="num">% of prod</th></tr></thead>
+      <tbody id="codes-tbody">${codesWithCat}</tbody>
+    </table>
+  </div>
+</div>
 
-  <h2>Hygiene Schedule — Potential</h2>
-  <table class="kv">
-    <thead><tr><th>Input / Metric</th><th class="num">Value</th><th>Formula / Note</th></tr></thead>
-    <tbody>${potentialRows.map(([k, v, n]) => `<tr><td>${k}</td><td class="num">${v}</td><td class="note">${n}</td></tr>`).join('')}</tbody>
-  </table>
-
-  <h2>Financial Overview</h2>
+<!-- ════ TAB: COLLECTIONS & AR ════ -->
+<div id="pane-collections" class="pane">
   <div class="twocol">
     <div>
-      <table class="kv"><tbody>${finRows.map(([k, v]) => k === '' ? '<tr><td colspan="2" style="border:none;height:4px"></td></tr>' : `<tr><td>${k}</td><td class="num">${v}</td></tr>`).join('')}</tbody></table>
-    </div>
-    <div>
-      <h3 style="font-size:13px;margin:0 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">Accounts Receivable Aging</h3>
+      <h2>Collections Summary</h2>
+      <table class="kv"><tbody>
+        <tr><td>Collections total (period)</td><td>${fmtMoney(collections.total)}</td></tr>
+        <tr><td>Collections months</td><td>${fmtInt(collections.months || period.prodMonths)}</td></tr>
+        <tr><td>Collections annualized</td><td>${fmtMoney(collections.annualized)}</td></tr>
+        <tr><td>Collection rate (period vs period)</td><td style="font-weight:700;color:${(kpis.collectionRate||0)>100?'#dc2626':'#16a34a'}">${fmtPct(kpis.collectionRate)}</td></tr>
+        <tr><td>P&L total income</td><td>${fmtMoney(financials.plIncome)}</td></tr>
+        <tr><td>Monthly P&L income</td><td>${fmtMoney(monthlyPL)}</td></tr>
+        <tr><td>Monthly collections (report)</td><td>${fmtMoney(monthlyColl2)}</td></tr>
+      </tbody></table>
+      <h2>Sources of Dollars</h2>
       <table>
-        <thead><tr><th></th><th class="num">Current</th><th class="num">30–60</th><th class="num">60–90</th><th class="num">90+</th><th class="num">Total</th></tr></thead>
-        <tbody>${arRow('Patient', arP)}${arRow('Insurance', arI)}</tbody>
-      </table>
-      <h3 style="font-size:13px;margin:16px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">Sources of Dollars</h3>
-      <table>
-        <thead><tr><th>Source</th><th class="num">$</th><th class="num">% of income</th></tr></thead>
+        <thead><tr><th>Source</th><th class="num">$</th><th class="num">%</th></tr></thead>
         <tbody>${sodRows}</tbody>
       </table>
     </div>
+    <div>
+      <h2>AR Aging</h2>
+      <table>
+        <thead><tr><th></th><th class="num">Current</th><th class="num">31–60</th><th class="num">61–90</th><th class="num">90+</th><th class="num">Total</th></tr></thead>
+        <tbody>${arRow('Patient', arP)}${arRow('Insurance', arI)}</tbody>
+      </table>
+    </div>
   </div>
+</div>
 
-  <h2>Targets &amp; Goal</h2>
+<!-- ════ TAB: P&L AUDIT ════ -->
+<div id="pane-pl" class="pane">
+  <h2>Stage 1 — Raw Extracted Text (what Claude read from the PDF)</h2>
+  <pre class="raw">${rawPL}</pre>
+  <div class="twocol">
+    <div>
+      <h2>Stage 2 — Parsed Numbers</h2>
+      <table class="kv"><tbody>
+        ${finRows.map(([k, v]) => k === '' ? '<tr><td colspan="2" style="border:none;height:6px"></td></tr>' : `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}
+      </tbody></table>
+    </div>
+    <div>
+      <h2>Stage 3 — Computed / Adjusted</h2>
+      <table class="kv"><tbody>
+        <tr><td>P&L expenses (raw)</td><td>${fmtMoney(financials.plExpensesRaw)}</td></tr>
+        <tr><td>Owner add-backs</td><td>${fmtMoney(financials.ownerAddBacks)}</td></tr>
+        <tr><td>Patient reimbursements</td><td>${fmtMoney(financials.patientReimbursements)}</td></tr>
+        <tr><td>Adjusted expenses</td><td style="font-weight:700">${fmtMoney(financials.plExpenses)}</td></tr>
+        <tr><td colspan="2" style="border:none;height:6px"></td></tr>
+        <tr><td>Overhead % (adjusted)</td><td style="font-weight:700">${fmtPct(kpis.overheadPct)}</td></tr>
+        <tr><td>Profit %</td><td style="font-weight:700">${fmtPct(kpis.profitPct)}</td></tr>
+        <tr><td>Staff cost %</td><td style="font-weight:700">${fmtPct(kpis.staffCostPct)}</td></tr>
+      </tbody></table>
+      <h2>Budgetary P&amp;L vs Targets</h2>
+      <table>
+        <thead>
+          <tr><th rowspan="2">Line</th><th colspan="2" style="text-align:center">YTD</th><th colspan="2" style="text-align:center">Target</th><th colspan="2" style="text-align:center">Goal</th></tr>
+          <tr><th class="num">$</th><th class="num">%</th><th class="num">$</th><th class="num">%</th><th class="num">$</th><th class="num">%</th></tr>
+        </thead>
+        <tbody>
+          ${budgetRow('Monthly collection', monthlyPL, null, null, tgtMonthly, null, goalMonthly)}
+          ${budgetRow('Staff cost %', null, kpis.staffCostPct, 18, null, 18, null)}
+          ${budgetRow('Overhead %', financials.plExpenses, kpis.overheadPct, 60, null, 55, null)}
+          ${budgetRow('Profit %', null, kpis.profitPct, 26, null, 30, null)}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════ TAB: TARGETS & GOALS ════ -->
+<div id="pane-targets" class="pane">
+  <h2>Targets &amp; Goals by Stream</h2>
   <table>
     <thead>
-      <tr><th rowspan="2">Stream</th><th colspan="3" style="text-align:center">Initial Monthly Target</th><th colspan="3" style="text-align:center">Long Term Monthly Goal</th></tr>
+      <tr><th rowspan="2">Stream</th><th colspan="3" style="text-align:center;background:#dbeafe">Initial Monthly Target</th><th colspan="3" style="text-align:center;background:#dcfce7">Long Term Monthly Goal</th></tr>
       <tr><th class="num">Days</th><th class="num">$/Day</th><th class="num">Monthly</th><th class="num">Days</th><th class="num">$/Day</th><th class="num">Monthly</th></tr>
     </thead>
     <tbody>
       ${targetsRows}
-      <tr style="font-weight:700;background:#eef">
-        <td>MONTHLY TOTAL</td>
-        <td class="num" colspan="2"></td><td class="num">${fmtMoney(tgtMonthly)}</td>
-        <td class="num" colspan="2"></td><td class="num">${fmtMoney(goalMonthly)}</td>
-      </tr>
-      <tr style="font-weight:600">
-        <td>ANNUAL</td>
-        <td class="num" colspan="2"></td><td class="num">${fmtMoney(tgt.initialAnnual)}</td>
-        <td class="num" colspan="2"></td><td class="num">${fmtMoney(tgt.longTermAnnual)}</td>
-      </tr>
+      <tr style="font-weight:700;background:#dbeafe"><td>MONTHLY TOTAL</td><td colspan="2"></td><td class="num">${fmtMoney(tgtMonthly)}</td><td colspan="2"></td><td class="num">${fmtMoney(goalMonthly)}</td></tr>
+      <tr style="font-weight:700"><td>ANNUAL</td><td colspan="2"></td><td class="num">${fmtMoney(tgt.initialAnnual)}</td><td colspan="2"></td><td class="num">${fmtMoney(tgt.longTermAnnual)}</td></tr>
     </tbody>
   </table>
+</div>
 
-  <h2>Budgetary P&amp;L — current reality vs. target vs. goal</h2>
+<!-- ════ TAB: KPI MATH ════ -->
+<div id="pane-kpimath" class="pane">
+  <h2>KPI Formulas — every number traced to its inputs</h2>
   <table>
-    <thead>
-      <tr><th rowspan="2">Line</th><th colspan="2" style="text-align:center">YTD (from P&amp;L)</th><th colspan="2" style="text-align:center">Target</th><th colspan="2" style="text-align:center">Goal</th></tr>
-      <tr><th class="num">$</th><th class="num">% inc</th><th class="num">$</th><th class="num">% tgt</th><th class="num">$</th><th class="num">% goal</th></tr>
-    </thead>
-    <tbody>
-      ${budgetRow('Collection (monthly)', monthlyPL, null, null, tgtMonthly, null, goalMonthly)}
-      ${budgetRow('Staff cost % of collections', null, kpis.staffCostPct, 18, null, 18, null)}
-      ${budgetRow('Overhead % (adjusted)', financials.plExpenses, kpis.overheadPct, 60, null, 55, null)}
-      ${budgetRow('Profit margin', null, kpis.profitPct, 26, null, 30, null)}
-    </tbody>
+    <thead><tr><th>KPI</th><th class="num">Value</th><th>Formula / Inputs</th><th>Flags</th></tr></thead>
+    <tbody>${kpiMathRows}</tbody>
   </table>
-  <div class="note" style="margin-top:4px">Full line-by-line P&amp;L breakdown (associates / hygienists / lab / supplies / rent / etc.) and target vs. goal cross-references live in <code>d.financials.sourcesOfDollars.items</code> and the Targets &amp; Goal detail table above. Expanding the Budgetary P&amp;L here is the next step once the per-line P&amp;L category mapping is surfaced on the data object.</div>
+</div>
 
-  <footer>
-    Review-only rendering of the canonical data object at <code>d</code>. Source: <code>netlify/functions/generate-report.js → renderReviewHtml()</code>. Any value wrong here is wrong in the engine — fix the computation, not the rendering.
-  </footer>
+<!-- ════ TAB: HYGIENE POTENTIAL ════ -->
+<div id="pane-hygiene" class="pane">
+  <h2>Hygiene Schedule — Potential Analysis</h2>
+  <table>
+    <thead><tr><th>Input / Metric</th><th class="num">Value</th><th>Formula / Note</th></tr></thead>
+    <tbody>${potentialRows.map(([k, v, n]) => `<tr><td>${k}</td><td class="num">${v}</td><td class="note">${n}</td></tr>`).join('')}</tbody>
+  </table>
+</div>
+
+<!-- ════ TAB: PRACTICE PROFILE ════ -->
+<div id="pane-profile" class="pane">
+  <h2>Practice Profile</h2>
+  ${painPointsBlock}
+  <table class="kv" style="max-width:600px"><tbody>${profileRows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</tbody></table>
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+function filterCodes(q) {
+  const lower = q.toLowerCase();
+  document.querySelectorAll('#codes-tbody tr').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(lower) ? '' : 'none';
+  });
+}
+</script>
 </body></html>`;
 }
 
@@ -1562,7 +1774,7 @@ exports.handler = async function(event) {
 
     /* Render HTML */
     const reportHtml = renderReportHtml(data);
-    const reviewHtml = renderReviewHtml(data);
+    const reviewHtml = renderReviewHtml(data, { prodText, collText, plText });
 
     const elapsed = Date.now() - t0;
     console.log(`generate-report: ${codes.length} codes, ${prodMonths}mo, ${elapsed}ms, ${reportHtml.length + reviewHtml.length} chars of HTML`);
