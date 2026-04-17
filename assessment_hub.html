@@ -1695,6 +1695,35 @@ async function extractARFromPdf(file, type) {
       }
     }
 
+/* ─── Helper: extract PDF via Claude Vision (for Eaglesoft + other non-Dentrix
+     vendors). Sends the PDF base64 to /.netlify/functions/parse-pdf with the
+     type (production | collections | pl) and software tag. Server returns
+     text already in the pipe-delimited schema our server-side parsers expect. ─── */
+async function parseViaClaude(file, type, software) {
+  const buf = await file.arrayBuffer();
+  /* Convert ArrayBuffer → base64 (chunked to avoid call-stack overflow on large PDFs) */
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  const pdfBase64 = btoa(bin);
+
+  console.log(`parseViaClaude: type=${type}, software=${software}, ${Math.round(bytes.length / 1024)}KB`);
+  const resp = await fetch('/.netlify/functions/parse-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdfBase64, type, software })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`parse-pdf (${type}/${software}) returned ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  if (!data.success || !data.text) throw new Error(`parse-pdf (${type}/${software}) returned no text: ${JSON.stringify(data).slice(0, 200)}`);
+  console.log(`parseViaClaude: got ${data.text.length} chars for ${type}`);
+  return data.text;
+}
+
 /* ─── Helper: extract all text rows from a PDF using pdf.js ─── */
 async function pdfToTextRows(file) {
   const arrayBuffer = await file.arrayBuffer();
@@ -1946,22 +1975,42 @@ async function generate() {
   try {
     const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
 
-    /* Step 1: Parse ALL PDFs client-side with pdf.js (no server calls needed) */
-    console.log('Step 1: Parsing PDFs client-side...');
-    const parsePromises = [
-      extractProductionFromPdf(files[1]),
-      extractCollectionsFromPdf(files[2]),
-      files[3] ? extractPLFromPdf(files[3]) : Promise.resolve(null)
-    ];
+    /* Load questionnaire answers first — drives PM-software-aware PDF parsing */
+    let practiceProfile = null;
+    try { practiceProfile = JSON.parse(sessionStorage.getItem('practiceProfile')); } catch(e) {}
+    /* Use the Hub's own software selector if set; fallback to questionnaire answer. */
+    const activeSoftware = (typeof software !== 'undefined' && software) ? software.toLowerCase() : (practiceProfile?.pmSoftware || 'dentrix').toLowerCase();
+    console.log('Step 1: Parsing PDFs, software=' + activeSoftware);
 
-    /* Extract AR data client-side in parallel */
-    const arPromises = [
+    /* Software-aware extractor dispatch. Dentrix uses the existing PDF.js client-side
+       parsers. Eaglesoft (and unknowns) route to the Claude-Vision-based parse-pdf
+       Netlify function, which has vendor-specific prompts that normalize output to
+       the same pipe-delimited schema. */
+    const extractByType = (file, type) => {
+      if (!file) return Promise.resolve(type === 'pl' ? null : '');
+      if (activeSoftware === 'eaglesoft') return parseViaClaude(file, type, activeSoftware);
+      /* Dentrix (default) — client-side PDF.js path */
+      if (type === 'production') return extractProductionFromPdf(file);
+      if (type === 'collections') return extractCollectionsFromPdf(file);
+      if (type === 'pl') return extractPLFromPdf(file);
+      return Promise.resolve('');
+    };
+
+    const [prodText, collText, plText] = await Promise.all([
+      extractByType(files[1], 'production'),
+      extractByType(files[2], 'collections'),
+      extractByType(files[3], 'pl'),
+    ]);
+
+    /* AR extraction — currently Dentrix-specific client-side parser. For
+       Eaglesoft, the "Accounts receivable by responsible party" report has
+       no aging buckets, so for now we fall through to the Dentrix extractor
+       and accept that aging fields may come back null. Full Eaglesoft AR
+       support requires a separate Aging Report — see BACKLOG. */
+    const [arPatient, arInsurance] = await Promise.all([
       files[4] ? extractARFromPdf(files[4], 'patient') : Promise.resolve({}),
       files[5] ? extractARFromPdf(files[5], 'insurance') : Promise.resolve({})
-    ];
-
-    const [prodText, collText, plText] = await Promise.all(parsePromises);
-    const [arPatient, arInsurance] = await Promise.all(arPromises);
+    ]);
     console.log('AR Patient:', JSON.stringify(arPatient));
     console.log('AR Insurance:', JSON.stringify(arInsurance));
 
@@ -1975,9 +2024,6 @@ async function generate() {
 
     /* Step 2: Build assessment report from parsed data */
     console.log('Step 2: Building assessment report from parsed data...');
-    /* Include questionnaire answers from sessionStorage */
-    let practiceProfile = null;
-    try { practiceProfile = JSON.parse(sessionStorage.getItem('practiceProfile')); } catch(e) {}
     const payload = { prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, practiceProfile };
     console.log('Payload keys:', Object.keys(payload), 'prodText len:', prodText?.length, 'collText len:', collText?.length, 'plText len:', plText?.length);
     console.log('practiceProfile:', JSON.stringify(practiceProfile)?.substring(0, 200));
