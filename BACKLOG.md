@@ -260,6 +260,15 @@ Dave flagged these while I was mid-build on the internal review page. Not touchi
 
 End-to-end Eaglesoft pipeline works — practice name + P&L come through cleanly. Two bugs in the Claude-normalized output surfaced:
 
+### Period-mismatch handling across uploaded reports
+- _observed_ — JD Troy DDS test: Service codes master was 16 days (2026 YTD), Day Sheet was 24 months, P&L was 12 months. Pipeline computed collection rate = 152% because it compared production from one period to collections from another.
+- _root_ — each PDF has its own period. Server uses production's `months` for production annualization and collections' `months` for collections annualization, but then compares annualized-vs-annualized when the periods still aren't identical ranges.
+- _fix options_ —
+  1. **Hub-level warning**: when the three date ranges don't overlap by at least 11 months, flag "period mismatch — results may be inaccurate" on the Report.
+  2. **User prompt at upload**: after parsing, show Dave the detected date ranges and ask "is this the period you want to analyze?" Allow override (e.g. force 12-month trailing).
+  3. **Normalize everything to common trailing 12**: if any report has more than 12 months of data, use only the last 12; if less, warn. Hardest to do correctly because some PDFs don't have month-by-month detail.
+- _status_ — design needed before tomorrow's multi-vendor data lands. Dentrix Ascend / Open Dental / Dentrix will each have their own date-range quirks.
+
 ### Eaglesoft production extraction picks "This Month" instead of "This Year"
 - _observed_ — JD Troy DDS Service codes productivity master returned 69 codes totaling $130,155 for the year. P&L says $2.1M revenue; research sample showed ~$2.8M production. Top code D2740 came back as 15 units / $18,948 — those exact numbers are the "This Month" column in the agent's research sample, NOT "This Year".
 - _root cause_ — pdf.js flattens multi-column tables into linear text. The Service codes productivity master has 9 columns: Code / ADA Code / Desc / Stand Fee / Avg Fee / **This Month Units** / **This Month Production** / **This Year Units** / **This Year Production**. When flattened, all these numbers run together per row and Claude can't tell which pair is which.
