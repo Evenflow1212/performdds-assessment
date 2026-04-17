@@ -256,6 +256,31 @@ Dave flagged these while I was mid-build on the internal review page. Not touchi
 
 ---
 
+## Eaglesoft parser bugs from first real run (2026-04-16 evening, JD Troy DDS)
+
+End-to-end Eaglesoft pipeline works — practice name + P&L come through cleanly. Two bugs in the Claude-normalized output surfaced:
+
+### Eaglesoft production extraction picks "This Month" instead of "This Year"
+- _observed_ — JD Troy DDS Service codes productivity master returned 69 codes totaling $130,155 for the year. P&L says $2.1M revenue; research sample showed ~$2.8M production. Top code D2740 came back as 15 units / $18,948 — those exact numbers are the "This Month" column in the agent's research sample, NOT "This Year".
+- _root cause_ — pdf.js flattens multi-column tables into linear text. The Service codes productivity master has 9 columns: Code / ADA Code / Desc / Stand Fee / Avg Fee / **This Month Units** / **This Month Production** / **This Year Units** / **This Year Production**. When flattened, all these numbers run together per row and Claude can't tell which pair is which.
+- _fix options_ —
+  1. **Better prompt disambiguation**: tell Claude "the LAST two numbers on each row are This Year Units and This Year Production; the middle pair is This Month — always use the last pair." Test first.
+  2. **Column-aware pdf.js extraction**: our `pdfToTextRows` helper joins by y-coordinate only; add x-coordinate tokenization and emit with pipes as column separators.
+  3. **Preferred**: direct Claude Vision on the actual PDF pages for just this one report (bypasses pdf.js flattening entirely). Cost: more tokens, but the report isn't that big (~500KB) and rate-limit is fine if we serialize.
+- _status_ — bug (2026-04-16), blocking accurate Eaglesoft production numbers
+
+### Eaglesoft collections extraction pulls partial total
+- _observed_ — JD Troy DDS Day Sheet returned $2.38M collections annualized. Research sample showed Day Sheet Totals row = $4.76M collections. Half of actual.
+- _root cause_ — unclear. Possibly: Claude found a section total (e.g. per-payor payment total) instead of the grand total. Day Sheet has multiple "Totals:" lines throughout if it's multi-section.
+- _fix_ — tighten the prompt: "Find the SINGLE grand-total 'Totals:' line at the very END of the document (last page). Ignore per-section or per-provider totals. The three numbers on that line are Production / Collections / Adjustments." Plus: log the raw text Claude saw so we can diagnose next time.
+- _status_ — bug (2026-04-16), partial numbers = wrong KPIs
+
+### Hot-swap caveat — script-scope vs window bindings
+- _observed_ — trying to hot-swap `parseViaClaude` via `window.X = newFn` worked for `window.X === X` checks but the actual `generate()` function kept using the original binding. Hot-swap fails silently with top-level `async function` declarations.
+- _workaround_ — just reload and re-run after deploy. Don't invest more in hot-swap infrastructure.
+
+---
+
 ## Rescued from the dead session (2026-04-16, bold-bassi worktree)
 
 These items were decided in conversation after the last commit but before an API error ("image exceeds 2000px many-image limit") bricked the session. Recovered from the JSONL on disk.
