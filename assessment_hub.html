@@ -2128,13 +2128,22 @@ async function downloadDebugXlsx() {
      Drops any cached rendered text (w) and — if we're replacing a formula
      with a literal value — drops the formula (f) too so Excel shows the
      new value instead of recalculating the old formula. */
-  const setCell = (ws, addr, value, type) => {
+  const setCell = (ws, addr, value, fmt, type) => {
     if (value == null || value === '' || (typeof value === 'number' && !isFinite(value))) return;
     if (!ws[addr]) ws[addr] = {};
     ws[addr].t = type || (typeof value === 'number' ? 'n' : 's');
     ws[addr].v = value;
+    if (fmt) ws[addr].z = fmt;
     delete ws[addr].w;
     delete ws[addr].f;
+  };
+  /* Number format codes — SheetJS community strips the template's styles on
+     read/write roundtrip, so we explicitly set the format per cell. */
+  const FMT = {
+    money: '$#,##0',
+    pct:   '0%',
+    pct1:  '0.0%',
+    int:   '#,##0',
   };
 
   /* ═══ POPULATE TEMPLATE SHEETS ═══ */
@@ -2281,20 +2290,28 @@ async function downloadDebugXlsx() {
   }
 
   /* ═══ TARGETS & GOAL ═══ fully driven by the backend synthesis.
-     Initial Monthly Target (rows 8-16) and Long Term Monthly Goal (rows 22-30)
-     each have {days, daily} per stream. E (monthly), G (cost), H (% or daily)
-     populate as well — template formulas for E and G compute from these. */
+     Initial Monthly Target (rows 8-16) and Long Term Monthly Goal (rows 22-30).
+     We write LITERAL values for E (monthly) and G (cost) too, not formulas —
+     Excel/Numbers don't always auto-recalc on open, so cells would appear blank
+     if we relied on the template's =C*D formulas. */
   const tg = wb.Sheets['Targets & Goal'];
   const tgt = d.goals?.targets;
   if (tg && tgt) {
     const writeRow = (ws, row, data) => {
       if (!data) return;
-      setCell(ws, `C${row}`, data.days || 0);
-      setCell(ws, `D${row}`, data.daily || 0);
-      /* E column is a formula (=C*D) in the template — leave it to compute.
-         Row 17/18 totals are formulas too. Only populate H (% or daily cost). */
-      if (data.costPct != null) setCell(ws, `H${row}`, data.costPct);
-      else if (data.cost != null) setCell(ws, `H${row}`, data.cost);
+      const days = data.days || 0;
+      const daily = data.daily || 0;
+      const monthly = days * daily;
+      setCell(ws, `C${row}`, days, FMT.int);
+      setCell(ws, `D${row}`, daily, FMT.money);
+      setCell(ws, `E${row}`, monthly, FMT.money);
+      if (data.costPct != null) {
+        setCell(ws, `H${row}`, data.costPct, FMT.pct);
+        setCell(ws, `G${row}`, Math.round(data.costPct * monthly), FMT.money);
+      } else if (data.cost != null) {
+        setCell(ws, `H${row}`, data.cost, FMT.money);
+        setCell(ws, `G${row}`, data.cost * days, FMT.money);
+      }
     };
 
     /* Initial Monthly Target — rows 8-16 */
@@ -2308,6 +2325,9 @@ async function downloadDebugXlsx() {
     writeRow(tg, 14, ini.ortho);
     writeRow(tg, 15, ini.cap);
     writeRow(tg, 16, ini.other);
+    /* Totals (row 17 monthly, row 18 annual) */
+    setCell(tg, 'E17', Math.round(tgt.initialMonthly || 0), FMT.money);
+    setCell(tg, 'E18', Math.round(tgt.initialAnnual || 0), FMT.money);
 
     /* Long Term Monthly Goal — rows 22-30 */
     const lt = tgt.longTerm || {};
@@ -2320,6 +2340,8 @@ async function downloadDebugXlsx() {
     writeRow(tg, 28, lt.ortho);
     writeRow(tg, 29, lt.cap);
     writeRow(tg, 30, lt.other);
+    setCell(tg, 'E31', Math.round(tgt.longTermMonthly || 0), FMT.money);
+    setCell(tg, 'E32', Math.round(tgt.longTermAnnual || 0), FMT.money);
   }
 
   /* ═══ P&L INPUT ═══ foundational numbers. B2 months, H2 total P&L
@@ -2343,20 +2365,21 @@ async function downloadDebugXlsx() {
     ['C7', 'E7', 'G7', 'I7'].forEach(addr => setCell(hs, addr, nHyg));
     if (p.hygieneDaysPerWeek >= 5) setCell(hs, 'K7', nHyg);
 
-    /* POTENTIAL block — from hygienePotential on the canonical data object */
+    /* POTENTIAL block — pre-computed literals since SheetJS won't recalc formulas */
     const hp = d.goals?.hygienePotential;
     if (hp) {
-      /* Active patient estimate + new patient estimate */
-      setCell(hs, 'N39', hp.activePatientEstimate);                 /* active patient estimate */
-      setCell(hs, 'N40', hp.newPatientsPerMo);                       /* new patient estimate/mo */
-      setCell(hs, 'N41', hp.perioDiseasePct);                        /* perio disease presence */
-      setCell(hs, 'N42', hp.probingPerioPct);                        /* probing perio positive */
-      /* N45-N47 are formulas in the template that reference N39-N42;
-         populating N39-N42 makes N45/46/47/48 auto-compute. */
-      setCell(hs, 'N51', hp.patientsPerHygienistPerDay);             /* patients scheduled per day */
-      /* N53 = (N48/N51)/12 is a formula; auto-computes daysRequiredPerMo */
-      /* Cross-check: also write the hard-estimate from procedures */
-      setCell(hs, 'H47', hp.activePatientEstimate);                  /* overall patient flow "as per software" fallback */
+      setCell(hs, 'N39', hp.activePatientEstimate, FMT.int);
+      setCell(hs, 'N40', hp.newPatientsPerMo, FMT.int);
+      setCell(hs, 'N41', hp.perioDiseasePct, FMT.pct);
+      setCell(hs, 'N42', hp.probingPerioPct, FMT.pct);
+      setCell(hs, 'N45', hp.potentialAppts?.adultProphy || 0, FMT.int);
+      setCell(hs, 'N46', hp.potentialAppts?.perioMaint || 0, FMT.int);
+      setCell(hs, 'N47', hp.potentialAppts?.srp || 0, FMT.int);
+      setCell(hs, 'N48', hp.potentialAppts?.total || 0, FMT.int);
+      setCell(hs, 'N51', hp.patientsPerHygienistPerDay, FMT.int);
+      setCell(hs, 'N53', hp.daysRequiredPerMo, FMT.int);
+      setCell(hs, 'H47', hp.activePatientEstimate, FMT.int);
+      setCell(hs, 'H49', hp.activePatientEstimate, FMT.int);  /* potential active patients cross-check */
     }
   }
 
@@ -2366,41 +2389,68 @@ async function downloadDebugXlsx() {
      practice vs ADA code comparison, AR aging, collections by payor. */
   const fo = wb.Sheets['Financial Overview'];
   if (fo) {
-    /* Historical: only current-period totals available. Overwrite the
-       G-column (most recent year) sum formula with literal annualized prod
-       and H-column with literal annualized collections. Other years blank
-       — that's honest about what we have. */
-    setCell(fo, 'G20', Math.round(prod.annualized || prod.total || 0));
-    setCell(fo, 'H20', Math.round(coll.annualized || coll.total || 0));
-    setCell(fo, 'G21', months);
-    setCell(fo, 'H21', months);
+    /* Historical — only current period available; put totals in G/H (most recent year column) */
+    const annualProdInt = Math.round(prod.annualized || prod.total || 0);
+    const annualCollInt = Math.round(coll.annualized || coll.total || 0);
+    setCell(fo, 'G20', annualProdInt, FMT.money);
+    setCell(fo, 'H20', annualCollInt, FMT.money);
+    setCell(fo, 'G21', months, FMT.int);
+    setCell(fo, 'H21', months, FMT.int);
+    /* Pre-compute AVERAGE row 22 (=total/months) since SheetJS won't recalc */
+    if (months > 0) {
+      setCell(fo, 'G22', Math.round(annualProdInt / months), FMT.money);
+      setCell(fo, 'H22', Math.round(annualCollInt / months), FMT.money);
+    }
 
-    /* P&L vs practice reports vs ADA code — monthly averages */
-    setCell(fo, 'D25', fin.plIncome ? Math.round(fin.plIncome / 12) : 0);
-    setCell(fo, 'D27', months ? Math.round(prod.total / months) : 0);
+    /* P&L vs practice reports vs ADA code */
+    const monthlyPL = fin.plIncome ? Math.round(fin.plIncome / 12) : 0;
+    const monthlyProd = months ? Math.round(prod.total / months) : 0;
+    const monthlyColl = months ? Math.round(annualCollInt / months) : 0;
+    setCell(fo, 'D25', monthlyPL, FMT.money);
+    setCell(fo, 'D26', monthlyColl, FMT.money);
+    setCell(fo, 'D27', monthlyProd, FMT.money);
+    if (monthlyProd > 0) setCell(fo, 'D28', monthlyPL / monthlyProd, FMT.pct1);
 
-    /* AR aging — matches Hub parsed structure: current / d3160 / d6190 / d90plus / total */
+    /* AR aging */
     const arP = ar.patient || {};
     const arI = ar.insurance || {};
-    setCell(fo, 'D32', arP.total ?? 0);
-    setCell(fo, 'E32', arP.current ?? 0);
-    setCell(fo, 'F32', arP.d3160 ?? 0);
-    setCell(fo, 'G32', arP.d6190 ?? 0);
-    setCell(fo, 'H32', arP.d90plus ?? 0);
-    setCell(fo, 'D33', arI.total ?? 0);
-    setCell(fo, 'E33', arI.current ?? 0);
-    setCell(fo, 'F33', arI.d3160 ?? 0);
-    setCell(fo, 'G33', arI.d6190 ?? 0);
-    setCell(fo, 'H33', arI.d90plus ?? 0);
+    setCell(fo, 'D32', arP.total ?? 0, FMT.money);
+    setCell(fo, 'E32', arP.current ?? 0, FMT.money);
+    setCell(fo, 'F32', arP.d3160 ?? 0, FMT.money);
+    setCell(fo, 'G32', arP.d6190 ?? 0, FMT.money);
+    setCell(fo, 'H32', arP.d90plus ?? 0, FMT.money);
+    setCell(fo, 'D33', arI.total ?? 0, FMT.money);
+    setCell(fo, 'E33', arI.current ?? 0, FMT.money);
+    setCell(fo, 'F33', arI.d3160 ?? 0, FMT.money);
+    setCell(fo, 'G33', arI.d6190 ?? 0, FMT.money);
+    setCell(fo, 'H33', arI.d90plus ?? 0, FMT.money);
+    /* Total AR (D34) and 0-90 days formula (D36) pre-computed */
+    setCell(fo, 'D34', (arP.total ?? 0) + (arI.total ?? 0), FMT.money);
+    const d36 = (arP.current||0)+(arP.d3160||0)+(arP.d6190||0)+(arI.current||0)+(arI.d3160||0)+(arI.d6190||0);
+    setCell(fo, 'D36', Math.round(d36), FMT.money);
+    /* Estimated value of AR (G37 @ 70%, G38 @ 80%) */
+    setCell(fo, 'G37', Math.round(d36 * 0.80 * 0.70), FMT.money);
+    setCell(fo, 'G38', Math.round(d36 * 0.80 * 0.80), FMT.money);
 
-    /* Collections by payment/payor type (row 44) — from Sources of Dollars */
-    setCell(fo, 'B44', Math.round(sodD.patientCreditCard || 0));
-    setCell(fo, 'C44', Math.round(sodD.patientCheck || 0));
-    setCell(fo, 'D44', Math.round(sodD.patientCash || 0));
-    setCell(fo, 'E44', Math.round(sodD.insurance || 0));
-    setCell(fo, 'F44', Math.round(sodD.government || 0));  /* capitation column — gov bucket is closest */
-    setCell(fo, 'G44', Math.round(sodD.thirdPartyFinance || 0));
-    /* H44 (dentical) left 0 — specific to CA Medicaid, no separate bucket in canonical data */
+    /* Collections by payment/payor type (row 44) */
+    const row44 = {
+      B: Math.round(sodD.patientCreditCard || 0),
+      C: Math.round(sodD.patientCheck || 0),
+      D: Math.round(sodD.patientCash || 0),
+      E: Math.round(sodD.insurance || 0),
+      F: Math.round(sodD.government || 0),
+      G: Math.round(sodD.thirdPartyFinance || 0),
+      H: 0,
+    };
+    const row44Total = Object.values(row44).reduce((a, b) => a + b, 0);
+    Object.entries(row44).forEach(([col, v]) => setCell(fo, col + '44', v, FMT.money));
+    setCell(fo, 'I44', row44Total, FMT.money);
+    /* Row 45 — % of total */
+    if (row44Total > 0) {
+      ['B','C','D','E','F','G','H'].forEach(col => {
+        setCell(fo, col + '45', (row44[col] || 0) / row44Total, FMT.pct);
+      });
+    }
   }
 
   /* ═══ APPEND DETAIL SHEETS (the old from-scratch view, as a deep-dive) ═══
