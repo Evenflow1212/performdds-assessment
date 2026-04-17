@@ -2,5 +2,7 @@
   "name": "performdds-assessment",
   "version": "1.0.0",
   "private": true,
-  "dependencies": {}
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
 }
