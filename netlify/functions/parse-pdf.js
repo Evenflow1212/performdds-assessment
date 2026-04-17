@@ -29,17 +29,29 @@ PAYMENTS|[number as positive]`,
   },
 
   eaglesoft: {
-    production: `Eaglesoft "Service codes productivity master" report. Each row has an internal Eaglesoft code + a separate ADA Code column (starts with D), a description, and "This Year" Units and Production columns.
+    production: `Eaglesoft "Service codes productivity master" report. This report has 9 columns per row, in this exact order left-to-right:
 
-For the DATE range, look for a "From EOD: ... To EOD: ..." header line anywhere in the document. Convert the mm/dd/yy dates to MM/DD/YYYY. If no date range is visible, emit DATES|THIS_YEAR as a placeholder.
+  1. Code (internal Eaglesoft code, e.g. 02740, 4BWH, PANOH)
+  2. ADA Code (starts with D, e.g. D2740 — SOMETIMES BLANK for custom/retail items)
+  3. Description
+  4. Stand Fee (the practice's standard fee)
+  5. Avg Fee (average charged fee)
+  6. This Month Units
+  7. This Month Production
+  8. This Year Units   ← THIS IS QTY (use this, NOT This Month)
+  9. This Year Production   ← THIS IS TOTAL (use this, NOT This Month)
+
+CRITICAL: you MUST use columns 8 and 9 (This Year), NOT columns 6 and 7 (This Month). The last two numeric values on each row are always This Year figures. If you see a row with only 4 numbers after the description, those are Stand Fee / Avg Fee / This Year Units / This Year Production (This Month was zero and got collapsed). The This Year values are cumulative-to-date across the full reporting period.
+
+For the DATE range, look for a "From EOD: ... To EOD: ..." header line. Convert mm/dd/yy to MM/DD/YYYY (20YY for 2-digit year). If no date range is visible, emit DATES|THIS_YEAR.
 
 For each procedure row:
-- Use the ADA Code column as CODE (must start with D, e.g., D0120, D1110, D2740).
-- If the ADA Code column is empty or blank for a row, SKIP that row entirely.
-- Use "This Year Units" as QTY.
-- Use "This Year Production" as TOTAL (strip $ and commas; negative values use a minus sign, not parens).
-- If multiple rows share the same ADA code (e.g., D1206 appears under different internal codes), SUM their units and production into a single line.
+- Use the ADA Code column as CODE (must start with D). If the ADA Code column is empty, SKIP that row entirely.
+- Use This Year Units as QTY.
+- Use This Year Production as TOTAL (strip $ and commas; negative values use a minus sign, not parens).
+- If multiple rows share the same ADA code (e.g., D1206 appears under different internal codes), SUM units and production into a single line.
 - Skip rows where This Year Units = 0 AND This Year Production = 0.
+- Sanity check: if your total production across ALL rows is less than $500,000, you are almost certainly reading the wrong column — re-read and use This Year, not This Month.
 
 Return ONLY lines in this format — no other text:
 First line: DATES|MM/DD/YYYY - MM/DD/YYYY
@@ -49,7 +61,20 @@ DATES|01/01/2024 - 12/31/2024
 D0120|Periodic Oral Evaluation|652|41200.00
 D1110|Prophylaxis - Adult|1204|154500.00`,
 
-    collections: `Eaglesoft "Day Sheet" summary. Find the "Totals:" line near the end — it has three columns: Production, Collections, Adjustments (adjustments may appear in parens = negative).
+    collections: `Eaglesoft "Day Sheet" summary report. You need to find the GRAND TOTAL row at the very end of the document — not per-section or per-provider subtotals.
+
+The grand total row:
+- Starts with the exact text "Totals:" (plural "Totals", with a colon).
+- Appears on the LAST PAGE or LAST SECTION of the document, after all detail rows.
+- Has three dollar values: Production, Collections, Adjustments (adjustments may appear in parens like ($33,244.34) = negative).
+- The dollar values are large (typically $500K+ for a full-year report).
+
+IGNORE any of these "total"-adjacent lines that are NOT the grand total:
+- "Subtotal" rows
+- Per-payor-type totals like "TOTAL CASH PAYMENTS:", "TOTAL CHECK PAYMENTS:"
+- Per-provider totals like "Dr. Smith's Total:"
+- Daily totals for individual dates
+- Payment method section totals
 
 Also find the "From EOD: ... To EOD: ..." date range in the header.
 
@@ -57,7 +82,8 @@ Return ONLY these 3 lines:
 DATES|MM/DD/YYYY - MM/DD/YYYY
 CHARGES|[production total as positive number, no $, no commas]
 PAYMENTS|[collections total as positive number, no $, no commas]
-If the report uses YY (2-digit year) format in the header, expand to 4-digit (20YY).`,
+If the YY format appears, expand to 4-digit (20YY).
+Sanity check: CHARGES and PAYMENTS should both be large numbers (typically $500K+). If either is under $100K, you probably picked a subtotal — re-scan for the end-of-document "Totals:" line.`,
   },
 };
 
