@@ -1464,7 +1464,6 @@ function renderReviewHtml(data, rawTexts = {}) {
   const rawColl = rawTexts.collText ? esc(rawTexts.collText).replace(/\n/g,'<br>') : '<em style="color:#999">Not available</em>';
 
   /* ─── KPI Math rows ─── */
-  const monthlyPL  = (financials.plIncome || 0) / 12;
   const monthlyProd2 = period.prodMonths ? (production.total || 0) / period.prodMonths : 0;
   const monthlyColl2 = period.prodMonths ? (collections.total || 0) / period.prodMonths : 0;
   const kpiMathRows = [
