@@ -191,9 +191,8 @@
 <section class="section">
   <div class="section-label">Production Mix</div>
   <h2 class="section-title">Where the production comes from</h2>
-  <div class="chart-grid">
-    <div class="chart-box"><h3>Production by Category</h3><div class="chart-sub">Annual dollars, grouped by major service area</div><div style="height:280px;position:relative"><canvas id="chartProdBar"></canvas></div></div>
-    <div class="chart-box"><h3>Doctor vs Hygiene vs Specialty</h3><div class="chart-sub">% of total production</div><div style="height:280px;position:relative"><canvas id="chartProdPie"></canvas></div></div>
+  <div class="chart-grid" style="grid-template-columns:1fr;">
+    <div class="chart-box"><h3>Production by Category</h3><div class="chart-sub">Annual dollars, grouped by major service area — percentage at end of each bar</div><div style="height:320px;position:relative"><canvas id="chartProdBar"></canvas></div></div>
   </div>
 </section>
 
@@ -226,6 +225,7 @@
   <div class="scorecard" id="financials">
     {{financialCards}}
   </div>
+  {{arAgingTable}}
 </section>
 
 <!-- ═════ SOURCES OF DOLLARS ═════ -->
@@ -254,6 +254,7 @@
 <section class="section">
   <div class="section-label">Practice Profile</div>
   <h2 class="section-title">What you told us</h2>
+  {{painPoints}}
   <div class="profile-grid" id="profile">
     {{profileRows}}
   </div>
@@ -312,19 +313,9 @@ if (REPORT.productionByCategory && REPORT.productionByCategory.length) {
   });
 }
 
-if (REPORT.productionSplit && REPORT.productionSplit.length) {
-  new Chart($('chartProdPie'), {
-    type: 'doughnut',
-    data: {
-      labels: REPORT.productionSplit.map(r => r.label),
-      datasets: [{ data: REPORT.productionSplit.map(r => r.value), backgroundColor: ['#3574b7','#10b981','#f59e0b','#ef4444','#a855f7'], borderColor: '#0f1c2e', borderWidth: 2 }]
-    },
-    options: {
-      maintainAspectRatio: false, cutout: '65%',
-      plugins: { legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } } }
-    }
-  });
-}
+/* Doctor-vs-Hygiene-vs-Specialty donut removed 2026-04-16 per Dave's
+   feedback — the bar chart above shows the same story with $ + % labels,
+   the donut was visual redundancy. */
 </script>
 
 </body>

@@ -298,8 +298,11 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     opportunities.push('Building out production goals and a scorekeeping cadence is typically the first 30 days of coaching. It\'s the foundation that makes every other recommendation actionable.');
   }
 
-  /* ── THREATS ── */
-  threats.push('A change in ownership or management style can lead to patient and staff attrition');
+  /* ── THREATS ──
+     "Ownership change → attrition" and "Experienced staff resist changes" rules
+     were removed 2026-04-16 per Dave — they only apply in buy/sell contexts,
+     not a default owner-running-their-practice assessment. Add back when
+     buy/sell report modes ship. */
   if (staffCostPct > 25 && netIncomePct < 20) threats.push('Current overhead levels may prevent the practice from investing in growth');
   if (npPerMonth > 0) {
     const npProd = codeTotal('D0150');
@@ -307,7 +310,23 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     if (npProdPct > 5) threats.push('The practice may be overly reliant on new patient flow');
   }
   if (specPct > 15) threats.push('Heavy reliance on specialty services means the provider must be able to sustain this production');
-  threats.push('Experienced staff may resist changes in philosophy or management style');
+
+  /* Shrinking patient base: if new patient flow is below ~18% of the active
+     patient base (industry attrition rule of thumb), the practice is losing
+     patients faster than it's replacing them. */
+  const prophyAnnualSWOT = codeTotal('D1110') === undefined ? 0 : (prodData?.codes || []).filter(c => (c.code||'').toUpperCase().startsWith('D1110')).reduce((s,c) => s + (c.qty||0), 0);
+  const perioMaintAnnualSWOT = (prodData?.codes || []).filter(c => (c.code||'').toUpperCase().startsWith('D4910')).reduce((s,c) => s + (c.qty||0), 0);
+  const srpAnnualSWOT = (prodData?.codes || []).filter(c => ['D4341','D4342'].some(p => (c.code||'').toUpperCase().startsWith(p))).reduce((s,c) => s + (c.qty||0), 0);
+  const compExamAnnualSWOT = (prodData?.codes || []).filter(c => (c.code||'').toUpperCase().startsWith('D0150')).reduce((s,c) => s + (c.qty||0), 0);
+  const activePatSWOT = ((prophyAnnualSWOT / 2) + (perioMaintAnnualSWOT / 4) + (srpAnnualSWOT / 16)) / 0.80;
+  const newPatAnnualSWOT = compExamAnnualSWOT;
+  if (activePatSWOT > 100 && newPatAnnualSWOT > 0) {
+    const replacementNeeded = activePatSWOT * 0.18;  /* ~18% annual attrition */
+    if (newPatAnnualSWOT < replacementNeeded * 0.85) {
+      const gapPatients = Math.round(replacementNeeded - newPatAnnualSWOT);
+      threats.push(`New patient flow (~${Math.round(newPatAnnualSWOT)}/year) is below the ~${Math.round(replacementNeeded)}/year needed to replace natural attrition on an active base of ~${Math.round(activePatSWOT)} patients — the practice may be shrinking by ~${gapPatients} patients/year`);
+    }
+  }
 
   /* Ensure minimum bullets per section */
   if (strengths.length === 0) strengths.push('Further data is needed to fully assess practice strengths');
@@ -555,12 +574,14 @@ function computeReportData(input) {
   const goalHygDaily = hygDailyAvg || 0;
   const gCurrentAnnual = annualProd;
 
-  const gShortDocDaily = goalDocDaily * 1.15;
-  const gShortHygDaily = goalHygDaily + 200;
+  /* Round displayed $/day targets to nearest $100 — cleaner than $1,002 / $4,215. */
+  const round100 = n => Math.round(n / 100) * 100;
+  const gShortDocDaily = round100(goalDocDaily * 1.15);
+  const gShortHygDaily = round100(goalHygDaily + 200);
   const gShortAnnual = (gShortDocDaily * totalDocDaysYr) + (gShortHygDaily * hygDaysPerYear) + annualSpecialty;
 
-  const gLongDocDaily = goalDocDaily * 1.30;
-  const gLongHygDaily = goalHygDaily + 400;
+  const gLongDocDaily = round100(goalDocDaily * 1.30);
+  const gLongHygDaily = round100(goalHygDaily + 400);
   const gLongAnnual = (gLongDocDaily * totalDocDaysYr) + (gLongHygDaily * hygDaysPerYear) + annualSpecialty;
 
   /* ──── Targets & Goal synthesis (per Dave's Pigneri reference workbook) ────
@@ -686,7 +707,7 @@ function computeReportData(input) {
     const hygGap = targetHyg - annualHyg;
     if (hygGap > 5000) opps.push({
       icon: '🦷', value: hygGap, title: 'Hygiene production gap',
-      body: `Hygiene is ${hygPct.toFixed(1)}% of production vs a 30-33% target. Growing hygiene to the benchmark could add up to $${Math.round(hygGap).toLocaleString()} annually — and each new hygiene patient opens a doctor-diagnosed treatment pipeline.`
+      body: `Hygiene is ${hygPct.toFixed(1)}% of production vs a 30–35% target. Growing hygiene to the benchmark could add up to $${Math.round(hygGap).toLocaleString()} annually — and each new hygiene patient opens a doctor-diagnosed treatment pipeline.`
     });
   }
   if (overheadPct > 65 && plIncome > 0) {
@@ -743,10 +764,16 @@ function computeReportData(input) {
       opsActive, opsTotal,
       doctorDays,
       hygieneDaysPerWeek,
+      numHygienists: Number(pp.numHygienists) || 0,
+      patientsPerHygienistPerDay: Number(pp.patientsPerHygienistPerDay) || 0,
       hasAssociate: !!pp.hasAssociate,
       associateDaysPerMonth,
       crownsPerMonth: pp.crownsPerMonth || null,
       payorMix: mix,
+      /* Dentist's own words — surfaced on Report + Review to tie every finding
+         back to what the dentist said was wrong. */
+      concerns: Array.isArray(pp.concerns) ? pp.concerns : [],
+      biggestChallenge: pp.biggestChallenge ? String(pp.biggestChallenge).trim() : '',
     },
 
     period: {
@@ -768,7 +795,12 @@ function computeReportData(input) {
         cosmetic: prodCosmetic * annualFactor,
       },
       split: { doctor: annualDoctor, hygiene: annualHyg, specialty: annualSpecialty },
-      categoriesForChart: prodCategories.map(c => ({ label: c.label, value: Math.round(c.value) })),
+      /* Chart labels get the % appended so readers see the percentage at the
+         end of each bar (donut chart removed per Dave's 2026-04-16 feedback). */
+      categoriesForChart: prodCategories.map(c => {
+        const pct = totalProd > 0 ? (c.value / annualFactor / totalProd * 100) : 0;
+        return { label: `${c.label} — ${pct.toFixed(0)}%`, value: Math.round(c.value) };
+      }),
       splitForChart: prodSplit.map(c => ({ label: c.label, value: Math.round(c.value) })),
       codes: codes,
     },
@@ -997,9 +1029,41 @@ function renderReportHtml(data) {
     { lbl: 'Annual Expenses', val: financials.plExpenses > 0 ? fmt$(financials.plExpenses) : '—', bench: financials.plExpenses > 0 ? '' : 'Not available in P&L' },
     { lbl: 'Profit Margin', val: (financials.profitPct != null && financials.profitPct > 0 && financials.profitPct < 100) ? financials.profitPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≥35%</strong>', status: statusVs(financials.profitPct, 35, true) },
     { lbl: 'Staff Cost / Collections', val: (financials.staffCostPct != null && financials.staffCostPct > 0) ? financials.staffCostPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤22%</strong>', status: statusVs(financials.staffCostPct, 22, false) },
-    { lbl: 'Patient AR (90+ days)', val: fmt$(ar.patient?.over90 || ar.patient?.d90plus), bench: ar.patient?.total ? `of ${fmt$(ar.patient.total)} total` : '' },
-    { lbl: 'Insurance AR (90+ days)', val: fmt$(ar.insurance?.over90 || ar.insurance?.d90plus), bench: ar.insurance?.total ? `of ${fmt$(ar.insurance.total)} total` : '' },
   ];
+  /* AR full aging table replaces the compact 90+ cards (Dave 2026-04-16: "show
+     the AR as it ages: current, 30-60, 60-90, and over 90"). */
+  const arP = ar.patient || {};
+  const arI = ar.insurance || {};
+  const arHasData = (arP.total || arI.total);
+  const arRow = (label, a) => `
+    <tr>
+      <td><strong>${label}</strong></td>
+      <td>${fmt$(a.current)}</td>
+      <td>${fmt$(a.d3160)}</td>
+      <td>${fmt$(a.d6190)}</td>
+      <td>${fmt$(a.d90plus ?? a.over90)}</td>
+      <td><strong>${fmt$(a.total)}</strong></td>
+    </tr>`;
+  const arAgingTable = arHasData ? `
+    <div style="margin-top:20px">
+      <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#8899aa;margin:0 0 8px;">Accounts Receivable Aging</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;background:rgba(15,28,46,.4);border-radius:8px;overflow:hidden;">
+        <thead>
+          <tr style="background:rgba(42,63,95,.6);color:#cbd5e1;">
+            <th style="padding:8px 12px;text-align:left;font-weight:600;"></th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">Current</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">30–60</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">60–90</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">90+</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">Total</th>
+          </tr>
+        </thead>
+        <tbody style="color:#e2e8f0;">
+          ${arRow('Patient', arP)}
+          ${arRow('Insurance', arI)}
+        </tbody>
+      </table>
+    </div>` : '';
   const financialHtml = financialCards.map(c => `
     <div class="score-card ${c.status || ''}">
       <div class="lbl">${htmlEscape(c.lbl)}</div>
@@ -1057,6 +1121,35 @@ function renderReportHtml(data) {
     <div class="profile-row"><span class="k">${htmlEscape(r[0])}</span><span class="v">${htmlEscape(r[1])}</span></div>
   `).join('');
 
+  /* ── Pain points block — dentist's own words (concerns checkboxes + freeform "biggest challenge")
+     Surface BEFORE the profile facts; this is what the dentist said is wrong, and every finding
+     in the Report should ultimately tie back to one of these. */
+  const concernLabels = {
+    'more_profitable': 'Want to be more profitable',
+    'staff_issues': 'Staff issues',
+    'insurance_low': 'Insurance reimbursements too low',
+    'too_busy': 'Too busy / overwhelmed',
+    'marketing': 'Marketing / new patient flow',
+    'burned_out': 'Burned out',
+    'cant_retire': "Can't afford to retire",
+    'growth_stalled': 'Growth has stalled',
+  };
+  const concerns = Array.isArray(practice.concerns) ? practice.concerns : [];
+  const biggestChallenge = practice.biggestChallenge ? String(practice.biggestChallenge).trim() : '';
+  const hasPainPoints = concerns.length > 0 || biggestChallenge.length > 0;
+  const painPointsHtml = hasPainPoints ? `
+    <div style="background:linear-gradient(135deg,rgba(232,135,42,.08),rgba(232,135,42,.02));border-left:3px solid #e8872a;padding:16px 20px;border-radius:8px;margin-bottom:20px;">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#e8872a;font-weight:700;margin-bottom:10px;">What you told us is wrong</div>
+      ${concerns.length > 0 ? `
+        <ul style="list-style:none;padding:0;margin:0 0 ${biggestChallenge ? '14px' : '0'} 0;">
+          ${concerns.map(c => `<li style="padding:4px 0;color:#e2e8f0;">✓  ${htmlEscape(concernLabels[c] || c)}</li>`).join('')}
+        </ul>` : ''}
+      ${biggestChallenge ? `
+        <blockquote style="font-style:italic;color:#cbd5e1;font-size:15px;line-height:1.5;border-left:2px solid rgba(203,213,225,.3);padding-left:14px;margin:0;">
+          "${htmlEscape(biggestChallenge)}"
+        </blockquote>` : ''}
+    </div>` : '';
+
   /* ── Chart data for the inlined <script> ── */
   const reportJson = {
     productionByCategory: production.categoriesForChart,
@@ -1079,6 +1172,8 @@ function renderReportHtml(data) {
     opportunityCards: oppHtml,
     goalRows: goalRowsHtml,
     financialCards: financialHtml,
+    arAgingTable: arAgingTable,
+    painPoints: painPointsHtml,
     sourcesOfDollarsCards: sourcesHtml,
     sourcesSummary: sourcesSummary,
     swotStrengths: swotLi(swot.strengths),
@@ -1139,6 +1234,27 @@ function renderReviewHtml(data) {
     ['Payor mix — FFS / OON', fmtPct(mix.ffs)],
     ['Stated crowns / month', practice.crownsPerMonth ?? '—'],
   ];
+
+  /* Pain points block for the Review page — same data as the Report's "What you
+     told us is wrong" section. Surface at the top of Practice Profile. */
+  const reviewConcernLabels = {
+    'more_profitable': 'Want to be more profitable',
+    'staff_issues': 'Staff issues',
+    'insurance_low': 'Insurance reimbursements too low',
+    'too_busy': 'Too busy / overwhelmed',
+    'marketing': 'Marketing / new patient flow',
+    'burned_out': 'Burned out',
+    'cant_retire': "Can't afford to retire",
+    'growth_stalled': 'Growth has stalled',
+  };
+  const reviewConcerns = Array.isArray(practice.concerns) ? practice.concerns : [];
+  const reviewChallenge = practice.biggestChallenge ? String(practice.biggestChallenge).trim() : '';
+  const painPointsBlock = (reviewConcerns.length || reviewChallenge) ? `
+    <div style="background:#fff7ed;border-left:4px solid #e8872a;padding:12px 16px;border-radius:6px;margin:0 0 12px 0;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#9a3412;font-weight:700;margin-bottom:6px;">What the dentist said is wrong</div>
+      ${reviewConcerns.length ? `<ul style="margin:0 0 ${reviewChallenge ? '10px' : '0'} 0;padding-left:20px;">${reviewConcerns.map(c => `<li>${esc(reviewConcernLabels[c] || c)}</li>`).join('')}</ul>` : ''}
+      ${reviewChallenge ? `<blockquote style="margin:0;font-style:italic;color:#555;border-left:2px solid #e8872a;padding-left:10px;">"${esc(reviewChallenge)}"</blockquote>` : ''}
+    </div>` : '';
 
   /* Section 2 — Production Overview (by category) */
   const totalProd = production.total || 0;
@@ -1306,6 +1422,7 @@ function renderReviewHtml(data) {
   <div><span class="badge">INTERNAL — NOT A CLIENT DELIVERABLE</span></div>
 
   <h2>Practice Profile</h2>
+  ${painPointsBlock}
   <table class="kv"><tbody>${profileRows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</tbody></table>
 
   <h2>Production Overview</h2>

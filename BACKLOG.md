@@ -185,6 +185,56 @@ Dave flagged these while I was mid-build on the internal review page. Not touchi
 - _how_ — hardcoded benchmark lives in `generate-report.js` `renderReportHtml` (search "30-33%" or similar). Bump to 30–35% for v1. ZIP-based adjustment is a follow-up — would need a lookup table (urban/metro = higher hygiene %, rural = lower).
 - _status_ — idea (2026-04-16), easy fix for v1 + gated regional follow-up
 
+### Report CTA — visual dashboard snapshot next to "deserves a movie" pitch
+- _current_ — Report's end CTA: "This is a snapshot. Your practice deserves a movie." + 30-min call button. Pitch is verbal-only; no visual of what ongoing coaching looks like.
+- _idea_ — drop a snapshot image of the actual ongoing dashboard (trend lines / goal tracking / monthly KPI progression) alongside the pitch so the reader can *see* the product, not just read about it.
+- _layout options_ —
+  1. **Below the CTA box** with caption "Preview: your ongoing coaching dashboard" — cleanest, doesn't interrupt the narrative-to-CTA flow.
+  2. **Above the CTA box** — risks breaking the emotional arc from content into the ask.
+  3. **Behind the CTA box with text overlay** — most visually striking, risks making the button text hard to read; would need a dark gradient overlay.
+  - Dave's instinct: "I don't know what you think." My vote: option 1 with a nice framed screenshot + caption. Clean and credible beats clever.
+- _dependency_ — **need the actual image asset.** Options:
+  - Screenshot of an existing PerformDDS client dashboard (preferred — real product)
+  - Commission a designed mock if no dashboard exists yet
+  - Placeholder stock image of a generic analytics dashboard (weakest — readers can tell)
+- _status_ — idea (2026-04-16); blocked on image asset decision
+
+### Report + Review — surface the dentist's stated pain points
+- _why_ — Survey captures what the dentist *says* is wrong: `practiceProfile.concerns` (checkbox list — "want to be more profitable", "staff issues", "insurance reimbursements too low", etc.) and `practiceProfile.biggestChallenge` (freeform open-ended text). **Neither surfaces anywhere on the Report or internal Review page.** The practice profile section shows "What you told us" = names/dates/days/payor mix, but not the actual problems the dentist flagged in their own words.
+- _impact_ — the Report's whole job is to tie what the dentist SAID they wanted to what the numbers show. If staff issues is a flagged concern, the staff cost % finding needs to explicitly connect to it. If "more profitable" is a concern, the overhead + profit margin story leads with that framing.
+- _fix_ —
+  1. Report Practice Profile section: add a **"Your pain points"** block at the top: bulleted list of checked concerns, plus the biggestChallenge quoted verbatim underneath (same quote-block styling the Report already has in IN THEIR OWN WORDS).
+  2. Review page: same fields added to Practice Profile kv table.
+  3. Down-stream: SWOT / Opportunities content should *reference back* to these concerns when relevant — "You said staff issues are a concern. Your 36% staff cost (vs 20% target) is downstream of that — misaligned capacity or underproducing hygienists are the usual root cause."
+- _data already there_ — yes. `practiceProfile.concerns` = array of strings, `practiceProfile.biggestChallenge` = string. Both come through the request body into `computeReportData` via `practiceProfile` param.
+- _status_ — idea (2026-04-16), ready to implement
+
+### Report Goals card — swap the +15%/+30% blunt-instrument table for the per-stream Targets & Goal matrix
+- _current_ — Report's "Current state → short-term → fully optimized" card shows 5 rows: Combined Doctor $/Day, Hygiene $/Day, Annual Doctor Production, Annual Hygiene Production, Total Annual Production. Short-term = +15% / fully optimized = +30% applied uniformly. Dave: "this is gonna have to be refined and expanded to have more meaning."
+- _fix_ — replace with the full per-stream **Initial Monthly Target** / **Long Term Monthly Goal** matrix from `d.goals.targets`. Rows: general dentist, associate GP, hygiene, perio surgery, endo, oral surgery, ortho, cap, other. Columns: Days Worked, $/Day, Monthly. Two blocks side-by-side (Initial / Long Term). Plus the **Hygiene Capacity Gap** callout from `d.goals.hygienePotential` ("you work X hygiene days/mo; your patient base requires Y; gap = Z visits/mo = $N/yr").
+- _what it shows the dentist_ — not just "work harder and hit +15%," but "here's *exactly* which stream needs how many days at what daily production to hit $X/year, and here's the capacity gap that justifies adding hygiene days." Actionable.
+- _dependencies_ — data already on canonical `d.goals.targets` + `d.goals.hygienePotential`. Just needs the HTML rendering in `renderReportHtml`. The internal Review page already renders this; port the same table (prettier styling) to the client Report.
+- _also_ — once per-provider GP split lands (owner vs associate PDFs), split the "general dentist" row into owner + associate with separate $/day targets per provider.
+- _status_ — spec complete (2026-04-16), ready to implement after the current review-page build lands
+
+### NEW SWOT Threat rule — low new patient flow → shrinking patient base
+- _why_ — If new patients/month × 12 is below the practice's natural attrition, the active patient base is shrinking year over year. Dentist is treadmilling — working harder for less. Classic slow-death signal the Report should surface explicitly.
+- _how_ — In `generateSWOT`, new threat bullet:
+  - Inputs (already on canonical data): `d.goals.hygienePotential.activePatientEstimate`, `d.goals.hygienePotential.newPatientsPerMo`
+  - Industry attrition benchmark: **15–20% of active patients leave each year** (move, switch, age out, die). Use 18% as the default replacement threshold.
+  - Rule: if `newPatientsPerMo × 12 < activePatientEstimate × 0.18` → fire threat.
+  - Language: "Your new patient flow of N/mo × 12 = X/year is below the ~18% replacement rate your active patient base (Y) requires (~Z/year needed). You're losing patients faster than you're replacing them — the practice is shrinking, which compounds every year."
+  - Quantify the gap: `visitsShortfall = (activePatientEstimate × 0.18 − newPatientsPerMo × 12)` → each missing new patient is ~$1,500–$2,500 in first-year value (tie to the PPO benchmark in the payor-mix spec).
+- _dependencies_ — none; `hygienePotential.newPatientsPerMo` already computed from D0150 count.
+- _status_ — idea (2026-04-16), ready to implement
+
+### Remove "ownership change → attrition" SWOT threat (buy/sell only)
+- _current_ — SWOT THREATS card includes "A change in ownership or management style can lead to patient and staff attrition." Fires by default on every assessment.
+- _problem_ — irrelevant unless the practice is being bought or sold. Default-assessment context = owner running their practice; this threat doesn't apply.
+- _fix_ — for v1, **remove this rule entirely** from `generateSWOT` in generate-report.js. Don't re-surface.
+- _later_ — when we build buy-side / sell-side assessment modes (separate report flavor), this threat belongs there under a "transition risk" section with more specific language. Dave said "we will develop some cardio [cards] for that but not yet."
+- _status_ — idea (2026-04-16), quick removal now, future-mode placeholder
+
 ### AR display — show full aging breakdown, not just 90+ days
 - _current_ — Report shows two compact cards: "Patient AR (90+ days) $9,765 of $120,145 total" and same for insurance. Only surfaces the 90+ bucket.
 - _fix_ — Show the full aging table for both patient and insurance AR: **current / 30–60 / 60–90 / 90+ / total** in each row. The data is already on `d.ar.patient.{current,d3160,d6190,d90plus,total}` and same for insurance — just render it.
