@@ -2147,11 +2147,178 @@ async function downloadDebugXlsx() {
   const sod = fin.sourcesOfDollars || {};
   const sodD = sod.dollars || {};
 
-  /* Practice name lives on Production Worksheet!D4 — other sheets
-     reference it via ='Production Worksheet'!D4. Setting it here
-     cascades automatically. */
+  /* ═══ PRODUCTION WORKSHEET ═══ — the main overview sheet.
+     Practice name lives on D4; all other sheets reference it.
+     Procedure code cells populate D (qty) + F (avg $/procedure) so
+     the template's existing G=D*F formulas auto-compute totals. */
+  const codeStats = (prefixes) => {
+    const list = Array.isArray(prefixes) ? prefixes : [prefixes];
+    const up = s => (s || '').toUpperCase();
+    const matches = (prod.codes || []).filter(c =>
+      list.some(pfx => up(c.code).startsWith(up(pfx)))
+    );
+    const qty = matches.reduce((s, c) => s + (c.qty || 0), 0);
+    const total = matches.reduce((s, c) => s + (c.total || 0), 0);
+    return { qty, total, avg: qty > 0 ? total / qty : 0 };
+  };
+  const setQtyAvg = (ws, row, prefixes) => {
+    const s = codeStats(prefixes);
+    if (s.qty > 0) {
+      setCell(ws, `D${row}`, s.qty);
+      setCell(ws, `F${row}`, Math.round(s.avg));
+    }
+  };
+  const setLM = (ws, row, prefixes) => {
+    const s = codeStats(prefixes);
+    if (s.qty > 0) {
+      setCell(ws, `L${row}`, s.qty);
+      setCell(ws, `M${row}`, Math.round(s.total));
+    }
+  };
+
   const pws = wb.Sheets['Production Worksheet'];
-  if (pws) setCell(pws, 'D4', p.name || '');
+  if (pws) {
+    setCell(pws, 'D4', p.name || '');
+    setCell(pws, 'D5', months);
+    setCell(pws, 'G5', Math.round(prod.total || 0));
+
+    /* Exams (D col = qty over period) */
+    setCell(pws, 'D10', codeStats('D0120').qty);
+    setCell(pws, 'D11', codeStats('D0140').qty);
+    setCell(pws, 'D12', codeStats('D0150').qty);
+    setCell(pws, 'D13', codeStats('D0180').qty);
+
+    /* Imaging */
+    setCell(pws, 'D16', codeStats('D0210').qty);
+    setCell(pws, 'D17', codeStats('D0274').qty);
+    setCell(pws, 'D18', codeStats('D0330').qty);
+
+    /* Hygiene — qty + avg $/each (G = D*F auto) */
+    setQtyAvg(pws, 21, 'D1110');
+    setQtyAvg(pws, 22, 'D1120');
+    setQtyAvg(pws, 23, 'D4910');
+    setQtyAvg(pws, 24, ['D4341', 'D4342']);
+    setQtyAvg(pws, 25, 'D4381');
+
+    /* Crown & Bridge — rows 31/32 are specific codes, 33/34/35 are SUM formulas
+       that pull from the L-column crown detail table. Populate the detail table
+       and the specific rows; the SUMs auto-compute. */
+    setQtyAvg(pws, 31, 'D2740');
+    setQtyAvg(pws, 32, 'D2750');
+
+    /* Crown detail (L3-L8 / M3-M8) — Veneers, Inlays, Onlays, Resin, Cast Metal, Implant */
+    setLM(pws, 3, ['D2960', 'D2961', 'D2962']);
+    setLM(pws, 4, ['D2610', 'D2620', 'D2630']);
+    setLM(pws, 5, ['D2642', 'D2643', 'D2644']);
+    setLM(pws, 6, ['D2710', 'D2712', 'D2720', 'D2721', 'D2722']);
+    setLM(pws, 7, ['D2780', 'D2781', 'D2782', 'D2790', 'D2791', 'D2792', 'D2794']);
+    setLM(pws, 8, ['D6065', 'D6066', 'D6067', 'D6068']);
+
+    /* Bridge units (L12-L15) */
+    setLM(pws, 12, ['D6245', 'D6740', 'D6068']);
+    setLM(pws, 13, ['D6242', 'D6066', 'D6752']);
+    setLM(pws, 14, ['D6057']);
+    setLM(pws, 15, ['D6065']);
+
+    /* Ortho (L21-L26) */
+    setLM(pws, 21, 'D7880');
+    setLM(pws, 22, 'D8040');
+    setLM(pws, 23, 'D8080');
+    setLM(pws, 24, 'D8090');
+    setLM(pws, 25, 'D8220');
+    setLM(pws, 26, 'D8680');
+
+    /* Dentures (L31-L39) */
+    setLM(pws, 31, ['D5110', 'D5120', 'D5130', 'D5140']);
+    setLM(pws, 32, ['D5211', 'D5212']);
+    setLM(pws, 33, ['D5213', 'D5214']);
+    setLM(pws, 34, ['D5225', 'D5226']);
+    setLM(pws, 35, ['D6111']);
+    setLM(pws, 36, ['D5410', 'D5411', 'D5421', 'D5422']);
+    setLM(pws, 37, ['D5511', 'D5512', 'D5520', 'D5611', 'D5612']);
+    setLM(pws, 38, ['D5730', 'D5731', 'D5740', 'D5741', 'D5750', 'D5751']);
+    setLM(pws, 39, ['D5820', 'D5821']);
+
+    /* Endo (L43-L46) */
+    setLM(pws, 43, 'D3310');
+    setLM(pws, 44, 'D3320');
+    setLM(pws, 45, 'D3330');
+    setLM(pws, 46, ['D3346', 'D3347', 'D3348']);
+
+    /* Perio (L51-L56; L55 is a SUM, skip) */
+    setLM(pws, 51, 'D4249');
+    setLM(pws, 52, 'D4266');
+    setLM(pws, 53, 'D4267');
+    setLM(pws, 54, 'D4273');
+    setLM(pws, 56, 'D4283');
+
+    /* Oral Surgery (L58-L67) */
+    setLM(pws, 58, 'D7922');
+    setLM(pws, 59, 'D7953');
+    setLM(pws, 60, 'D6104');
+    setLM(pws, 61, 'D7140');
+    setLM(pws, 62, 'D7210');
+    setLM(pws, 63, 'D6010');
+    setLM(pws, 64, 'D6100');
+    setLM(pws, 65, 'D7250');
+    setLM(pws, 66, 'D7286');
+    setLM(pws, 67, 'D7952');
+  }
+
+  /* ═══ ALL CODES - PRODUCTION REPORT ═══ every code, sorted by $ desc */
+  const ac = wb.Sheets['All Codes - Production Report'];
+  if (ac) {
+    const sorted = [...(prod.codes || [])].sort((a, b) => (b.total || 0) - (a.total || 0));
+    sorted.forEach((c, i) => {
+      const row = i + 2;  /* header at row 1 */
+      setCell(ac, `A${row}`, c.code || '');
+      setCell(ac, `B${row}`, c.desc || '');
+      setCell(ac, `C${row}`, c.qty || 0);
+      setCell(ac, `D${row}`, Math.round(c.total || 0));
+      setCell(ac, `E${row}`, c.qty > 0 ? Math.round((c.total || 0) / c.qty) : 0);
+      setCell(ac, `F${row}`, prod.total > 0 ? Number(((c.total || 0) / prod.total).toFixed(4)) : 0);
+    });
+  }
+
+  /* ═══ TARGETS & GOAL ═══ current days + achieved $/day per stream.
+     Long-term block (rows 22-30) left at template defaults until the Goals
+     tab rebuild — see BACKLOG.md "Rebuild the Goals tab properly". */
+  const tg = wb.Sheets['Targets & Goal'];
+  if (tg) {
+    const docDays = p.doctorDays || 0;
+    const assocDays = p.associateDaysPerMonth || 0;
+    const hygDaysPerMonth = Math.round((p.hygieneDaysPerWeek || 0) * 4.33);
+
+    /* C col = days worked / month, D col = $/day target */
+    setCell(tg, 'C8', docDays);
+    if (k.ownerDocDailyAvg || k.combinedDocDailyAvg) {
+      setCell(tg, 'D8', Math.round(k.ownerDocDailyAvg || k.combinedDocDailyAvg));
+    }
+    setCell(tg, 'C9', assocDays);
+    if (k.associateDocDailyAvg) setCell(tg, 'D9', Math.round(k.associateDocDailyAvg));
+    setCell(tg, 'C10', hygDaysPerMonth);
+    if (k.hygDailyAvg) setCell(tg, 'D10', Math.round(k.hygDailyAvg));
+  }
+
+  /* ═══ P&L INPUT ═══ foundational numbers. B2 months, H2 total P&L
+     collections over period — so N2 monthly ave computes. Budgetary P&L
+     downstream cells will pull from this. Row 50 "Adj. Figure" per-category
+     is deferred until fin exposes a full category breakdown. */
+  const pli = wb.Sheets['P&L Input'];
+  if (pli) {
+    setCell(pli, 'B2', months);
+    setCell(pli, 'H2', Math.round(fin.plIncome || 0));
+  }
+
+  /* ═══ HYGIENE SCHEDULE ═══ just the core inputs from the form; per-day
+     scheduled/seen columns left as 0 until Hub exposes that data on `d`. */
+  const hs = wb.Sheets['Hygiene Schedule'];
+  if (hs) {
+    const nHyg = p.numHygienists || 0;
+    /* RDH scheduled per day (C7 mon, E7 tue, G7 wed, I7 thu, K7 fri) */
+    ['C7', 'E7', 'G7', 'I7'].forEach(addr => setCell(hs, addr, nHyg));
+    if (p.hygieneDaysPerWeek >= 5) setCell(hs, 'K7', nHyg);
+  }
 
   /* Financial Overview — the sheet Dave screenshotted first. Covers:
      historical production/collection (we only have current period, so
