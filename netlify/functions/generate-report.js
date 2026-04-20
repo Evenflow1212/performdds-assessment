@@ -73,13 +73,28 @@ function parsePL(text) {
   const items = [];
   let totalIncome = null, totalExpense = null, netIncome = null;
   let currentSection = 'Expense';
+  /* Recognize summary-line variants Claude emits in the wild: the PL prompt
+     asks for TOTAL_EXPENSE but Haiku often echoes the QB label verbatim
+     ("Total Expenses"), pluralizes the underscored key ("TOTAL_EXPENSES"),
+     or keeps the "$" / parens formatting from the source PDF. When any of
+     these slip through, totalExpense stays null and Overhead % renders as
+     "—" on the scorecard — the bug flagged in MORNING_NOTES.md (2026-04-15). */
+  const RE_INCOME  = /^total[\s_]+(?:for\s+)?(?:income|revenue|sales)\s*\|\s*([^\s|]+)/i;
+  const RE_EXPENSE = /^total[\s_]+(?:for\s+)?(?:operating\s+)?expenses?\s*\|\s*([^\s|]+)/i;
+  const RE_NET     = /^net[\s_]+(?:operating[\s_]+)?income\s*\|\s*([^\s|]+)/i;
+  const parseAmount = (s) => {
+    let raw = String(s).replace(/[,$]/g, '');
+    if (raw.startsWith('(') && raw.endsWith(')')) raw = '-' + raw.slice(1, -1);
+    const n = parseFloat(raw);
+    return isNaN(n) ? null : n;
+  };
   for (const line of (text || '').split('\n')) {
-    const sm = line.match(/^TOTAL_INCOME\|([-\d,.]+)/i);
-    if (sm) { totalIncome = Math.abs(parseFloat(sm[1].replace(/,/g,''))); continue; }
-    const se = line.match(/^TOTAL_EXPENSE\|([-\d,.]+)/i);
-    if (se) { totalExpense = Math.abs(parseFloat(se[1].replace(/,/g,''))); continue; }
-    const sn = line.match(/^NET_INCOME\|([-\d,.]+)/i);
-    if (sn) { netIncome = parseFloat(sn[1].replace(/,/g,'')); continue; }
+    const sm = line.match(RE_INCOME);
+    if (sm) { const v = parseAmount(sm[1]); if (v != null) totalIncome = Math.abs(v); continue; }
+    const se = line.match(RE_EXPENSE);
+    if (se) { const v = parseAmount(se[1]); if (v != null) totalExpense = Math.abs(v); continue; }
+    const sn = line.match(RE_NET);
+    if (sn) { const v = parseAmount(sn[1]); if (v != null) netIncome = v; continue; }
     const secMatch = line.match(/^SECTION\|(.+)/i);
     if (secMatch) { currentSection = secMatch[1].trim(); continue; }
     if (/^DATES?\|/i.test(line)) continue;

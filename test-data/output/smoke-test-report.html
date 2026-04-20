@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Smoke Test — Practice Assessment</title>
+<title>Test Dental Group — Practice Assessment</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
@@ -150,17 +150,16 @@
 <section class="hero">
   <div class="hero-inner">
     <div class="hero-brand">Perform DDS &middot; Practice Assessment</div>
-    <h1>Smoke Test</h1>
-    <div class="meta">Based on 12 months of production data (2024) &middot; Generated April 15, 2026</div>
+    <h1>Test Dental Group</h1>
+    <div class="meta">Based on 12 months of production data (2025) &middot; Generated April 19, 2026</div>
     <div class="hero-opportunity">
       <div>
         <div class="label">Total annual opportunity identified</div>
-        <div class="num">$0</div>
+        <div class="num">$271,114</div>
       </div>
     </div>
     <div class="hero-ctas">
       <a href="javascript:window.print()" class="btn btn-primary">⬇ Download as PDF</a>
-      <a href="#" class="btn btn-ghost" download>📊 Download Excel Workbook</a>
       <a href="https://calendly.com/davidorr/dental-assessment-review" target="_blank" class="btn btn-ghost">📅 Book Review Call</a>
     </div>
   </div>
@@ -177,38 +176,44 @@
     
     <div class="score-card ">
       <div class="lbl">Annual Production</div>
-      <div class="val">$20,000</div>
+      <div class="val">$1,002,200</div>
       <div class="bench">Based on 12mo, annualized</div>
     </div>
   
-    <div class="score-card bad">
+    <div class="score-card warn">
       <div class="lbl">Collection Rate</div>
-      <div class="val">—</div>
+      <div class="val">91.8%</div>
       <div class="bench">Target <strong>97%+</strong></div>
     </div>
   
     <div class="score-card good">
       <div class="lbl">Hygiene % of Production</div>
-      <div class="val">100.0%</div>
+      <div class="val">50.7%</div>
       <div class="bench">Target <strong>30–33%</strong></div>
     </div>
   
     <div class="score-card ">
-      <div class="lbl">Doctor Avg $/Day</div>
-      <div class="val">$0</div>
-      <div class="bench">16 days/mo</div>
+      <div class="lbl">Doctor $/Day</div>
+      <div class="val">$1,759</div>
+      <div class="bench">16 days/mo &middot; 192 days/yr</div>
     </div>
   
     <div class="score-card ">
       <div class="lbl">Hygiene Avg $/Day</div>
-      <div class="val">$48</div>
-      <div class="bench">8 days/week</div>
+      <div class="val">$2,444</div>
+      <div class="bench">4 days/week</div>
     </div>
   
     <div class="score-card good">
       <div class="lbl">Overhead %</div>
-      <div class="val">—</div>
+      <div class="val">50.2%</div>
       <div class="bench">Target <strong>≤60%</strong></div>
+    </div>
+  
+    <div class="score-card bad">
+      <div class="lbl">Batting Average</div>
+      <div class="val">18.3:1</div>
+      <div class="bench">Sweet spot <strong>4–6:1</strong> (lower is better) · 3,880 visits · 212 crowns</div>
     </div>
   
   </div>
@@ -220,7 +225,31 @@
   <h2 class="section-title">Where the money is</h2>
   <p class="section-desc">The top financial opportunities surfaced by this assessment, each quantified in annual dollars.</p>
   <div class="opp-grid" id="opportunities">
-    <div style="color:#8899aa">No major opportunities identified — practice appears to be performing close to benchmarks across the board.</div>
+    
+    <div class="opp-card">
+      <div class="opp-icon">👥</div>
+      <div class="opp-value">$168,310</div>
+      <div class="opp-unit">per year</div>
+      <div class="opp-title">Staff cost optimization</div>
+      <div class="opp-body">Staff costs are 38.3% of collections vs a 20% benchmark. Right-sizing toward benchmark could free approximately $168,310 per year without cutting people — often a mix of schedule optimization and hygiene productivity.</div>
+    </div>
+  
+    <div class="opp-card">
+      <div class="opp-icon">💰</div>
+      <div class="opp-value">$52,134</div>
+      <div class="opp-unit">per year</div>
+      <div class="opp-title">Collection rate opportunity</div>
+      <div class="opp-body">Current collection rate is 91.8% vs a 97% industry benchmark. Closing that gap at current production levels would recover roughly $52,134 in annual collections.</div>
+    </div>
+  
+    <div class="opp-card">
+      <div class="opp-icon">📈</div>
+      <div class="opp-value">$50,670</div>
+      <div class="opp-unit">per year</div>
+      <div class="opp-title">Doctor production lift (15%)</div>
+      <div class="opp-body">A 15% short-term lift in doctor production is realistic with tighter scheduling and better case presentation — roughly $50,670 per year at current day counts.</div>
+    </div>
+  
   </div>
 </section>
 
@@ -228,9 +257,8 @@
 <section class="section">
   <div class="section-label">Production Mix</div>
   <h2 class="section-title">Where the production comes from</h2>
-  <div class="chart-grid">
-    <div class="chart-box"><h3>Production by Category</h3><div class="chart-sub">Annual dollars, grouped by major service area</div><div style="height:280px;position:relative"><canvas id="chartProdBar"></canvas></div></div>
-    <div class="chart-box"><h3>Doctor vs Hygiene vs Specialty</h3><div class="chart-sub">% of total production</div><div style="height:280px;position:relative"><canvas id="chartProdPie"></canvas></div></div>
+  <div class="chart-grid" style="grid-template-columns:1fr;">
+    <div class="chart-box"><h3>Production by Category</h3><div class="chart-sub">Annual dollars, grouped by major service area — percentage at end of each bar</div><div style="height:320px;position:relative"><canvas id="chartProdBar"></canvas></div></div>
   </div>
 </section>
 
@@ -252,38 +280,38 @@
       <tbody id="goalMatrix">
         
     <tr>
-      <td class="row-label">Doctor $/Day</td>
-      <td><span class="val current">$0</span></td>
-      <td><span class="val short">$0</span></td>
-      <td><span class="val long">$0</span></td>
+      <td class="row-label">Combined Doctor $/Day</td>
+      <td><span class="val current">$1,759</span></td>
+      <td><span class="val short">$2,000</span></td>
+      <td><span class="val long">$2,300</span></td>
     </tr>
   
     <tr>
       <td class="row-label">Hygiene $/Day</td>
-      <td><span class="val current">$48</span></td>
-      <td><span class="val short">$248</span></td>
-      <td><span class="val long">$448</span></td>
+      <td><span class="val current">$2,444</span></td>
+      <td><span class="val short">$2,600</span></td>
+      <td><span class="val long">$2,800</span></td>
     </tr>
   
     <tr>
       <td class="row-label">Annual Doctor Production</td>
-      <td><span class="val current">$0k</span></td>
-      <td><span class="val short">$0k</span></td>
-      <td><span class="val long">$0k</span></td>
+      <td><span class="val current">$338k</span></td>
+      <td><span class="val short">$384k</span></td>
+      <td><span class="val long">$442k</span></td>
     </tr>
   
     <tr>
       <td class="row-label">Annual Hygiene Production</td>
-      <td><span class="val current">$20k</span></td>
-      <td><span class="val short">$103k</span></td>
-      <td><span class="val long">$186k</span></td>
+      <td><span class="val current">$508k</span></td>
+      <td><span class="val short">$541k</span></td>
+      <td><span class="val long">$582k</span></td>
     </tr>
   
     <tr class="total">
       <td>Total Annual Production</td>
-      <td><span class="val current">$20k</span></td>
-      <td><span class="val short">$103k</span></td>
-      <td><span class="val long">$186k</span></td>
+      <td><span class="val current">$1,002k</span></td>
+      <td><span class="val short">$1,081k</span></td>
+      <td><span class="val long">$1,180k</span></td>
     </tr>
   
       </tbody>
@@ -299,38 +327,96 @@
     
     <div class="score-card ">
       <div class="lbl">Annual Revenue (P&amp;L)</div>
-      <div class="val">$0</div>
-      <div class="bench">P&L not uploaded</div>
+      <div class="val">$975,000</div>
+      <div class="bench">From P&L statement</div>
     </div>
   
     <div class="score-card ">
       <div class="lbl">Annual Expenses</div>
-      <div class="val">$0</div>
+      <div class="val">$489,000</div>
       
     </div>
   
     <div class="score-card good">
       <div class="lbl">Profit Margin</div>
-      <div class="val">100.0%</div>
+      <div class="val">49.8%</div>
       <div class="bench">Target <strong>≥35%</strong></div>
     </div>
   
-    <div class="score-card ">
+    <div class="score-card bad">
       <div class="lbl">Staff Cost / Collections</div>
-      <div class="val">—</div>
+      <div class="val">38.3%</div>
       <div class="bench">Target <strong>≤22%</strong></div>
     </div>
   
-    <div class="score-card ">
-      <div class="lbl">Patient AR (90+ days)</div>
-      <div class="val">—</div>
-      
+  </div>
+  
+    <div style="margin-top:20px">
+      <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#8899aa;margin:0 0 8px;">Accounts Receivable Aging</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;background:rgba(15,28,46,.4);border-radius:8px;overflow:hidden;">
+        <thead>
+          <tr style="background:rgba(42,63,95,.6);color:#cbd5e1;">
+            <th style="padding:8px 12px;text-align:left;font-weight:600;"></th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">Current</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">30–60</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">60–90</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">90+</th>
+            <th style="padding:8px 12px;text-align:right;font-weight:600;">Total</th>
+          </tr>
+        </thead>
+        <tbody style="color:#e2e8f0;">
+          
+    <tr>
+      <td><strong>Patient</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>$8,000</td>
+      <td><strong>$45,000</strong></td>
+    </tr>
+          
+    <tr>
+      <td><strong>Insurance</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>$4,000</td>
+      <td><strong>$62,000</strong></td>
+    </tr>
+        </tbody>
+      </table>
+    </div>
+</section>
+
+<!-- ═════ SOURCES OF DOLLARS ═════ -->
+<section class="section">
+  <div class="section-label">Revenue Mix</div>
+  <h2 class="section-title">Where the money came from</h2>
+  <p style="color:#cbd5e1;margin-bottom:18px;">Of the <strong>$975,000</strong> collected over the last 12 months, approximately <strong>12.8%</strong> came through insurance, <strong>0.0%</strong> directly from patients (credit card, check, cash combined), and <strong>0.0%</strong> from government programs or HMO/capitation.</p>
+  <div class="scorecard" id="sources-of-dollars">
+    
+    <div class="score-card">
+      <div class="lbl">From Insurance</div>
+      <div class="val">12.8%</div>
+      <div class="bench">$125,000</div>
     </div>
   
-    <div class="score-card ">
-      <div class="lbl">Insurance AR (90+ days)</div>
-      <div class="val">—</div>
-      
+    <div class="score-card">
+      <div class="lbl">From Patient Pay</div>
+      <div class="val">0.0%</div>
+      <div class="bench">$0 (CC + check + cash)</div>
+    </div>
+  
+    <div class="score-card">
+      <div class="lbl">From 3rd-party Finance</div>
+      <div class="val">0.0%</div>
+      <div class="bench">$0</div>
+    </div>
+  
+    <div class="score-card">
+      <div class="lbl">From Government / HMO</div>
+      <div class="val">0.0%</div>
+      <div class="bench">$0</div>
     </div>
   
   </div>
@@ -341,10 +427,10 @@
   <div class="section-label">Strategic Assessment</div>
   <h2 class="section-title">SWOT</h2>
   <div class="swot">
-    <div class="swot-quad s"><h3>Strengths</h3><ul><li>Hygiene department is performing well at 100% of total production</li></ul></div>
-    <div class="swot-quad w"><h3>Weaknesses</h3><ul><li>Perio maintenance appears limited — no D4910 codes present</li><li>Periodontal disease appears to be under-diagnosed — no SRP procedures found</li><li>The practice does not appear to have a Panorex</li><li>Active patient base is small, estimated at approximately 200</li></ul></div>
-    <div class="swot-quad o"><h3>Opportunities</h3><ul><li>Developing soft tissue management protocols would increase patient care and hygiene revenue</li><li>Bringing specialists in-house would increase the range of treatment and revenue</li><li>Clear aligner therapy represents an untapped revenue opportunity</li><li>A panoramic machine would assist in growing in-house specialty services</li></ul></div>
-    <div class="swot-quad t"><h3>Threats</h3><ul><li>A change in ownership or management style can lead to patient and staff attrition</li><li>Experienced staff may resist changes in philosophy or management style</li></ul></div>
+    <div class="swot-quad s"><h3>Strengths</h3><ul><li>Hygiene department is performing well at 47% of total production</li><li>Strong new patient flow at 30 per month</li><li>Practice has a strong active patient base, estimated at approximately 3400</li><li>The practice has established in-house specialty services</li><li>Practice net income is strong at 53% of collections</li><li>Production volume is strong at $83,517 per month</li></ul></div>
+    <div class="swot-quad w"><h3>Weaknesses</h3><ul><li>Collection rate of 92% is below the 98% benchmark</li><li>Staff wages at 30% of collections significantly exceed the 20% benchmark</li><li>Periodontal disease may be under-diagnosed relative to the patient flow</li><li>Lab costs at 5.2% of collections exceed the 4% benchmark</li><li>Aged AR over 90 days at 11% needs attention</li></ul></div>
+    <div class="swot-quad o"><h3>Opportunities</h3><ul><li>Developing soft tissue management protocols would increase patient care and hygiene revenue</li><li>Improved collection systems could recover approximately $62,156 annually</li><li>Staff cost optimization could improve profitability by approximately $7,583 monthly</li><li>Focused AR management could recover a significant portion of the $12,000 in 90+ day receivables</li></ul></div>
+    <div class="swot-quad t"><h3>Threats</h3><ul><li>Market conditions and competitive landscape should be evaluated</li></ul></div>
   </div>
 </section>
 
@@ -352,23 +438,24 @@
 <section class="section">
   <div class="section-label">Practice Profile</div>
   <h2 class="section-title">What you told us</h2>
+  
   <div class="profile-grid" id="profile">
     
-    <div class="profile-row"><span class="k">Practice Name</span><span class="v">Smoke Test</span></div>
+    <div class="profile-row"><span class="k">Practice Name</span><span class="v">Test Dental Group</span></div>
   
-    <div class="profile-row"><span class="k">Zip Code</span><span class="v">85016</span></div>
+    <div class="profile-row"><span class="k">Zip Code</span><span class="v">12345</span></div>
   
     <div class="profile-row"><span class="k">Practice Management Software</span><span class="v">Dentrix</span></div>
   
-    <div class="profile-row"><span class="k">Years Owned</span><span class="v">15 years</span></div>
+    <div class="profile-row"><span class="k">Years Owned</span><span class="v">12 years</span></div>
   
-    <div class="profile-row"><span class="k">Owner Age</span><span class="v">52 years old</span></div>
+    <div class="profile-row"><span class="k">Owner Age</span><span class="v">48 years old</span></div>
   
-    <div class="profile-row"><span class="k">Operatories</span><span class="v">6 active of 8</span></div>
+    <div class="profile-row"><span class="k">Operatories</span><span class="v">5 active of 6</span></div>
   
     <div class="profile-row"><span class="k">Doctor Days / Month</span><span class="v">16 days</span></div>
   
-    <div class="profile-row"><span class="k">Hygiene Days / Week</span><span class="v">8 days</span></div>
+    <div class="profile-row"><span class="k">Hygiene Days / Week</span><span class="v">4 days</span></div>
   
     <div class="profile-row"><span class="k">In-Network PPO</span><span class="v">60%</span></div>
   
@@ -378,9 +465,7 @@
   
     <div class="profile-row"><span class="k">Fee-for-Service</span><span class="v">25%</span></div>
   
-    <div class="profile-row"><span class="k">Has Associate Doctor</span><span class="v">Yes (12 days/mo)</span></div>
-  
-    <div class="profile-row"><span class="k">Crowns / Month</span><span class="v">25</span></div>
+    <div class="profile-row"><span class="k">Has Associate Doctor</span><span class="v">No</span></div>
   
   </div>
 </section>
@@ -393,8 +478,8 @@
 </section>
 
 <footer>
-  Generated by <a href="https://performdds.com" target="_blank">Perform DDS</a> Practice Assessment System &middot; April 15, 2026<br>
-  v39-html-report
+  Generated by <a href="https://performdds.com" target="_blank">Perform DDS</a> Practice Assessment System &middot; April 19, 2026<br>
+  v41-report-only
 </footer>
 
 </div>
@@ -403,7 +488,7 @@
 // ─────────────────────────────────────────────────────
 // DATA — injected by generate-workbook.js at generation time
 // ─────────────────────────────────────────────────────
-const REPORT = {"productionByCategory":[{"label":"Hygiene","value":20000}],"productionSplit":[{"label":"Hygiene","value":20000}]};
+const REPORT = {"productionByCategory":[{"label":"Hygiene — 51%","value":508400},{"label":"General Dentistry — 34%","value":337800},{"label":"Endo — 6%","value":60000},{"label":"Ortho — 5%","value":48000},{"label":"Oral Surgery — 2%","value":24000},{"label":"Cosmetic — 2%","value":24000}],"productionSplit":[{"label":"Doctor","value":337800},{"label":"Hygiene","value":508400},{"label":"Specialty","value":156000}]};
 
 // ─────────────────────────────────────────────────────
 // RENDER HELPERS
@@ -438,19 +523,9 @@ if (REPORT.productionByCategory && REPORT.productionByCategory.length) {
   });
 }
 
-if (REPORT.productionSplit && REPORT.productionSplit.length) {
-  new Chart($('chartProdPie'), {
-    type: 'doughnut',
-    data: {
-      labels: REPORT.productionSplit.map(r => r.label),
-      datasets: [{ data: REPORT.productionSplit.map(r => r.value), backgroundColor: ['#3574b7','#10b981','#f59e0b','#ef4444','#a855f7'], borderColor: '#0f1c2e', borderWidth: 2 }]
-    },
-    options: {
-      maintainAspectRatio: false, cutout: '65%',
-      plugins: { legend: { position: 'bottom', labels: { padding: 12, boxWidth: 12 } } }
-    }
-  });
-}
+/* Doctor-vs-Hygiene-vs-Specialty donut removed 2026-04-16 per Dave's
+   feedback — the bar chart above shows the same story with $ + % labels,
+   the donut was visual redundancy. */
 </script>
 
 </body>
