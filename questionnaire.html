@@ -617,6 +617,12 @@
         <div class="q-section-title">Practice Basics</div>
       </div>
 
+      <div class="q-group">
+        <label class="q-label">Practice Name</label>
+        <div class="q-hint">The name that will appear on your report</div>
+        <input type="text" class="q-input q-tracked" name="practiceName" placeholder="e.g. Smith Family Dentistry" required>
+      </div>
+
       <div class="q-row">
         <div class="q-group">
           <label class="q-label">Practice Zip Code</label>
@@ -1033,6 +1039,7 @@
 
     /* Collect all answers */
     const data = {
+      practiceName: document.querySelector('[name="practiceName"]').value.trim(),
       zipCode: document.querySelector('[name="zipCode"]').value.trim(),
       website: document.querySelector('[name="website"]').value.trim(),
       yearsOwned: parseInt(document.querySelector('[name="yearsOwned"]').value) || 0,
@@ -1100,7 +1107,7 @@
       const pp = data.practiceProfile || {};
       /* Simple text/number fields */
       const setByName = (n, v) => { const el = document.querySelector('[name="' + n + '"]'); if (el && v != null) el.value = v; };
-      ['zipCode','website','yearsOwned','ownerAge','pmSoftware',
+      ['practiceName','zipCode','website','yearsOwned','ownerAge','pmSoftware',
        'doctorDays','numHygienists','patientsPerHygienistPerDay','associateDays','opsActive','opsTotal',
        'docDailyAvg','assocDailyAvg','hygDailyAvg','crownsPerMonth','biggestChallenge']
         .forEach(k => setByName(k, pp[k]));

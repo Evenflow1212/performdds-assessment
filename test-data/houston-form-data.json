@@ -1,6 +1,7 @@
 {
   "description": "Houston Dentists at Post Oak test data \u2014 survey (questionnaire.html), employee costs (step 6), hygiene schedule (step 7). Autofilled when either page is loaded with ?autofill=houston. Practice name and zip are plausible placeholders; docDailyAvg/hygDailyAvg are null so the system derives combined $/day from actual production rather than anchoring on a guess.",
   "practiceProfile": {
+    "practiceName": "Houston Dentists at Post Oak",
     "zipCode": "77056",
     "website": "www.postoakdentists.com",
     "yearsOwned": 15,

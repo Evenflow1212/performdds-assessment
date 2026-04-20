@@ -160,6 +160,18 @@
     background: #f8fafc;
   }
   .practice-row input:focus { border-color: var(--blue); background: white; box-shadow: 0 0 0 3px var(--blue-glow); }
+  /* Practice name is captured on the questionnaire and carried forward; the Hub shows
+     it as a display element rather than an editable field. */
+  .practice-row input[readonly] {
+    background: transparent;
+    border-color: transparent;
+    font-weight: 700;
+    color: var(--text);
+    cursor: default;
+    padding-left: 0;
+    font-size: 1rem;
+  }
+  .practice-row input[readonly]:focus { border-color: transparent; background: transparent; box-shadow: none; }
 
   /* PROGRESS TRACKER */
   .progress-bar {
@@ -1972,7 +1984,13 @@ async function generate() {
   document.getElementById('step8').classList.remove('visible');
   document.getElementById('generatingState').classList.add('visible');
   try {
-    const practiceName = document.getElementById('practiceName').value.trim() || 'Practice';
+    const practiceName = document.getElementById('practiceName').value.trim();
+    if (!practiceName) {
+      /* Shouldn't happen — profileGuard redirects when profile is missing and the
+         questionnaire now requires practiceName. Defensive fallback. */
+      window.location.replace('questionnaire.html' + (window.location.search || ''));
+      return;
+    }
 
     /* Load questionnaire answers first — drives PM-software-aware PDF parsing */
     let practiceProfile = null;
@@ -2586,9 +2604,9 @@ async function downloadDebugXlsx() {
     ['AR Insurance Total', money(d.ar?.insurance?.total), 'from Hub step 5 input', ''],
     ['AR Insurance 90+ days', money(d.ar?.insurance?.d90plus || d.ar?.insurance?.over90), 'from Hub step 5 input', ''],
     ['', '', '', ''],
-    ['Batting Average', k.battingAverage != null ? k.battingAverage.toFixed(1) + ':1' : '—', 'visits ÷ crowns prepped', `visits=${k.battingAverageInputs?.visitsCount}, crowns=${k.battingAverageInputs?.crownsPreppedCount}`],
+    ['Conversion Ratio', k.battingAverage != null ? k.battingAverage.toFixed(1) + ':1' : '—', 'visits ÷ crowns prepped', `visits=${k.battingAverageInputs?.visitsCount}, crowns=${k.battingAverageInputs?.crownsPreppedCount}`],
     ['  └ Visit codes counted', 'D1110, D1120, D4910, D4341, D4342, D0150', '', 'NP comp exam (D0150) included; D0120 periodic exam is diagnostic companion, not a visit'],
-    ['  └ Periodic exams (D0120) — diagnostic only', k.battingAverageInputs?.exam0120Count ?? '—', 'compare to visits when BA is high', 'if D0120 << visits → exams not happening (upstream); if D0120 ≈ visits → diagnosis/presentation weak (downstream)'],
+    ['  └ Periodic exams (D0120) — diagnostic only', k.battingAverageInputs?.exam0120Count ?? '—', 'compare to visits when CR is high', 'if D0120 << visits → exams not happening (upstream); if D0120 ≈ visits → diagnosis/presentation weak (downstream)'],
     ['  └ Sweet spot', '4–6:1', 'lower is better, floor at 3:1', 'under 3:1 may signal overtreatment (critical for buy-side)'],
   ];
   addSheet('KPIs with Sources', kpiRows);
@@ -2765,31 +2783,35 @@ populateDates();
 updateSubtitles();
 populateHygieneDates();
 
-/* Pre-fill practice name from questionnaire, if present */
-(function prefillPracticeName() {
-  try {
-    const pp = JSON.parse(sessionStorage.getItem('practiceProfile') || 'null');
-    if (pp && (pp.practiceName || pp.name) && !document.getElementById('practiceName').value) {
-      document.getElementById('practiceName').value = pp.practiceName || pp.name;
-    }
-  } catch(e) {}
-})();
-
-/* Guard: if the user arrives here without completing the questionnaire, nudge them back.
-   Skip the nudge if they've already started uploading or if ?skipIntake=1 is present. */
+/* Guard: require a completed questionnaire before using the Hub. Missing /
+   empty profiles (bookmark, refresh, stale session) silently produced reports
+   with "Practice" as the name and blank context; now we hard-redirect back to
+   the questionnaire and preserve any ?autofill=... query params. */
 (function profileGuard() {
   try {
     const params = new URLSearchParams(window.location.search);
     if (params.get('skipIntake') === '1') return;
-    const pp = sessionStorage.getItem('practiceProfile');
-    if (pp) return;
-    const container = document.querySelector('.wrap') || document.body;
-    if (!container) return;
-    const notice = document.createElement('div');
-    notice.className = 'callout warn';
-    notice.style.marginBottom = '20px';
-    notice.innerHTML = '<div class="callout-icon">\u2139\ufe0f</div><div>For the most complete assessment, <a href="questionnaire.html" style="color:#78350f;font-weight:700;text-decoration:underline;">fill out the 2-minute practice profile</a> first. You can continue without it, but your report will be missing context.</div>';
-    container.insertBefore(notice, container.firstChild);
+    const raw = sessionStorage.getItem('practiceProfile');
+    let pp = null;
+    try { pp = raw ? JSON.parse(raw) : null; } catch(e) { pp = null; }
+    const hasProfile = pp && typeof pp === 'object' && (pp.zipCode || pp.numHygienists);
+    if (!hasProfile) {
+      window.location.replace('questionnaire.html' + (window.location.search || ''));
+    }
+  } catch(e) {}
+})();
+
+/* Pre-fill practice name from the questionnaire and lock it as a display element —
+   users shouldn't edit the name inconsistently on the Hub. */
+(function prefillPracticeName() {
+  try {
+    const pp = JSON.parse(sessionStorage.getItem('practiceProfile') || 'null');
+    const el = document.getElementById('practiceName');
+    const name = pp && (pp.practiceName || pp.name);
+    if (el && name) {
+      el.value = name;
+      el.readOnly = true;
+    }
   } catch(e) {}
 })();
 
