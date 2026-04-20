@@ -148,8 +148,27 @@ function plCategory(item) {
   return 'M';
 }
 
+/* Canonical staff-cost-% calc: wages + benefits + payroll-tax uplift, all
+   annualized, divided by annualized collections. Used by BOTH computeReportData
+   (which publishes kpis.staffCostPct + the scorecard) and generateSWOT (which
+   gates the Staff-cost weakness and Labor-crowding threat). Keeping this in
+   one place guarantees the two surfaces report the same percentage. */
+function canonicalStaffCostPct(employeeCosts, annualCollections) {
+  if (!employeeCosts || !(annualCollections > 0)) return null;
+  const sumRole = (arr, benefits, empCostPct) => {
+    const wages = (arr || []).reduce((s, p) => s + (Number(p.rate) || 0) * (Number(p.hours) || 0) * 12, 0);
+    const benefitsAnnual = (Number(benefits) || 0) * 12;
+    const empCosts = wages * (Number(empCostPct) || 0);
+    return wages + benefitsAnnual + empCosts;
+  };
+  const staffAnnual =
+    sumRole(employeeCosts.staff, employeeCosts.staffBenefits, employeeCosts.staffEmpCostPct) +
+    sumRole(employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct);
+  return staffAnnual > 0 ? (staffAnnual / annualCollections) * 100 : null;
+}
+
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
   const pp = practiceProfile || {};
   const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
@@ -197,34 +216,24 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
 
   const hasPanorex = codeQty('D0330') > 0;
 
-  let staffCostPct = 0, labPct = 0, supplyPct = 0, netIncomePct = 0;
-  let totalStaffCost = 0, totalLabCost = 0, totalSupplyCost = 0;
+  let labPct = 0, supplyPct = 0, netIncomePct = 0;
+  let totalLabCost = 0, totalSupplyCost = 0;
   if (plData && plData.items && netCollections > 0) {
     for (const item of plData.items) {
       if (item.section === 'Income' || item.section === 'COGS') continue;
-      const cat = plCategory(item.item);
-      if (cat === 'H') totalStaffCost += item.amount;
       const l = item.item.toLowerCase();
       if (/lab\s*(fee|cost|expense)/i.test(l) || l.includes('laboratory')) totalLabCost += item.amount;
       if (/dental.*suppl|job.*suppl/i.test(l)) totalSupplyCost += item.amount;
     }
-    staffCostPct = (totalStaffCost / netCollections * 100);
     labPct = (totalLabCost / netCollections * 100);
     supplyPct = (totalSupplyCost / netCollections * 100);
     if (plData.netIncome != null) netIncomePct = (plData.netIncome / netCollections * 100);
   }
 
-  /* Fallback: derive staff cost from employee-cost form if P&L doesn't give it. */
-  if (employeeCosts && netCollections > 0 && totalStaffCost === 0) {
-    let totalWages = 0;
-    (employeeCosts.staff || []).forEach(p => { totalWages += (p.rate || 0) * (p.hours || 0) * 4.33; });
-    (employeeCosts.hygiene || []).forEach(p => { totalWages += (p.rate || 0) * (p.hours || 0) * 4.33; });
-    if (totalWages > 0) {
-      const annualWages = totalWages * 12;
-      const empStaffPct = annualWages / netCollections * 100;
-      if (empStaffPct > 0) staffCostPct = empStaffPct;
-    }
-  }
+  /* Staff-cost % reads the canonical value — the SAME number the scorecard
+     renders as "Staff Cost / Collections". Passed in by the handler so SWOT
+     and computeReportData can't drift. */
+  const staffCostPct = Number.isFinite(canonicalStaffPct) ? canonicalStaffPct : 0;
 
   const totalAR = (arPatient?.total || 0) + (arInsurance?.total || 0);
   const ar90Plus = (arPatient?.d90plus || 0) + (arInsurance?.d90plus || 0);
@@ -244,7 +253,9 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
 
   /* ── WEAKNESSES ── */
   if (collectionRate > 0 && collectionRate < 93) weaknesses.push('Collection rate of ' + Math.round(collectionRate) + '% is below the 97% benchmark');
-  if (staffCostPct > 25) weaknesses.push('Staff cost at ' + Math.round(staffCostPct) + '% of collections exceeds the 20% benchmark');
+  /* Format matches scorecard ("Staff Cost / Collections: 36.2%") so the two
+     surfaces report the same number. */
+  if (staffCostPct > 25) weaknesses.push('Staff cost at ' + staffCostPct.toFixed(1) + '% of collections exceeds the 20% benchmark');
   if (hygPct > 0 && hygPct < 25) weaknesses.push('Hygiene production at ' + Math.round(hygPct) + '% is below the 30-35% target');
   if (perioMaintQty === 0 && prophyQty > 0) weaknesses.push('Perio maintenance appears limited — no D4910 codes present');
   if (srpQty === 0 && prophyQty > 50) weaknesses.push('Periodontal disease appears to be under-diagnosed — no SRP procedures found');
@@ -377,7 +388,7 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   /* Labor cost crowding out growth: >30% staff cost leaves no margin to reinvest
      in marketing, tech, or capacity expansion even when top-line is healthy. */
   if (staffCostPct > 30) {
-    threats.push(`Staff cost at ${Math.round(staffCostPct)}% of collections is crowding out growth investment — with this little margin, every expansion decision (new chair, marketing push, hygiene day) has to clear a higher bar to pencil out`);
+    threats.push(`Staff cost at ${staffCostPct.toFixed(1)}% of collections is crowding out growth investment — with this little margin, every expansion decision (new chair, marketing push, hygiene day) has to clear a higher bar to pencil out`);
   }
 
   /* Ensure minimum bullets per section */
@@ -611,20 +622,8 @@ function computeReportData(input) {
   const patientPayPct = sourcesTotal > 0 ? (patientPayTotal / sourcesTotal) * 100 : 0;
   const profitPct = overheadPct != null ? 100 - overheadPct : null;
 
-  /* Staff cost % of collections */
-  let staffCostPct = null;
-  if (employeeCosts && annualCollections > 0) {
-    const sumRole = (arr, benefits, empCostPct) => {
-      const wages = (arr || []).reduce((s, p) => s + (Number(p.rate) || 0) * (Number(p.hours) || 0) * 12, 0);
-      const benefitsAnnual = (Number(benefits) || 0) * 12;
-      const empCosts = wages * (Number(empCostPct) || 0);
-      return wages + benefitsAnnual + empCosts;
-    };
-    const staffAnnual =
-      sumRole(employeeCosts.staff, employeeCosts.staffBenefits, employeeCosts.staffEmpCostPct) +
-      sumRole(employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct);
-    if (staffAnnual > 0) staffCostPct = (staffAnnual / annualCollections) * 100;
-  }
+  /* Staff cost % of collections — single canonical calc (see helper). */
+  const staffCostPct = canonicalStaffCostPct(employeeCosts, annualCollections);
 
   /* ──── Goal matrix ──── */
   const goalDocDaily = combinedDocDailyAvg || 0;
@@ -1854,8 +1853,15 @@ exports.handler = async function(event) {
       collTotal = Math.round(collTotal / collMonths * prodMonths * 100) / 100;
     }
 
+    /* Canonical staff-cost % — computed once, passed to both SWOT and the
+       data-object builder so the scorecard, weakness bullet, and threat
+       rule can never show different percentages. */
+    const annualFactorForStaff = prodMonths && prodMonths !== 12 ? (12 / prodMonths) : 1;
+    const annualCollectionsForStaff = collTotal * annualFactorForStaff;
+    const canonicalStaffPct = canonicalStaffCostPct(employeeCosts, annualCollectionsForStaff);
+
     /* SWOT */
-    const swotData = generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile);
+    const swotData = generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct);
 
     /* Compute canonical data object */
     const data = computeReportData({

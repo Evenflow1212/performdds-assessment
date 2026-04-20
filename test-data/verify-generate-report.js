@@ -282,6 +282,30 @@ test('SWOT threats: labor crowding out growth fires when staff cost > 30%', asyn
   expect(threats.some(t => /crowding out growth/i.test(t)), 'labor-crowding-out-growth threat did not fire: ' + JSON.stringify(threats));
 });
 
+/* ──────────────────────────────────────────────────────────────────────
+   Staff-cost parity — the SWOT weakness bullet and the scorecard card must
+   show the EXACT same percentage. Pigneri-style regression (2026-04-20):
+   scorecard displayed 36.2% while SWOT said 26% because the two surfaces
+   had independent calcs.
+   ────────────────────────────────────────────────────────────────────── */
+test('SWOT weakness staff cost matches scorecard kpis.staffCostPct', async () => {
+  const body = await invoke();
+  const kpis = body.data.kpis;
+  const fin = body.data.financials;
+  const canonical = fin.staffCostPct;
+  /* Smoke-test baseline lands at ~38% — triggers the weakness. */
+  expect(canonical > 20, `test fixture should have staffCostPct > 20 to exercise this rule; got ${canonical}`);
+  expect(kpis.staffCostPct === canonical, `kpis.staffCostPct (${kpis.staffCostPct}) != financials.staffCostPct (${canonical})`);
+  const expectedText = canonical.toFixed(1) + '%';
+  const weakness = body.data.swot.weaknesses.find(w => /staff cost/i.test(w));
+  expect(weakness, 'SWOT did not surface a staff-cost weakness: ' + JSON.stringify(body.data.swot.weaknesses));
+  expect(weakness.includes(expectedText), `SWOT weakness "${weakness}" does not contain canonical "${expectedText}"`);
+  /* And the scorecard card should render the same string. */
+  const scorecardMatch = body.reportHtml.match(/Staff Cost[^%]*?([\d.]+)%/);
+  expect(scorecardMatch, 'scorecard Staff Cost card not found');
+  expect(scorecardMatch[1] === canonical.toFixed(1), `scorecard shows ${scorecardMatch[1]}%, canonical is ${canonical.toFixed(1)}%`);
+});
+
 (async () => {
   let failed = 0;
   const start = Date.now();
