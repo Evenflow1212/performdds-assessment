@@ -2783,19 +2783,24 @@ populateDates();
 updateSubtitles();
 populateHygieneDates();
 
-/* Guard: require a completed questionnaire before using the Hub. Missing /
-   empty profiles (bookmark, refresh, stale session) silently produced reports
-   with "Practice" as the name and blank context; now we hard-redirect back to
-   the questionnaire and preserve any ?autofill=... query params. */
+/* Guard: require a completed questionnaire before using the Hub. The only
+   criterion is "did the user come through the questionnaire?" — presence of
+   the sessionStorage key. Don't gate on specific fields like zipCode/
+   numHygienists: those are optional and gating on them bounces users who
+   filled only the required practiceName. That created a redirect loop
+   (2026-04-20 regression). Empty optional fields are a UX issue for another
+   day, not a reason to loop. */
+function shouldRedirectToQuestionnaire(rawSession, skipIntake) {
+  if (skipIntake) return false;
+  let pp = null;
+  try { pp = rawSession ? JSON.parse(rawSession) : null; } catch(e) { pp = null; }
+  return !(pp && typeof pp === 'object');
+}
 (function profileGuard() {
   try {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('skipIntake') === '1') return;
     const raw = sessionStorage.getItem('practiceProfile');
-    let pp = null;
-    try { pp = raw ? JSON.parse(raw) : null; } catch(e) { pp = null; }
-    const hasProfile = pp && typeof pp === 'object' && (pp.zipCode || pp.numHygienists);
-    if (!hasProfile) {
+    if (shouldRedirectToQuestionnaire(raw, params.get('skipIntake') === '1')) {
       window.location.replace('questionnaire.html' + (window.location.search || ''));
     }
   } catch(e) {}

@@ -369,6 +369,53 @@ test('scorecard shows both admin/clinical and hygienist wage cards', async () =>
   expect(html.includes('Total Staff Cost'), 'financials section missing "Total Staff Cost" label');
 });
 
+/* ──────────────────────────────────────────────────────────────────────
+   Hub profile-guard redirect predicate. Previous implementation gated on
+   pp.zipCode || pp.numHygienists, which bounced users who completed the
+   questionnaire with only the required practiceName — infinite redirect
+   loop. New rule: presence of the sessionStorage key is enough.
+
+   This test reads assessment_hub.html, extracts the pure predicate
+   function's source, and runs it against a matrix of real inputs. No
+   browser needed.
+   ────────────────────────────────────────────────────────────────────── */
+test('Hub profile-guard: redirect predicate matches spec', () => {
+  const hubPath = path.resolve(__dirname, '..', 'assessment_hub.html');
+  const html = fs.readFileSync(hubPath, 'utf8');
+  const match = html.match(/function\s+shouldRedirectToQuestionnaire\s*\(([^)]*)\)\s*\{([\s\S]*?)\n\}/);
+  expect(match, 'shouldRedirectToQuestionnaire not found in assessment_hub.html');
+  const [, argList, body] = match;
+  const [arg1, arg2] = argList.split(',').map(s => s.trim());
+  const predicate = new Function(arg1, arg2, body);
+
+  /* Fresh incognito / cleared storage → redirect */
+  expect(predicate(null, false) === true,
+    'null sessionStorage should redirect');
+  expect(predicate(undefined, false) === true,
+    'undefined sessionStorage should redirect');
+  expect(predicate('', false) === true,
+    'empty sessionStorage should redirect');
+  expect(predicate('not-json', false) === true,
+    'invalid JSON should redirect');
+  expect(predicate('null', false) === true,
+    'JSON null should redirect');
+
+  /* Minimal questionnaire submission (only practiceName) → NO redirect */
+  expect(predicate(JSON.stringify({ practiceName: 'Smith Family Dentistry' }), false) === false,
+    'practiceName-only submission should NOT redirect (regression fix)');
+
+  /* Fully-filled questionnaire → NO redirect */
+  expect(predicate(JSON.stringify({
+    practiceName: 'X', zipCode: '12345', numHygienists: 4,
+  }), false) === false, 'fully-filled profile should NOT redirect');
+
+  /* skipIntake=1 bypass, even with no session → NO redirect */
+  expect(predicate(null, true) === false,
+    'skipIntake=1 should bypass redirect even with no session');
+  expect(predicate('', true) === false,
+    'skipIntake=1 should bypass redirect even with empty session');
+});
+
 (async () => {
   let failed = 0;
   const start = Date.now();
