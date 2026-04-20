@@ -989,7 +989,7 @@ function renderReportHtml(data) {
       ? 'Sweet spot <strong>4–6:1</strong> · under 3:1 can mean overtreatment'
       : 'Sweet spot <strong>4–6:1</strong> (lower is better)';
     scorecardCards.push({
-      lbl: 'Batting Average',
+      lbl: 'Conversion Ratio',
       val: ba.toFixed(1) + ':1',
       bench: `${baBench} · ${kpis.battingAverageInputs.visitsCount.toLocaleString()} visits · ${kpis.battingAverageInputs.crownsPreppedCount.toLocaleString()} crowns`,
       status: baStatus,
