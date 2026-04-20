@@ -63,7 +63,7 @@ const PL_STANDARD = [
   'NET_INCOME|486000',
 ].join('\n');
 
-function buildEvent(plText) {
+function buildEvent(plText, profileOverrides) {
   return {
     httpMethod: 'POST',
     body: JSON.stringify({
@@ -83,7 +83,7 @@ function buildEvent(plText) {
         staffBenefits: 3500, staffEmpCostPct: 0.10,
         hygBenefits: 1800, hygEmpCostPct: 0.10,
       },
-      practiceProfile: {
+      practiceProfile: Object.assign({
         name: 'Test Dental Group',
         zipCode: '12345',
         doctorDays: 16,
@@ -94,13 +94,13 @@ function buildEvent(plText) {
         opsActive: 5, opsTotal: 6,
         payorMix: { ppo: 60, hmo: 10, gov: 5, ffs: 25 },
         pmSoftware: 'dentrix',
-      },
+      }, profileOverrides || {}),
     }),
   };
 }
 
-async function invoke(plText) {
-  const res = await handler(buildEvent(plText));
+async function invoke(plText, profileOverrides) {
+  const res = await handler(buildEvent(plText, profileOverrides));
   if (res.statusCode !== 200) throw new Error('HTTP ' + res.statusCode + ': ' + res.body);
   return JSON.parse(res.body);
 }
@@ -186,6 +186,100 @@ test('parsePL — "Net Operating Income" variant populates netIncome', async () 
   const body = await invoke(pl);
   const netIncome = body.data.financials.netIncome;
   expect(netIncome != null && Math.abs(netIncome - 486000) < 1, 'netIncome not populated on "Net Operating Income": ' + netIncome);
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Fix 1 lock-in — Combined Doctor $/Day must use total (owner + associate)
+   days when hasAssociate=true. The canonical value is the single source of
+   truth for the scorecard, the review page, and kpis.combinedDocDailyAvg.
+   ────────────────────────────────────────────────────────────────────── */
+test('combinedDocDailyAvg — includes associate days when hasAssociate=true', async () => {
+  const body = await invoke(null, { hasAssociate: true, associateDays: 8, assocDailyAvg: 2500 });
+  const k = body.data.kpis;
+  const prod = body.data.production;
+  /* 16 owner days/mo + 8 assoc days/mo = 288 total days/yr */
+  const expectedDenom = (16 + 8) * 12;
+  const expected = (prod.byCategory?.doctor || 0) / expectedDenom;
+  expect(Math.abs(k.combinedDocDailyAvg - expected) < 1, `combinedDocDailyAvg=${k.combinedDocDailyAvg} expected≈${expected} (doctor=${prod.byCategory?.doctor}, denom=${expectedDenom})`);
+  /* Scorecard should show the same number */
+  const scorecardMatch = body.reportHtml.match(/Combined Doctor \$\/Day[^$]*\$([\d,]+)/);
+  expect(scorecardMatch, 'scorecard did not render "Combined Doctor $/Day" card');
+  const scorecardVal = parseFloat(scorecardMatch[1].replace(/,/g, ''));
+  expect(Math.abs(scorecardVal - k.combinedDocDailyAvg) < 2, `scorecard $/Day ${scorecardVal} != data ${k.combinedDocDailyAvg}`);
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Fix 4 lock-in — concerns render as human-readable labels on the Report.
+   The raw token "new_patients" previously leaked through because the
+   concernLabels map was missing that key.
+   ────────────────────────────────────────────────────────────────────── */
+test('concerns render as human-readable labels, not raw tokens', async () => {
+  const body = await invoke(null, {
+    concerns: ['new_patients', 'more_profitable', 'overhead_high', 'staff_issues'],
+  });
+  const html = body.reportHtml;
+  expect(!/\bnew_patients\b/.test(html), 'raw token "new_patients" leaked into report HTML');
+  expect(!/\bmore_profitable\b/.test(html), 'raw token "more_profitable" leaked into report HTML');
+  expect(!/\boverhead_high\b/.test(html), 'raw token "overhead_high" leaked into report HTML');
+  expect(html.includes('New patient growth'), 'missing "New patient growth" label');
+  expect(html.includes('More profitable'), 'missing "More profitable" label');
+  expect(html.includes('Overhead too high'), 'missing "Overhead too high" label');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Fix 5 lock-in — periodLabel uses human-readable date range when a
+   date range is captured from the PDF (not bare "(2025, 2026)").
+   ────────────────────────────────────────────────────────────────────── */
+test('period label shows human-readable date range', async () => {
+  const body = await invoke();
+  const html = body.reportHtml;
+  expect(/January 2025 . December 2025/.test(html), 'period label missing "January 2025 – December 2025": ' + (html.match(/Based on \d+ months[^<]*/) || []).join(''));
+  /* Should not still show the bare year list. */
+  expect(!/Based on 12 months of production data \(2025\)/.test(html), 'old year-list period label still present');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Fix 3 lock-in — collection-rate benchmark is 97% everywhere.
+   ────────────────────────────────────────────────────────────────────── */
+test('collection-rate benchmark: 97% only — no 98% references in report HTML', async () => {
+  const body = await invoke();
+  const html = body.reportHtml;
+  expect(!/98%/.test(html), 'report HTML still contains "98%" text');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Fix 6 lock-in — threat rules fire on suggestive inputs.
+   ────────────────────────────────────────────────────────────────────── */
+test('SWOT threats: concentrated payor mix fires', async () => {
+  const body = await invoke(null, { payorMix: { ppo: 75, hmo: 0, gov: 0, ffs: 25 } });
+  const threats = body.data.swot.threats;
+  expect(threats.some(t => /PPO/.test(t) && /concentration/i.test(t)), 'PPO concentration threat did not fire: ' + JSON.stringify(threats));
+});
+
+test('SWOT threats: succession risk fires when owner ≥ 60 and no associate', async () => {
+  const body = await invoke(null, { ownerAge: 63, hasAssociate: false });
+  const threats = body.data.swot.threats;
+  expect(threats.some(t => /succession/i.test(t)), 'succession-risk threat did not fire: ' + JSON.stringify(threats));
+});
+
+test('SWOT threats: insurance AR 90+ tail risk fires when >10% of insurance AR is 90+', async () => {
+  /* Override the baseEvent's arInsurance via a direct handler call rather than
+     through invoke() — invoke() doesn't thread AR overrides. */
+  const evt = buildEvent();
+  const body = JSON.parse(evt.body);
+  body.arInsurance = { total: 100000, d90plus: 15000 };  /* 15% tail */
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(body) });
+  const data = JSON.parse(res.body).data;
+  expect(data.swot.threats.some(t => /insurance ar 90\+/i.test(t) || /aging tail/i.test(t)), 'insurance AR aging tail threat did not fire: ' + JSON.stringify(data.swot.threats));
+});
+
+test('SWOT threats: labor crowding out growth fires when staff cost > 30%', async () => {
+  /* Override P&L salaries to push staff cost % above 30. Baseline has $275k
+     staff on $920k collections ≈ 30% — bump to $340k to cross the line. */
+  const pl = PL_STANDARD.replace('Salaries & Wages|250000', 'Salaries & Wages|340000');
+  const body = await invoke(pl);
+  const threats = body.data.swot.threats;
+  expect(threats.some(t => /crowding out growth/i.test(t)), 'labor-crowding-out-growth threat did not fire: ' + JSON.stringify(threats));
 });
 
 (async () => {

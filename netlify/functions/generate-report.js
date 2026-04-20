@@ -29,12 +29,14 @@ const ENGINE_VERSION = 'v41-report-only';
 /* ─── Parsers (text from Claude → structured data) ─── */
 function parseProduction(text) {
   const codes = [];
-  let months = 12, years = [];
+  let months = 12, years = [], dateStart = null, dateEnd = null;
   for (const line of (text || '').split('\n')) {
     const dm = line.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*[-–]\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
     if (dm && !years.length) {
       const from = new Date(dm[1]), to = new Date(dm[2]);
       months = Math.max(1, Math.round((to - from) / (1000*60*60*24*30.44)));
+      dateStart = from.toISOString().slice(0, 10);
+      dateEnd = to.toISOString().slice(0, 10);
       for (let y = from.getFullYear(); y <= to.getFullYear(); y++) years.push(y);
       continue;
     }
@@ -53,7 +55,7 @@ function parseProduction(text) {
     }
   }
   if (!years.length) { const n = new Date(); years = [n.getFullYear()-1, n.getFullYear()]; }
-  return { codes, months, years };
+  return { codes, months, years, dateStart, dateEnd };
 }
 
 function parseCollections(text) {
@@ -241,8 +243,8 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   if (monthlyProd >= 80000) strengths.push('Production volume is strong at $' + Math.round(monthlyProd).toLocaleString() + ' per month');
 
   /* ── WEAKNESSES ── */
-  if (collectionRate > 0 && collectionRate < 93) weaknesses.push('Collection rate of ' + Math.round(collectionRate) + '% is below the 98% benchmark');
-  if (staffCostPct > 25) weaknesses.push('Staff wages at ' + Math.round(staffCostPct) + '% of collections significantly exceed the 20% benchmark');
+  if (collectionRate > 0 && collectionRate < 93) weaknesses.push('Collection rate of ' + Math.round(collectionRate) + '% is below the 97% benchmark');
+  if (staffCostPct > 25) weaknesses.push('Staff cost at ' + Math.round(staffCostPct) + '% of collections exceeds the 20% benchmark');
   if (hygPct > 0 && hygPct < 25) weaknesses.push('Hygiene production at ' + Math.round(hygPct) + '% is below the 30-35% target');
   if (perioMaintQty === 0 && prophyQty > 0) weaknesses.push('Perio maintenance appears limited — no D4910 codes present');
   if (srpQty === 0 && prophyQty > 50) weaknesses.push('Periodontal disease appears to be under-diagnosed — no SRP procedures found');
@@ -341,6 +343,41 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
       const gapPatients = Math.round(replacementNeeded - newPatAnnualSWOT);
       threats.push(`New patient flow (~${Math.round(newPatAnnualSWOT)}/year) is below the ~${Math.round(replacementNeeded)}/year needed to replace natural attrition on an active base of ~${Math.round(activePatSWOT)} patients — the practice may be shrinking by ~${gapPatients} patients/year`);
     }
+  }
+
+  /* Insurance aging tail risk: 90+ days bucket above 10% of total insurance AR
+     means claims are dragging and cash flow compounds downstream. */
+  const insuranceARTotal = Number(arInsurance?.total) || 0;
+  const insuranceAR90 = Number(arInsurance?.d90plus) || 0;
+  if (insuranceARTotal > 0 && (insuranceAR90 / insuranceARTotal) > 0.10) {
+    const pct = Math.round((insuranceAR90 / insuranceARTotal) * 100);
+    threats.push(`Insurance AR 90+ is ${pct}% of total insurance receivables ($${Math.round(insuranceAR90).toLocaleString()} of $${Math.round(insuranceARTotal).toLocaleString()}) — slow claims aging tail compounds into write-offs and cash-flow pressure`);
+  }
+
+  /* Single-channel revenue concentration: >60% of payor mix in one bucket means
+     a single policy change (insurer fee cut, state Medicaid reform, PPO in/out of
+     network) can swing the whole top line. */
+  if (ppoPct > 60) {
+    threats.push(`Payor mix is ${Math.round(ppoPct)}% PPO — single-channel revenue concentration means a PPO fee-schedule cut or network change can swing the top line materially`);
+  } else if (hmoPct > 60) {
+    threats.push(`Payor mix is ${Math.round(hmoPct)}% HMO — single-channel revenue concentration amplifies the effect of any capitation-rate or contract change`);
+  } else if (govPct > 60) {
+    threats.push(`Payor mix is ${Math.round(govPct)}% government/Medicaid — single-channel revenue concentration makes the practice vulnerable to state reimbursement changes`);
+  } else if (ffsPct > 60 && (Number(pp.npPerMonth) || npPerMonth || 0) < 20) {
+    threats.push(`Practice is ${Math.round(ffsPct)}% FFS / out-of-network with limited new-patient flow — a concentrated economic exposure if referrals soften`);
+  }
+
+  /* Succession risk: owner 60+ with no associate means there's no transition
+     runway in place — a health or lifestyle change collapses practice value fast. */
+  const ownerAgeNum = Number(pp.ownerAge) || 0;
+  if (ownerAgeNum >= 60 && !pp.hasAssociate) {
+    threats.push(`Owner is ${ownerAgeNum} with no associate in place — succession risk: a health event or accelerated exit timeline has no transition runway and compresses practice value`);
+  }
+
+  /* Labor cost crowding out growth: >30% staff cost leaves no margin to reinvest
+     in marketing, tech, or capacity expansion even when top-line is healthy. */
+  if (staffCostPct > 30) {
+    threats.push(`Staff cost at ${Math.round(staffCostPct)}% of collections is crowding out growth investment — with this little margin, every expansion decision (new chair, marketing push, hygiene day) has to clear a higher bar to pencil out`);
   }
 
   /* Ensure minimum bullets per section */
@@ -475,6 +512,11 @@ function computeReportData(input) {
   let ownerDocDailyAvg = null;
   let associateDocDailyAvg = null;
   let hasOwnerSplit = false;  /* true → show Owner + Associate + Combined cards */
+  /* Canonical Combined Doctor $/Day = annualDoctor ÷ (ownerDays + associateDays × 12).
+     When hasAssociate=true this includes both provider streams; when hasAssociate=false
+     totalDocDaysYr = ownerDaysYr and the "combined" card degenerates to owner-only.
+     The Executive Report scorecard card, the review page, and kpis.combinedDocDailyAvg
+     all read from this one value — keep it the single source of truth. */
   const combinedDocDailyAvg = totalDocDaysYr > 0 ? annualDoctor / totalDocDaysYr : null;
 
   if (associateDaysYr > 0 && surveyDocDaily > 0 && surveyAssocDaily > 0) {
@@ -794,6 +836,8 @@ function computeReportData(input) {
     period: {
       prodMonths,
       years,
+      dateStart: prodData?.dateStart || null,
+      dateEnd:   prodData?.dateEnd   || null,
       annualFactor,
     },
 
@@ -1139,15 +1183,27 @@ function renderReportHtml(data) {
   /* ── Pain points block — dentist's own words (concerns checkboxes + freeform "biggest challenge")
      Surface BEFORE the profile facts; this is what the dentist said is wrong, and every finding
      in the Report should ultimately tie back to one of these. */
+  /* Full mapping — keys MUST match the questionnaire.html concerns checkbox values.
+     Missing entries fall back to the raw token (e.g. "new_patients"), which is what
+     prompted this fix. Keep this synced with questionnaire.html:914-926. */
   const concernLabels = {
-    'more_profitable': 'Want to be more profitable',
-    'staff_issues': 'Staff issues',
-    'insurance_low': 'Insurance reimbursements too low',
-    'too_busy': 'Too busy / overwhelmed',
-    'marketing': 'Marketing / new patient flow',
-    'burned_out': 'Burned out',
-    'cant_retire': "Can't afford to retire",
-    'growth_stalled': 'Growth has stalled',
+    'more_profitable': 'More profitable',
+    'more_busy':       'Busier practice',
+    'pay_staff_more':  'Pay staff more',
+    'owner_bonus':     'Take home more income',
+    'more_control':    'More control over the practice',
+    'staff_issues':    'Staff frustrations',
+    'overhead_high':   'Overhead too high',
+    'insurance_rates': 'Insurance reimbursements too low',
+    'new_patients':    'New patient growth',
+    'exit_plan':       'Sale or retirement planning',
+    /* Legacy keys (kept for back-compat with older practiceProfile payloads) */
+    'insurance_low':   'Insurance reimbursements too low',
+    'too_busy':        'Too busy / overwhelmed',
+    'marketing':       'Marketing / new patient flow',
+    'burned_out':      'Burned out',
+    'cant_retire':     "Can't afford to retire",
+    'growth_stalled':  'Growth has stalled',
   };
   const concerns = Array.isArray(practice.concerns) ? practice.concerns : [];
   const biggestChallenge = practice.biggestChallenge ? String(practice.biggestChallenge).trim() : '';
@@ -1171,10 +1227,24 @@ function renderReportHtml(data) {
     productionSplit: production.splitForChart,
   };
 
-  /* ── Period label for hero ── */
-  const periodLabel = period.prodMonths
-    ? `Based on ${period.prodMonths} months of production data` + (period.years && period.years.length ? ` (${period.years.join(', ')})` : '')
-    : 'Based on uploaded reports';
+  /* ── Period label for hero ──
+     Prefer the actual date range ("April 2025 – March 2026") when parseProduction
+     captured it. Falls back to the year list only when the PDF didn't include an
+     explicit range (parseProduction's fallback path populates `years` from the
+     current/prior year). */
+  const periodLabel = (() => {
+    if (!period.prodMonths) return 'Based on uploaded reports';
+    const base = `Based on ${period.prodMonths} months of production data`;
+    if (period.dateStart && period.dateEnd) {
+      const fmt = (iso) => {
+        const d = new Date(iso + 'T00:00:00Z');
+        return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      };
+      return `${base} (${fmt(period.dateStart)} – ${fmt(period.dateEnd)})`;
+    }
+    if (period.years && period.years.length) return `${base} (${period.years.join(', ')})`;
+    return base;
+  })();
   const generatedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   let template = loadReportTemplate();
@@ -1252,14 +1322,22 @@ function renderReviewHtml(data, rawTexts = {}) {
   /* Pain points block for the Review page — same data as the Report's "What you
      told us is wrong" section. Surface at the top of Practice Profile. */
   const reviewConcernLabels = {
-    'more_profitable': 'Want to be more profitable',
-    'staff_issues': 'Staff issues',
-    'insurance_low': 'Insurance reimbursements too low',
-    'too_busy': 'Too busy / overwhelmed',
-    'marketing': 'Marketing / new patient flow',
-    'burned_out': 'Burned out',
-    'cant_retire': "Can't afford to retire",
-    'growth_stalled': 'Growth has stalled',
+    'more_profitable': 'More profitable',
+    'more_busy':       'Busier practice',
+    'pay_staff_more':  'Pay staff more',
+    'owner_bonus':     'Take home more income',
+    'more_control':    'More control over the practice',
+    'staff_issues':    'Staff frustrations',
+    'overhead_high':   'Overhead too high',
+    'insurance_rates': 'Insurance reimbursements too low',
+    'new_patients':    'New patient growth',
+    'exit_plan':       'Sale or retirement planning',
+    'insurance_low':   'Insurance reimbursements too low',
+    'too_busy':        'Too busy / overwhelmed',
+    'marketing':       'Marketing / new patient flow',
+    'burned_out':      'Burned out',
+    'cant_retire':     "Can't afford to retire",
+    'growth_stalled':  'Growth has stalled',
   };
   const reviewConcerns = Array.isArray(practice.concerns) ? practice.concerns : [];
   const reviewChallenge = practice.biggestChallenge ? String(practice.biggestChallenge).trim() : '';

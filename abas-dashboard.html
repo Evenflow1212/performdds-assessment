@@ -182,7 +182,7 @@ body { font-family: Arial, Helvetica, sans-serif; background: #1a2332; color: #f
         <div class="kpi-card"><div class="kpi-label" id="kpi-days-label">Avg. Days (Last 12 Months)</div><div class="kpi-value orange" id="kpi-days"></div></div>
         <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-prepped-label">Avg. Crowns Prepped (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns-prepped"></div></div>
         <div class="kpi-card"><div class="kpi-label" id="kpi-crowns-label">Avg. Crowns Added (Last 12 Months)</div><div class="kpi-value orange" id="kpi-crowns"></div></div>
-        <div class="kpi-card"><div class="kpi-label" id="kpi-batavg-label">Avg. Batting Average (Last 12 Months)</div><div class="kpi-value orange" id="kpi-batavg"></div></div>
+        <div class="kpi-card"><div class="kpi-label" id="kpi-batavg-label">Avg. Conversion Ratio (Last 12 Months)</div><div class="kpi-value orange" id="kpi-batavg"></div></div>
     </div>
     <div class="chart-box" style="margin-bottom:16px;display:flex;flex-direction:column;"><h3>Revenue</h3><div class="chart-sub">Production, Collections &amp; Future Scheduled by Month</div><div style="height:200px;max-height:200px;position:relative;"><canvas id="chartRevenue"></canvas></div></div>
     <div class="chart-grid" style="grid-template-columns: 2fr 1fr; align-items: stretch;">
@@ -601,13 +601,13 @@ function initCharts(data = null) {
         document.getElementById('kpi-crowns-label').textContent = 'CROWNS ADDED';
         document.getElementById('kpi-crowns').textContent = Math.round(currentCrownsAdded);
 
-        // Batting Average: total visits / crowns added
+        // Conversion Ratio: total visits / crowns added
         const batVisits = activeData.visits.filter(r => r.date === allResultDates[0] && ['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)).reduce((s, r) => s + (r.value || 0), 0);
         const batPeriodic = activeData.exams.filter(r => r.date === allResultDates[0] && r.dimension === '0120 Periodic Exam').reduce((s, r) => s + (r.value || 0), 0);
         const batTotal = batVisits + batPeriodic;
         const crownsAdded = currentCrownsAdded;
         const batAvg = crownsAdded > 0 ? (batTotal / crownsAdded) : 0;
-        document.getElementById('kpi-batavg-label').textContent = 'BATTING AVERAGE';
+        document.getElementById('kpi-batavg-label').textContent = 'CONVERSION RATIO';
         document.getElementById('kpi-batavg').textContent = batAvg > 0 ? batAvg.toFixed(1) : String.fromCharCode(8212);
     } else {
         // Multi-month: show 12-month averages
@@ -630,14 +630,14 @@ function initCharts(data = null) {
         document.getElementById('kpi-crowns-label').textContent = 'Avg. Crowns Added (Last 12 Months)';
         document.getElementById('kpi-crowns').textContent = Math.round(crownDates.reduce((s,d) => { const p = crownsByDate[d]['Crowns PREPPED'] || 0; const fb = crownsByDate[d]['Crowns FUTURE BOOKED'] || 0; const fl = crownsByDate[d]['Crowns from LAST MONTH'] || 0; return s + p + fb - fl; }, 0) / crownDates.length);
 
-        // Batting Average for multi-month
+        // Conversion Ratio for multi-month
         const batVisitsByDate = {}; activeData.visits.forEach(r => { if (['1110 Prophy', '4910 Perio Maint', 'New Patients seen'].includes(r.dimension)) batVisitsByDate[r.date] = (batVisitsByDate[r.date]||0) + (r.value||0); });
         const batExamsByDate = {}; activeData.exams.forEach(r => { if (r.dimension === '0120 Periodic Exam') batExamsByDate[r.date] = (batExamsByDate[r.date]||0) + (r.value||0); });
         const batDates = [...new Set([...Object.keys(batVisitsByDate), ...Object.keys(batExamsByDate)])].sort().slice(-12);
         const avgCrownsAdded = crownDates.length > 0 ? crownDates.reduce((s, d) => { const p = crownsByDate[d]['Crowns PREPPED']||0; const fb = crownsByDate[d]['FUTURE BOOKED']||0; const fl = crownsByDate[d]['Crowns from LAST MONTH']||0; return s + p + fb - fl; }, 0) / crownDates.length : 0;
         const avgBatVisits = batDates.length > 0 ? batDates.reduce((s, d) => s + (batVisitsByDate[d]||0) + (batExamsByDate[d]||0), 0) / batDates.length : 0;
         const batAvgVal = avgCrownsAdded > 0 ? (avgBatVisits / avgCrownsAdded) : 0;
-        document.getElementById('kpi-batavg-label').textContent = 'Avg. Batting Average (Last 12 Months)';
+        document.getElementById('kpi-batavg-label').textContent = 'Avg. Conversion Ratio (Last 12 Months)';
         document.getElementById('kpi-batavg').textContent = batAvgVal > 0 ? batAvgVal.toFixed(1) : String.fromCharCode(8212);
     }
 
