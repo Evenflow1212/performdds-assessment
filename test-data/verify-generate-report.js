@@ -273,37 +273,100 @@ test('SWOT threats: insurance AR 90+ tail risk fires when >10% of insurance AR i
   expect(data.swot.threats.some(t => /insurance ar 90\+/i.test(t) || /aging tail/i.test(t)), 'insurance AR aging tail threat did not fire: ' + JSON.stringify(data.swot.threats));
 });
 
-test('SWOT threats: labor crowding out growth fires when staff cost > 30%', async () => {
-  /* Override P&L salaries to push staff cost % above 30. Baseline has $275k
-     staff on $920k collections ≈ 30% — bump to $340k to cross the line. */
-  const pl = PL_STANDARD.replace('Salaries & Wages|250000', 'Salaries & Wages|340000');
-  const body = await invoke(pl);
-  const threats = body.data.swot.threats;
-  expect(threats.some(t => /crowding out growth/i.test(t)), 'labor-crowding-out-growth threat did not fire: ' + JSON.stringify(threats));
+/* ──────────────────────────────────────────────────────────────────────
+   Three-way staff-cost decomposition (2026-04-20 methodology). Hygienist
+   wages scale with hygiene days/week, so benchmarking total staff cost as
+   one blob conflates admin efficiency with hygiene scheduling. Three
+   separate metrics; SWOT and threats anchor on the decomposed ones.
+   ────────────────────────────────────────────────────────────────────── */
+
+test('staff-cost decomposition: all three metrics compute without NaN', async () => {
+  const body = await invoke();
+  const k = body.data.kpis;
+  expect(k.staffCostPct      != null && Number.isFinite(k.staffCostPct),      'staffCostPct is null/NaN: ' + k.staffCostPct);
+  expect(k.staffCostExHygPct != null && Number.isFinite(k.staffCostExHygPct), 'staffCostExHygPct is null/NaN: ' + k.staffCostExHygPct);
+  expect(k.hygienistCostPct  != null && Number.isFinite(k.hygienistCostPct),  'hygienistCostPct is null/NaN: ' + k.hygienistCostPct);
 });
 
-/* ──────────────────────────────────────────────────────────────────────
-   Staff-cost parity — the SWOT weakness bullet and the scorecard card must
-   show the EXACT same percentage. Pigneri-style regression (2026-04-20):
-   scorecard displayed 36.2% while SWOT said 26% because the two surfaces
-   had independent calcs.
-   ────────────────────────────────────────────────────────────────────── */
-test('SWOT weakness staff cost matches scorecard kpis.staffCostPct', async () => {
+test('staff-cost decomposition: staffCostExHygPct strictly less than staffCostPct (hygiene not leaked)', async () => {
   const body = await invoke();
-  const kpis = body.data.kpis;
-  const fin = body.data.financials;
-  const canonical = fin.staffCostPct;
-  /* Smoke-test baseline lands at ~38% — triggers the weakness. */
-  expect(canonical > 20, `test fixture should have staffCostPct > 20 to exercise this rule; got ${canonical}`);
-  expect(kpis.staffCostPct === canonical, `kpis.staffCostPct (${kpis.staffCostPct}) != financials.staffCostPct (${canonical})`);
-  const expectedText = canonical.toFixed(1) + '%';
-  const weakness = body.data.swot.weaknesses.find(w => /staff cost/i.test(w));
-  expect(weakness, 'SWOT did not surface a staff-cost weakness: ' + JSON.stringify(body.data.swot.weaknesses));
-  expect(weakness.includes(expectedText), `SWOT weakness "${weakness}" does not contain canonical "${expectedText}"`);
-  /* And the scorecard card should render the same string. */
-  const scorecardMatch = body.reportHtml.match(/Staff Cost[^%]*?([\d.]+)%/);
-  expect(scorecardMatch, 'scorecard Staff Cost card not found');
-  expect(scorecardMatch[1] === canonical.toFixed(1), `scorecard shows ${scorecardMatch[1]}%, canonical is ${canonical.toFixed(1)}%`);
+  const k = body.data.kpis;
+  expect(k.staffCostExHygPct < k.staffCostPct, `staffCostExHygPct (${k.staffCostExHygPct}) should be < staffCostPct (${k.staffCostPct}); equal → hygiene double-counted or leaked into admin`);
+});
+
+test('staff-cost decomposition: hygienistCostPct denominator is hygiene production (not collections)', async () => {
+  const body = await invoke();
+  const k = body.data.kpis;
+  const hygProd = body.data.production.byCategory.hygiene;
+  const annualColl = body.data.collections.annualized;
+  /* Recompute from hygiene employee-cost fixture to verify denominator. */
+  const hygWages = (42 * 136 + 40 * 136) * 12;
+  const hygBenefits = 1800 * 12;
+  const hygEmp = hygWages * 0.10;
+  const hygAnnual = hygWages + hygBenefits + hygEmp;
+  const expectedFromHyg = (hygAnnual / hygProd) * 100;
+  const expectedFromColl = (hygAnnual / annualColl) * 100;
+  expect(Math.abs(k.hygienistCostPct - expectedFromHyg) < 0.5, `hygienistCostPct=${k.hygienistCostPct} expected≈${expectedFromHyg} (from hygiene production=${hygProd})`);
+  /* If the denominator were collections, hygienistCostPct would equal this
+     alternate value — assert it's DIFFERENT to prove the denominator. */
+  expect(Math.abs(k.hygienistCostPct - expectedFromColl) > 1, `hygienistCostPct looks like it was divided by collections (${expectedFromColl}) not hygiene production (${expectedFromHyg})`);
+});
+
+test('SWOT: admin/clinical weakness fires when staffCostExHygPct > 15% and uses that exact number', async () => {
+  const body = await invoke();
+  const k = body.data.kpis;
+  expect(k.staffCostExHygPct > 15, `fixture must have staffCostExHygPct > 15 to exercise this rule; got ${k.staffCostExHygPct}`);
+  const w = body.data.swot.weaknesses.find(x => /admin\/clinical staff cost/i.test(x));
+  expect(w, 'admin/clinical weakness did not fire: ' + JSON.stringify(body.data.swot.weaknesses));
+  expect(w.includes(k.staffCostExHygPct.toFixed(1) + '%'), `weakness text "${w}" does not contain ${k.staffCostExHygPct.toFixed(1)}%`);
+});
+
+test('SWOT: labor-crowding-out threat anchors on staffCostExHygPct > 20% (not total)', async () => {
+  /* Fixture: admin wages push admin-only ratio over 20% while total still
+     matters less. Staff array wages alone ≈ $128k + $30k benefits + emp costs ≈
+     $170k on $920k collections ≈ 18.5%; bump the admin rates to cross 20. */
+  const body = await invoke(null, {});
+  const k = body.data.kpis;
+  /* Our smoke fixture has staffCostExHygPct ≈ 19.9% — below the threat
+     threshold (20%). Verify the threat does NOT fire here so we're sure the
+     gate isn't just firing on total. */
+  if (k.staffCostExHygPct <= 20) {
+    const hasThreat = body.data.swot.threats.some(t => /admin\/clinical staff cost[^]*crowding out growth/i.test(t));
+    expect(!hasThreat, `threat fired at staffCostExHygPct=${k.staffCostExHygPct} (<=20) — should not fire`);
+  } else {
+    const hasThreat = body.data.swot.threats.some(t => /admin\/clinical staff cost[^]*crowding out growth/i.test(t));
+    expect(hasThreat, `threat did not fire at staffCostExHygPct=${k.staffCostExHygPct} (>20)`);
+  }
+});
+
+test('SWOT: hygienist-productivity weakness fires when hygienistCostPct > 38%', async () => {
+  /* Low hygiene production → high hygienistCostPct. Use only hygiene codes
+     with low totals to spike the ratio, employeeCosts same as baseline. */
+  const sparseProd = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D0120|Periodic Oral Evaluation|1200|78000',
+    'D1110|Prophy|2400|120000',  /* half the normal wages-vs-production makes ratio blow up */
+    'D2740|Crown|140|420000',
+  ].join('\n');
+  const res = await handler({
+    httpMethod: 'POST',
+    body: JSON.stringify(Object.assign(JSON.parse(buildEvent().body), { prodText: sparseProd })),
+  });
+  const data = JSON.parse(res.body).data;
+  expect(data.kpis.hygienistCostPct > 38, `fixture should drive hygienistCostPct > 38; got ${data.kpis.hygienistCostPct}`);
+  const w = data.swot.weaknesses.find(x => /hygienist productivity/i.test(x));
+  expect(w, 'hygienist-productivity weakness did not fire: ' + JSON.stringify(data.swot.weaknesses));
+  expect(w.includes(data.kpis.hygienistCostPct.toFixed(1) + '%'), `weakness text "${w}" does not contain ${data.kpis.hygienistCostPct.toFixed(1)}%`);
+});
+
+test('scorecard shows both admin/clinical and hygienist wage cards', async () => {
+  const body = await invoke();
+  const html = body.reportHtml;
+  expect(html.includes('Staff Cost (Admin + Clinical)'), 'scorecard missing "Staff Cost (Admin + Clinical)" card');
+  expect(html.includes('Hygienist Wage Ratio'), 'scorecard missing "Hygienist Wage Ratio" card');
+  expect(/Staff cost is shown three ways/.test(html), 'scorecard explainer paragraph missing');
+  /* Total staff cost stays visible in financials under a clarified label. */
+  expect(html.includes('Total Staff Cost'), 'financials section missing "Total Staff Cost" label');
 });
 
 (async () => {

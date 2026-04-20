@@ -148,27 +148,56 @@ function plCategory(item) {
   return 'M';
 }
 
-/* Canonical staff-cost-% calc: wages + benefits + payroll-tax uplift, all
-   annualized, divided by annualized collections. Used by BOTH computeReportData
-   (which publishes kpis.staffCostPct + the scorecard) and generateSWOT (which
-   gates the Staff-cost weakness and Labor-crowding threat). Keeping this in
-   one place guarantees the two surfaces report the same percentage. */
+/* Role-scoped annualized staff cost: wages + benefits×12 + wages × empCostPct.
+   Called separately for the admin/clinical `staff` and the `hygiene` arrays
+   so Dave's three-way decomposition (admin-only, hygienist-only, total) can
+   use a single source of truth. */
+function staffRoleAnnualCost(arr, benefits, empCostPct) {
+  const wages = (arr || []).reduce((s, p) => s + (Number(p.rate) || 0) * (Number(p.hours) || 0) * 12, 0);
+  const benefitsAnnual = (Number(benefits) || 0) * 12;
+  const empCosts = wages * (Number(empCostPct) || 0);
+  return wages + benefitsAnnual + empCosts;
+}
+
+/* Canonical TOTAL staff-cost-% calc: admin + hygiene, all annualized, divided
+   by annualized collections. Kept for backward compat and industry-reference
+   benchmarking (25-28%). Per Dave's methodology this is NOT the primary
+   coaching metric — use staffCostExHygPct + hygienistCostPct instead. */
 function canonicalStaffCostPct(employeeCosts, annualCollections) {
   if (!employeeCosts || !(annualCollections > 0)) return null;
-  const sumRole = (arr, benefits, empCostPct) => {
-    const wages = (arr || []).reduce((s, p) => s + (Number(p.rate) || 0) * (Number(p.hours) || 0) * 12, 0);
-    const benefitsAnnual = (Number(benefits) || 0) * 12;
-    const empCosts = wages * (Number(empCostPct) || 0);
-    return wages + benefitsAnnual + empCosts;
-  };
   const staffAnnual =
-    sumRole(employeeCosts.staff, employeeCosts.staffBenefits, employeeCosts.staffEmpCostPct) +
-    sumRole(employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct);
+    staffRoleAnnualCost(employeeCosts.staff,   employeeCosts.staffBenefits, employeeCosts.staffEmpCostPct) +
+    staffRoleAnnualCost(employeeCosts.hygiene, employeeCosts.hygBenefits,   employeeCosts.hygEmpCostPct);
   return staffAnnual > 0 ? (staffAnnual / annualCollections) * 100 : null;
 }
 
+/* Admin + clinical staff cost as % of annualized collections — excludes the
+   hygiene array entirely. This isolates how efficiently the non-clinical
+   and non-hygiene team runs; hygiene days/week swing the total-staff figure
+   and muddy the signal. Target ≤15%, flag >18%. */
+function staffCostExHygPctCalc(employeeCosts, annualCollections) {
+  if (!employeeCosts || !(annualCollections > 0)) return null;
+  const adminAnnual = staffRoleAnnualCost(
+    employeeCosts.staff, employeeCosts.staffBenefits, employeeCosts.staffEmpCostPct
+  );
+  return adminAnnual > 0 ? (adminAnnual / annualCollections) * 100 : null;
+}
+
+/* Hygienist wages as % of HYGIENE PRODUCTION (NOT total collections).
+   This normalizes for how many days/week the hygiene department runs —
+   a 5-day hygiene practice and a 3-day hygiene practice can have the same
+   underlying hygienist productivity but different total-staff ratios.
+   Target 30–33%, flag >38%. */
+function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
+  if (!employeeCosts || !(annualHygieneProduction > 0)) return null;
+  const hygAnnual = staffRoleAnnualCost(
+    employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct
+  );
+  return hygAnnual > 0 ? (hygAnnual / annualHygieneProduction) * 100 : null;
+}
+
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
   const pp = practiceProfile || {};
   const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
@@ -230,10 +259,13 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     if (plData.netIncome != null) netIncomePct = (plData.netIncome / netCollections * 100);
   }
 
-  /* Staff-cost % reads the canonical value — the SAME number the scorecard
-     renders as "Staff Cost / Collections". Passed in by the handler so SWOT
-     and computeReportData can't drift. */
-  const staffCostPct = Number.isFinite(canonicalStaffPct) ? canonicalStaffPct : 0;
+  /* Staff-cost percentages all come from the handler — single source of
+     truth with computeReportData. Total is retained for industry-reference
+     threats; the decomposed admin/hygienist metrics drive Dave's coaching
+     rules per the three-way methodology. */
+  const staffCostPct  = Number.isFinite(canonicalStaffPct) ? canonicalStaffPct : 0;
+  const staffExHyg    = Number.isFinite(staffExHygPct)     ? staffExHygPct     : null;
+  const hygienist     = Number.isFinite(hygienistPct)      ? hygienistPct      : null;
 
   const totalAR = (arPatient?.total || 0) + (arInsurance?.total || 0);
   const ar90Plus = (arPatient?.d90plus || 0) + (arInsurance?.d90plus || 0);
@@ -242,7 +274,7 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   /* ── STRENGTHS ── */
   if (collectionRate >= 95) strengths.push('Collection rate is strong at ' + Math.round(collectionRate) + '%');
   if (hygPct >= 28) strengths.push('Hygiene department is performing well at ' + Math.round(hygPct) + '% of total production');
-  if (staffCostPct > 0 && staffCostPct <= 22) strengths.push('Staff costs are well managed at ' + Math.round(staffCostPct) + '% of collections');
+  if (staffCostPct > 0 && staffCostPct <= 22) strengths.push('Staff costs are well managed at ' + Math.round(staffCostPct) + '% of collections (total, admin + hygiene)');
   if (npPerMonth >= 30) strengths.push('Strong new patient flow at ' + npPerMonth + ' per month');
   if (activePatientEst >= 1000) strengths.push('Practice has a strong active patient base, estimated at approximately ' + activePatientEst);
   if (perioMaintQty > 0 && perioRatio >= 15) strengths.push('Solid soft tissue management protocols appear to be in place');
@@ -253,9 +285,16 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
 
   /* ── WEAKNESSES ── */
   if (collectionRate > 0 && collectionRate < 93) weaknesses.push('Collection rate of ' + Math.round(collectionRate) + '% is below the 97% benchmark');
-  /* Format matches scorecard ("Staff Cost / Collections: 36.2%") so the two
-     surfaces report the same number. */
-  if (staffCostPct > 25) weaknesses.push('Staff cost at ' + staffCostPct.toFixed(1) + '% of collections exceeds the 20% benchmark');
+  /* Decomposed staff-cost weaknesses (2026-04-20 methodology) — hygienist
+     wages scale with hygiene days/week, so total staff cost alone conflates
+     admin efficiency with hygiene scheduling. Anchor coaching on the two
+     isolated metrics instead. Format matches the scorecard strings verbatim. */
+  if (staffExHyg != null && staffExHyg > 15) {
+    weaknesses.push('Admin/clinical staff cost at ' + staffExHyg.toFixed(1) + '% of collections exceeds the 15% benchmark (excludes hygiene — front desk, OM, assistants)');
+  }
+  if (hygienist != null && hygienist > 38) {
+    weaknesses.push('Hygienist productivity below benchmark — wages are ' + hygienist.toFixed(1) + '% of hygiene production (target 30–33%)');
+  }
   if (hygPct > 0 && hygPct < 25) weaknesses.push('Hygiene production at ' + Math.round(hygPct) + '% is below the 30-35% target');
   if (perioMaintQty === 0 && prophyQty > 0) weaknesses.push('Perio maintenance appears limited — no D4910 codes present');
   if (srpQty === 0 && prophyQty > 50) weaknesses.push('Periodontal disease appears to be under-diagnosed — no SRP procedures found');
@@ -385,10 +424,11 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     threats.push(`Owner is ${ownerAgeNum} with no associate in place — succession risk: a health event or accelerated exit timeline has no transition runway and compresses practice value`);
   }
 
-  /* Labor cost crowding out growth: >30% staff cost leaves no margin to reinvest
-     in marketing, tech, or capacity expansion even when top-line is healthy. */
-  if (staffCostPct > 30) {
-    threats.push(`Staff cost at ${staffCostPct.toFixed(1)}% of collections is crowding out growth investment — with this little margin, every expansion decision (new chair, marketing push, hygiene day) has to clear a higher bar to pencil out`);
+  /* Labor cost crowding out growth: anchored on admin/clinical cost (not total)
+     so it isolates front-office drag from hygiene-scheduling swings. >20% on
+     admin alone leaves no margin to reinvest in marketing, tech, or capacity. */
+  if (staffExHyg != null && staffExHyg > 20) {
+    threats.push(`Admin/clinical staff cost at ${staffExHyg.toFixed(1)}% of collections is crowding out growth investment — with this little margin on the non-hygiene side alone, every expansion decision (new chair, marketing push, hygiene day) has to clear a higher bar to pencil out`);
   }
 
   /* Ensure minimum bullets per section */
@@ -622,8 +662,15 @@ function computeReportData(input) {
   const patientPayPct = sourcesTotal > 0 ? (patientPayTotal / sourcesTotal) * 100 : 0;
   const profitPct = overheadPct != null ? 100 - overheadPct : null;
 
-  /* Staff cost % of collections — single canonical calc (see helper). */
-  const staffCostPct = canonicalStaffCostPct(employeeCosts, annualCollections);
+  /* Staff cost — three metrics per Dave's methodology:
+       staffCostPct       = total (admin + hygiene) ÷ annualCollections  — industry reference
+       staffCostExHygPct  = admin/clinical only       ÷ annualCollections  — primary coaching anchor
+       hygienistCostPct   = hygiene wages             ÷ annualHygieneProd — isolates hygienist productivity
+     The last normalizes for how many days/week hygiene runs, so it's
+     apples-to-apples across practices with different hygiene footprints. */
+  const staffCostPct      = canonicalStaffCostPct(employeeCosts, annualCollections);
+  const staffCostExHygPct = staffCostExHygPctCalc(employeeCosts, annualCollections);
+  const hygienistCostPct  = hygienistCostPctCalc(employeeCosts, annualHyg);
 
   /* ──── Goal matrix ──── */
   const goalDocDaily = combinedDocDailyAvg || 0;
@@ -880,7 +927,9 @@ function computeReportData(input) {
       overheadRawPct,             /* raw, unadjusted — shown as a secondary number */
       profitPct,
       netIncome: plData?.netIncome != null ? plData.netIncome : null,
-      staffCostPct,
+      staffCostPct,                   /* total — admin + hygiene, ÷ annualCollections (industry ref) */
+      staffCostExHygPct,              /* admin/clinical only, ÷ annualCollections (primary coaching anchor) */
+      hygienistCostPct,               /* hygiene-only, ÷ annualHygieneProduction (normalized) */
       sourcesOfDollars: {
         dollars: sourcesOfDollars,
         percent: sourcesPct,
@@ -908,6 +957,8 @@ function computeReportData(input) {
       overheadPct,
       profitPct,
       staffCostPct,
+      staffCostExHygPct,
+      hygienistCostPct,
       battingAverage,           /* visits ÷ crowns prepped (lower is better; sweet spot 4-6:1) */
       battingAverageInputs: {
         visitsCount,
@@ -1018,6 +1069,28 @@ function renderReportHtml(data) {
     : 'Target <strong>≤60%</strong>';
   scorecardCards.push({ lbl: 'Overhead %', val: (kpis.overheadPct != null && kpis.overheadPct > 0) ? kpis.overheadPct.toFixed(1) + '%' : '—', bench: overheadBench, status: statusVs(kpis.overheadPct, 60, false) });
 
+  /* Three-way staff-cost decomposition per Dave's methodology (2026-04-20):
+     admin/clinical isolation is the primary coaching anchor, hygienist ratio
+     normalizes for hygiene-schedule size, total is shown in financials only. */
+  if (kpis.staffCostExHygPct != null) {
+    const v = kpis.staffCostExHygPct;
+    scorecardCards.push({
+      lbl: 'Staff Cost (Admin + Clinical)',
+      val: v.toFixed(1) + '%',
+      bench: 'Front desk, OM, assistants &mdash; excludes hygiene &middot; Target <strong>&le;15%</strong>',
+      status: v <= 15 ? 'good' : (v <= 18 ? 'warn' : 'bad'),
+    });
+  }
+  if (kpis.hygienistCostPct != null) {
+    const v = kpis.hygienistCostPct;
+    scorecardCards.push({
+      lbl: 'Hygienist Wage Ratio',
+      val: v.toFixed(1) + '%',
+      bench: '% of hygiene production &middot; Target <strong>30–33%</strong>',
+      status: (v >= 30 && v <= 33) ? 'good' : (v <= 38 ? 'warn' : 'bad'),
+    });
+  }
+
   /* Batting Average — visits ÷ crowns prepped. Lower is better; sweet spot 4-6:1. */
   if (kpis.battingAverage != null && kpis.battingAverage > 0) {
     const ba = kpis.battingAverage;
@@ -1086,7 +1159,10 @@ function renderReportHtml(data) {
     { lbl: 'Annual Revenue (P&L)', val: financials.plIncome > 0 ? fmt$(financials.plIncome) : '—', bench: financials.plIncome > 0 ? 'From P&L statement' : 'P&L not uploaded' },
     { lbl: 'Annual Expenses', val: financials.plExpenses > 0 ? fmt$(financials.plExpenses) : '—', bench: financials.plExpenses > 0 ? '' : 'Not available in P&L' },
     { lbl: 'Profit Margin', val: (financials.profitPct != null && financials.profitPct > 0 && financials.profitPct < 100) ? financials.profitPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≥35%</strong>', status: statusVs(financials.profitPct, 35, true) },
-    { lbl: 'Staff Cost / Collections', val: (financials.staffCostPct != null && financials.staffCostPct > 0) ? financials.staffCostPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≤22%</strong>', status: statusVs(financials.staffCostPct, 22, false) },
+    /* Total staff cost (admin + hygiene) — shown here as industry reference only.
+       Primary coaching metrics are on the scorecard: Staff Cost (Admin + Clinical)
+       and Hygienist Wage Ratio. See the scorecard explainer for why. */
+    { lbl: 'Total Staff Cost (incl. hygiene)', val: (financials.staffCostPct != null && financials.staffCostPct > 0) ? financials.staffCostPct.toFixed(1) + '%' : '—', bench: 'Industry reference <strong>25–28%</strong> &middot; for coaching see scorecard', status: statusVs(financials.staffCostPct, 28, false) },
   ];
   /* AR full aging table replaces the compact 90+ cards (Dave 2026-04-16: "show
      the AR as it ages: current, 30-60, 60-90, and over 90"). */
@@ -1253,6 +1329,14 @@ function renderReportHtml(data) {
     generatedDate: htmlEscape(generatedDate),
     totalOpportunity: fmt$(opportunities.totalValue),
     scorecardCards: scorecardHtml,
+    scorecardExplainer: (kpis.staffCostExHygPct != null || kpis.hygienistCostPct != null) ? `
+      <p style="font-size:13px;color:#94a3b8;line-height:1.55;margin-top:18px;max-width:860px;">
+        Staff cost is shown three ways because hygienist wages scale with hygiene days/week &mdash;
+        a practice running 5 days of hygiene will always show higher &ldquo;total staff cost&rdquo; than one
+        running 3 days, regardless of efficiency. Anchor on the first two metrics: admin/clinical staff
+        efficiency, and hygienist productivity. Total staff cost is shown for reference only in the
+        financials section below.
+      </p>` : '',
     opportunityCards: oppHtml,
     goalRows: goalRowsHtml,
     financialCards: financialHtml,
@@ -1853,22 +1937,26 @@ exports.handler = async function(event) {
       collTotal = Math.round(collTotal / collMonths * prodMonths * 100) / 100;
     }
 
-    /* Canonical staff-cost % — computed once, passed to both SWOT and the
-       data-object builder so the scorecard, weakness bullet, and threat
-       rule can never show different percentages. */
-    const annualFactorForStaff = prodMonths && prodMonths !== 12 ? (12 / prodMonths) : 1;
-    const annualCollectionsForStaff = collTotal * annualFactorForStaff;
-    const canonicalStaffPct = canonicalStaffCostPct(employeeCosts, annualCollectionsForStaff);
-
-    /* SWOT */
-    const swotData = generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct);
-
-    /* Compute canonical data object */
-    const data = computeReportData({
+    /* Compute canonical data object first — it performs the authoritative
+       hygiene categorization and yields the three staff-cost percentages
+       (total, admin-only, hygienist-only) that SWOT's rules need. We then
+       run SWOT against those canonical values and splice the result back
+       in. Keeps the cost formulas and the coaching rules in lockstep. */
+    const dataWithoutSwot = computeReportData({
       prodData, collData, plData, employeeCosts, practiceProfile,
-      arPatient, arInsurance, swotData, practiceName,
+      arPatient, arInsurance, swotData: null, practiceName,
       totalProd, collTotal, years, prodMonths,
     });
+
+    const swotData = generateSWOT(
+      prodData, collData, plData, hygieneData, employeeCosts,
+      arPatient, arInsurance, practiceProfile,
+      dataWithoutSwot.kpis.staffCostPct,
+      dataWithoutSwot.kpis.staffCostExHygPct,
+      dataWithoutSwot.kpis.hygienistCostPct,
+    );
+
+    const data = Object.assign({}, dataWithoutSwot, { swot: swotData });
 
     /* Render HTML */
     const reportHtml = renderReportHtml(data);
