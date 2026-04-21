@@ -359,6 +359,23 @@ test('SWOT: hygienist-productivity weakness fires when hygienistCostPct > 38%', 
   expect(w.includes(data.kpis.hygienistCostPct.toFixed(1) + '%'), `weakness text "${w}" does not contain ${data.kpis.hygienistCostPct.toFixed(1)}%`);
 });
 
+test('opportunity "Staff cost optimization" uses admin/clinical decomposed metric (not total)', async () => {
+  const body = await invoke();
+  const k = body.data.kpis;
+  const annualColl = body.data.collections.annualized;
+  expect(k.staffCostExHygPct > 15, `fixture must drive staffCostExHygPct > 15 to exercise this rule; got ${k.staffCostExHygPct}`);
+  /* Find the card in the full opportunities list (not just top3 — it may be
+     outranked there by a bigger dollar item). */
+  const staffOpp = body.data.opportunities.all.find(o => /staff cost/i.test(o.title));
+  expect(staffOpp, 'staff cost opportunity card missing: ' + JSON.stringify(body.data.opportunities.all.map(o => o.title)));
+  const expected = annualColl * (k.staffCostExHygPct / 100 - 0.15);
+  expect(Math.abs(staffOpp.value - expected) < 1, `opportunity value ${staffOpp.value} != expected ${expected} from (staffCostExHygPct ${k.staffCostExHygPct} - 15) × annualColl ${annualColl} / 100`);
+  expect(/admin\/clinical/i.test(staffOpp.body), `body copy should mention admin/clinical, got: "${staffOpp.body}"`);
+  expect(/15% benchmark/.test(staffOpp.body), `body copy should reference 15% benchmark, got: "${staffOpp.body}"`);
+  expect(!/hygienist/i.test(staffOpp.body) || /not hygiene/i.test(staffOpp.body), `body should exclude hygiene from the scope, got: "${staffOpp.body}"`);
+  expect(staffOpp.icon === '👥', `icon should be unchanged 👥, got: ${staffOpp.icon}`);
+});
+
 test('scorecard shows both admin/clinical and hygienist wage cards', async () => {
   const body = await invoke();
   const html = body.reportHtml;

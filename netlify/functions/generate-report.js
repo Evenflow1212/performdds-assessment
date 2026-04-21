@@ -821,11 +821,14 @@ function computeReportData(input) {
       body: `Overhead is ${overheadPct.toFixed(1)}% of income vs a 60% target for a well-run practice. Bringing it closer to benchmark could free up $${Math.round(savings).toLocaleString()} in additional profit annually.`
     });
   }
-  if (staffCostPct != null && staffCostPct > 22 && annualCollections > 0) {
-    const savings = annualCollections * (staffCostPct/100 - 0.20);
+  /* Staff cost opportunity — anchored on admin/clinical (not total) per
+     the three-way decomposition methodology. Hygienist cost swings with
+     hygiene days/week and belongs in a separate opportunity surface. */
+  if (staffCostExHygPct != null && staffCostExHygPct > 15 && annualCollections > 0) {
+    const savings = annualCollections * (staffCostExHygPct/100 - 0.15);
     if (savings > 5000) opps.push({
       icon: '👥', value: savings, title: 'Staff cost optimization',
-      body: `Staff costs are ${staffCostPct.toFixed(1)}% of collections vs a 20% benchmark. Right-sizing toward benchmark could free approximately $${Math.round(savings).toLocaleString()} per year without cutting people — often a mix of schedule optimization and hygiene productivity.`
+      body: `Admin/clinical staff costs are ${staffCostExHygPct.toFixed(1)}% of collections vs a 15% benchmark. Right-sizing admin + clinical assistants (not hygiene) toward benchmark could free approximately $${Math.round(savings).toLocaleString()} per year — typically via schedule optimization, cross-training, and front-desk workflow tightening.`
     });
   }
   const docLift = annualDoctor * 0.15;
