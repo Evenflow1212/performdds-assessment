@@ -228,7 +228,7 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   const perioMaintQty = codeQty('D4910');
   const activePatientEst = Math.round((prophyQty + perioMaintQty) / (prodMonths / 12));
 
-  const hygCodes = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0274'];
+  const hygCodes = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0140','D0274'];
   let hygProd = 0;
   for (const hc of hygCodes) hygProd += codeTotal(hc);
   const hygPct = totalProd > 0 ? (hygProd / totalProd * 100) : 0;
@@ -285,23 +285,24 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
 
   /* ── WEAKNESSES ── */
   if (collectionRate > 0 && collectionRate < 93) weaknesses.push('Collection rate of ' + Math.round(collectionRate) + '% is below the 97% benchmark');
-  /* Decomposed staff-cost weaknesses (2026-04-20 methodology) — hygienist
-     wages scale with hygiene days/week, so total staff cost alone conflates
-     admin efficiency with hygiene scheduling. Anchor coaching on the two
-     isolated metrics instead. Format matches the scorecard strings verbatim. */
-  if (staffExHyg != null && staffExHyg > 15) {
-    weaknesses.push('Admin/clinical staff cost at ' + staffExHyg.toFixed(1) + '% of collections exceeds the 15% benchmark (excludes hygiene — front desk, OM, assistants)');
+  /* Staff cost — HYBRID model per 2026-04-21 methodology reconciliation.
+     Primary coaching anchor is TOTAL staff cost vs 20%. The admin/clinical
+     and hygienist-ratio decomposition stays on the scorecard as diagnostic
+     color (where the cost lives — front-desk vs hygiene) but doesn't drive
+     the primary red flag; that's always on total. Excludes owner draws. */
+  if (staffCostPct > 20) {
+    weaknesses.push('Total staff cost at ' + staffCostPct.toFixed(1) + '% of collections exceeds the 20% benchmark (includes all staff + hygiene; excludes owner draws)');
   }
   if (hygienist != null && hygienist > 38) {
     weaknesses.push('Hygienist productivity below benchmark — wages are ' + hygienist.toFixed(1) + '% of hygiene production (target 30–33%)');
   }
-  if (hygPct > 0 && hygPct < 25) weaknesses.push('Hygiene production at ' + Math.round(hygPct) + '% is below the 30-35% target');
+  if (hygPct > 0 && hygPct < 25) weaknesses.push('Hygiene production at ' + Math.round(hygPct) + '% is below the 33% target');
   if (perioMaintQty === 0 && prophyQty > 0) weaknesses.push('Perio maintenance appears limited — no D4910 codes present');
   if (srpQty === 0 && prophyQty > 50) weaknesses.push('Periodontal disease appears to be under-diagnosed — no SRP procedures found');
   else if (perioRatio > 0 && perioRatio < 8 && prophyQty > 50) weaknesses.push('Periodontal disease may be under-diagnosed relative to the patient flow');
   if (!hasPanorex) weaknesses.push('The practice does not appear to have a Panorex');
-  if (labPct > 5) weaknesses.push('Lab costs at ' + labPct.toFixed(1) + '% of collections exceed the 4% benchmark');
-  if (supplyPct > 5) weaknesses.push('Dental supply costs at ' + supplyPct.toFixed(1) + '% are above benchmark');
+  if (labPct > 6) weaknesses.push('Lab costs at ' + labPct.toFixed(1) + '% of collections exceed the 6% target');
+  if (supplyPct > 6) weaknesses.push('Dental supply costs at ' + supplyPct.toFixed(1) + '% exceed the 6% target');
   if (totalAR > 0 && ar90Pct > 10) weaknesses.push('Aged AR over 90 days at ' + Math.round(ar90Pct) + '% needs attention');
   if (npPerMonth > 0 && npPerMonth < 15) weaknesses.push('New patient flow is low at ' + npPerMonth + ' per month');
   if (activePatientEst > 0 && activePatientEst < 500) weaknesses.push('Active patient base is small, estimated at approximately ' + activePatientEst);
@@ -424,11 +425,13 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     threats.push(`Owner is ${ownerAgeNum} with no associate in place — succession risk: a health event or accelerated exit timeline has no transition runway and compresses practice value`);
   }
 
-  /* Labor cost crowding out growth: anchored on admin/clinical cost (not total)
-     so it isolates front-office drag from hygiene-scheduling swings. >20% on
-     admin alone leaves no margin to reinvest in marketing, tech, or capacity. */
-  if (staffExHyg != null && staffExHyg > 20) {
-    threats.push(`Admin/clinical staff cost at ${staffExHyg.toFixed(1)}% of collections is crowding out growth investment — with this little margin on the non-hygiene side alone, every expansion decision (new chair, marketing push, hygiene day) has to clear a higher bar to pencil out`);
+  /* Labor cost crowding out growth: anchored on TOTAL staff cost vs 30%
+     (2026-04-21 hybrid methodology). At that level the labor load leaves
+     no margin to reinvest in marketing, tech, or capacity — and since the
+     admin/hygienist split is diagnostic color, the primary threat fires
+     on the total figure. */
+  if (staffCostPct > 30) {
+    threats.push(`Total staff cost at ${staffCostPct.toFixed(1)}% of collections is crowding out growth investment — with this much of every dollar going to labor, every expansion decision (new chair, marketing push, hygiene day) has to clear a higher bar to pencil out`);
   }
 
   /* Ensure minimum bullets per section */
@@ -494,7 +497,11 @@ function computeReportData(input) {
   const hygieneDaysPerWeek = Number(pp.numHygienists) || Number(pp.hygieneDays) || 0;
 
   /* ──── Categorize production into hygiene / specialty / doctor ──── */
-  const hygCodes = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0150','D0140','D0274'];
+  /* Hygiene codes (2026-04-21 methodology, from hygiene-percentage.yaml):
+     prophy/perio visits + locally-delivered antimicrobial + debridement
+     + periodic/limited exam visit companions + bitewings. D0150
+     (comprehensive exam) is NOT hygiene — it's the NP visit anchor. */
+  const hygCodes = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0140','D0274'];
   const perioCodes = ['D4260','D4261','D4263','D4273','D4275','D4341','D4342','D4910'];
   const endoCodes = ['D3310','D3320','D3330','D3346','D3347','D3348'];
   const surgCodes = ['D7140','D7210','D7220','D7230','D7240','D7250'];
@@ -515,8 +522,14 @@ function computeReportData(input) {
     else prodOther += val;  /* doctor general dentistry: fillings, crowns, etc. */
   });
 
-  /* ──── Batting Average inputs (knowledge base: kpis/batting-average.yaml) ──── */
+  /* ──── Conversion Ratio inputs (knowledge base: kpis/batting-average.yaml) ──── */
+  /* Visits (numerator): prophy, perio maint, SRP, comp exam. EXCLUDES D0120
+     (periodic exam is a diagnostic companion, not a standalone visit). */
   const VISIT_CODES = ['D1110','D1120','D4910','D4341','D4342','D0150'];
+  /* Crowns (denominator): full range per 2026-04-21 reconciliation.
+     Directly-enumerated single-unit crowns + veneers; implant crowns
+     (D6058-D6067) and bridge units (D6210-D6794) via numeric-range match so
+     we don't miss D6246/D6608/etc. if they appear. */
   const CROWN_CODES = [
     /* Porcelain / ceramic */
     'D2740','D2750','D2751','D2752',
@@ -526,18 +539,23 @@ function computeReportData(input) {
     'D2780','D2781','D2782','D2783','D2790','D2791','D2792','D2794',
     /* Veneers */
     'D2960','D2961','D2962',
-    /* Implant crowns */
-    'D6058','D6059','D6060','D6061','D6062','D6063','D6064','D6065','D6066','D6067',
-    /* Bridge units (pontics + abutment crowns + cantilever retainers) */
-    'D6210','D6211','D6212','D6214','D6240','D6241','D6242','D6243','D6245','D6250','D6251','D6252','D6253',
-    'D6545','D6548','D6549','D6710','D6720','D6721','D6722','D6740','D6750','D6751','D6752','D6753',
-    'D6780','D6781','D6782','D6783','D6790','D6791','D6792','D6793','D6794',
   ];
+  const isCrownCode = (raw) => {
+    const code = (raw || '').toUpperCase();
+    if (CROWN_CODES.includes(code)) return true;
+    if (!/^D\d{4}$/.test(code)) return false;
+    const n = parseInt(code.slice(1), 10);
+    if (n >= 6058 && n <= 6067) return true;   /* implant crowns */
+    if (n >= 6210 && n <= 6794) return true;   /* bridge units (pontics + retainers) */
+    return false;
+  };
   const countCodeMatchingQty = (list) => codes
     .filter(c => list.includes((c.code || '').toUpperCase()))
     .reduce((s, c) => s + (c.qty || 0), 0);
   const visitsCount = countCodeMatchingQty(VISIT_CODES);
-  const crownsPreppedCount = countCodeMatchingQty(CROWN_CODES);
+  const crownsPreppedCount = codes
+    .filter(c => isCrownCode(c.code))
+    .reduce((s, c) => s + (c.qty || 0), 0);
   const exam0120Count = codes
     .filter(c => (c.code || '').toUpperCase().startsWith('D0120'))
     .reduce((s, c) => s + (c.qty || 0), 0);
@@ -806,11 +824,11 @@ function computeReportData(input) {
     });
   }
   if (hygPct < 30 && annualProd > 0) {
-    const targetHyg = annualProd * 0.32;
+    const targetHyg = annualProd * 0.33;
     const hygGap = targetHyg - annualHyg;
     if (hygGap > 5000) opps.push({
       icon: '🦷', value: hygGap, title: 'Hygiene production gap',
-      body: `Hygiene is ${hygPct.toFixed(1)}% of production vs a 30–35% target. Growing hygiene to the benchmark could add up to $${Math.round(hygGap).toLocaleString()} annually — and each new hygiene patient opens a doctor-diagnosed treatment pipeline.`
+      body: `Hygiene is ${hygPct.toFixed(1)}% of production vs a 33% target. Growing hygiene to the benchmark could add up to $${Math.round(hygGap).toLocaleString()} annually — and each new hygiene patient opens a doctor-diagnosed treatment pipeline.`
     });
   }
   if (overheadPct > 65 && plIncome > 0) {
@@ -821,15 +839,21 @@ function computeReportData(input) {
       body: `Overhead is ${overheadPct.toFixed(1)}% of income vs a 60% target for a well-run practice. Bringing it closer to benchmark could free up $${Math.round(savings).toLocaleString()} in additional profit annually.`
     });
   }
-  /* Staff cost opportunity — anchored on admin/clinical (not total) per
-     the three-way decomposition methodology. Hygienist cost swings with
-     hygiene days/week and belongs in a separate opportunity surface. */
-  if (staffCostExHygPct != null && staffCostExHygPct > 15 && annualCollections > 0) {
-    const savings = annualCollections * (staffCostExHygPct/100 - 0.15);
-    if (savings > 5000) opps.push({
-      icon: '👥', value: savings, title: 'Staff cost optimization',
-      body: `Admin/clinical staff costs are ${staffCostExHygPct.toFixed(1)}% of collections vs a 15% benchmark. Right-sizing admin + clinical assistants (not hygiene) toward benchmark could free approximately $${Math.round(savings).toLocaleString()} per year — typically via schedule optimization, cross-training, and front-desk workflow tightening.`
-    });
+  /* Staff cost opportunity — anchored on TOTAL staff cost vs 20%
+     (2026-04-21 hybrid methodology). Dollar value = (total% - 20) × annual
+     collections. The admin/clinical and hygienist-ratio decomposition is
+     surfaced in the body as diagnostic color so the dentist knows where
+     the cost lives, but the scoreboard is the total figure. */
+  if (staffCostPct != null && staffCostPct > 20 && annualCollections > 0) {
+    const savings = annualCollections * (staffCostPct/100 - 0.20);
+    if (savings > 5000) {
+      const adminTxt = staffCostExHygPct != null ? staffCostExHygPct.toFixed(1) + '%' : '—';
+      const hygTxt   = hygienistCostPct  != null ? hygienistCostPct.toFixed(1)  + '%' : '—';
+      opps.push({
+        icon: '👥', value: savings, title: 'Staff cost optimization',
+        body: `Total staff cost is ${staffCostPct.toFixed(1)}% of collections vs a 20% benchmark. Reducing total staff cost toward benchmark could free approximately $${Math.round(savings).toLocaleString()} per year. Of that ${staffCostPct.toFixed(1)}% total: admin/clinical is ${adminTxt} (benchmark-free reference) and hygienist wages are ${hygTxt} of hygiene production (benchmark-free reference) — see admin vs hygienist breakdown on the scorecard for where to focus.`
+      });
+    }
   }
   const docLift = annualDoctor * 0.15;
   if (docLift > 10000) opps.push({
@@ -1047,24 +1071,57 @@ function renderReportHtml(data) {
   const scorecardCards = [
     { lbl: 'Annual Production', val: fmt$(kpis.annualProduction), bench: period.prodMonths ? `Based on ${period.prodMonths}mo, annualized` : '', status: '' },
     { lbl: 'Collection Rate', val: (kpis.collectionRate != null && kpis.collectionRate > 0) ? kpis.collectionRate.toFixed(1) + '%' : '—', bench: 'Target <strong>97%+</strong>', status: statusVs(kpis.collectionRate, 97, true) },
-    { lbl: 'Hygiene % of Production', val: (kpis.hygienePercent != null && kpis.hygienePercent > 0) ? kpis.hygienePercent.toFixed(1) + '%' : '—', bench: 'Target <strong>30–33%</strong>', status: statusVs(kpis.hygienePercent, 30, true) },
+    { lbl: 'Hygiene % of Production', val: (kpis.hygienePercent != null && kpis.hygienePercent > 0) ? kpis.hygienePercent.toFixed(1) + '%' : '—', bench: 'Target <strong>33%</strong> (acceptable &ge;30%)', status: (kpis.hygienePercent == null || kpis.hygienePercent <= 0) ? '' : (kpis.hygienePercent >= 30 ? 'good' : (kpis.hygienePercent >= 25 ? 'warn' : 'bad')) },
   ];
   /* Doctor $/day: only one card — Combined — because owner-vs-associate production
      can't be reliably derived from practice totals alone. The split logic still exists
      in computeReportData (ownerDocDailyAvg, associateDocDailyAvg, hasOwnerSplit) and
-     will be wired back in once we parse per-provider production from the PDFs. */
+     will be wired back in once we parse per-provider production from the PDFs.
+     Benchmarks (2026-04-21): owner $4,000/day, associate $3,500/day. When both
+     are present we show a day-weighted blend as the target for the combined card. */
   {
     const hasAssoc = practice.associateDaysPerMonth > 0;
+    const docVal = kpis.combinedDocDailyAvg || kpis.ownerDocDailyAvg;
+    const ownerDaysYr = practice.doctorDays * 12;
+    const assocDaysYr = practice.associateDaysPerMonth * 12;
+    const totalDays = ownerDaysYr + assocDaysYr;
+    const blend = (ownerVal, assocVal) => hasAssoc && totalDays > 0
+      ? (ownerVal * ownerDaysYr + assocVal * assocDaysYr) / totalDays
+      : ownerVal;
+    const targetVal = blend(4000, 3500);
+    const warnVal   = blend(3500, 3000);
+    const docStatus = (docVal == null || !isFinite(docVal) || docVal <= 0)
+      ? ''
+      : (docVal >= targetVal ? 'good' : (docVal >= warnVal ? 'warn' : 'bad'));
+    const targetLabel = hasAssoc
+      ? `Blended target <strong>${fmt$(Math.round(targetVal))}/day</strong> (owner $4k · assoc $3.5k, weighted by days)`
+      : 'Target <strong>$4,000/day</strong> (owner / GP)';
     scorecardCards.push({
       lbl: hasAssoc ? 'Combined Doctor $/Day' : 'Doctor $/Day',
-      val: fmt$(kpis.combinedDocDailyAvg || kpis.ownerDocDailyAvg),
-      bench: hasAssoc
-        ? `${goals.totalDocDaysPerYear} total doctor-days/yr across owner + associate`
-        : `${practice.doctorDays} days/mo &middot; ${practice.doctorDays * 12} days/yr`,
-      status: '',
+      val: fmt$(docVal),
+      bench: targetLabel,
+      status: docStatus,
     });
   }
-  scorecardCards.push({ lbl: 'Hygiene Avg $/Day', val: fmt$(kpis.hygDailyAvg), bench: `${practice.hygieneDaysPerWeek} days/week`, status: '' });
+  /* Hygiene $/day: payor-mix-dependent benchmarks (2026-04-21).
+     PPO / FFS / unknown → target $1,000 (healthy), $1,200 (excellent), $800 floor.
+     HMO / Medicaid / capitated (HMO + Gov > 50%) → target $500-600, $400 warn, $300 bad. */
+  {
+    const mix = practice.payorMix || {};
+    const hmoPct = Number(mix.hmo) || 0;
+    const govPct = Number(mix.gov) || 0;
+    const isCapitated = (hmoPct + govPct) > 50;
+    const hygVal = kpis.hygDailyAvg;
+    const hygStatus = (hygVal == null || !isFinite(hygVal) || hygVal <= 0)
+      ? ''
+      : isCapitated
+        ? (hygVal >= 500 ? 'good' : (hygVal >= 400 ? 'warn' : 'bad'))
+        : (hygVal >= 1000 ? 'good' : (hygVal >= 800 ? 'warn' : 'bad'));
+    const hygBench = isCapitated
+      ? `Target <strong>$500–600</strong> (HMO/capitated tier) &middot; ${practice.hygieneDaysPerWeek} days/week`
+      : `Target <strong>$1,000+</strong> (PPO/FFS tier; $1,200 excellent) &middot; ${practice.hygieneDaysPerWeek} days/week`;
+    scorecardCards.push({ lbl: 'Hygiene Avg $/Day', val: fmt$(hygVal), bench: hygBench, status: hygStatus });
+  }
   /* Overhead bench: show raw overhead alongside adjusted when we did any add-back. */
   const addBackTotal = (financials.ownerAddBacks || 0) + (financials.patientReimbursements || 0);
   const overheadBench = addBackTotal > 0
@@ -1072,16 +1129,18 @@ function renderReportHtml(data) {
     : 'Target <strong>≤60%</strong>';
   scorecardCards.push({ lbl: 'Overhead %', val: (kpis.overheadPct != null && kpis.overheadPct > 0) ? kpis.overheadPct.toFixed(1) + '%' : '—', bench: overheadBench, status: statusVs(kpis.overheadPct, 60, false) });
 
-  /* Three-way staff-cost decomposition per Dave's methodology (2026-04-20):
-     admin/clinical isolation is the primary coaching anchor, hygienist ratio
-     normalizes for hygiene-schedule size, total is shown in financials only. */
+  /* Staff-cost decomposition cards — un-flagged diagnostic per 2026-04-21
+     hybrid methodology. Primary red flag lives on Total Staff Cost in the
+     financials section; these two are here to show WHERE the total cost
+     lives (front-desk/admin vs hygiene), not as individually-benchmarked
+     metrics. No color status; no "Target" phrasing. */
   if (kpis.staffCostExHygPct != null) {
     const v = kpis.staffCostExHygPct;
     scorecardCards.push({
       lbl: 'Staff Cost (Admin + Clinical)',
       val: v.toFixed(1) + '%',
-      bench: 'Front desk, OM, assistants &mdash; excludes hygiene &middot; Target <strong>&le;15%</strong>',
-      status: v <= 15 ? 'good' : (v <= 18 ? 'warn' : 'bad'),
+      bench: 'Front desk, OM, assistants &mdash; excludes hygiene &middot; diagnostic reference',
+      status: '',
     });
   }
   if (kpis.hygienistCostPct != null) {
@@ -1089,8 +1148,8 @@ function renderReportHtml(data) {
     scorecardCards.push({
       lbl: 'Hygienist Wage Ratio',
       val: v.toFixed(1) + '%',
-      bench: '% of hygiene production &middot; Target <strong>30–33%</strong>',
-      status: (v >= 30 && v <= 33) ? 'good' : (v <= 38 ? 'warn' : 'bad'),
+      bench: '% of hygiene production &middot; diagnostic reference',
+      status: '',
     });
   }
 
@@ -1162,10 +1221,11 @@ function renderReportHtml(data) {
     { lbl: 'Annual Revenue (P&L)', val: financials.plIncome > 0 ? fmt$(financials.plIncome) : '—', bench: financials.plIncome > 0 ? 'From P&L statement' : 'P&L not uploaded' },
     { lbl: 'Annual Expenses', val: financials.plExpenses > 0 ? fmt$(financials.plExpenses) : '—', bench: financials.plExpenses > 0 ? '' : 'Not available in P&L' },
     { lbl: 'Profit Margin', val: (financials.profitPct != null && financials.profitPct > 0 && financials.profitPct < 100) ? financials.profitPct.toFixed(1) + '%' : '—', bench: 'Target <strong>≥35%</strong>', status: statusVs(financials.profitPct, 35, true) },
-    /* Total staff cost (admin + hygiene) — shown here as industry reference only.
-       Primary coaching metrics are on the scorecard: Staff Cost (Admin + Clinical)
-       and Hygienist Wage Ratio. See the scorecard explainer for why. */
-    { lbl: 'Total Staff Cost (incl. hygiene)', val: (financials.staffCostPct != null && financials.staffCostPct > 0) ? financials.staffCostPct.toFixed(1) + '%' : '—', bench: 'Industry reference <strong>25–28%</strong> &middot; for coaching see scorecard', status: statusVs(financials.staffCostPct, 28, false) },
+    /* Total staff cost (admin + hygiene) — the PRIMARY coaching anchor per
+       the 2026-04-21 hybrid methodology. Target ≤20%; the admin/clinical
+       and hygienist-ratio decomposition lives on the scorecard as
+       benchmark-free diagnostic reference only. */
+    { lbl: 'Total Staff Cost (incl. hygiene)', val: (financials.staffCostPct != null && financials.staffCostPct > 0) ? financials.staffCostPct.toFixed(1) + '%' : '—', bench: 'Target <strong>&le;20%</strong> &middot; includes all staff + hygiene (excludes owner draws)', status: statusVs(financials.staffCostPct, 20, false) },
   ];
   /* AR full aging table replaces the compact 90+ cards (Dave 2026-04-16: "show
      the AR as it ages: current, 30-60, 60-90, and over 90"). */
@@ -1334,11 +1394,12 @@ function renderReportHtml(data) {
     scorecardCards: scorecardHtml,
     scorecardExplainer: (kpis.staffCostExHygPct != null || kpis.hygienistCostPct != null) ? `
       <p style="font-size:13px;color:#94a3b8;line-height:1.55;margin-top:18px;max-width:860px;">
-        Staff cost is shown three ways because hygienist wages scale with hygiene days/week &mdash;
-        a practice running 5 days of hygiene will always show higher &ldquo;total staff cost&rdquo; than one
-        running 3 days, regardless of efficiency. Anchor on the first two metrics: admin/clinical staff
-        efficiency, and hygienist productivity. Total staff cost is shown for reference only in the
-        financials section below.
+        Staff cost is shown three ways. The primary coaching metric is <strong>Total Staff Cost</strong>
+        (target &le;20%), shown in the financials section below &mdash; that's the number the red flag
+        fires on. The <em>Admin + Clinical</em> and <em>Hygienist Wage Ratio</em> cards above are
+        diagnostic only &mdash; they tell you WHERE the total staff cost lives (front-desk / assistants vs
+        hygiene), but they're benchmark-free because hygienist wages swing with hygiene days/week and
+        a 5-day hygiene schedule will always read higher than a 3-day regardless of efficiency.
       </p>` : '',
     opportunityCards: oppHtml,
     goalRows: goalRowsHtml,
@@ -1569,7 +1630,7 @@ function renderReviewHtml(data, rawTexts = {}) {
     </tr>`;
 
   /* ─── Code → category helper (mirrors computeReportData logic exactly) ─── */
-  const hygCodes_r  = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0150','D0140','D0274'];
+  const hygCodes_r  = ['D1110','D1120','D4910','D4341','D4342','D4346','D4381','D0120','D0140','D0274'];
   const perioCodes_r = ['D4260','D4261','D4263','D4273','D4275','D4341','D4342','D4910'];
   const endoCodes_r  = ['D3310','D3320','D3330','D3346','D3347','D3348'];
   const surgCodes_r  = ['D7140','D7210','D7220','D7230','D7240','D7250'];
