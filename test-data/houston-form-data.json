@@ -36,7 +36,8 @@
     "insuranceFeeSchedulesCurrent": "yes",
     "writeOffCalculation": "automatic",
     "frequentManualAdjustments": "no",
-    "hasPatientCollectionsSystem": "yes"
+    "hasPatientCollectionsSystem": "yes",
+    "biteConsultApproach": "during_hygiene"
   },
   "employeeCosts": {
     "ec_name_om": "Maria",

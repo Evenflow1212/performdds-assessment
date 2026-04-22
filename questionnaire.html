@@ -952,6 +952,28 @@
           </div>
         </div>
       </div>
+
+      <div class="q-group">
+        <label class="q-label">Do you do dedicated bite/realign consults in a separate appointment, or try to fit them in during hygiene?</label>
+        <div class="q-radio-group">
+          <div class="q-radio-option">
+            <input type="radio" name="biteConsultApproach" id="bcaDedicated" value="dedicated">
+            <label for="bcaDedicated">Dedicated appointment (Bite Wellness Visit or similar)</label>
+          </div>
+          <div class="q-radio-option">
+            <input type="radio" name="biteConsultApproach" id="bcaDuringHyg" value="during_hygiene">
+            <label for="bcaDuringHyg">Fit into hygiene appointment</label>
+          </div>
+          <div class="q-radio-option">
+            <input type="radio" name="biteConsultApproach" id="bcaNone" value="none">
+            <label for="bcaNone">We don't do these consults</label>
+          </div>
+          <div class="q-radio-option">
+            <input type="radio" name="biteConsultApproach" id="bcaNotSure" value="not_sure">
+            <label for="bcaNotSure">Not sure</label>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ═══ SECTION: GOALS & VISION ═══ -->
@@ -1147,6 +1169,8 @@
       writeOffCalculation: document.querySelector('input[name="writeOffCalculation"]:checked')?.value || '',
       frequentManualAdjustments: document.querySelector('input[name="frequentManualAdjustments"]:checked')?.value || '',
       hasPatientCollectionsSystem: document.querySelector('input[name="hasPatientCollectionsSystem"]:checked')?.value || '',
+      /* Q6 BWV operational gate (2026-04-22): dedicated / during_hygiene / none / not_sure */
+      biteConsultApproach: document.querySelector('input[name="biteConsultApproach"]:checked')?.value || '',
       concerns: [...document.querySelectorAll('input[name="concerns"]:checked')].map(c => c.value),
       biggestChallenge: document.querySelector('[name="biggestChallenge"]').value.trim(),
     };
@@ -1216,6 +1240,7 @@
       setRadio('writeOffCalculation', pp.writeOffCalculation);
       setRadio('frequentManualAdjustments', pp.frequentManualAdjustments);
       setRadio('hasPatientCollectionsSystem', pp.hasPatientCollectionsSystem);
+      setRadio('biteConsultApproach', pp.biteConsultApproach);
       /* Concerns checkboxes */
       (pp.concerns || []).forEach(v => {
         const cb = document.querySelector('input[name="concerns"][value="' + v + '"]');

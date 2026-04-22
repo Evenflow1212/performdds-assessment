@@ -847,6 +847,200 @@ test('Q4b: Pre-booking SWOT weakness fires when nearFuturePreBooking=85 (< 90)',
   expect(!noHyg.data.swot.weaknesses.some(x => /pre-booking rate 2.3 weeks out/i.test(x)), 'pre-booking weakness should not fire when hygieneData null');
 });
 
+/* ──────────────────────────────────────────────────────────────────────
+   Q5-Q6 methodology batch (2026-04-22): production-diagnostic SWOT
+   (alarm → upstream → downstream), BWV operational-gate SWOT,
+   Conversion Ratio color-threshold tier update.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Helper — build a Q5-shaped fixture with custom hygiene visit + crown counts
+   and optional hygieneData. All Q5 probes use this to drive BA ≈ 10
+   (alarm A tripped) while varying upstream signals. */
+function q5Fixture({ prodText: pt, hygieneData, profileOverrides }) {
+  return {
+    httpMethod: 'POST',
+    body: JSON.stringify({
+      prodText: pt,
+      collText,
+      plText: PL_STANDARD,
+      practiceName: 'Q5 Probe',
+      arPatient:   { total: 45000, d90plus: 4000 },
+      arInsurance: { total: 62000, d90plus: 4000 },
+      employeeCosts: {
+        staff:   [{ rate: 25, hours: 160 }, { rate: 22, hours: 160 }, { rate: 20, hours: 160 }],
+        hygiene: [{ rate: 42, hours: 136 }, { rate: 40, hours: 136 }],
+        staffBenefits: 3500, staffEmpCostPct: 0.10,
+        hygBenefits: 1800, hygEmpCostPct: 0.10,
+      },
+      hygieneData: hygieneData || null,
+      practiceProfile: Object.assign({
+        name: 'Q5 Probe', zipCode: '12345', doctorDays: 16,
+        numHygienists: 4, hasAssociate: false,
+        yearsOwned: 12, ownerAge: 48,
+        opsActive: 5, opsTotal: 6,
+        payorMix: { ppo: 60, hmo: 10, gov: 5, ffs: 25 },
+        pmSoftware: 'dentrix',
+        /* Setup-check answers clean so Q2 weaknesses don't crowd Q5 in assertions. */
+        feesAttachedToScheduler: 'yes', insuranceFeeSchedulesCurrent: 'yes',
+        writeOffCalculation: 'automatic', frequentManualAdjustments: 'no',
+        hasPatientCollectionsSystem: 'yes', biteConsultApproach: 'dedicated',
+        hasProductionGoal: 'yes', knowsIfAhead: 'yes',
+      }, profileOverrides || {}),
+    }),
+  };
+}
+
+/* Q5 prod fixtures — all target BA ≈ 10 (alarm A trips) with varying
+   exam coverage and hygiene mix. Dollar amounts chosen to keep hygiene%
+   in a plausible band and doctor $/day comfortably below warn so that
+   alarm B also trips (but the assertions below key off the body copy,
+   not the framing variant). */
+const Q5_PROD_EMPTIES = [
+  'DATE RANGE: 01/01/2025 - 12/31/2025',
+  'D1110|Prophy|500|55000','D1120|Child Prophy|200|16000',
+  'D4910|Perio Maint|200|28000','D4341|SRP 4+|50|17500','D4342|SRP 1-3|50|12500',
+  /* totalExams = D0150 + D0120 = 200 + 600 = 800; hygVisits = 1000; 800/1000 = 0.80 */
+  'D0150|Comp Eval|200|20000','D0120|Periodic|600|36000',
+  /* BA = visitsCount (1000 + 200) / crowns (120) = 10.0 */
+  'D2740|Crown|120|168000',
+].join('\n');
+const Q5_PROD_EXAM_GAP = [
+  'DATE RANGE: 01/01/2025 - 12/31/2025',
+  'D1110|Prophy|500|55000','D1120|Child Prophy|200|16000',
+  'D4910|Perio Maint|200|28000','D4341|SRP 4+|50|17500','D4342|SRP 1-3|50|12500',
+  /* totalExams = 200 + 500 = 700; coverage = 700/1000 = 0.70 */
+  'D0150|Comp Eval|200|20000','D0120|Periodic|500|30000',
+  'D2740|Crown|120|168000',
+].join('\n');
+const Q5_PROD_DOWNSTREAM = [
+  'DATE RANGE: 01/01/2025 - 12/31/2025',
+  'D1110|Prophy|500|55000','D1120|Child Prophy|200|16000',
+  'D4910|Perio Maint|200|28000','D4341|SRP 4+|50|17500','D4342|SRP 1-3|50|12500',
+  /* totalExams = 300 + 650 = 950; coverage = 950/1000 = 0.95 */
+  'D0150|Comp Eval|300|30000','D0120|Periodic|650|39000',
+  /* visitsCount = 1000 + 300 = 1300; BA = 1300/130 = 10.0 */
+  'D2740|Crown|130|182000',
+].join('\n');
+
+test('Q5 EMPTIES branch: alarm trips + fill<85 → upstream empties-leak copy', async () => {
+  const res = await handler(q5Fixture({
+    prodText: Q5_PROD_EMPTIES,
+    hygieneData: { recentFillRate: 78, nearFuturePreBooking: 95 },
+  }));
+  const data = JSON.parse(res.body).data;
+  expect(data.kpis.battingAverage >= 8, `fixture must drive BA>=8; got ${data.kpis.battingAverage}`);
+  const q5 = data.swot.weaknesses.find(w => /Conversion Ratio/i.test(w) && /healthy range/i.test(w));
+  expect(q5, 'Q5 weakness did not fire: ' + JSON.stringify(data.swot.weaknesses));
+  /* Branch-specific copy markers. */
+  expect(/Recent fill rate is 78%/.test(q5), `EMPTIES body should cite fill rate 78%, got: ${q5}`);
+  expect(/empty chair time shrinks the pool of exam opportunities/i.test(q5), 'EMPTIES body missing "empty chair time" phrasing');
+  /* DOWNSTREAM / EXAM-GAP copy must NOT appear. */
+  expect(!/case presentation approach or financial arrangements/i.test(q5), 'DOWNSTREAM branch leaked into EMPTIES');
+  expect(!/90% coverage, against a 90% floor/i.test(q5), 'EXAM-GAP branch leaked into EMPTIES');
+});
+
+test('Q5 EXAM-GAP branch: alarm trips + fill≥85 + coverage<90 → exam-gap copy', async () => {
+  const res = await handler(q5Fixture({
+    prodText: Q5_PROD_EXAM_GAP,
+    hygieneData: { recentFillRate: 95, nearFuturePreBooking: 95 },
+  }));
+  const data = JSON.parse(res.body).data;
+  const q5 = data.swot.weaknesses.find(w => /Conversion Ratio/i.test(w));
+  expect(q5, 'Q5 weakness did not fire: ' + JSON.stringify(data.swot.weaknesses));
+  expect(/70% coverage/i.test(q5), `EXAM-GAP body should report 70% exam coverage; got: ${q5}`);
+  expect(/90% floor/i.test(q5), 'EXAM-GAP body missing 90% floor reference');
+  expect(/D0150 periodic \+ D0120 comprehensive/i.test(q5), 'EXAM-GAP body missing D-code list');
+  /* Other branches must not appear. */
+  expect(!/empty chair time/i.test(q5), 'EMPTIES branch leaked into EXAM-GAP');
+  expect(!/case presentation approach or financial arrangements/i.test(q5), 'DOWNSTREAM branch leaked into EXAM-GAP');
+});
+
+test('Q5 DOWNSTREAM branch: alarm trips + upstream clean → case-presentation copy', async () => {
+  const res = await handler(q5Fixture({
+    prodText: Q5_PROD_DOWNSTREAM,
+    hygieneData: { recentFillRate: 95, nearFuturePreBooking: 95 },
+  }));
+  const data = JSON.parse(res.body).data;
+  const q5 = data.swot.weaknesses.find(w => /Conversion Ratio/i.test(w));
+  expect(q5, 'Q5 weakness did not fire: ' + JSON.stringify(data.swot.weaknesses));
+  expect(/case presentation approach or financial arrangements/i.test(q5), `DOWNSTREAM body should cite case presentation / financial arrangements; got: ${q5}`);
+  expect(/upstream clinical pipeline looks intact/i.test(q5), 'DOWNSTREAM body missing "upstream clinical pipeline" phrasing');
+  expect(!/empty chair time/i.test(q5), 'EMPTIES branch leaked into DOWNSTREAM');
+});
+
+test('Q5 DOES NOT fire when BA in healthy band and Owner $/day above warn', async () => {
+  /* BA target ≈ 5.5, Owner $/day ≈ $4,300 (> $3,500 warn), hasAssociate=false. */
+  const prod = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    /* hygVisits = 2500 (D1110 only); exam D0150 qty 272 → visitsCount = 2772 */
+    'D1110|Prophy|2500|275000',
+    'D0150|Comp Eval|272|27200',
+    /* BA = 2772 / 504 = 5.5 */
+    'D2740|Crown|504|806400',
+  ].join('\n');
+  const res = await handler(q5Fixture({ prodText: prod, hygieneData: null }));
+  const data = JSON.parse(res.body).data;
+  const ba = data.kpis.battingAverage;
+  const ownerDaily = data.kpis.ownerDocDailyAvg;
+  expect(ba > 5 && ba < 7, `fixture must drive BA into healthy band 5-7; got ${ba}`);
+  expect(ownerDaily >= 3500, `fixture must drive Owner $/day >= $3,500; got ${ownerDaily}`);
+  const q5 = data.swot.weaknesses.find(w => /Conversion Ratio/i.test(w) && /healthy range 4:1-7:1/i.test(w));
+  expect(!q5, `Q5 should not fire when no alarm tripped; fired: ${q5}`);
+});
+
+test('Q6 STRONG: biteConsultApproach="during_hygiene" fires three-reason copy', async () => {
+  const body = await invoke(null, { biteConsultApproach: 'during_hygiene' });
+  const q6 = body.data.swot.weaknesses.find(w => /bite\/realign consults are fit into the hygiene appointment/i.test(w));
+  expect(q6, 'Q6 STRONG weakness did not fire: ' + JSON.stringify(body.data.swot.weaknesses));
+  expect(/three structural reasons/i.test(q6), 'Q6 STRONG body missing "three structural reasons"');
+  expect(/10-15 minutes/.test(q6), 'Q6 STRONG body missing conversation-length reason');
+  expect(/came in for a cleaning, not a treatment consult/i.test(q6), 'Q6 STRONG body missing expectation-mismatch reason');
+  expect(/leading with a solution before a dedicated diagnosis/i.test(q6), 'Q6 STRONG body missing solution-before-diagnosis reason');
+  /* SOFT variant must NOT fire simultaneously. */
+  const q6Soft = body.data.swot.weaknesses.find(w => /practice doesn't currently do dedicated bite or realign consults/i.test(w));
+  expect(!q6Soft, 'Q6 SOFT fired alongside STRONG — should be mutually exclusive');
+});
+
+test('Q6 SOFT: biteConsultApproach="none" fires the soft-variant copy', async () => {
+  const body = await invoke(null, { biteConsultApproach: 'none' });
+  const q6 = body.data.swot.weaknesses.find(w => /practice doesn't currently do dedicated bite or realign consults/i.test(w));
+  expect(q6, 'Q6 SOFT weakness did not fire: ' + JSON.stringify(body.data.swot.weaknesses));
+  expect(/production-pipeline gap that shows up in restorative, specialty, and cosmetic/i.test(q6), 'Q6 SOFT body missing restorative/specialty/cosmetic framing');
+});
+
+test('Q6: biteConsultApproach="dedicated" fires no BWV weakness', async () => {
+  const body = await invoke(null, { biteConsultApproach: 'dedicated' });
+  const q6Any = body.data.swot.weaknesses.find(w =>
+    /bite\/realign consults are fit into the hygiene appointment/i.test(w) ||
+    /practice doesn't currently do dedicated bite or realign consults/i.test(w)
+  );
+  expect(!q6Any, `Q6 should not fire when approach=dedicated; fired: ${q6Any}`);
+});
+
+test('Fix 4: Conversion Ratio card uses 2026-04-22 tier colors (3-7 good, 7-12 warn, >12 bad, ≤3 warn)', async () => {
+  /* Craft four prodText variants to probe each tier. Each test asserts the
+     Conversion Ratio card HTML carries the expected status class. */
+  const cases = [
+    { name: 'BA=2 (aggressive)',  ba: 2,  expected: 'warn',
+      prod: 'DATE RANGE: 01/01/2025 - 12/31/2025\nD1110|P|200|22000\nD2740|C|100|140000' },
+    { name: 'BA=5 (healthy)',     ba: 5,  expected: 'good',
+      prod: 'DATE RANGE: 01/01/2025 - 12/31/2025\nD1110|P|500|55000\nD2740|C|100|140000' },
+    { name: 'BA=10 (trending)',   ba: 10, expected: 'warn',
+      prod: 'DATE RANGE: 01/01/2025 - 12/31/2025\nD1110|P|1000|110000\nD2740|C|100|140000' },
+    { name: 'BA=15 (bad)',        ba: 15, expected: 'bad',
+      prod: 'DATE RANGE: 01/01/2025 - 12/31/2025\nD1110|P|1500|165000\nD2740|C|100|140000' },
+  ];
+  for (const c of cases) {
+    const res = await handler(q5Fixture({ prodText: c.prod, hygieneData: null }));
+    const parsed = JSON.parse(res.body);
+    const actualBa = parsed.data.kpis.battingAverage;
+    expect(Math.abs(actualBa - c.ba) < 0.6, `${c.name}: expected BA~${c.ba}, got ${actualBa}`);
+    const match = parsed.reportHtml.match(/<div class="score-card ([^"]*)">\s*<div class="lbl">Conversion Ratio/);
+    expect(match, `${c.name}: Conversion Ratio card not rendered`);
+    expect(match[1].trim().includes(c.expected), `${c.name}: expected status "${c.expected}", got "${match[1]}"`);
+  }
+});
+
 (async () => {
   let failed = 0;
   const start = Date.now();

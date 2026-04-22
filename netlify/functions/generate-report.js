@@ -197,7 +197,7 @@ function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
 }
 
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
   const pp = practiceProfile || {};
   const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
@@ -398,10 +398,82 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     setupWeaknesses.push("You indicated you don't track production goals (or don't know mid-month whether you're ahead or behind). Start here, before any other initiative in this report. Dave's methodology: a weekly scorecard capturing days in/out, crown pipeline, doctor $/day, hygiene $/day, empties, and production/collections totals. Without this rhythm, every other improvement below will be hard to sustain — there's no weekly signal telling you if the fix is working.");
   }
 
-  /* E. Prepend any setup weaknesses so they appear at the top of the list. */
+  /* ── Q5 production diagnostic (2026-04-22): three-layer weakness ────────
+     Alarm (Conversion Ratio ≥ 8:1 OR role-aware doctor $/day below warn)
+     → Upstream check (empties leak? exam gap?) → Downstream branch (case
+     presentation / financial arrangements). Copy NAMES the leaking layer;
+     it does not prescribe the cure. Role-aware Owner/Associate targets stay
+     fixed per memory: Owner warn $3,500 / Associate warn $3,000. */
+  const q5 = q5Inputs || {};
+  const ba_q5 = Number(q5.battingAverage);
+  const ownerDaily = Number.isFinite(Number(q5.ownerDocDailyAvg)) ? Number(q5.ownerDocDailyAvg) : null;
+  const assocDaily = q5.hasAssociate && Number.isFinite(Number(q5.associateDocDailyAvg)) ? Number(q5.associateDocDailyAvg) : null;
+  /* Pick whichever role is tripped first; owner checked before associate. */
+  let docBelowWarn = null;
+  if (ownerDaily != null && ownerDaily > 0 && ownerDaily < 3500) {
+    docBelowWarn = { role: 'Owner', val: ownerDaily, target: 4000 };
+  } else if (assocDaily != null && assocDaily > 0 && assocDaily < 3000) {
+    docBelowWarn = { role: 'Associate', val: assocDaily, target: 3500 };
+  }
+  const alarmA = Number.isFinite(ba_q5) && ba_q5 >= 8;
+  const alarmB = !!docBelowWarn;
+  if (alarmA || alarmB) {
+    const fmtDollar = n => '$' + Math.round(n).toLocaleString();
+    let framing;
+    if (alarmA && alarmB) {
+      framing = `Your Conversion Ratio is ${ba_q5.toFixed(1)}:1 (healthy range 4:1-7:1) and your ${docBelowWarn.role} doctor $/day is ${fmtDollar(docBelowWarn.val)} against a ${fmtDollar(docBelowWarn.target)} target.`;
+    } else if (alarmA) {
+      framing = `Your Conversion Ratio (hygiene visits per crown prepped) is ${ba_q5.toFixed(1)}:1 — the healthy range is 4:1 to 7:1, and above 8:1 trends in the wrong direction.`;
+    } else {
+      framing = `Your ${docBelowWarn.role} doctor $/day is ${fmtDollar(docBelowWarn.val)} against a ${fmtDollar(docBelowWarn.target)} target.`;
+    }
+
+    /* Upstream evaluation — branch priority: empties_leak > exam_gap > downstream. */
+    const fillRate    = Number(q5.hygieneFillRate);
+    const haveFill    = Number.isFinite(fillRate);
+    const empties_leak = haveFill && fillRate < 85;
+
+    const examsCount  = Number(q5.totalExamsCount);
+    const hygVisits   = Number(q5.hygieneVisitsForExamCheck);
+    const haveExams   = Number.isFinite(examsCount) && Number.isFinite(hygVisits) && hygVisits > 0;
+    const examCoverage = haveExams ? (examsCount / hygVisits) : null;
+    const exam_gap    = haveExams && examCoverage < 0.90;
+
+    let branch;
+    if (empties_leak) {
+      branch = `The leading upstream contributor is hygiene capacity. Recent fill rate is ${fillRate.toFixed(0)}%, which means roughly ${(100 - fillRate).toFixed(0)}% of hygiene slots are going empty. Empty chair time shrinks the pool of exam opportunities, and exams that can't happen can't produce diagnoses. Downstream production — crowns, specialty, and total doctor $/day — is constrained by that upstream bottleneck.`;
+    } else if (exam_gap) {
+      branch = `Hygiene is filling, but the doctor isn't getting into every hygiene visit for an exam. Total exams (D0150 periodic + D0120 comprehensive) over the period are ${examsCount.toLocaleString()} against ${hygVisits.toLocaleString()} hygiene visits — roughly ${Math.round(examCoverage * 100)}% coverage, against a 90% floor where the pipeline starts to work properly. Exams that don't happen can't produce diagnoses, and undiagnosed work doesn't flow to restorative, specialty, or case acceptance.`;
+    } else {
+      branch = `Hygiene is filling at a healthy rate and the doctor is getting into exams on roughly 90%+ of hygiene visits — so the upstream clinical pipeline looks intact. The gap between diagnosis and production sits downstream: treatment plans are being generated but not converting at the rate a healthy practice shows. That points at case presentation approach or financial arrangements as the operational constraint, not the clinical pipeline.`;
+    }
+    /* HIGH PRIORITY — prepended alongside the Q2 setup-foundation weaknesses
+       via `highPriorityWeaknesses` below. Kept separate from `setupWeaknesses`
+       so the Q2 opportunity copy (which is specifically about data foundation
+       and scorekeeping) doesn't fire when only Q5 tripped. */
+    var q5Weakness = `${framing} ${branch}`;
+  }
+
+  /* ── Q6 BWV operational-gate weakness (2026-04-22). Independent of Q5. ─ */
+  const bca = (pp.biteConsultApproach || '').toLowerCase();
+  if (bca === 'during_hygiene') {
+    weaknesses.push("You indicated bite/realign consults are fit into the hygiene appointment. This approach consistently underperforms for three structural reasons. First, the conversation needs 10-15 minutes — hygiene doesn't have that time. Second, the patient came in for a cleaning, not a treatment consult; pivoting breaks the expectation they walked in with. Third, leading with a solution before a dedicated diagnosis puts the patient on the defensive and the conversation ends before it starts.");
+  } else if (bca === 'none' || bca === 'not_sure') {
+    weaknesses.push("You indicated the practice doesn't currently do dedicated bite or realign consults (or isn't sure). For a patient base with crowding, wear, or chipping, the absence of a dedicated-consult pathway means those patients aren't being systematically screened or presented — a production-pipeline gap that shows up in restorative, specialty, and cosmetic numbers.");
+  }
+
+  /* E. Prepend any HIGH PRIORITY weaknesses so they appear at the top.
+     Order within the prepended block: setup-foundation (Q2) items first,
+     then the Q5 production-diagnostic item if it fired. Q2's "first 30 days
+     of coaching" opportunity only fires when Q2 weaknesses actually fired
+     — not when only Q5 tripped. */
   if (setupWeaknesses.length > 0) {
-    weaknesses.unshift(...setupWeaknesses);
     opportunities.push('Building out your data foundation and scorekeeping rhythm is typically the first 30 days of coaching. It\'s what makes every other recommendation in this report actionable.');
+  }
+  const highPriorityWeaknesses = [...setupWeaknesses];
+  if (typeof q5Weakness !== 'undefined' && q5Weakness) highPriorityWeaknesses.push(q5Weakness);
+  if (highPriorityWeaknesses.length > 0) {
+    weaknesses.unshift(...highPriorityWeaknesses);
   }
 
   /* ── THREATS ──
@@ -594,6 +666,15 @@ function computeReportData(input) {
   const crownsPreppedCount = codes
     .filter(c => isCrownCode(c.code))
     .reduce((s, c) => s + (c.qty || 0), 0);
+
+  /* Q5 exam-gap inputs (2026-04-22): totalExams = D0150 + D0120 over the period,
+     hygieneVisitsForExamCheck = D1110+D1120+D4910+D4341+D4342 (prophy + perio
+     maint + SRP — NO D0150, unlike VISIT_CODES). Ratio should sit near 0.90+
+     if the doctor is getting into every hygiene visit for an exam. */
+  const EXAM_CODES = ['D0150', 'D0120'];
+  const HYG_VISIT_CODES = ['D1110', 'D1120', 'D4910', 'D4341', 'D4342'];
+  const totalExamsCount           = countCodeMatchingQty(EXAM_CODES);
+  const hygieneVisitsForExamCheck = countCodeMatchingQty(HYG_VISIT_CODES);
   const exam0120Count = codes
     .filter(c => (c.code || '').toUpperCase().startsWith('D0120'))
     .reduce((s, c) => s + (c.qty || 0), 0);
@@ -1066,6 +1147,11 @@ function computeReportData(input) {
         crownsPreppedCount,
         exam0120Count,          /* diagnostic companion for BA — compare to visitsCount when BA is high */
       },
+      /* Q5 exam-gap inputs (2026-04-22) — drives the three-layer production
+         diagnostic. totalExams vs hygieneVisits tells us whether the doctor
+         is getting into hygiene visits for the exam step. */
+      totalExamsCount,
+      hygieneVisitsForExamCheck,
       /* Hygiene scheduling signals (from hygiene_schedule_form / hub collectHygieneSchedule).
          Null when no hygieneData was supplied. Renderer hides the fill-rate card when null. */
       hygieneFillRate,
@@ -1257,19 +1343,23 @@ function renderReportHtml(data) {
     });
   }
 
-  /* Batting Average — visits ÷ crowns prepped. Lower is better; sweet spot 4-6:1. */
+  /* Conversion Ratio — visits ÷ crowns prepped. Tier update 2026-04-22:
+       ≤ 3.0  → warn ("too aggressive", possible over-diagnosis)
+       3.0 < x ≤ 7.0  → good  (healthy range)
+       7.0 < x ≤ 12.0 → warn  (trending wrong direction)
+       > 12.0         → bad   (materially under-diagnosing)
+     Lower is better within the good band; at the bottom end, too low flips
+     back to a yellow flag because it can indicate over-diagnosis. */
   if (kpis.battingAverage != null && kpis.battingAverage > 0) {
     const ba = kpis.battingAverage;
-    /* Status: green for 4-6:1 sweet spot; warn for 3:1 or under (overtreatment) and 7-9:1; red at 10+:1 */
     let baStatus = '';
-    if (ba >= 4 && ba <= 6) baStatus = 'good';
-    else if (ba >= 3 && ba < 4) baStatus = 'warn';       /* approaching overtreatment floor */
-    else if (ba < 3) baStatus = 'warn';                   /* too aggressive; possible overtreatment */
-    else if (ba <= 9) baStatus = 'warn';                  /* 7-9, mild underperformance */
-    else baStatus = 'bad';                                 /* 10+, materially under-diagnosing */
-    const baBench = ba < 3
-      ? 'Sweet spot <strong>4–6:1</strong> · under 3:1 can mean overtreatment'
-      : 'Sweet spot <strong>4–6:1</strong> (lower is better)';
+    if (ba <= 3.0)       baStatus = 'warn';   /* too aggressive — possible over-diagnosis */
+    else if (ba <= 7.0)  baStatus = 'good';   /* healthy band */
+    else if (ba <= 12.0) baStatus = 'warn';   /* trending wrong direction */
+    else                 baStatus = 'bad';    /* under-diagnosing */
+    const baBench = ba <= 3.0
+      ? 'Healthy range <strong>3–7:1</strong> · ratio this low can indicate over-diagnosis or aggressive case acceptance — worth reviewing'
+      : 'Healthy range <strong>3–7:1</strong> (lower is better within range; &gt;12:1 trends into under-diagnosis)';
     scorecardCards.push({
       lbl: 'Conversion Ratio',
       val: ba.toFixed(1) + ':1',
@@ -2123,6 +2213,16 @@ exports.handler = async function(event) {
       dataWithoutSwot.kpis.staffCostExHygPct,
       dataWithoutSwot.kpis.hygienistCostPct,
       dataWithoutSwot.kpis.hygieneNearFuturePreBooking,
+      {
+        battingAverage:       dataWithoutSwot.kpis.battingAverage,
+        ownerDocDailyAvg:     dataWithoutSwot.kpis.ownerDocDailyAvg,
+        associateDocDailyAvg: dataWithoutSwot.kpis.associateDocDailyAvg,
+        combinedDocDailyAvg:  dataWithoutSwot.kpis.combinedDocDailyAvg,
+        hasAssociate:         !!dataWithoutSwot.practice.hasAssociate,
+        hygieneFillRate:      dataWithoutSwot.kpis.hygieneFillRate,
+        totalExamsCount:      dataWithoutSwot.kpis.totalExamsCount,
+        hygieneVisitsForExamCheck: dataWithoutSwot.kpis.hygieneVisitsForExamCheck,
+      },
     );
 
     const data = Object.assign({}, dataWithoutSwot, { swot: swotData });
