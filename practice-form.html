@@ -381,7 +381,7 @@ const PRACTICES = {
     vanek: {
         name: "Dr. Vanek's Practice",
         code: 'vanek',
-        passcode: 'pine-summit',
+        passcode: 'Surf',
         doctors: ['Dr. Vanek', 'Temp Doctor'],
         hygienists: ['Sandra', 'Natalia', 'Ann', 'Jenny', 'Eileen'],
         specialties: ['Ortho Prod', 'Oral Surgery', 'Cosmetic', 'Endo'],
@@ -390,7 +390,7 @@ const PRACTICES = {
     pigneri: {
         name: "Dr. Pigneri's Practice",
         code: 'pigneri',
-        passcode: 'maple-canyon',
+        passcode: 'Post Oak',
         doctors: ['Dr. Pigneri'],
         hygienists: ['Deissy', 'Temp'],
         specialties: ['Ortho Prod', 'Oral Surgery', 'TMJ', 'Perio', 'Cosmetic', 'Dr Su'],
@@ -399,7 +399,7 @@ const PRACTICES = {
     murray: {
         name: "Dr. Murray's Practice",
         code: 'murray',
-        passcode: 'willow-brook',
+        passcode: 'Birding',
         doctors: ['Dr. Murray', 'Dr. Najem'],
         hygienists: ['Mia', 'Brenda', 'Phoung', 'Temp'],
         specialties: ['Ortho Prod', 'Oral Surgery', 'Endo', 'Cosmetic'],
@@ -408,7 +408,7 @@ const PRACTICES = {
     bilbeisi: {
         name: "Dr. Bilbeisi's Practice (Cedar Creek)",
         code: 'bilbeisi',
-        passcode: 'cedar-harbor',
+        passcode: 'Cedar',
         doctors: ['Dr. Bilbeisi'],
         hygienists: ['Linda'],
         specialties: [],
@@ -417,7 +417,7 @@ const PRACTICES = {
     abas: {
         name: "Dr. Abas's Practice",
         code: 'abas',
-        passcode: 'silver-meadow',
+        passcode: 'Taj Mahal',
         doctors: ['Dr. Abas'],
         hygienists: ['Tina'],
         specialties: ['Oral Surgery', 'Pedo', 'Perio'],
@@ -465,8 +465,9 @@ function initLogin() {
 }
 
 function doLogin() {
-    // Case-sensitive passcode; trim only. Do not lowercase (passcodes may contain mixed case).
-    const input = document.getElementById('practiceCode').value.trim();
+    // Case-insensitive passcode match. Trim and lowercase both sides so
+    // "Surf", "surf", "SURF" all work.
+    const input = document.getElementById('practiceCode').value.trim().toLowerCase();
     const errorEl = document.getElementById('loginError');
 
     if (!input) {
@@ -477,7 +478,7 @@ function doLogin() {
     // If URL specifies a practice, ONLY accept that practice's passcode.
     const urlPractice = checkURLPractice();
     if (urlPractice) {
-        if (input === urlPractice.passcode) {
+        if (input === (urlPractice.passcode || '').toLowerCase()) {
             activePractice = urlPractice;
             showForm();
             return;
@@ -488,7 +489,7 @@ function doLogin() {
 
     // No URL practice: match input against any practice's passcode.
     for (const key of Object.keys(PRACTICES)) {
-        if (PRACTICES[key].passcode === input) {
+        if ((PRACTICES[key].passcode || '').toLowerCase() === input) {
             activePractice = PRACTICES[key];
             showForm();
             return;
@@ -866,7 +867,7 @@ function clearForm() {
     if (authCode) {
         const code = (params.get('practice') || '').toLowerCase().trim();
         const p = PRACTICES[code];
-        if (p && authCode === p.passcode) {
+        if (p && authCode.toLowerCase() === (p.passcode || '').toLowerCase()) {
             initLogin();
             document.getElementById('practiceCode').value = authCode;
             doLogin();
