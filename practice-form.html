@@ -226,11 +226,11 @@
 <div id="loginScreen" class="login-screen">
     <div class="logo">Perform DDS</div>
     <h1>Month End Report</h1>
-    <p>Enter your practice code to continue</p>
+    <p id="loginSubtitle">Enter your passcode to continue</p>
     <div class="login-box">
-        <label for="practiceCode">Practice Code</label>
-        <input type="text" id="practiceCode" placeholder="e.g. vanek" autocomplete="off" autofocus>
-        <div class="login-error" id="loginError">Invalid practice code. Please try again.</div>
+        <label for="practiceCode">Passcode</label>
+        <input type="password" id="practiceCode" placeholder="Enter passcode" autocomplete="off" autofocus>
+        <div class="login-error" id="loginError">Invalid passcode. Please try again.</div>
         <button class="login-btn" id="loginBtn">Continue</button>
     </div>
 </div>
@@ -408,19 +408,20 @@ const PRACTICES = {
     bilbeisi: {
         name: "Dr. Bilbeisi's Practice (Cedar Creek)",
         code: 'bilbeisi',
-        passcode: 'bilbeisi2026',
+        passcode: 'cedar-harbor',
         doctors: ['Dr. Bilbeisi'],
         hygienists: ['Linda'],
         specialties: [],
-        imaging: ['Panos', 'FMX']
+        imaging: ['FMX', 'Panos']
     },
     abas: {
         name: "Dr. Abas's Practice",
         code: 'abas',
-        passcode: 'abas2026',
+        passcode: 'silver-meadow',
         doctors: ['Dr. Abas'],
         hygienists: ['Tina'],
-        specialties: ['Oral Surgery', 'Pedo', 'Perio']
+        specialties: ['Oral Surgery', 'Pedo', 'Perio'],
+        imaging: ['FMX', 'Panos']
     }
 };
 
@@ -451,10 +452,10 @@ function initLogin() {
     const urlPractice = checkURLPractice();
 
     if (urlPractice) {
-        // Practice identified from URL -- still need passcode
-        document.getElementById('practiceCode').value = urlPractice.code;
-        document.getElementById('practiceCode').placeholder = 'Enter passcode for ' + urlPractice.name;
-        document.querySelector('.login-box label').textContent = 'Passcode';
+        // Practice identified from URL -- require its passcode. Do NOT pre-fill the practice code.
+        document.getElementById('practiceCode').value = '';
+        document.getElementById('practiceCode').placeholder = 'Passcode for ' + urlPractice.name;
+        document.getElementById('loginSubtitle').textContent = 'Enter passcode for ' + urlPractice.name;
     }
 
     document.getElementById('loginBtn').addEventListener('click', doLogin);
@@ -464,31 +465,34 @@ function initLogin() {
 }
 
 function doLogin() {
-    const input = document.getElementById('practiceCode').value.toLowerCase().trim();
+    // Case-sensitive passcode; trim only. Do not lowercase (passcodes may contain mixed case).
+    const input = document.getElementById('practiceCode').value.trim();
     const errorEl = document.getElementById('loginError');
 
-    // Try matching as practice code first
-    if (PRACTICES[input]) {
-        activePractice = PRACTICES[input];
-        showForm();
+    if (!input) {
+        errorEl.style.display = 'block';
         return;
     }
 
-    // Try matching as passcode
+    // If URL specifies a practice, ONLY accept that practice's passcode.
+    const urlPractice = checkURLPractice();
+    if (urlPractice) {
+        if (input === urlPractice.passcode) {
+            activePractice = urlPractice;
+            showForm();
+            return;
+        }
+        errorEl.style.display = 'block';
+        return;
+    }
+
+    // No URL practice: match input against any practice's passcode.
     for (const key of Object.keys(PRACTICES)) {
         if (PRACTICES[key].passcode === input) {
             activePractice = PRACTICES[key];
             showForm();
             return;
         }
-    }
-
-    // Check URL practice and treat input as passcode
-    const urlPractice = checkURLPractice();
-    if (urlPractice && urlPractice.passcode === input) {
-        activePractice = urlPractice;
-        showForm();
-        return;
     }
 
     errorEl.style.display = 'block';
@@ -860,12 +864,11 @@ function clearForm() {
     const params = new URLSearchParams(window.location.search);
     const authCode = params.get('auth');
     if (authCode) {
-        const code = params.get('practice') || '';
+        const code = (params.get('practice') || '').toLowerCase().trim();
         const p = PRACTICES[code];
         if (p && authCode === p.passcode) {
             initLogin();
-            const inp = document.getElementById('passcodeInput');
-            if (inp) { inp.value = authCode; }
+            document.getElementById('practiceCode').value = authCode;
             doLogin();
             return;
         }
