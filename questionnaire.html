@@ -880,6 +880,80 @@
       </div>
     </div>
 
+    <!-- ═══ SECTION: PRACTICE MANAGEMENT SETUP ═══ -->
+    <div class="q-section">
+      <div class="q-section-header">
+        <div class="q-section-icon">&#128202;</div>
+        <div class="q-section-title">Practice Management Setup</div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Are fees attached to each procedure on your scheduler so scheduled production is accurate?</label>
+        <div class="q-toggle-row">
+          <div class="q-toggle-group">
+            <input type="radio" name="feesAttachedToScheduler" id="feesAttYes" value="yes">
+            <label for="feesAttYes">Yes</label>
+            <input type="radio" name="feesAttachedToScheduler" id="feesAttNo" value="no">
+            <label for="feesAttNo">No</label>
+            <input type="radio" name="feesAttachedToScheduler" id="feesAttIdk" value="not_sure">
+            <label for="feesAttIdk">Not sure</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Are your insurance fee schedules current and entered in your PM software?</label>
+        <div class="q-toggle-row">
+          <div class="q-toggle-group">
+            <input type="radio" name="insuranceFeeSchedulesCurrent" id="ifsYes" value="yes">
+            <label for="ifsYes">Yes</label>
+            <input type="radio" name="insuranceFeeSchedulesCurrent" id="ifsNo" value="no">
+            <label for="ifsNo">No</label>
+            <input type="radio" name="insuranceFeeSchedulesCurrent" id="ifsIdk" value="not_sure">
+            <label for="ifsIdk">Not sure</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Are insurance write-offs calculated automatically, or entered manually after the fact?</label>
+        <div class="q-toggle-row">
+          <div class="q-toggle-group">
+            <input type="radio" name="writeOffCalculation" id="woAuto" value="automatic">
+            <label for="woAuto">Automatic</label>
+            <input type="radio" name="writeOffCalculation" id="woManual" value="manual">
+            <label for="woManual">Manual</label>
+            <input type="radio" name="writeOffCalculation" id="woMix" value="mix">
+            <label for="woMix">Mix</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Are you constantly having to make large write-offs or patient adjustments to balances?</label>
+        <div class="q-toggle-row">
+          <div class="q-toggle-group">
+            <input type="radio" name="frequentManualAdjustments" id="fmaYes" value="yes">
+            <label for="fmaYes">Yes</label>
+            <input type="radio" name="frequentManualAdjustments" id="fmaNo" value="no">
+            <label for="fmaNo">No</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Do you have a system for collecting patient portions (statements, payment plans, collections process)?</label>
+        <div class="q-toggle-row">
+          <div class="q-toggle-group">
+            <input type="radio" name="hasPatientCollectionsSystem" id="pcsYes" value="yes">
+            <label for="pcsYes">Yes</label>
+            <input type="radio" name="hasPatientCollectionsSystem" id="pcsNo" value="no">
+            <label for="pcsNo">No</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ SECTION: GOALS & VISION ═══ -->
     <div class="q-section">
       <div class="q-section-header">
@@ -1065,6 +1139,14 @@
       crownsPerMonth: document.querySelector('[name="crownsPerMonth"]').dataset.idk ? 'idk' : (parseInt(document.querySelector('[name="crownsPerMonth"]').value) || null),
       hasProductionGoal: document.querySelector('input[name="hasProductionGoal"]:checked')?.value || '',
       knowsIfAhead: document.querySelector('input[name="knowsIfAhead"]:checked')?.value || '',
+      /* Practice Management Setup (2026-04-21 methodology — foundation questions
+         that gate every downstream KPI. If fees aren't attached to the scheduler
+         or fee schedules aren't current, scheduled production can't be trusted. */
+      feesAttachedToScheduler: document.querySelector('input[name="feesAttachedToScheduler"]:checked')?.value || '',
+      insuranceFeeSchedulesCurrent: document.querySelector('input[name="insuranceFeeSchedulesCurrent"]:checked')?.value || '',
+      writeOffCalculation: document.querySelector('input[name="writeOffCalculation"]:checked')?.value || '',
+      frequentManualAdjustments: document.querySelector('input[name="frequentManualAdjustments"]:checked')?.value || '',
+      hasPatientCollectionsSystem: document.querySelector('input[name="hasPatientCollectionsSystem"]:checked')?.value || '',
       concerns: [...document.querySelectorAll('input[name="concerns"]:checked')].map(c => c.value),
       biggestChallenge: document.querySelector('[name="biggestChallenge"]').value.trim(),
     };
@@ -1129,6 +1211,11 @@
       setRadio('yearsToWork', pp.yearsToWork);
       setRadio('hasProductionGoal', pp.hasProductionGoal);
       setRadio('knowsIfAhead', pp.knowsIfAhead);
+      setRadio('feesAttachedToScheduler', pp.feesAttachedToScheduler);
+      setRadio('insuranceFeeSchedulesCurrent', pp.insuranceFeeSchedulesCurrent);
+      setRadio('writeOffCalculation', pp.writeOffCalculation);
+      setRadio('frequentManualAdjustments', pp.frequentManualAdjustments);
+      setRadio('hasPatientCollectionsSystem', pp.hasPatientCollectionsSystem);
       /* Concerns checkboxes */
       (pp.concerns || []).forEach(v => {
         const cb = document.querySelector('input[name="concerns"][value="' + v + '"]');

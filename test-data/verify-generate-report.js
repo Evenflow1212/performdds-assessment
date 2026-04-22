@@ -63,16 +63,17 @@ const PL_STANDARD = [
   'NET_INCOME|486000',
 ].join('\n');
 
-function buildEvent(plText, profileOverrides) {
+function buildEvent(plText, profileOverrides, extras) {
+  const ex = extras || {};
   return {
     httpMethod: 'POST',
     body: JSON.stringify({
       prodText, collText,
       plText: plText == null ? PL_STANDARD : plText,
       practiceName: 'Test Dental Group',
-      arPatient: { total: 45000, d90plus: 8000 },
-      arInsurance: { total: 62000, d90plus: 4000 },
-      hygieneData: null,
+      arPatient: ex.arPatient || { total: 45000, d90plus: 8000 },
+      arInsurance: ex.arInsurance || { total: 62000, d90plus: 4000 },
+      hygieneData: ex.hygieneData != null ? ex.hygieneData : null,
       employeeCosts: {
         staff: [
           { rate: 25, hours: 160 }, { rate: 22, hours: 160 }, { rate: 20, hours: 160 },
@@ -99,8 +100,8 @@ function buildEvent(plText, profileOverrides) {
   };
 }
 
-async function invoke(plText, profileOverrides) {
-  const res = await handler(buildEvent(plText, profileOverrides));
+async function invoke(plText, profileOverrides, extras) {
+  const res = await handler(buildEvent(plText, profileOverrides, extras));
   if (res.statusCode !== 200) throw new Error('HTTP ' + res.statusCode + ': ' + res.body);
   return JSON.parse(res.body);
 }
@@ -709,6 +710,141 @@ test('Pigneri-scale probe: total staff cost ≈ 36%, opportunity ≈ (36-20)%×$
   /* Expected: D1110(320) + D1120(40) + D4910(112) + D4341(63) + D4342(15) + D4346(10) + D4381(3) + D0120(97.5) = 660500. */
   const expectedHyg = 320000 + 40000 + 112000 + 63000 + 15000 + 10000 + 3000 + 97500;
   expect(Math.abs(hygProd - expectedHyg) < 1, `Pigneri hygiene bucket should be $${expectedHyg}; got $${hygProd}`);
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Q1-Q4 methodology batch (2026-04-21): hygiene 3-levers copy, setup-check
+   SWOT layered rules, scorecard reorder, fill-rate card + pre-booking SWOT.
+   ────────────────────────────────────────────────────────────────────── */
+
+test('Q1: hygiene gap body uses 3-levers coaching copy (empties / perio program / adjuncts)', async () => {
+  /* Sparse hygiene production to guarantee the opp card fires. */
+  const sparseProd = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D0150|Comp Eval|360|32400',
+    'D1110|Prophy|600|60000',
+    'D2740|Crown|200|300000',
+  ].join('\n');
+  const res = await handler({
+    httpMethod: 'POST',
+    body: JSON.stringify(Object.assign(JSON.parse(buildEvent().body), { prodText: sparseProd })),
+  });
+  const data = JSON.parse(res.body).data;
+  const oppHyg = data.opportunities.all.find(o => /hygiene production gap/i.test(o.title));
+  expect(oppHyg, 'hygiene gap opp did not fire');
+  expect(/Three levers to close this gap/i.test(oppHyg.body), `body missing "Three levers" framing: ${oppHyg.body}`);
+  expect(/Reduce empties/i.test(oppHyg.body), 'body missing empties lever');
+  expect(/perio program/i.test(oppHyg.body) && /D4341/.test(oppHyg.body) && /D4910/.test(oppHyg.body), 'body missing perio-program lever with D4341/D4910 refs');
+  expect(/Arestin.*D4381/i.test(oppHyg.body) || /D4381.*Arestin/i.test(oppHyg.body), 'body missing Arestin/D4381 adjunctive-therapy lever');
+  /* Old copy must be gone. */
+  expect(!/doctor.diagnosed treatment pipeline/i.test(oppHyg.body), 'stale "doctor-diagnosed treatment pipeline" phrasing still present');
+});
+
+test('Q2b: Setup-check SWOT fires multiple HIGH-PRIORITY weaknesses when all answers are problematic', async () => {
+  const body = await invoke(null, {
+    feesAttachedToScheduler: 'no',
+    insuranceFeeSchedulesCurrent: 'no',
+    writeOffCalculation: 'manual',
+    frequentManualAdjustments: 'yes',
+    hasPatientCollectionsSystem: 'no',
+    hasProductionGoal: 'no',
+    knowsIfAhead: 'no',
+  }, {
+    /* Drive AR over-90 > 15% so rule C fires. */
+    arPatient: { total: 50000, d90plus: 12000 },
+  });
+  const w = body.data.swot.weaknesses;
+  /* A. data foundation. */
+  expect(w.some(x => /data foundation needs attention/i.test(x)), 'rule A (data foundation) did not fire');
+  /* B. frequent adjustments. */
+  expect(w.some(x => /fee schedules and adjustment codes aren't set up correctly/i.test(x)), 'rule B (adjustments) did not fire');
+  /* C. no collections system + AR over 90 > 15%. */
+  expect(w.some(x => /patient AR over 90 days is[^]*15% threshold/i.test(x)), 'rule C (AR + collections) did not fire');
+  /* D. no production goal / doesn't know mid-month. */
+  expect(w.some(x => /don't track production goals/i.test(x) || /weekly scorecard/i.test(x)), 'rule D (scorekeeping) did not fire');
+  /* At least 3 setup-foundation weaknesses total. */
+  const setupCount = w.filter(x =>
+    /data foundation needs attention/i.test(x) ||
+    /fee schedules and adjustment codes/i.test(x) ||
+    /patient AR over 90 days is[^]*15% threshold/i.test(x) ||
+    /weekly scorecard/i.test(x)
+  ).length;
+  expect(setupCount >= 3, `expected ≥3 setup weaknesses, got ${setupCount}: ${JSON.stringify(w)}`);
+  /* Prepended (HIGH PRIORITY) — the first weakness in the list should be one of the setup-foundation bullets. */
+  const firstIsSetup =
+    /data foundation needs attention/i.test(w[0]) ||
+    /fee schedules and adjustment codes/i.test(w[0]) ||
+    /patient AR over 90 days is[^]*15% threshold/i.test(w[0]) ||
+    /weekly scorecard/i.test(w[0]);
+  expect(firstIsSetup, `first weakness should be a setup-foundation item, got: "${w[0]}"`);
+});
+
+test('Q2b: Setup-check does NOT fire when all answers are clean', async () => {
+  const body = await invoke(null, {
+    feesAttachedToScheduler: 'yes',
+    insuranceFeeSchedulesCurrent: 'yes',
+    writeOffCalculation: 'automatic',
+    frequentManualAdjustments: 'no',
+    hasPatientCollectionsSystem: 'yes',
+    hasProductionGoal: 'yes',
+    knowsIfAhead: 'yes',
+  });
+  const w = body.data.swot.weaknesses;
+  expect(!w.some(x => /data foundation needs attention/i.test(x)), 'rule A fired when all setup answers are "yes/automatic"');
+  expect(!w.some(x => /weekly scorecard/i.test(x)), 'rule D fired when hasProductionGoal=yes and knowsIfAhead=yes');
+  /* Regression: the old generic goal-setting weakness must be gone. */
+  expect(!w.some(x => /no destination to measure progress against/i.test(x)), 'stale generic goal-setting weakness still firing');
+});
+
+test('Q3: Scorecard order follows coaching-ritual flow (production → doc $/day → hyg $/day → …)', async () => {
+  const body = await invoke();
+  const html = body.reportHtml;
+  /* Extract the order of score-card labels as they appear in the HTML. */
+  const labels = [...html.matchAll(/<div class="lbl">([^<]+)<\/div>/g)].map(m => m[1].trim());
+  const annualIdx = labels.indexOf('Annual Production');
+  const docIdx = labels.findIndex(l => /Doctor \$\/Day/.test(l));
+  const hygDollarIdx = labels.indexOf('Hygiene Avg $/Day');
+  const hygPctIdx = labels.indexOf('Hygiene % of Production');
+  const collIdx = labels.indexOf('Collection Rate');
+  const overheadIdx = labels.indexOf('Overhead %');
+  expect(annualIdx >= 0, 'Annual Production card missing');
+  expect(docIdx > annualIdx, `Doctor $/Day (${docIdx}) should appear after Annual Production (${annualIdx})`);
+  expect(hygDollarIdx > docIdx, `Hygiene Avg $/Day (${hygDollarIdx}) should appear after Doctor $/Day (${docIdx})`);
+  expect(hygPctIdx > hygDollarIdx, `Hygiene % (${hygPctIdx}) should appear after Hygiene Avg $/Day (${hygDollarIdx})`);
+  expect(collIdx > hygPctIdx, `Collection Rate (${collIdx}) should appear after Hygiene % (${hygPctIdx})`);
+  expect(overheadIdx > collIdx, `Overhead % (${overheadIdx}) should appear after Collection Rate (${collIdx})`);
+});
+
+test('Q4a: Hygiene Fill Rate card renders red when recentFillRate=80', async () => {
+  const body = await invoke(null, {}, {
+    hygieneData: { recentFillRate: 80, nearFuturePreBooking: 95 },
+  });
+  const html = body.reportHtml;
+  const fillCardMatch = html.match(/<div class="score-card ([^"]*)">\s*<div class="lbl">Hygiene Fill Rate<\/div>\s*<div class="val">80%/);
+  expect(fillCardMatch, 'Hygiene Fill Rate card with value 80% not found in HTML');
+  expect(/\bbad\b/.test(fillCardMatch[1]), `Fill Rate card at 80% should carry "bad" status, got: "${fillCardMatch[1]}"`);
+  /* And green when healthy. */
+  const green = await invoke(null, {}, { hygieneData: { recentFillRate: 96, nearFuturePreBooking: 95 } });
+  expect(/<div class="score-card good">\s*<div class="lbl">Hygiene Fill Rate/.test(green.reportHtml), 'Fill Rate card should be "good" at 96%');
+  /* And missing entirely when no hygieneData. */
+  const noHyg = await invoke();
+  expect(!/>Hygiene Fill Rate</.test(noHyg.reportHtml), 'Fill Rate card should NOT render when hygieneData is null');
+});
+
+test('Q4b: Pre-booking SWOT weakness fires when nearFuturePreBooking=85 (< 90)', async () => {
+  const body = await invoke(null, {}, {
+    hygieneData: { recentFillRate: 92, nearFuturePreBooking: 85 },
+  });
+  const w = body.data.swot.weaknesses.find(x => /pre-booking rate 2.3 weeks out/i.test(x));
+  expect(w, 'pre-booking weakness did not fire at 85%: ' + JSON.stringify(body.data.swot.weaknesses));
+  expect(/85%/.test(w), `weakness should cite 85%, got: "${w}"`);
+  expect(/90%\+/.test(w), `weakness should reference the 90%+ healthy threshold, got: "${w}"`);
+  /* Does NOT fire when pre-booking is healthy. */
+  const healthy = await invoke(null, {}, { hygieneData: { recentFillRate: 92, nearFuturePreBooking: 95 } });
+  expect(!healthy.data.swot.weaknesses.some(x => /pre-booking rate 2.3 weeks out/i.test(x)), 'pre-booking weakness should not fire at 95%');
+  /* Does NOT fire when hygieneData missing. */
+  const noHyg = await invoke();
+  expect(!noHyg.data.swot.weaknesses.some(x => /pre-booking rate 2.3 weeks out/i.test(x)), 'pre-booking weakness should not fire when hygieneData null');
 });
 
 (async () => {

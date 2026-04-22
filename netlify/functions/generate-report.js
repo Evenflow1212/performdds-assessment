@@ -197,7 +197,7 @@ function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
 }
 
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
   const pp = practiceProfile || {};
   const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
@@ -297,6 +297,12 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     weaknesses.push('Hygienist productivity below benchmark — wages are ' + hygienist.toFixed(1) + '% of hygiene production (target 30–33%)');
   }
   if (hygPct > 0 && hygPct < 25) weaknesses.push('Hygiene production at ' + Math.round(hygPct) + '% is below the 33% target');
+  /* Pre-booking discipline at the hygiene chair (2026-04-21). Healthy practices
+     maintain 90%+ booked 2–3 weeks out; below 90 is a leading indicator that
+     empties will spike. Only fires when hygiene schedule data is present. */
+  if (Number.isFinite(hygieneNearFuturePreBooking) && hygieneNearFuturePreBooking < 90) {
+    weaknesses.push(`Your pre-booking rate 2–3 weeks out is ${hygieneNearFuturePreBooking.toFixed(0)}% — healthy practices maintain 90%+ at that horizon. Below 90% is a leading indicator that empties will spike. Pre-booking discipline at the hygiene chair (next appointment scheduled before patient leaves) is the fix.`);
+  }
   if (perioMaintQty === 0 && prophyQty > 0) weaknesses.push('Perio maintenance appears limited — no D4910 codes present');
   if (srpQty === 0 && prophyQty > 50) weaknesses.push('Periodontal disease appears to be under-diagnosed — no SRP procedures found');
   else if (perioRatio > 0 && perioRatio < 8 && prophyQty > 50) weaknesses.push('Periodontal disease may be under-diagnosed relative to the patient flow');
@@ -353,17 +359,49 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     weaknesses.push('The practice blends meaningful PPO volume (' + ppoPct + '%) with government/HMO volume (' + (govPct + hmoPct) + '%). Growing the PPO portion is typically hard in this configuration — the pace and style that Medicaid/HMO economics require works against the experience PPO patients expect.');
   }
 
-  /* ── Goals & Vision rule (survey-driven) ────────────────────────────────
-     When the dentist admits they don't have production goals or don't know
-     mid-month whether they're ahead or behind, that's foundational — every
-     other improvement is downstream of "are you measuring anything." */
-  const hasGoal = pp.hasProductionGoal || '';
-  const knowsIfAhead = pp.knowsIfAhead || '';
-  const goalsGap = (hasGoal === 'no' || hasGoal === 'sort_of') ||
-                   (knowsIfAhead === 'no' || knowsIfAhead === 'sometimes');
-  if (goalsGap) {
-    weaknesses.push('Without a clearly stated production goal and a weekly/monthly tracking rhythm, every other improvement surfaced in this report is hard to sustain — there\'s no destination to measure progress against.');
-    opportunities.push('Building out production goals and a scorekeeping cadence is typically the first 30 days of coaching. It\'s the foundation that makes every other recommendation actionable.');
+  /* ── Setup-check + scorekeeping SWOT rules (2026-04-21 methodology) ─────
+     Layered A–E logic keyed off the Practice Management Setup questionnaire
+     section. Any setup-foundation weakness that fires is prepended to the
+     weakness list (HIGH PRIORITY) because every downstream KPI assumes these
+     foundations are in place — if scheduled production can't be trusted, no
+     other finding can either. */
+  const setupWeaknesses = [];
+
+  /* A. Data foundation — fees on scheduler, fee schedules current, write-offs automatic. */
+  const feesAtt    = (pp.feesAttachedToScheduler    || '').toLowerCase();
+  const ifsCurrent = (pp.insuranceFeeSchedulesCurrent || '').toLowerCase();
+  const woCalc     = (pp.writeOffCalculation         || '').toLowerCase();
+  const aTriggers = (feesAtt === 'no' || feesAtt === 'not_sure') ||
+                    (ifsCurrent === 'no' || ifsCurrent === 'not_sure') ||
+                    (woCalc === 'manual' || woCalc === 'mix');
+  if (aTriggers) {
+    setupWeaknesses.push("Before reading any of this report, your data foundation needs attention. Scheduled production in your PM software can't be trusted until fees are attached to procedures on the scheduler, insurance fee schedules are current, and write-offs compute automatically. This is the first thing to fix — every other finding below rests on these numbers being accurate.");
+  }
+
+  /* B. Frequent manual adjustments — piggybacks on A, or fires its own bullet. */
+  if ((pp.frequentManualAdjustments || '').toLowerCase() === 'yes') {
+    setupWeaknesses.push("You indicated you're constantly making large write-offs or patient adjustments — that's a signal your fee schedules and adjustment codes aren't set up correctly. Fix the setup and adjustments drop to zero.");
+  }
+
+  /* C. No patient-collections system AND patient-AR over-90 > 15%. */
+  const arPatTotal    = Number(arPatient?.total)   || 0;
+  const arPatOver90   = Number(arPatient?.d90plus) || 0;
+  const arPatOver90Pct = arPatTotal > 0 ? (arPatOver90 / arPatTotal) : 0;
+  if ((pp.hasPatientCollectionsSystem || '').toLowerCase() === 'no' && arPatOver90Pct > 0.15) {
+    setupWeaknesses.push(`Your patient AR over 90 days is ${(arPatOver90Pct * 100).toFixed(1)}% of total patient AR, which exceeds the 15% threshold. Combined with no systematic collections process, this means patient money is being left on the table. Statement rhythm and a documented collections process are where to start.`);
+  }
+
+  /* D. No production goal or doesn't know mid-month status → scorekeeping prescription. */
+  const hasGoal = (pp.hasProductionGoal || '').toLowerCase();
+  const knowsIfAhead = (pp.knowsIfAhead || '').toLowerCase();
+  if (hasGoal === 'no' || knowsIfAhead === 'no') {
+    setupWeaknesses.push("You indicated you don't track production goals (or don't know mid-month whether you're ahead or behind). Start here, before any other initiative in this report. Dave's methodology: a weekly scorecard capturing days in/out, crown pipeline, doctor $/day, hygiene $/day, empties, and production/collections totals. Without this rhythm, every other improvement below will be hard to sustain — there's no weekly signal telling you if the fix is working.");
+  }
+
+  /* E. Prepend any setup weaknesses so they appear at the top of the list. */
+  if (setupWeaknesses.length > 0) {
+    weaknesses.unshift(...setupWeaknesses);
+    opportunities.push('Building out your data foundation and scorekeeping rhythm is typically the first 30 days of coaching. It\'s what makes every other recommendation in this report actionable.');
   }
 
   /* ── THREATS ──
@@ -480,7 +518,7 @@ function computeReportData(input) {
   const {
     prodData, collData, plData, employeeCosts, practiceProfile,
     arPatient, arInsurance, swotData, practiceName,
-    totalProd, collTotal, years, prodMonths,
+    totalProd, collTotal, years, prodMonths, hygieneData,
   } = input;
 
   const codes = prodData?.codes || [];
@@ -613,6 +651,42 @@ function computeReportData(input) {
 
   const hygDaysPerYear = hygieneDaysPerWeek * 52;
   const hygDailyAvg = hygDaysPerYear > 0 ? annualHyg / hygDaysPerYear : null;
+
+  /* ──── Hygiene schedule fill-rate + near-future pre-booking (2026-04-21) ────
+     The Hub posts `hygieneData` as either:
+       - direct numeric fields (fixtures, or a future form rev that pre-computes)
+         hygieneData.recentFillRate, hygieneData.nearFuturePreBooking
+       - or grid arrays from collectHygieneSchedule():
+         hygieneData.recentPast[].data   (evens = totalAppt, odds = patSeen)
+         hygieneData.nearFuture[].data   (evens = totalAppt, odds = apptFilled)
+     We prefer the direct fields when present; otherwise derive from grids. */
+  const sumEvenOdd = (weeks) => {
+    let a = 0, b = 0;
+    for (const w of (weeks || [])) {
+      const d = w?.data || [];
+      for (let i = 0; i < d.length; i += 2) {
+        a += Number(d[i])     || 0;   /* column a: total appointments available */
+        b += Number(d[i + 1]) || 0;   /* column b: seen / filled / confirmed */
+      }
+    }
+    return { a, b };
+  };
+  let hygieneFillRate = null;
+  let hygieneNearFuturePreBooking = null;
+  if (hygieneData) {
+    if (Number.isFinite(Number(hygieneData.recentFillRate))) {
+      hygieneFillRate = Number(hygieneData.recentFillRate);
+    } else {
+      const { a, b } = sumEvenOdd(hygieneData.recentPast);
+      if (a > 0) hygieneFillRate = Math.round((b / a) * 100);
+    }
+    if (Number.isFinite(Number(hygieneData.nearFuturePreBooking))) {
+      hygieneNearFuturePreBooking = Number(hygieneData.nearFuturePreBooking);
+    } else {
+      const { a, b } = sumEvenOdd(hygieneData.nearFuture);
+      if (a > 0) hygieneNearFuturePreBooking = Math.round((b / a) * 100);
+    }
+  }
 
   /* ──── KPI benchmarks ──── */
   const collectionRate = annualProd > 0 ? (annualCollections / annualProd) * 100 : null;
@@ -828,7 +902,7 @@ function computeReportData(input) {
     const hygGap = targetHyg - annualHyg;
     if (hygGap > 5000) opps.push({
       icon: '🦷', value: hygGap, title: 'Hygiene production gap',
-      body: `Hygiene is ${hygPct.toFixed(1)}% of production vs a 33% target. Growing hygiene to the benchmark could add up to $${Math.round(hygGap).toLocaleString()} annually — and each new hygiene patient opens a doctor-diagnosed treatment pipeline.`
+      body: `Hygiene is ${hygPct.toFixed(1)}% of production vs the 33% target. Three levers to close this gap: (1) Reduce empties in the hygiene schedule — unfilled slots are lost revenue. (2) Build a perio program — a steady flow of new SRP (D4341/D4342) diagnoses each month that convert to perio maintenance (D4910) shifts hygiene production upward because perio maint bills higher than prophy. (3) Add adjunctive therapies where clinically indicated — Arestin (D4381) and laser-assisted periodontal treatment add revenue per visit without adding chair time. Growing hygiene to benchmark could add up to $${Math.round(hygGap).toLocaleString()} annually.`
     });
   }
   if (overheadPct > 65 && plIncome > 0) {
@@ -992,6 +1066,10 @@ function computeReportData(input) {
         crownsPreppedCount,
         exam0120Count,          /* diagnostic companion for BA — compare to visitsCount when BA is high */
       },
+      /* Hygiene scheduling signals (from hygiene_schedule_form / hub collectHygieneSchedule).
+         Null when no hygieneData was supplied. Renderer hides the fill-rate card when null. */
+      hygieneFillRate,
+      hygieneNearFuturePreBooking,
     },
 
     goals: {
@@ -1067,18 +1145,23 @@ function renderReportHtml(data) {
     return ratio <= 1 ? 'good' : (ratio <= (2 - warnPct) ? 'warn' : 'bad');
   };
 
-  /* ── Scorecard cards ── */
+  /* ── Scorecard cards ──
+     Order (2026-04-21 methodology — coaching-ritual flow anchored on production):
+       1. Annual Production      (the anchor — topline first)
+       2. Combined Doctor $/Day
+       3. Hygiene Avg $/Day
+       4. Hygiene Fill Rate      (when hygieneSchedule data present)
+       5. Hygiene % of Production
+       6. Collection Rate
+       7. Overhead %
+     Staff cost decomposition + Conversion Ratio follow (appended after the
+     primary ritual order). */
   const scorecardCards = [
     { lbl: 'Annual Production', val: fmt$(kpis.annualProduction), bench: period.prodMonths ? `Based on ${period.prodMonths}mo, annualized` : '', status: '' },
-    { lbl: 'Collection Rate', val: (kpis.collectionRate != null && kpis.collectionRate > 0) ? kpis.collectionRate.toFixed(1) + '%' : '—', bench: 'Target <strong>97%+</strong>', status: statusVs(kpis.collectionRate, 97, true) },
-    { lbl: 'Hygiene % of Production', val: (kpis.hygienePercent != null && kpis.hygienePercent > 0) ? kpis.hygienePercent.toFixed(1) + '%' : '—', bench: 'Target <strong>33%</strong> (acceptable &ge;30%)', status: (kpis.hygienePercent == null || kpis.hygienePercent <= 0) ? '' : (kpis.hygienePercent >= 30 ? 'good' : (kpis.hygienePercent >= 25 ? 'warn' : 'bad')) },
   ];
-  /* Doctor $/day: only one card — Combined — because owner-vs-associate production
-     can't be reliably derived from practice totals alone. The split logic still exists
-     in computeReportData (ownerDocDailyAvg, associateDocDailyAvg, hasOwnerSplit) and
-     will be wired back in once we parse per-provider production from the PDFs.
-     Benchmarks (2026-04-21): owner $4,000/day, associate $3,500/day. When both
-     are present we show a day-weighted blend as the target for the combined card. */
+
+  /* 2. Doctor $/day: Combined card. Benchmarks (2026-04-21): owner $4,000/day,
+     associate $3,500/day; when both present, show day-weighted blend target. */
   {
     const hasAssoc = practice.associateDaysPerMonth > 0;
     const docVal = kpis.combinedDocDailyAvg || kpis.ownerDocDailyAvg;
@@ -1103,9 +1186,10 @@ function renderReportHtml(data) {
       status: docStatus,
     });
   }
-  /* Hygiene $/day: payor-mix-dependent benchmarks (2026-04-21).
-     PPO / FFS / unknown → target $1,000 (healthy), $1,200 (excellent), $800 floor.
-     HMO / Medicaid / capitated (HMO + Gov > 50%) → target $500-600, $400 warn, $300 bad. */
+
+  /* 3. Hygiene $/day: payor-mix-dependent benchmarks (2026-04-21).
+     PPO/FFS/unknown → $1,000 healthy ($1,200 excellent, $800 floor).
+     HMO/Medicaid/capitated (HMO + Gov > 50%) → $500–600 healthy, $400 warn. */
   {
     const mix = practice.payorMix || {};
     const hmoPct = Number(mix.hmo) || 0;
@@ -1122,7 +1206,27 @@ function renderReportHtml(data) {
       : `Target <strong>$1,000+</strong> (PPO/FFS tier; $1,200 excellent) &middot; ${practice.hygieneDaysPerWeek} days/week`;
     scorecardCards.push({ lbl: 'Hygiene Avg $/Day', val: fmt$(hygVal), bench: hygBench, status: hygStatus });
   }
-  /* Overhead bench: show raw overhead alongside adjusted when we did any add-back. */
+
+  /* 4. Hygiene Fill Rate (2026-04-21) — only rendered when hygieneSchedule
+     data was supplied. >=95% good; 85–94 warn; <85 bad. */
+  if (kpis.hygieneFillRate != null && Number.isFinite(kpis.hygieneFillRate)) {
+    const fr = kpis.hygieneFillRate;
+    const frStatus = fr >= 95 ? 'good' : (fr >= 85 ? 'warn' : 'bad');
+    scorecardCards.push({
+      lbl: 'Hygiene Fill Rate',
+      val: fr.toFixed(0) + '%',
+      bench: `Past weeks &middot; Empties: ${(100 - fr).toFixed(0)}%`,
+      status: frStatus,
+    });
+  }
+
+  /* 5. Hygiene % of Production. */
+  scorecardCards.push({ lbl: 'Hygiene % of Production', val: (kpis.hygienePercent != null && kpis.hygienePercent > 0) ? kpis.hygienePercent.toFixed(1) + '%' : '—', bench: 'Target <strong>33%</strong> (acceptable &ge;30%)', status: (kpis.hygienePercent == null || kpis.hygienePercent <= 0) ? '' : (kpis.hygienePercent >= 30 ? 'good' : (kpis.hygienePercent >= 25 ? 'warn' : 'bad')) });
+
+  /* 6. Collection Rate. */
+  scorecardCards.push({ lbl: 'Collection Rate', val: (kpis.collectionRate != null && kpis.collectionRate > 0) ? kpis.collectionRate.toFixed(1) + '%' : '—', bench: 'Target <strong>97%+</strong>', status: statusVs(kpis.collectionRate, 97, true) });
+
+  /* 7. Overhead %. Show raw alongside adjusted when add-backs were applied. */
   const addBackTotal = (financials.ownerAddBacks || 0) + (financials.patientReimbursements || 0);
   const overheadBench = addBackTotal > 0
     ? `Target <strong>≤60%</strong> · raw ${financials.overheadRawPct ? financials.overheadRawPct.toFixed(1) : '—'}%, less $${Math.round(addBackTotal).toLocaleString()} add-backs`
@@ -2009,7 +2113,7 @@ exports.handler = async function(event) {
     const dataWithoutSwot = computeReportData({
       prodData, collData, plData, employeeCosts, practiceProfile,
       arPatient, arInsurance, swotData: null, practiceName,
-      totalProd, collTotal, years, prodMonths,
+      totalProd, collTotal, years, prodMonths, hygieneData,
     });
 
     const swotData = generateSWOT(
@@ -2018,6 +2122,7 @@ exports.handler = async function(event) {
       dataWithoutSwot.kpis.staffCostPct,
       dataWithoutSwot.kpis.staffCostExHygPct,
       dataWithoutSwot.kpis.hygienistCostPct,
+      dataWithoutSwot.kpis.hygieneNearFuturePreBooking,
     );
 
     const data = Object.assign({}, dataWithoutSwot, { swot: swotData });

@@ -31,7 +31,12 @@
       "new_patients"
     ],
     "biggestChallenge": "",
-    "patientsPerHygienistPerDay": 8
+    "patientsPerHygienistPerDay": 8,
+    "feesAttachedToScheduler": "yes",
+    "insuranceFeeSchedulesCurrent": "yes",
+    "writeOffCalculation": "automatic",
+    "frequentManualAdjustments": "no",
+    "hasPatientCollectionsSystem": "yes"
   },
   "employeeCosts": {
     "ec_name_om": "Maria",
@@ -72,6 +77,8 @@
     "ec_ben_other": "CE allowance"
   },
   "hygieneSchedule": {
+    "recentFillRate": 92,
+    "nearFuturePreBooking": 85,
     "hs_rdh_mon": 2,
     "hs_rdh_tue": 2,
     "hs_rdh_wed": 2,
