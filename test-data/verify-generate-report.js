@@ -1041,6 +1041,251 @@ test('Fix 4: Conversion Ratio card uses 2026-04-22 tier colors (3-7 good, 7-12 w
   }
 });
 
+/* ──────────────────────────────────────────────────────────────────────
+   Overhead methodology batch (2026-04-22): four new overheadBreakdown
+   questionnaire fields + five-branch Overhead SWOT (Staff / Supplies /
+   Lab / Occupancy / Marketing floor), HIGH PRIORITY prepended.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Helper: craft an Overhead-SWOT fixture where we directly control the
+   four sub-component percentages via annualCollections-targeted spend
+   figures, plus the aggregate overhead % via a chosen total-expense
+   figure. Staff % is driven by employeeCosts sizing. All setup/BWV
+   answers are clean so only Overhead-related weaknesses surface. */
+function overheadFixture({ overheadPct, suppliesPct, labPct, occupancyPct, marketingPct, staffPct, withStaffCosts }) {
+  /* Fixed scale: annualCollections ≈ $1,000,000 for easy dollar math. */
+  const ANNUAL_COLL = 1000000;
+  const prod = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D1110|Prophy|2400|240000','D1120|Child|400|32000',
+    'D4910|Perio Maint|600|84000','D4341|SRP 4+|80|28000','D4342|SRP 1-3|20|5000',
+    'D0150|Comp Eval|400|36000','D0120|Periodic|1000|40000',
+    'D2740|Crown|200|280000',
+    'D2750|Crown PM|50|70000',
+    'D7140|Extraction|100|30000',
+    'D3330|RCT|40|60000',
+    'D8090|Ortho|10|60000',
+  ].join('\n');
+  const coll = `DATES| 01/01/2025 - 12/31/2025\nCHARGES|1050000\nPAYMENTS|${ANNUAL_COLL}`;
+  const totalExpense = Math.round(ANNUAL_COLL * overheadPct / 100);
+  const pl = [
+    'DATES| 01/01/2025 - 12/31/2025',
+    'SECTION|Income', `Sales|${ANNUAL_COLL}`, `TOTAL_INCOME|${ANNUAL_COLL}`,
+    'SECTION|Expense',
+    /* Legacy P&L-derived lab/supplies are kept at benchmark so they never
+       fire (double-fire guard is also present). */
+    'Salaries & Wages|400000','Payroll Taxes|40000',
+    'Lab Fees|50000','Dental Supplies|50000',
+    'Rent|60000','Marketing|15000','Office Supplies|20000',
+    `Other Expenses|${Math.max(0, totalExpense - 635000)}`,
+    `TOTAL_EXPENSE|${totalExpense}`,
+    `NET_INCOME|${ANNUAL_COLL - totalExpense}`,
+  ].join('\n');
+  /* Build employeeCosts so (admin + hyg annual) / $1M ≈ staffPct exactly.
+     50/50 split between admin and hyg. Zero benefits, 10% emp-cost uplift —
+     pick rate such that rate × 160 × 12 × 1.10 = halfTarget. */
+  const halfTarget = ANNUAL_COLL * staffPct / 100 / 2;
+  const rateForHalf = Math.max(1, halfTarget / (160 * 12 * 1.10));
+  const staff = {
+    staff:   [{ rate: rateForHalf, hours: 160 }],
+    hygiene: [{ rate: rateForHalf, hours: 160 }],
+    staffBenefits: 0, staffEmpCostPct: 0.10,
+    hygBenefits: 0, hygEmpCostPct: 0.10,
+  };
+  const dollarFor = pct => (pct == null ? null : Math.round(ANNUAL_COLL * pct / 100));
+  const profile = {
+    name: 'Overhead Probe', zipCode: '11111',
+    doctorDays: 16, numHygienists: 4, hasAssociate: false,
+    yearsOwned: 12, ownerAge: 48, opsActive: 5, opsTotal: 6,
+    payorMix: { ppo: 60, hmo: 0, gov: 0, ffs: 40 },
+    pmSoftware: 'dentrix',
+    feesAttachedToScheduler: 'yes', insuranceFeeSchedulesCurrent: 'yes',
+    writeOffCalculation: 'automatic', frequentManualAdjustments: 'no',
+    hasPatientCollectionsSystem: 'yes', biteConsultApproach: 'dedicated',
+    hasProductionGoal: 'yes', knowsIfAhead: 'yes',
+    overheadBreakdown: {
+      annualSuppliesSpend:  dollarFor(suppliesPct),
+      annualLabSpend:       dollarFor(labPct),
+      annualOccupancyCost:  dollarFor(occupancyPct),
+      annualMarketingSpend: dollarFor(marketingPct),
+    },
+  };
+  if (withStaffCosts) profile.staffCosts = withStaffCosts;
+  return {
+    httpMethod: 'POST',
+    body: JSON.stringify({
+      prodText: prod, collText: coll, plText: pl,
+      practiceName: 'Overhead Probe',
+      arPatient: { total: 40000, d90plus: 3000 }, arInsurance: { total: 55000, d90plus: 3000 },
+      employeeCosts: staff, hygieneData: null, practiceProfile: profile,
+    }),
+  };
+}
+
+async function invokeOverhead(opts) {
+  const res = await handler(overheadFixture(opts));
+  if (res.statusCode !== 200) throw new Error('HTTP ' + res.statusCode + ': ' + res.body);
+  return JSON.parse(res.body);
+}
+
+/* Match helper: find the Overhead weakness body (the one that opens with
+   "Overhead is X.X%" or "Aggregate overhead %" framing). */
+const findOverheadWeakness = (data) => data.swot.weaknesses.find(w =>
+  /^Overhead is \d/i.test(w) || /^Aggregate overhead %/i.test(w)
+);
+
+test('Overhead SWOT: STAFF PRIMARY — overhead 70%, staff 28%, others at benchmark', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 70, staffPct: 28,
+    suppliesPct: 6, labPct: 6, occupancyPct: 6, marketingPct: 2,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire: ' + JSON.stringify(body.data.swot.weaknesses));
+  expect(/Overhead is \d+\.\d%/.test(w), 'aggregate framing missing');
+  expect(/60% target \/ 65% warn \/ 70% bad band/.test(w), 'aggregate band phrasing missing');
+  expect(/every percentage point of overhead represents \$/.test(w), 'aggregate per-point-of-overhead framing missing');
+  expect(/primary contributor is staff cost/i.test(w), 'Staff branch not named as primary');
+  expect(/20% benchmark/.test(w), 'Staff branch missing 20% benchmark reference');
+  /* Subcomponents at benchmark → no secondary row. */
+  expect(!/Secondary: /.test(w), 'Secondary line fired unexpectedly when others sit at benchmark');
+});
+
+test('Overhead SWOT: STAFF PRIMARY — role decomposition renders when staffCosts populated', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 70, staffPct: 28,
+    suppliesPct: 6, labPct: 6, occupancyPct: 6, marketingPct: 2,
+    withStaffCosts: { frontOffice: 6, backOffice: 9, hygiene: 13 },
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire');
+  expect(/decomposes to 6\.0% front office/.test(w), 'role decomposition sentence missing front %');
+  expect(/9\.0% back office clinical/.test(w), 'role decomposition missing back office %');
+  expect(/13\.0% hygiene/.test(w), 'role decomposition missing hygiene %');
+  expect(/Hygiene sits highest/i.test(w), 'worst-role naming missing (expected "Hygiene sits highest")');
+});
+
+test('Overhead SWOT: SUPPLIES PRIMARY — overhead 66%, supplies 10%', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 66, staffPct: 19,
+    suppliesPct: 10, labPct: 6, occupancyPct: 6, marketingPct: 2,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire');
+  expect(/primary contributor is supplies at 10\.0%/.test(w), 'Supplies branch not named as primary');
+  expect(/6% benchmark/.test(w), 'Supplies branch missing 6% benchmark reference');
+  expect(!/primary contributor is staff cost/i.test(w), 'Staff branch appeared when it should not');
+});
+
+test('Overhead SWOT: LAB PRIMARY — overhead 66%, lab 9%', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 66, staffPct: 19,
+    suppliesPct: 6, labPct: 9, occupancyPct: 6, marketingPct: 2,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire');
+  expect(/primary contributor is lab cost at 9\.0%/.test(w), 'Lab branch not named as primary');
+  expect(/6% benchmark/.test(w), 'Lab branch missing 6% benchmark reference');
+});
+
+test('Overhead SWOT: OCCUPANCY PRIMARY — includes "harder to move short-term" qualifier', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 66, staffPct: 19,
+    suppliesPct: 6, labPct: 6, occupancyPct: 9, marketingPct: 2,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire');
+  expect(/primary contributor is occupancy \(rent \+ utilities\) at 9\.0%/.test(w), 'Occupancy branch not named as primary');
+  expect(/harder to move short-term/i.test(w), 'Occupancy branch missing "harder to move" qualifier');
+});
+
+test('Overhead SWOT: MARKETING FLOOR — overhead 64% (under warn), marketing 0.5%', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 64, staffPct: 19,
+    suppliesPct: 6, labPct: 6, occupancyPct: 6, marketingPct: 0.5,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire on marketing floor alone');
+  expect(/primary gap here is under-investment in marketing/i.test(w), 'Marketing branch framing missing');
+  expect(/Marketing spend is 0\.5% of collections against a 2% benchmark/.test(w), 'Marketing branch missing actual vs 2% phrasing');
+  expect(/marketing is a floor/i.test(w), 'Marketing branch missing "floor" explainer');
+  expect(/stagnant new-patient numbers/i.test(w), 'Marketing branch missing new-patient consequence');
+});
+
+test('Overhead SWOT: TWO-CONTRIBUTOR case — staff primary, lab secondary (within 20%)', async () => {
+  /* Dollar-gap math on $1M collections:
+       staff 23% → gap (23-20)×$1M/100 = $30,000
+       lab    9% → gap  (9- 6)×$1M/100 = $30,000
+     Gaps tied at $30k → ratio 1.0 → secondary fires (threshold 0.80).
+     Staff pushed before lab in the candidate list, so with equal gaps
+     staff stays primary by stable sort. */
+  const body = await invokeOverhead({
+    overheadPct: 72, staffPct: 23,
+    suppliesPct: 6, labPct: 9, occupancyPct: 6, marketingPct: 2,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire');
+  expect(/primary contributor is staff cost at 2\d\.\d%/.test(w), 'Staff should be named as primary when staff gap ≥ lab gap');
+  expect(/Secondary: lab cost also runs outside its benchmark at 9\.0% vs 6\.0%/.test(w), 'Secondary lab line missing');
+  expect(/another ~\$/.test(w), 'Secondary missing "another ~$" dollar framing');
+});
+
+test('Overhead SWOT: SUB-COMPONENT ALARM with clean aggregate — staff 22%, overhead 62%', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 62, staffPct: 28,
+    suppliesPct: 6, labPct: 6, occupancyPct: 6, marketingPct: 2,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire on sub-component alarm alone');
+  /* Aggregate 62% is under 65% warn, so aggregate alarm A did not trip —
+     but alarm B (staff > 20%) did. Body should still include aggregate
+     framing (because overheadPct is non-null) and name Staff as primary. */
+  expect(/Overhead is 62\.0%/.test(w), 'aggregate framing should appear since overheadPct != null');
+  expect(/primary contributor is staff cost/i.test(w), 'Staff should be named as primary');
+});
+
+test('Overhead SWOT: GRACEFUL DEGRADATION — overheadBreakdown null, staff 24%, overhead 68%', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 68, staffPct: 28,
+    suppliesPct: null, labPct: null, occupancyPct: null, marketingPct: null,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(w, 'Overhead SWOT did not fire when only aggregate + staff alarms tripped');
+  expect(/primary contributor is staff cost/i.test(w), 'Staff should be primary');
+  /* No supplies/lab/occupancy/marketing text should appear — they were null. */
+  expect(!/supplies at \d/.test(w), 'supplies should not appear when annualSuppliesSpend was null');
+  expect(!/lab cost at \d/.test(w), 'lab should not appear when annualLabSpend was null');
+  expect(!/occupancy \(rent \+ utilities\)/.test(w), 'occupancy should not appear when annualOccupancyCost was null');
+  expect(!/under-investment in marketing/i.test(w), 'marketing should not appear when annualMarketingSpend was null');
+});
+
+test('Overhead SWOT: NO FIRE — overhead 58%, staff 19%, all sub-components at benchmark', async () => {
+  const body = await invokeOverhead({
+    overheadPct: 58, staffPct: 19,
+    suppliesPct: 6, labPct: 6, occupancyPct: 6, marketingPct: 2,
+  });
+  const w = findOverheadWeakness(body.data);
+  expect(!w, `Overhead SWOT should not fire when nothing exceeds benchmark; fired: ${w}`);
+});
+
+test('Overhead SWOT: graceful degradation — no aggregate data but sub-component alarm trips', async () => {
+  /* Simulate a practice that uploaded no P&L (overheadPct=null) but filled
+     in the Overhead Breakdown fields, with supplies > 6%. Aggregate
+     framing should fall back to the "not available" copy. */
+  const payload = overheadFixture({
+    overheadPct: 0, staffPct: 19,
+    suppliesPct: 10, labPct: 6, occupancyPct: 6, marketingPct: 2,
+  });
+  const body = JSON.parse(payload.body);
+  /* Drop plText so overheadPct ends up null. */
+  delete body.plText;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(body) });
+  const data = JSON.parse(res.body).data;
+  const w = findOverheadWeakness(data);
+  expect(w, 'Overhead SWOT did not fire with null aggregate + sub-component alarm');
+  expect(/Aggregate overhead % is not available/i.test(w), 'Alt aggregate framing missing');
+  expect(/primary contributor is supplies at 10\.0%/.test(w), 'Supplies branch should still render under null aggregate');
+});
+
 (async () => {
   let failed = 0;
   const start = Date.now();

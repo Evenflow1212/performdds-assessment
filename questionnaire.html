@@ -976,6 +976,51 @@
       </div>
     </div>
 
+    <!-- ═══ SECTION: OVERHEAD BREAKDOWN ═══ -->
+    <div class="q-section">
+      <div class="q-section-header">
+        <div class="q-section-icon">&#128176;</div>
+        <div class="q-section-title">Overhead Breakdown</div>
+      </div>
+      <div class="q-hint" style="margin-bottom:16px;">If you have your most recent annual Profit &amp; Loss statement handy, the more of these fields you can fill in, the more granular your report will be. Anything left blank will be skipped — the report still works, it just has fewer sub-component findings.</div>
+
+      <div class="q-group">
+        <label class="q-label">Annual supplies spend</label>
+        <div class="q-hint">Dental supplies, office supplies, consumables</div>
+        <div class="q-number-wrap">
+          <input type="number" class="q-input" name="annualSuppliesSpend" placeholder="$" min="0" step="1">
+          <span class="q-unit">per year</span>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Annual lab spend</label>
+        <div class="q-hint">Outside lab fees (crown &amp; bridge, dentures, ortho)</div>
+        <div class="q-number-wrap">
+          <input type="number" class="q-input" name="annualLabSpend" placeholder="$" min="0" step="1">
+          <span class="q-unit">per year</span>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Annual occupancy cost</label>
+        <div class="q-hint">Rent, utilities, property tax, building maintenance</div>
+        <div class="q-number-wrap">
+          <input type="number" class="q-input" name="annualOccupancyCost" placeholder="$" min="0" step="1">
+          <span class="q-unit">per year</span>
+        </div>
+      </div>
+
+      <div class="q-group">
+        <label class="q-label">Annual marketing spend</label>
+        <div class="q-hint">Ads, SEO, website, referral programs — excluding internal patient events</div>
+        <div class="q-number-wrap">
+          <input type="number" class="q-input" name="annualMarketingSpend" placeholder="$" min="0" step="1">
+          <span class="q-unit">per year</span>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ SECTION: GOALS & VISION ═══ -->
     <div class="q-section">
       <div class="q-section-header">
@@ -1171,6 +1216,18 @@
       hasPatientCollectionsSystem: document.querySelector('input[name="hasPatientCollectionsSystem"]:checked')?.value || '',
       /* Q6 BWV operational gate (2026-04-22): dedicated / during_hygiene / none / not_sure */
       biteConsultApproach: document.querySelector('input[name="biteConsultApproach"]:checked')?.value || '',
+      /* Overhead breakdown (2026-04-22) — four optional annual-spend figures.
+         Blank/0 = skip in SWOT. Nested so it's easy to extend with sub-role
+         staff costs later without touching the top-level practiceProfile shape. */
+      overheadBreakdown: (() => {
+        const val = (n) => { const raw = document.querySelector('[name="' + n + '"]').value; const p = parseFloat(raw); return Number.isFinite(p) && p > 0 ? p : null; };
+        return {
+          annualSuppliesSpend:  val('annualSuppliesSpend'),
+          annualLabSpend:       val('annualLabSpend'),
+          annualOccupancyCost:  val('annualOccupancyCost'),
+          annualMarketingSpend: val('annualMarketingSpend'),
+        };
+      })(),
       concerns: [...document.querySelectorAll('input[name="concerns"]:checked')].map(c => c.value),
       biggestChallenge: document.querySelector('[name="biggestChallenge"]').value.trim(),
     };
@@ -1217,6 +1274,12 @@
        'doctorDays','numHygienists','patientsPerHygienistPerDay','associateDays','opsActive','opsTotal',
        'docDailyAvg','assocDailyAvg','hygDailyAvg','crownsPerMonth','biggestChallenge']
         .forEach(k => setByName(k, pp[k]));
+      /* Overhead breakdown (2026-04-22) — 4 optional annual-spend numbers. */
+      const ob = pp.overheadBreakdown || {};
+      setByName('annualSuppliesSpend',  ob.annualSuppliesSpend);
+      setByName('annualLabSpend',       ob.annualLabSpend);
+      setByName('annualOccupancyCost',  ob.annualOccupancyCost);
+      setByName('annualMarketingSpend', ob.annualMarketingSpend);
       /* Sliders for payor mix — fire input so clamp/total UI updates */
       const mix = pp.payorMix || {};
       const setSlider = (id, v) => { const el = document.getElementById(id); if (el && v != null) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } };

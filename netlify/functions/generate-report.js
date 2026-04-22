@@ -197,7 +197,7 @@ function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
 }
 
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs, overheadInputs) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
   const pp = practiceProfile || {};
   const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
@@ -307,8 +307,18 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   if (srpQty === 0 && prophyQty > 50) weaknesses.push('Periodontal disease appears to be under-diagnosed — no SRP procedures found');
   else if (perioRatio > 0 && perioRatio < 8 && prophyQty > 50) weaknesses.push('Periodontal disease may be under-diagnosed relative to the patient flow');
   if (!hasPanorex) weaknesses.push('The practice does not appear to have a Panorex');
-  if (labPct > 6) weaknesses.push('Lab costs at ' + labPct.toFixed(1) + '% of collections exceed the 6% target');
-  if (supplyPct > 6) weaknesses.push('Dental supply costs at ' + supplyPct.toFixed(1) + '% exceed the 6% target');
+  /* Legacy P&L-derived lab/supplies weaknesses. Suppressed when the user
+     filled in the questionnaire's Overhead Breakdown fields — the new
+     five-branch Overhead SWOT (2026-04-22) covers those sub-components
+     using questionnaire-derived values, and double-firing would leave the
+     reader with two nearly-identical findings. When the questionnaire
+     fields are null, these legacy P&L-derived weaknesses still fire so
+     detailed P&L uploads don't lose coverage. */
+  const obQ = (practiceProfile && practiceProfile.overheadBreakdown) || {};
+  const userGaveLabSpend      = Number(obQ.annualLabSpend)      > 0;
+  const userGaveSuppliesSpend = Number(obQ.annualSuppliesSpend) > 0;
+  if (labPct > 6 && !userGaveLabSpend) weaknesses.push('Lab costs at ' + labPct.toFixed(1) + '% of collections exceed the 6% target');
+  if (supplyPct > 6 && !userGaveSuppliesSpend) weaknesses.push('Dental supply costs at ' + supplyPct.toFixed(1) + '% exceed the 6% target');
   if (totalAR > 0 && ar90Pct > 10) weaknesses.push('Aged AR over 90 days at ' + Math.round(ar90Pct) + '% needs attention');
   if (npPerMonth > 0 && npPerMonth < 15) weaknesses.push('New patient flow is low at ' + npPerMonth + ' per month');
   if (activePatientEst > 0 && activePatientEst < 500) weaknesses.push('Active patient base is small, estimated at approximately ' + activePatientEst);
@@ -454,6 +464,118 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     var q5Weakness = `${framing} ${branch}`;
   }
 
+  /* ── Overhead diagnostic SWOT (2026-04-22) — five-branch finding ─────────
+     Alarm fires on any of: aggregate overhead ≥ 65%, total staff > 20%,
+     supplies > 6%, lab > 6%, occupancy > 6%, or marketing < 2% (floor).
+     Primary leak = sub-component with the largest absolute-dollar gap vs
+     its benchmark. Secondary is included only if its gap ≥ 80% of primary.
+     Copy NAMES the finding — no prescriptions in the body. HIGH PRIORITY
+     (prepended with Q2/Q5). Any sub-component whose value is null is
+     silently skipped in both alarms and ranking. */
+  const oi = overheadInputs || {};
+  const oAnnColl = Number(oi.annualCollections) > 0 ? Number(oi.annualCollections) : 0;
+  const asPct = (v) => (v == null || !Number.isFinite(Number(v))) ? null : Number(v);
+  const oOverheadPct = asPct(oi.overheadPct);
+  const oStaffPct    = asPct(oi.staffCostPct);
+  const oSupPct      = asPct(oi.suppliesPct);
+  const oLabPct      = asPct(oi.labPct);
+  const oOccPct      = asPct(oi.occupancyPct);
+  const oMktPct      = asPct(oi.marketingPct);
+
+  const oAlarmA = oOverheadPct != null && oOverheadPct >= 65;
+  const oAlarmB = oStaffPct    != null && oStaffPct    >  20;
+  const oAlarmC = oSupPct      != null && oSupPct      >  6;
+  const oAlarmD = oLabPct      != null && oLabPct      >  6;
+  const oAlarmE = oOccPct      != null && oOccPct      >  6;
+  const oAlarmF = oMktPct      != null && oMktPct      <  2;
+  const overheadAlarmTripped = oAlarmA || oAlarmB || oAlarmC || oAlarmD || oAlarmE || oAlarmF;
+
+  var overheadWeakness = '';
+  if (overheadAlarmTripped) {
+    const fmt$ = n => '$' + Math.round(n).toLocaleString();
+
+    /* Rank sub-components by absolute-dollar gap vs their benchmark. Ceiling
+       components (staff/supplies/lab/occupancy) fire when actual > benchmark;
+       floor component (marketing) fires when actual < benchmark. Any entry
+       with null pct or no gap is skipped. */
+    const candidates = [];
+    const pushCeiling = (key, pct, bench) => {
+      if (pct == null || pct <= bench || !(oAnnColl > 0)) return;
+      candidates.push({ key, pct, bench, gap: (pct - bench) * oAnnColl / 100, isFloor: false });
+    };
+    const pushFloor = (key, pct, bench) => {
+      if (pct == null || pct >= bench || !(oAnnColl > 0)) return;
+      candidates.push({ key, pct, bench, gap: (bench - pct) * oAnnColl / 100, isFloor: true });
+    };
+    pushCeiling('staff',     oStaffPct, 20);
+    pushCeiling('supplies',  oSupPct,    6);
+    pushCeiling('lab',       oLabPct,    6);
+    pushCeiling('occupancy', oOccPct,    6);
+    pushFloor  ('marketing', oMktPct,    2);
+    candidates.sort((a, b) => b.gap - a.gap);
+
+    /* Piece 1 — aggregate framing. */
+    let pieces = [];
+    if (oOverheadPct != null && oAnnColl > 0) {
+      pieces.push(`Overhead is ${oOverheadPct.toFixed(1)}% of collections against a 60% target / 65% warn / 70% bad band. At current collections (${fmt$(oAnnColl)}), every percentage point of overhead represents ${fmt$(oAnnColl / 100)} of annual profit.`);
+    } else {
+      pieces.push('Aggregate overhead % is not available from the data provided, but one or more cost categories sit outside benchmark.');
+    }
+
+    /* Piece 2 — primary leak branch. Copy is component-specific and does
+       NOT prescribe the fix (lesson library owns prescriptions). */
+    if (candidates.length > 0) {
+      const primary = candidates[0];
+      const componentLabel = {
+        staff:     'staff cost',
+        supplies:  'supplies',
+        lab:       'lab cost',
+        occupancy: 'occupancy',
+        marketing: 'marketing spend',
+      };
+      let branch;
+      if (primary.key === 'staff') {
+        /* Optional role decomposition — fires only when practiceProfile.staffCosts
+           contains frontOffice + backOffice + hygiene sub-ratios (future data
+           Dave is still collecting). Structure is forward-compatible: adding
+           those fields later auto-lights this sentence up without a rewrite. */
+        const sc = (pp.staffCosts || {});
+        const frontPct = Number(sc.frontOffice);
+        const backPct  = Number(sc.backOffice);
+        const hygPct   = Number(sc.hygiene);
+        const haveRoles = [frontPct, backPct, hygPct].every(v => Number.isFinite(v)) && (frontPct + backPct + hygPct > 0);
+        let roleSentence = '';
+        if (haveRoles) {
+          const entries = [
+            { name: 'front office',           val: frontPct },
+            { name: 'back office clinical',   val: backPct  },
+            { name: 'hygiene',                val: hygPct   },
+          ];
+          const worst = entries.slice().sort((a, b) => b.val - a.val)[0];
+          roleSentence = ` That staff cost decomposes to ${frontPct.toFixed(1)}% front office, ${backPct.toFixed(1)}% back office clinical, and ${hygPct.toFixed(1)}% hygiene. ${worst.name.charAt(0).toUpperCase() + worst.name.slice(1)} sits highest as a share of collections.`;
+        }
+        branch = `The primary contributor is staff cost at ${primary.pct.toFixed(1)}% against a 20% benchmark — roughly ${fmt$(primary.gap)} of annual opportunity on its own.${roleSentence}`;
+      } else if (primary.key === 'supplies') {
+        branch = `The primary contributor is supplies at ${primary.pct.toFixed(1)}% against a 6% benchmark — roughly ${fmt$(primary.gap)} of annual opportunity.`;
+      } else if (primary.key === 'lab') {
+        branch = `The primary contributor is lab cost at ${primary.pct.toFixed(1)}% against a 6% benchmark — roughly ${fmt$(primary.gap)} of annual opportunity.`;
+      } else if (primary.key === 'occupancy') {
+        branch = `The primary contributor is occupancy (rent + utilities) at ${primary.pct.toFixed(1)}% against a 6% benchmark — roughly ${fmt$(primary.gap)} of annual opportunity. Occupancy is harder to move short-term than variable costs, but the number is worth naming.`;
+      } else if (primary.key === 'marketing') {
+        branch = `The primary gap here is under-investment in marketing. Marketing spend is ${primary.pct.toFixed(1)}% of collections against a 2% benchmark — roughly ${fmt$(primary.gap)} of annual growth investment that isn't being made. Unlike other overhead components where lower is better, marketing is a floor — practices with no marketing spend trend toward stagnant new-patient numbers.`;
+      }
+      pieces.push(branch);
+
+      /* Piece 3 — secondary leak framing, only if within 20% of primary. */
+      if (candidates.length > 1 && candidates[1].gap >= 0.8 * primary.gap) {
+        const sec = candidates[1];
+        pieces.push(`Secondary: ${componentLabel[sec.key]} also runs outside its benchmark at ${sec.pct.toFixed(1)}% vs ${sec.bench.toFixed(1)}% — another ~${fmt$(sec.gap)} in annual opportunity.`);
+      }
+    }
+
+    overheadWeakness = pieces.join(' ');
+  }
+
   /* ── Q6 BWV operational-gate weakness (2026-04-22). Independent of Q5. ─ */
   const bca = (pp.biteConsultApproach || '').toLowerCase();
   if (bca === 'during_hygiene') {
@@ -471,7 +593,8 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     opportunities.push('Building out your data foundation and scorekeeping rhythm is typically the first 30 days of coaching. It\'s what makes every other recommendation in this report actionable.');
   }
   const highPriorityWeaknesses = [...setupWeaknesses];
-  if (typeof q5Weakness !== 'undefined' && q5Weakness) highPriorityWeaknesses.push(q5Weakness);
+  if (typeof q5Weakness        !== 'undefined' && q5Weakness)        highPriorityWeaknesses.push(q5Weakness);
+  if (typeof overheadWeakness  !== 'undefined' && overheadWeakness)  highPriorityWeaknesses.push(overheadWeakness);
   if (highPriorityWeaknesses.length > 0) {
     weaknesses.unshift(...highPriorityWeaknesses);
   }
@@ -845,6 +968,24 @@ function computeReportData(input) {
   const staffCostExHygPct = staffCostExHygPctCalc(employeeCosts, annualCollections);
   const hygienistCostPct  = hygienistCostPctCalc(employeeCosts, annualHyg);
 
+  /* ──── Overhead Breakdown (2026-04-22) ──── */
+  /* Four optional user-supplied annual-spend figures driven by the
+     questionnaire's "Overhead Breakdown" section. Each is converted to a
+     percentage of annualCollections when both the input dollar and the
+     denominator are present; otherwise stays null. Null → the new
+     five-branch Overhead SWOT skips that sub-component silently. */
+  const ob = pp.overheadBreakdown || {};
+  const obPct = (raw) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    if (!(annualCollections > 0)) return null;
+    return (n / annualCollections) * 100;
+  };
+  const suppliesPct  = obPct(ob.annualSuppliesSpend);
+  const labPctOb     = obPct(ob.annualLabSpend);
+  const occupancyPct = obPct(ob.annualOccupancyCost);
+  const marketingPct = obPct(ob.annualMarketingSpend);
+
   /* ──── Goal matrix ──── */
   const goalDocDaily = combinedDocDailyAvg || 0;
   const goalHygDaily = hygDailyAvg || 0;
@@ -1156,6 +1297,13 @@ function computeReportData(input) {
          Null when no hygieneData was supplied. Renderer hides the fill-rate card when null. */
       hygieneFillRate,
       hygieneNearFuturePreBooking,
+      /* Overhead Breakdown (2026-04-22) — user-supplied sub-component % of
+         collections. Null when the corresponding questionnaire field was left
+         blank (graceful degradation). Drives the five-branch Overhead SWOT. */
+      overheadSuppliesPct:  suppliesPct,
+      overheadLabPct:       labPctOb,
+      overheadOccupancyPct: occupancyPct,
+      overheadMarketingPct: marketingPct,
     },
 
     goals: {
@@ -2222,6 +2370,15 @@ exports.handler = async function(event) {
         hygieneFillRate:      dataWithoutSwot.kpis.hygieneFillRate,
         totalExamsCount:      dataWithoutSwot.kpis.totalExamsCount,
         hygieneVisitsForExamCheck: dataWithoutSwot.kpis.hygieneVisitsForExamCheck,
+      },
+      {
+        overheadPct:       dataWithoutSwot.kpis.overheadPct,
+        annualCollections: dataWithoutSwot.collections.annualized,
+        staffCostPct:      dataWithoutSwot.kpis.staffCostPct,
+        suppliesPct:       dataWithoutSwot.kpis.overheadSuppliesPct,
+        labPct:            dataWithoutSwot.kpis.overheadLabPct,
+        occupancyPct:      dataWithoutSwot.kpis.overheadOccupancyPct,
+        marketingPct:      dataWithoutSwot.kpis.overheadMarketingPct,
       },
     );
 

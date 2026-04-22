@@ -37,7 +37,13 @@
     "writeOffCalculation": "automatic",
     "frequentManualAdjustments": "no",
     "hasPatientCollectionsSystem": "yes",
-    "biteConsultApproach": "during_hygiene"
+    "biteConsultApproach": "during_hygiene",
+    "overheadBreakdown": {
+      "annualSuppliesSpend":  64400,
+      "annualLabSpend":       46000,
+      "annualOccupancyCost":  55200,
+      "annualMarketingSpend": 13800
+    }
   },
   "employeeCosts": {
     "ec_name_om": "Maria",
