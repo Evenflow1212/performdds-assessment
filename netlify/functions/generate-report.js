@@ -197,7 +197,7 @@ function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
 }
 
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs, overheadInputs) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs, overheadInputs, hygDeptRatioInputs) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
   const pp = practiceProfile || {};
   const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
@@ -293,9 +293,10 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   if (staffCostPct > 20) {
     weaknesses.push('Total staff cost at ' + staffCostPct.toFixed(1) + '% of collections exceeds the 20% benchmark (includes all staff + hygiene; excludes owner draws)');
   }
-  if (hygienist != null && hygienist > 38) {
-    weaknesses.push('Hygienist productivity below benchmark — wages are ' + hygienist.toFixed(1) + '% of hygiene production (target 30–33%)');
-  }
+  /* Legacy labor-as-percentage hygienist weakness removed 2026-04-22 —
+     superseded by the Hygiene Department Ratio SWOT (3:1 production-to-labor
+     framing) added later in this function. Keeping both would double-fire
+     when hygienistCostPct > 38 with redundant narrative on the same finding. */
   if (hygPct > 0 && hygPct < 25) weaknesses.push('Hygiene production at ' + Math.round(hygPct) + '% is below the 33% target');
   /* Pre-booking discipline at the hygiene chair (2026-04-21). Healthy practices
      maintain 90%+ booked 2–3 weeks out; below 90 is a leading indicator that
@@ -576,6 +577,28 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     overheadWeakness = pieces.join(' ');
   }
 
+  /* ── Hygiene Department Ratio SWOT (2026-04-22) — 3:1 benchmark ─────────
+     Production-to-labor framing (not labor-as-percentage): healthy hygiene
+     departments produce at least $3 for every $1 of hygienist wages.
+     Fires when the ratio is strictly below 3 — anything at or above 3:1
+     is healthy. Names the gap in dollars and points at the two structural
+     paths to close it (raise $/day via empties/perio/adjuncts, or align
+     compensation to production). Does NOT prescribe the how.
+     Graceful degradation: null or zero on either side → no fire. */
+  const hri = hygDeptRatioInputs || {};
+  const hrCost = Number(hri.annualHygienistCost);
+  const hrProd = Number(hri.annualHygieneProduction);
+  var hygDeptRatioWeakness = '';
+  if (Number.isFinite(hrCost) && hrCost > 0 && Number.isFinite(hrProd) && hrProd > 0) {
+    const hrRatio = hrProd / hrCost;
+    if (hrRatio < 3) {
+      const fmt$ = n => '$' + Math.round(n).toLocaleString();
+      const productionToHitBench = 3 * hrCost;
+      const productionGap = productionToHitBench - hrProd;
+      hygDeptRatioWeakness = `Your hygiene department produces $${hrRatio.toFixed(2)} for every $1 of hygiene labor cost — against a 3:1 benchmark. At current hygiene wages of ${fmt$(hrCost)}, hitting 3:1 would require annual hygiene production of ${fmt$(productionToHitBench)} against the current ${fmt$(hrProd)}, a gap of roughly ${fmt$(productionGap)}. There are two structural paths to close that gap: raise hygiene $/day (through reducing empties, building a perio program, or adjunctive therapies like Arestin and laser perio), or align hygiene compensation to production. The numbers name the gap; they don't tell you which path fits this practice.`;
+    }
+  }
+
   /* ── Q6 BWV operational-gate weakness (2026-04-22). Independent of Q5. ─ */
   const bca = (pp.biteConsultApproach || '').toLowerCase();
   if (bca === 'during_hygiene') {
@@ -593,8 +616,9 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     opportunities.push('Building out your data foundation and scorekeeping rhythm is typically the first 30 days of coaching. It\'s what makes every other recommendation in this report actionable.');
   }
   const highPriorityWeaknesses = [...setupWeaknesses];
-  if (typeof q5Weakness        !== 'undefined' && q5Weakness)        highPriorityWeaknesses.push(q5Weakness);
-  if (typeof overheadWeakness  !== 'undefined' && overheadWeakness)  highPriorityWeaknesses.push(overheadWeakness);
+  if (typeof q5Weakness            !== 'undefined' && q5Weakness)            highPriorityWeaknesses.push(q5Weakness);
+  if (typeof overheadWeakness      !== 'undefined' && overheadWeakness)      highPriorityWeaknesses.push(overheadWeakness);
+  if (typeof hygDeptRatioWeakness  !== 'undefined' && hygDeptRatioWeakness)  highPriorityWeaknesses.push(hygDeptRatioWeakness);
   if (highPriorityWeaknesses.length > 0) {
     weaknesses.unshift(...highPriorityWeaknesses);
   }
@@ -967,6 +991,12 @@ function computeReportData(input) {
   const staffCostPct      = canonicalStaffCostPct(employeeCosts, annualCollections);
   const staffCostExHygPct = staffCostExHygPctCalc(employeeCosts, annualCollections);
   const hygienistCostPct  = hygienistCostPctCalc(employeeCosts, annualHyg);
+  /* Raw hygiene labor + production dollars — needed for the Hygiene
+     Department Ratio SWOT (2026-04-22). Exposed separately from the
+     percentage so the SWOT copy can cite both sides of the 3:1 benchmark. */
+  const annualHygienistCost = employeeCosts ? staffRoleAnnualCost(
+    employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct
+  ) : 0;
 
   /* ──── Overhead Breakdown (2026-04-22) ──── */
   /* Four optional user-supplied annual-spend figures driven by the
@@ -1304,6 +1334,10 @@ function computeReportData(input) {
       overheadLabPct:       labPctOb,
       overheadOccupancyPct: occupancyPct,
       overheadMarketingPct: marketingPct,
+      /* Hygiene Department Ratio inputs (2026-04-22) — raw labor + production
+         dollars backing the 3:1 methodology benchmark. Null when either is 0. */
+      annualHygienistCost:       annualHygienistCost > 0 ? annualHygienistCost : null,
+      annualHygieneProduction:   annualHyg > 0 ? annualHyg : null,
     },
 
     goals: {
@@ -1486,7 +1520,10 @@ function renderReportHtml(data) {
     scorecardCards.push({
       lbl: 'Hygienist Wage Ratio',
       val: v.toFixed(1) + '%',
-      bench: '% of hygiene production &middot; diagnostic reference',
+      /* 2026-04-22: added the 3:1 benchmark note so the card framing lines
+         up with the Hygiene Department Ratio SWOT copy — tiers and data
+         source are unchanged. */
+      bench: '% of hygiene production &middot; diagnostic reference<br>Benchmark: hygiene produces at least $3 for every $1 of wages.',
       status: '',
     });
   }
@@ -2379,6 +2416,10 @@ exports.handler = async function(event) {
         labPct:            dataWithoutSwot.kpis.overheadLabPct,
         occupancyPct:      dataWithoutSwot.kpis.overheadOccupancyPct,
         marketingPct:      dataWithoutSwot.kpis.overheadMarketingPct,
+      },
+      {
+        annualHygienistCost:     dataWithoutSwot.kpis.annualHygienistCost,
+        annualHygieneProduction: dataWithoutSwot.kpis.annualHygieneProduction,
       },
     );
 

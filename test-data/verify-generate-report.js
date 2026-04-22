@@ -345,13 +345,14 @@ test('SWOT: labor-crowding-out threat anchors on TOTAL staffCostPct > 30% (hybri
   expect(!adminThreat, `stale admin-only threat still firing: "${adminThreat}"`);
 });
 
-test('SWOT: hygienist-productivity weakness fires when hygienistCostPct > 38%', async () => {
-  /* Low hygiene production → high hygienistCostPct. Use only hygiene codes
-     with low totals to spike the ratio, employeeCosts same as baseline. */
+test('Hygiene Dept Ratio SWOT supersedes legacy labor-as-% weakness when ratio < 3', async () => {
+  /* Low hygiene production → ratio well below 3. Same fixture that used to
+     exercise the legacy "hygienist > 38%" weakness; it now exercises the new
+     Hygiene Department Ratio SWOT (3:1 framing) after the 2026-04-22 refresh. */
   const sparseProd = [
     'DATE RANGE: 01/01/2025 - 12/31/2025',
     'D0120|Periodic Oral Evaluation|1200|78000',
-    'D1110|Prophy|2400|120000',  /* half the normal wages-vs-production makes ratio blow up */
+    'D1110|Prophy|2400|120000',
     'D2740|Crown|140|420000',
   ].join('\n');
   const res = await handler({
@@ -360,9 +361,14 @@ test('SWOT: hygienist-productivity weakness fires when hygienistCostPct > 38%', 
   });
   const data = JSON.parse(res.body).data;
   expect(data.kpis.hygienistCostPct > 38, `fixture should drive hygienistCostPct > 38; got ${data.kpis.hygienistCostPct}`);
-  const w = data.swot.weaknesses.find(x => /hygienist productivity/i.test(x));
-  expect(w, 'hygienist-productivity weakness did not fire: ' + JSON.stringify(data.swot.weaknesses));
-  expect(w.includes(data.kpis.hygienistCostPct.toFixed(1) + '%'), `weakness text "${w}" does not contain ${data.kpis.hygienistCostPct.toFixed(1)}%`);
+  /* New HIGH PRIORITY weakness — 3:1 production-to-labor framing. */
+  const w = data.swot.weaknesses.find(x => /hygiene department produces \$[\d.]+ for every \$1 of hygiene labor cost/i.test(x));
+  expect(w, 'Hygiene Department Ratio weakness did not fire: ' + JSON.stringify(data.swot.weaknesses));
+  expect(/3:1 benchmark/.test(w), `weakness should cite 3:1 benchmark, got: ${w}`);
+  expect(/two structural paths to close that gap/i.test(w), 'weakness missing two-paths phrase');
+  /* Legacy labor-as-% phrasing must be gone. */
+  const legacy = data.swot.weaknesses.find(x => /Hygienist productivity below benchmark — wages are /.test(x));
+  expect(!legacy, `Legacy hygienist>38 weakness still firing: "${legacy}"`);
 });
 
 test('opportunity "Staff cost optimization" uses TOTAL staff cost vs 20% (hybrid anchor)', async () => {
@@ -1284,6 +1290,126 @@ test('Overhead SWOT: graceful degradation — no aggregate data but sub-componen
   expect(w, 'Overhead SWOT did not fire with null aggregate + sub-component alarm');
   expect(/Aggregate overhead % is not available/i.test(w), 'Alt aggregate framing missing');
   expect(/primary contributor is supplies at 10\.0%/.test(w), 'Supplies branch should still render under null aggregate');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Hygiene Department Ratio SWOT (2026-04-22): 3:1 production-to-labor
+   benchmark with two-paths diagnostic copy. Fires when hygiene produces
+   < $3 for every $1 of hygienist wages. Graceful degradation when
+   either side is zero/null.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Helper — build a fixture with the two controlled values:
+     targetHygWagesAnnual: exact annual hygienist cost (admin staff kept tiny)
+     targetHygProdAnnual:  hygiene production (as D1110 dollars)
+   A doctor production block is added to keep collections / ratios clean so
+   no unrelated weaknesses interfere. Null values yield zero-cost or
+   zero-production fixtures for the graceful-degradation paths. */
+function hygRatioFixture({ targetHygWagesAnnual, targetHygProdAnnual }) {
+  /* Wages = rate × 160 hrs/mo × 12 mo × 1.10 (10% emp-cost uplift, no benefits).
+     rate = wages / 2112. Zero wages → zero-hour shell so we don't touch
+     staffRoleAnnualCost edge paths. */
+  const mkHyg = (annualTarget) => {
+    if (!annualTarget || annualTarget <= 0) return [];
+    const rate = Math.max(1, annualTarget / 2112);
+    return [{ rate, hours: 160 }];
+  };
+  const hygProd = Math.round(Number(targetHygProdAnnual) || 0);
+  /* Always include enough doctor production that hygiene % stays healthy
+     and collection rate lands near 96% — keeps unrelated weaknesses quiet. */
+  const docProd = 600000;
+  const prodLines = ['DATE RANGE: 01/01/2025 - 12/31/2025'];
+  if (hygProd > 0) prodLines.push(`D1110|Prophy|2400|${hygProd}`);
+  prodLines.push(`D2740|Crown|400|${docProd}`);
+  const totalProd = hygProd + docProd;
+  const collPayments = Math.round(totalProd * 0.96);
+  const collText_ = `DATES| 01/01/2025 - 12/31/2025\nCHARGES|${Math.round(totalProd * 1.02)}\nPAYMENTS|${collPayments}`;
+  return {
+    httpMethod: 'POST',
+    body: JSON.stringify({
+      prodText: prodLines.join('\n'),
+      collText: collText_,
+      plText: PL_STANDARD,
+      practiceName: 'HygRatio Probe',
+      arPatient: { total: 35000, d90plus: 3000 },
+      arInsurance: { total: 50000, d90plus: 3000 },
+      employeeCosts: {
+        staff: [{ rate: 15, hours: 160 }],     /* minimal admin — keeps total staff low */
+        hygiene: mkHyg(targetHygWagesAnnual),
+        staffBenefits: 0, staffEmpCostPct: 0.10,
+        hygBenefits: 0, hygEmpCostPct: 0.10,
+      },
+      hygieneData: null,
+      practiceProfile: {
+        name: 'HygRatio', zipCode: '1',
+        doctorDays: 16, numHygienists: 2, hasAssociate: false,
+        yearsOwned: 12, ownerAge: 48, opsActive: 5, opsTotal: 6,
+        payorMix: { ppo: 60, hmo: 0, gov: 0, ffs: 40 },
+        pmSoftware: 'dentrix',
+        feesAttachedToScheduler: 'yes', insuranceFeeSchedulesCurrent: 'yes',
+        writeOffCalculation: 'automatic', frequentManualAdjustments: 'no',
+        hasPatientCollectionsSystem: 'yes', biteConsultApproach: 'dedicated',
+        hasProductionGoal: 'yes', knowsIfAhead: 'yes',
+      },
+    }),
+  };
+}
+
+const findHygRatioWeakness = (data) => data.swot.weaknesses.find(w =>
+  /hygiene department produces \$[\d.]+ for every \$1 of hygiene labor cost/i.test(w)
+);
+
+test('Hygiene Dept Ratio SWOT: FIRES at ratio 2.2 (wages $100k, prod $220k)', async () => {
+  const res = await handler(hygRatioFixture({ targetHygWagesAnnual: 100000, targetHygProdAnnual: 220000 }));
+  const data = JSON.parse(res.body).data;
+  /* Allow a small rate-rounding tolerance on the derived wages. */
+  const cost = data.kpis.annualHygienistCost;
+  const prod = data.kpis.annualHygieneProduction;
+  expect(Math.abs(cost - 100000) < 200, `annualHygienistCost should be ~$100k; got $${cost}`);
+  expect(Math.abs(prod - 220000) < 1,   `annualHygieneProduction should be $220k; got $${prod}`);
+  const w = findHygRatioWeakness(data);
+  expect(w, 'Hygiene Dept Ratio SWOT did not fire: ' + JSON.stringify(data.swot.weaknesses));
+  expect(/\$2\.20 for every \$1/.test(w), `body should cite $2.20 ratio; got: ${w}`);
+  expect(/3:1 benchmark/.test(w), 'body missing 3:1 benchmark reference');
+  expect(/\$300,000/.test(w), 'body should cite production-to-hit-bench $300,000');
+  expect(/\$80,000/.test(w), 'body should cite production gap $80,000');
+  expect(/two structural paths to close that gap/i.test(w), 'body missing two-structural-paths phrase');
+  expect(/Arestin and laser perio/.test(w), 'body missing adjunctive-therapies mention');
+  expect(/align hygiene compensation to production/i.test(w), 'body missing compensation-alignment path');
+  expect(/don't tell you which path fits this practice/.test(w), 'body missing closing framing');
+  /* Legacy labor-as-% phrasing must be gone — no double-fire narrative. */
+  const legacy = data.swot.weaknesses.find(x => /Hygienist productivity below benchmark — wages are /.test(x));
+  expect(!legacy, `Legacy hygienist>38 weakness still firing: "${legacy}"`);
+});
+
+test('Hygiene Dept Ratio SWOT: AT THRESHOLD — ratio exactly 3.0 does NOT fire', async () => {
+  const res = await handler(hygRatioFixture({ targetHygWagesAnnual: 100000, targetHygProdAnnual: 300000 }));
+  const data = JSON.parse(res.body).data;
+  const w = findHygRatioWeakness(data);
+  expect(!w, `Hygiene Dept Ratio SWOT should not fire at ratio=3.0 (strict < threshold); fired: ${w}`);
+});
+
+test('Hygiene Dept Ratio SWOT: HEALTHY — ratio 3.5 does NOT fire', async () => {
+  const res = await handler(hygRatioFixture({ targetHygWagesAnnual: 100000, targetHygProdAnnual: 350000 }));
+  const data = JSON.parse(res.body).data;
+  const w = findHygRatioWeakness(data);
+  expect(!w, `Hygiene Dept Ratio SWOT should not fire at ratio=3.5; fired: ${w}`);
+});
+
+test('Hygiene Dept Ratio SWOT: GRACEFUL DEGRADATION — zero hygienist cost → no fire', async () => {
+  const res = await handler(hygRatioFixture({ targetHygWagesAnnual: 0, targetHygProdAnnual: 220000 }));
+  expect(res.statusCode === 200, 'handler errored on zero hygienist cost: ' + res.body);
+  const data = JSON.parse(res.body).data;
+  const w = findHygRatioWeakness(data);
+  expect(!w, `SWOT should not fire when annualHygienistCost is zero; fired: ${w}`);
+});
+
+test('Hygiene Dept Ratio SWOT: GRACEFUL DEGRADATION — zero hygiene production → no fire', async () => {
+  const res = await handler(hygRatioFixture({ targetHygWagesAnnual: 100000, targetHygProdAnnual: 0 }));
+  expect(res.statusCode === 200, 'handler errored on zero hygiene production: ' + res.body);
+  const data = JSON.parse(res.body).data;
+  const w = findHygRatioWeakness(data);
+  expect(!w, `SWOT should not fire when annualHygieneProduction is zero; fired: ${w}`);
 });
 
 (async () => {
