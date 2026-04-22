@@ -354,9 +354,10 @@
 <!-- âââââââââââ SUCCESS MODAL âââââââââââ -->
 <div class="modal" id="successModal">
     <div class="modal-content">
-        <div class="checkmark"></div>
-        <h2 class="modal-heading">Report Submitted</h2>
+        <div class="checkmark" id="modalCheckmark"></div>
+        <h2 class="modal-heading" id="modalHeading">Submitting Report...</h2>
         <div class="modal-summary" id="modalSummary"></div>
+        <div class="modal-status" id="modalStatus" style="font-size:13px;color:var(--label);margin-bottom:16px;min-height:18px;"></div>
         <div class="modal-buttons">
             <button class="modal-btn modal-btn-primary" id="emailDataBtn">Email Report</button>
             <button class="modal-btn modal-btn-secondary" id="copyDataBtn">Copy JSON</button>
@@ -367,6 +368,15 @@
 
 <script>
 /* ââââââââââââââââââââââââââââââââââââââââââ
+   PIPELINE CONFIGURATION
+   Both values set once after first Apps Script deploy — see
+   apps-script/SETUP.md. The SHARED_SECRET is a write-side speed bump
+   (visible in view-source); real auth is the passcode gate above.
+   ========================================== */
+const APPS_SCRIPT_URL = 'REPLACE_ME_WITH_APPS_SCRIPT_WEBAPP_URL';
+const SHARED_SECRET   = 'REPLACE_ME_WITH_SHARED_SECRET';
+
+/* ==========================================
    PRACTICE CONFIGURATIONS
    Add new practices here. Each practice gets:
    - name: display name
@@ -381,7 +391,7 @@ const PRACTICES = {
     vanek: {
         name: "Dr. Vanek's Practice",
         code: 'vanek',
-        passcode: 'Surf',
+        passcode: 'evacuee-bargraph-oil-manly-eighty-seven',
         doctors: ['Dr. Vanek', 'Temp Doctor'],
         hygienists: ['Sandra', 'Natalia', 'Ann', 'Jenny', 'Eileen'],
         specialties: ['Ortho Prod', 'Oral Surgery', 'Cosmetic', 'Endo'],
@@ -390,7 +400,7 @@ const PRACTICES = {
     pigneri: {
         name: "Dr. Pigneri's Practice",
         code: 'pigneri',
-        passcode: 'Post Oak',
+        passcode: 'ice-casualty-snowy-habitant-thirty',
         doctors: ['Dr. Pigneri'],
         hygienists: ['Deissy', 'Temp'],
         specialties: ['Ortho Prod', 'Oral Surgery', 'TMJ', 'Perio', 'Cosmetic', 'Dr Su'],
@@ -399,7 +409,7 @@ const PRACTICES = {
     murray: {
         name: "Dr. Murray's Practice",
         code: 'murray',
-        passcode: 'Birding',
+        passcode: 'clear-unclog-twig-onset-nineteen',
         doctors: ['Dr. Murray', 'Dr. Najem'],
         hygienists: ['Mia', 'Brenda', 'Phoung', 'Temp'],
         specialties: ['Ortho Prod', 'Oral Surgery', 'Endo', 'Cosmetic'],
@@ -408,7 +418,7 @@ const PRACTICES = {
     bilbeisi: {
         name: "Dr. Bilbeisi's Practice (Cedar Ridge)",
         code: 'bilbeisi',
-        passcode: 'Cedar Ridge',
+        passcode: 'winnings-justice-populace-rocking-forty-eight',
         doctors: ['Dr. Bilbeisi'],
         hygienists: ['Linda'],
         specialties: [],
@@ -417,7 +427,7 @@ const PRACTICES = {
     abas: {
         name: "Dr. Abas's Practice",
         code: 'abas',
-        passcode: 'Taj Mahal',
+        passcode: 'dean-definite-railroad-payee-sixty-one',
         doctors: ['Dr. Abas'],
         hygienists: ['Tina'],
         specialties: ['Oral Surgery', 'Pedo', 'Perio'],
@@ -760,7 +770,81 @@ function toDashboardFormat(data) {
 }
 
 // ââ Submit ââ
-function handleSubmit() {
+// -- Flatten form data to {tag, dimension, value}[] for Apps Script --
+// Dimension labels must match what the sheet uses, or upsert will create
+// new rows instead of updating existing ones. Labels taken from existing
+// dashboard RAW blobs for Murray/Abas/Pigneri. Adjust if sheet drift shows up.
+function flattenToValues(d) {
+    const v = [];
+    const push = (tag, dimension, value) => {
+        if (value == null) return;
+        v.push({ tag, dimension, value });
+    };
+
+    push('Results', 'Production',       d.results.production);
+    push('Results', 'Collections',      d.results.collections);
+    push('Results', 'Future Scheduled', d.results.futureScheduled);
+
+    push('Days', 'Days IN:', d.daysIn);
+
+    push('Crowns', 'Crowns PREPPED',                d.crowns.prepped);
+    push('Crowns', 'Crowns from LAST MONTH',         d.crowns.lastMonth);
+    push('Crowns', 'Crowns FUTURE BOOKED',           d.crowns.futureBooked);
+    push('Crowns', 'Crown diagnosed - NON Cosmetic', d.crowns.diagnosedNonCosmetic);
+
+    d.doctors.forEach(doc => {
+        push('Doctor', doc.name + ' production', doc.production);
+        push('Doctor', doc.name + ' days',       doc.days);
+    });
+
+    d.hygiene.hygienists.forEach(h => {
+        push('Hygiene', h.name + ' production', h.production);
+        push('Hygiene', h.name + ' days',       h.days);
+    });
+
+    Object.entries(d.specialties).forEach(([name, val]) => push('Specialty', name, val));
+
+    push('Visits', 'New Patients seen',       d.visits.newPatients);
+    push('Visits', '1110 Prophy',             d.visits.prophies);
+    push('Visits', '4910 Perio Maint',        d.visits.perioMaint);
+    push('Visits', 'SRP--PATIENTS NOT Quads', d.visits.srp);
+    push('Visits', 'Arrestin $',              d.visits.arrestin);
+    push('Visits', 'Laser $',                 d.visits.laser);
+
+    push('Exams', '0150 Comp Exam',     d.exams.comp);
+    push('Exams', '0120 Periodic Exam', d.exams.periodic);
+    push('Exams', '0140 Limited Exam',  d.exams.limited);
+    push('Exams', 'Bite Wellness',      d.exams.biteWellness);
+
+    Object.entries(d.imaging).forEach(([name, val]) => push('Imaging', name, val));
+
+    return v;
+}
+
+// -- POST to Apps Script --
+// No Content-Type header: Apps Script web apps mishandle the CORS preflight
+// on application/json. Leaving the body as a plain string keeps this a
+// "simple" request per CORS.
+async function submitToDashboard(data) {
+    if (APPS_SCRIPT_URL.startsWith('REPLACE_ME')) {
+        return { ok: false, error: 'APPS_SCRIPT_URL not configured. See apps-script/SETUP.md.' };
+    }
+    const body = {
+        secret: SHARED_SECRET,
+        practice: activePractice.code,
+        date: data.year + '-' + data.monthNum,
+        meeting: 'Month End',
+        values: flattenToValues(data),
+    };
+    try {
+        const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(body) });
+        return await res.json();
+    } catch (err) {
+        return { ok: false, error: String(err && err.message || err) };
+    }
+}
+
+async function handleSubmit() {
     const month = document.getElementById('month').value;
     const year = document.getElementById('year').value;
     if (!month || !year) {
@@ -770,11 +854,15 @@ function handleSubmit() {
 
     lastSubmitData = getFormData();
 
-    // Show modal
-    const summary = document.getElementById('modalSummary');
+    const modal = document.getElementById('successModal');
+    const heading = document.getElementById('modalHeading');
+    const checkmark = document.getElementById('modalCheckmark');
+    const status = document.getElementById('modalStatus');
+    const submitBtn = document.getElementById('submitBtn');
+
     const prod = lastSubmitData.results.production;
     const coll = lastSubmitData.results.collections;
-    summary.innerHTML = `
+    document.getElementById('modalSummary').innerHTML = `
         <div><strong>${lastSubmitData.practice}</strong></div>
         <div>${lastSubmitData.month} ${lastSubmitData.year}</div>
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--divider);">
@@ -784,7 +872,34 @@ function handleSubmit() {
             <div>Hygiene Total: <strong>${'$' + (lastSubmitData.hygiene.total || 0).toLocaleString()}</strong></div>
         </div>
     `;
-    document.getElementById('successModal').classList.add('show');
+
+    heading.textContent = 'Submitting Report...';
+    checkmark.style.background = 'var(--label)';
+    status.textContent = 'Sending to dashboard...';
+    submitBtn.disabled = true;
+    modal.classList.add('show');
+
+    const result = await submitToDashboard(lastSubmitData);
+    submitBtn.disabled = false;
+
+    if (result && result.ok) {
+        heading.textContent = 'Report Submitted';
+        checkmark.style.background = 'var(--success)';
+        const parts = [];
+        if (result.inserted) parts.push(result.inserted + ' new');
+        if (result.updated)  parts.push(result.updated + ' updated');
+        if (result.unknownTabs && result.unknownTabs.length) {
+            parts.push('skipped tabs: ' + result.unknownTabs.join(', '));
+        }
+        status.textContent = parts.length
+            ? 'Sheet: ' + parts.join(', ') + '. Dashboard rebuild in ~1-3 min.'
+            : 'Sheet synced. Dashboard rebuild in ~1-3 min.';
+    } else {
+        heading.textContent = 'Submission Failed';
+        checkmark.style.background = '#dc3545';
+        status.innerHTML = 'Error: ' + (result && result.error || 'unknown') +
+            '<br>Use <strong>Copy JSON</strong> or <strong>Email Report</strong> as a fallback.';
+    }
 }
 
 // ââ Copy JSON ââ
