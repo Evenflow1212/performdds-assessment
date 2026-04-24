@@ -236,7 +236,7 @@ function sortedDates(arr) { return [...new Set(arr.map(r => r.date))].sort(); }
 function groupByDate(arr, dimKey = 'dimension', valKey = 'value') { const m = {}; arr.forEach(r => { if (!m[r.date]) m[r.date] = {}; m[r.date][r[dimKey]] = r[valKey]; }); return m; }
 
 // === AUTH ===
-const USERS = {"abas":"0a5e932a2a836e130009d9c051a9cae7753fe094b30822d9680fbbbe33638215"};
+const USERS = {"abas":"19c1ca6a3c474437cbf0492fdae180524679304fbacc506d70fda1fdec6f84aa"};
 
 async function sha256(message) {
     const msgBuffer = new TextEncoder().encode(message);

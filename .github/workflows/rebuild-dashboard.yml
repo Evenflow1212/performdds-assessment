@@ -1,0 +1,37 @@
+name: Rebuild dashboard
+
+on:
+  repository_dispatch:
+    types: [dashboard_update]
+
+concurrency:
+  group: dashboard-${{ github.event.client_payload.practice }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace RAW block
+        env:
+          PRACTICE: ${{ github.event.client_payload.practice }}
+          RAW_JSON: ${{ toJson(github.event.client_payload.raw) }}
+        run: |
+          python3 .github/scripts/replace_raw.py "$PRACTICE" <<< "$RAW_JSON"
+
+      - name: Commit and push
+        run: |
+          git config user.name "performdds-bot"
+          git config user.email "dashboard@performdds.com"
+          git add "${{ github.event.client_payload.practice }}-dashboard.html"
+          if git diff --cached --quiet; then
+            echo "No changes — skipping commit."
+            exit 0
+          fi
+          git commit -m "Update ${{ github.event.client_payload.practice }} dashboard"
+          git push
