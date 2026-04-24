@@ -9,15 +9,65 @@ const fetch = require('node-fetch');
    in generate-report.js are vendor-agnostic. */
 const PROMPTS = {
   dentrix: {
-    production: `Dentrix Production by Procedure Code report. Extract the date range from the header, then every procedure code with its description, quantity and dollar total.
-Return ONLY lines in this format — no other text:
-First line: DATES|MM/DD/YYYY - MM/DD/YYYY
-Then one line per code: CODE|DESCRIPTION|QTY|TOTAL
-Example:
+    production: `Dentrix Practice Analysis report. This PDF contains TWO sections you must extract:
+  (1) Production by Procedure Code — every procedure code with qty + dollar total.
+  (2) Payment Summary — dollar totals by payment method (appears near the end).
+
+OUTPUT ORDER:
+  Line 1: DATES|MM/DD/YYYY - MM/DD/YYYY   (date range from the header)
+  Then: one CODE|DESCRIPTION|QTY|TOTAL line per procedure (section 1).
+  Then (if Payment Summary section is present): four REVENUE_* lines
+  classifying every payment line by bucket.
+
+PROCEDURE CODES (section 1):
+CODE|DESCRIPTION|QTY|TOTAL — one per row. Include ALL codes, even those with $0
+total. Maintain the order they appear. Example:
+D0120|Periodic Oral Evaluation - Established Patient|910|62016.00
+D1110|Prophylaxis - Adult|938|117415.00
+
+PAYMENT SUMMARY (section 2) — emit these four lines after the code list,
+summing each payment row into the correct bucket:
+  REVENUE_INSURANCE|<sum of all "Dental Ins", "Medical Ins", "Ins Pmt" rows>
+  REVENUE_3RDPARTY|<sum of "Care Credit", "Lending Club", "Cherry", "Alphaeon", "Sunbit", "Proceed Finance">
+  REVENUE_GOVERNMENT|<sum of "Medicaid", "Medicare", "HMO", "Capitation", "DMO" rows>
+  REVENUE_PATIENT|<sum of all other payment methods — VISA, MasterCard, AMEX, Discover, Cash, Check, Online CC, phone CC, Collection Payment, etc.>
+
+Rules for the Payment Summary:
+- Skip rows labeled "Sub-Total", "Total", "Grand Total", "Refund", "Adjustment" — those
+  are aggregates or reversals, not payment receipts.
+- If a row has an amount in parentheses (negative), subtract it from the bucket.
+- If the Payment Summary section is absent from this report, emit the four
+  REVENUE_* lines with value 0 each — do NOT omit them.
+- Amounts: plain numbers, no $, no commas, no parens.
+
+Example output (production followed by payment breakdown):
 DATES|03/01/2025 - 02/28/2026
 D0120|Periodic Oral Evaluation - Established Patient|910|62016.00
 D1110|Prophylaxis - Adult|938|117415.00
-Include ALL codes, even those with $0 total. Maintain the order they appear in the document.`,
+REVENUE_INSURANCE|879888.70
+REVENUE_3RDPARTY|306858.70
+REVENUE_GOVERNMENT|0
+REVENUE_PATIENT|1971579.00
+
+Return ONLY the lines above — no commentary, no markdown.`,
+
+    patientSummary: `Dentrix Practice Analysis — Patient Summary report. Extract the
+top-line patient counts from the summary tables. Return ONLY these pipe-delimited lines,
+one per metric, in this order (omit a line entirely if the figure isn't present):
+ACTIVE_PATIENTS|<integer>
+INSURED_PATIENTS|<integer>
+FAMILIES|<integer>
+NEW_PATIENTS_YTD|<integer>
+NEW_PATIENTS_MONTH|<integer>
+REFERRALS_YTD|<integer>
+
+Plain integers — no commas, no $, no decimals, no commentary. Example:
+ACTIVE_PATIENTS|2667
+INSURED_PATIENTS|1670
+FAMILIES|5927
+NEW_PATIENTS_YTD|1581
+NEW_PATIENTS_MONTH|29
+REFERRALS_YTD|773`,
 
     collections: `Dentrix Analysis Summary Provider report. Find:
 1. The date range at the top (format: MM/DD/YYYY - MM/DD/YYYY)
@@ -85,21 +135,44 @@ Sanity check: CHARGES and PAYMENTS should both be large numbers (typically $500K
   },
 };
 
-/* P&L prompt is vendor-agnostic — QuickBooks output is the same regardless of PM software. */
-const PL_PROMPT = `QuickBooks Profit and Loss statement. Extract every line item with its dollar amount.
-Return ONLY lines in this format:
-SECTION|[Income/COGS/Expense/Other Expense]
-ITEM|AMOUNT
-Use these exact section markers before each group.
-For each line item under Expenses, return: ItemName|Amount
-Also include these summary lines at the end:
-TOTAL_INCOME|[amount]
-TOTAL_EXPENSE|[amount]
-NET_INCOME|[amount]
-Match QuickBooks labels: "Total for Income" / "Total Income" / "Total Revenue" all mean TOTAL_INCOME. "Total for Expenses" / "Total Expenses" mean TOTAL_EXPENSE. "Net Income" / "Net Operating Income" mean NET_INCOME (prefer Net Income if both present).
-Return negative numbers with minus sign. Include ALL line items.`;
+/* P&L prompt is vendor-agnostic — QuickBooks output is the same regardless of PM software.
+   2026-04-23: totals moved to the TOP so they survive any token-limit
+   truncation on long P&Ls (JD Troy 2024 revealed silent parse failure
+   when detailed line items filled the budget before totals emitted). */
+const PL_PROMPT = `QuickBooks Profit and Loss statement. Extract totals AND every line item with its dollar amount.
 
-const TOKEN_LIMITS = { production: 8192, collections: 4096, pl: 8192 };
+OUTPUT ORDER — totals first, then sections with line items. This matters because
+truncation at the end of the output is acceptable; truncation before the totals is not.
+
+The FIRST three lines of your output MUST be (in this order):
+TOTAL_INCOME|[number]
+TOTAL_EXPENSE|[number]
+NET_INCOME|[number]
+
+Do NOT emit these as markdown (no ** around the label), do NOT add commentary, do NOT
+add a dollar sign. Pipe-delimited, plain text, one per line. Example:
+TOTAL_INCOME|2124318.47
+TOTAL_EXPENSE|2207517.73
+NET_INCOME|-92796.84
+
+Match QuickBooks label variants: "Total for Income" / "Total Income" / "Total Revenue"
+/ "Gross Revenue" all mean TOTAL_INCOME. "Total for Expenses" / "Total Expenses" /
+"Total Operating Expenses" mean TOTAL_EXPENSE. "Net Income" / "Net Operating Income"
+mean NET_INCOME — prefer Net Income over Net Operating Income when both are present.
+Return negatives with a minus sign (not parentheses, not dollar signs).
+
+AFTER the three totals, emit each section's line items:
+SECTION|[Income/COGS/Expense/Other Expense]
+ItemName|Amount
+ItemName|Amount
+SECTION|Expense
+ItemName|Amount
+... etc.
+
+Include EVERY line item. Use the exact QuickBooks label for each item's ItemName.
+Return ONLY these lines — no prose, no preamble, no summary, no markdown.`;
+
+const TOKEN_LIMITS = { production: 8192, collections: 4096, pl: 8192, patientSummary: 1024 };
 
 exports.handler = async function(event) {
   if (event.httpMethod === 'OPTIONS') {
@@ -154,15 +227,74 @@ exports.handler = async function(event) {
     const data = await resp.json();
     if (!resp.ok) throw new Error('Claude API: ' + JSON.stringify(data).slice(0, 300));
     const text = data.content?.[0]?.text || '';
-    console.log(`parse-pdf: got ${text.split('\n').length} lines for type=${type}`);
+    const stopReason = data.stop_reason || 'unknown';
+    console.log(`parse-pdf: type=${type}, stop_reason=${stopReason}, lines=${text.split('\n').length}, chars=${text.length}`);
+
+    /* Shape-check the response so silent parse failures become visible both
+       in logs and in the API response (Fix 5 — Hub uses `parseOk` to show
+       a "Parse failed — re-upload" badge instead of a green checkmark). */
+    const parseOk = validateShape(type, text);
+    const hintHead = text.slice(0, 160).replace(/\n/g, ' | ');
+    if (!parseOk.ok) {
+      console.warn(`parse-pdf WARN type=${type}: ${parseOk.reason}. Head: "${hintHead}"`);
+    }
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ success: true, text })
+      body: JSON.stringify({
+        success: true,
+        text,
+        parseOk: parseOk.ok,
+        parseReason: parseOk.reason || null,
+        stopReason,
+      })
     };
   } catch (err) {
     console.error('parse-pdf error:', err.message);
     return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+/* Shape-check Claude's response to detect silent parse failures before they
+   reach the downstream parsers. Each type has a minimum viable signature —
+   if absent, the Hub marks the step as "Parse failed — re-upload". */
+function validateShape(type, text) {
+  if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    return { ok: false, reason: 'empty response' };
+  }
+  if (type === 'pl') {
+    const hasIncome  = /(^|\n)\s*TOTAL_INCOME\s*\|/i.test(text);
+    const hasExpense = /(^|\n)\s*TOTAL_EXPENSE\s*\|/i.test(text);
+    /* Also accept QuickBooks label variants in case Claude bypasses the
+       requested format entirely. */
+    const qbIncome   = /(^|\n)\s*total\s+(?:for\s+)?(?:income|revenue|sales)\s*\|/i.test(text);
+    const qbExpense  = /(^|\n)\s*total\s+(?:for\s+)?(?:operating\s+)?expenses?\s*\|/i.test(text);
+    if (!(hasIncome || qbIncome) || !(hasExpense || qbExpense)) {
+      return { ok: false, reason: 'P&L missing TOTAL_INCOME or TOTAL_EXPENSE line' };
+    }
+    return { ok: true };
+  }
+  if (type === 'production') {
+    const hasDate = /(^|\n)\s*DATES\s*\|/i.test(text);
+    const hasCode = /(^|\n)\s*D\d{4}\s*\|/i.test(text);
+    if (!hasDate || !hasCode) {
+      return { ok: false, reason: 'production missing DATES header or D-code rows' };
+    }
+    return { ok: true };
+  }
+  if (type === 'collections') {
+    const hasCharges  = /(^|\n)\s*CHARGES\s*\|/i.test(text);
+    const hasPayments = /(^|\n)\s*PAYMENTS\s*\|/i.test(text);
+    if (!hasCharges || !hasPayments) {
+      return { ok: false, reason: 'collections missing CHARGES or PAYMENTS line' };
+    }
+    return { ok: true };
+  }
+  if (type === 'patientSummary') {
+    const hasActive = /(^|\n)\s*ACTIVE_PATIENTS\s*\|/i.test(text);
+    if (!hasActive) return { ok: false, reason: 'patientSummary missing ACTIVE_PATIENTS line' };
+    return { ok: true };
+  }
+  return { ok: true };  /* unknown type — don't block */
+}

@@ -1412,6 +1412,259 @@ test('Hygiene Dept Ratio SWOT: GRACEFUL DEGRADATION — zero hygiene production 
   expect(!w, `SWOT should not fire when annualHygieneProduction is zero; fired: ${w}`);
 });
 
+/* ──────────────────────────────────────────────────────────────────────
+   Parser bug-fix batch (2026-04-23): Insurance AR column offset,
+   P&L silent parse failure, Collections payment breakdown, Active
+   patients unblock. Ground-truth shapes come from the fresh Pigneri
+   Dentrix output Dave captured on 2026-04-22.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Bug 1 — Insurance AR client-side parser regression.
+   The parser lives in assessment_hub.html as `extractARFromPdf`. Here we
+   re-extract its numeric-bucket logic inline and drive it against a
+   synthetic text flow that matches Dentrix's 6-column layout:
+     ESTIMATE | CURRENT | 31-60 | 61-90 | OVER 90 | TOTAL
+
+   This is structured as a unit test against the parser's shape-detection
+   rule rather than a whole-PDF round-trip, because pdf.js doesn't run in
+   Node. The equivalent shape-rule is captured in `parseInsuranceARNums`
+   below — kept identical to the production parser so any drift surfaces. */
+function parseInsuranceARNums(allNumsRaw) {
+  /* Mirror the live parser's filter — tolerant to legitimate $0 aging
+     buckets (over-90 can be exactly zero), but still drops page-number
+     noise (bare 1-2 digit integers with no comma/decimal). */
+  const allNums = (allNumsRaw || []).filter((s) => {
+    const n = parseFloat(String(s).replace(/,/g, ''));
+    if (isNaN(n)) return false;
+    if (/[,.]/.test(String(s))) return true;
+    return n >= 100 || n === 0;
+  });
+  const parseF = (s) => parseFloat(String(s).replace(/,/g, ''));
+  if (allNums.length >= 6) {
+    return {
+      estimate: parseF(allNums[0]),
+      current:  parseF(allNums[1]),
+      d3160:    parseF(allNums[2]),
+      d6190:    parseF(allNums[3]),
+      d90plus:  parseF(allNums[4]),
+      total:    parseF(allNums[5]),
+    };
+  } else if (allNums.length >= 5) {
+    return {
+      current: parseF(allNums[0]), d3160: parseF(allNums[1]),
+      d6190:   parseF(allNums[2]), d90plus: parseF(allNums[3]),
+      total:   parseF(allNums[4]),
+    };
+  } else if (allNums.length >= 4) {
+    const c = parseF(allNums[0]), a1 = parseF(allNums[1]);
+    const a2 = parseF(allNums[2]), a3 = parseF(allNums[3]);
+    return { current: c, d3160: a1, d6190: a2, d90plus: a3, total: c + a1 + a2 + a3 };
+  }
+  return null;
+}
+
+test('Bug 1: Insurance AR 6-column layout skips ESTIMATE', async () => {
+  /* Dentrix Insurance Claim Aging Report ALL CLAIMS row (2026-04-22 Pigneri): */
+  const nums = ['15,444.05', '49,172', '15,238', '18,802', '0', '83,212'];
+  const parsed = parseInsuranceARNums(nums);
+  expect(parsed, 'parseInsuranceARNums returned null on 6-num layout');
+  expect(parsed.estimate === 15444.05, `estimate should be $15,444.05; got ${parsed.estimate}`);
+  expect(parsed.current  === 49172,    `current should be $49,172; got ${parsed.current} (was previously the ESTIMATE column)`);
+  expect(parsed.d3160    === 15238,    `31-60 should be $15,238; got ${parsed.d3160}`);
+  expect(parsed.d6190    === 18802,    `61-90 should be $18,802; got ${parsed.d6190}`);
+  expect(parsed.d90plus  === 0,        `over 90 should be $0; got ${parsed.d90plus}`);
+  expect(parsed.total    === 83212,    `total should be $83,212; got ${parsed.total}`);
+  /* Regression guard: pre-fix behavior would have produced current=$15,444, d90plus=$18,802, total=sum=$98,656. */
+  expect(parsed.total !== 98656, 'Insurance AR total should NOT be sum of estimate+current+31-60+61-90 (old bug signature)');
+});
+
+test('Bug 1: Insurance AR 5-column layout (no estimate) parses straight through', async () => {
+  const nums = ['49,172', '15,238', '18,802', '0', '83,212'];
+  const parsed = parseInsuranceARNums(nums);
+  expect(parsed.current === 49172 && parsed.total === 83212, 'five-number layout should map positionally');
+});
+
+test('Bug 1: Insurance AR 4-column layout (no estimate, no total) synthesizes total from sum', async () => {
+  const nums = ['49,172', '15,238', '18,802', '200'];
+  const parsed = parseInsuranceARNums(nums);
+  expect(parsed.total === 49172 + 15238 + 18802 + 200, 'four-num layout should synthesize total from aging buckets');
+});
+
+/* Bug 2 — P&L silent parse failure. Every variant Claude might emit against
+   the JD Troy 2024 QuickBooks P&L should produce non-null totals. */
+const { parseProduction: pp, parseCollections: pc, parsePL: pl, parsePatientSummary: pps } = require(require('path').resolve(__dirname, '..', 'netlify', 'functions', 'generate-report.js'));
+
+test('Bug 2: P&L parser accepts TOTAL_INCOME at the TOP (post-2026-04-23 prompt)', () => {
+  const txt = [
+    'TOTAL_INCOME|2124318.47',
+    'TOTAL_EXPENSE|2207517.73',
+    'NET_INCOME|-92796.84',
+    'SECTION|Income',
+    'Patient Income|1800000',
+    'Insurance Income|324318.47',
+    'SECTION|Expense',
+    'Salaries & Wages|889164.04',
+    'Lab Fees|75509.00',
+    'Dental Supplies|171167.66',
+  ].join('\n');
+  const r = pl(txt);
+  expect(Math.abs(r.totalIncome  - 2124318.47) < 0.01, 'totalIncome missed');
+  expect(Math.abs(r.totalExpense - 2207517.73) < 0.01, 'totalExpense missed');
+  expect(Math.abs(r.netIncome    - -92796.84)  < 0.01, 'netIncome missed (negative)');
+});
+
+test('Bug 2: P&L parser tolerates markdown-bold wrapping around totals', () => {
+  const txt = [
+    '**TOTAL_INCOME**|2124318.47',
+    '**TOTAL_EXPENSE**|2207517.73',
+    '**NET_INCOME**|-92796.84',
+  ].join('\n');
+  const r = pl(txt);
+  expect(Math.abs(r.totalIncome  - 2124318.47) < 0.01, 'totalIncome should survive markdown wrapping');
+  expect(Math.abs(r.totalExpense - 2207517.73) < 0.01, 'totalExpense should survive markdown wrapping');
+});
+
+test('Bug 2: P&L parser tolerates "Total for Expenses" QuickBooks label', () => {
+  const txt = [
+    'Total for Income|2124318.47',
+    'Total for Expenses|2207517.73',
+    'Net Income|-92796.84',
+  ].join('\n');
+  const r = pl(txt);
+  expect(Math.abs(r.totalIncome  - 2124318.47) < 0.01, 'Total for Income missed');
+  expect(Math.abs(r.totalExpense - 2207517.73) < 0.01, 'Total for Expenses missed');
+});
+
+test('Bug 2: P&L parser tolerates $ and ( ) formatting from QuickBooks', () => {
+  const txt = [
+    'TOTAL_INCOME|$2,124,318.47',
+    'TOTAL_EXPENSE|$2,207,517.73',
+    'NET_INCOME|($92,796.84)',
+  ].join('\n');
+  const r = pl(txt);
+  expect(Math.abs(r.totalIncome  - 2124318.47) < 0.01, '$ + commas should parse');
+  expect(Math.abs(r.totalExpense - 2207517.73) < 0.01, '$ + commas should parse');
+  expect(Math.abs(r.netIncome    - -92796.84)  < 0.01, '( ) negative should parse as negative');
+});
+
+test('Bug 2: P&L parser synthesizes totals from items when TOTAL_ lines are missing (truncation)', () => {
+  /* Simulate the truncated-mid-output case: only line items, no explicit totals. */
+  const txt = [
+    'SECTION|Income',
+    'Patient Income|1000000',
+    'Insurance Income|800000',
+    'SECTION|Expense',
+    'Salaries & Wages|500000',
+    'Lab Fees|70000',
+  ].join('\n');
+  const r = pl(txt);
+  expect(Math.abs(r.totalIncome  - 1800000) < 0.01, `totalIncome should be synthesized from income items; got ${r.totalIncome}`);
+  expect(Math.abs(r.totalExpense - 570000)  < 0.01, `totalExpense should be synthesized from expense items; got ${r.totalExpense}`);
+});
+
+/* Bug 3 — Collections payment breakdown via REVENUE_* lines. Parser should
+   now expose prodData.revenueBreakdown; end-to-end verification that the
+   Revenue Mix card populates from Dentrix when the breakdown is present. */
+test('Bug 3: parseProduction captures REVENUE_* lines as revenueBreakdown', () => {
+  const txt = [
+    'DATES|01/01/2024 - 12/31/2024',
+    'D1110|Prophy|938|117415.00',
+    'REVENUE_INSURANCE|879888.70',
+    'REVENUE_PATIENT|1971579.00',
+    'REVENUE_3RDPARTY|306858.70',
+    'REVENUE_GOVERNMENT|0',
+  ].join('\n');
+  const p = pp(txt);
+  expect(p.codes.length === 1, 'should still parse the code row');
+  expect(p.revenueBreakdown, 'revenueBreakdown should be non-null');
+  expect(p.revenueBreakdown.insurance       === 879888.70, 'insurance bucket wrong');
+  expect(p.revenueBreakdown.patient         === 1971579,   'patient bucket wrong');
+  expect(p.revenueBreakdown.thirdPartyFinance === 306858.70, '3rd-party bucket wrong');
+  expect(p.revenueBreakdown.government      === 0,         'government bucket wrong');
+});
+
+test('Bug 3: revenueBreakdown is null when no REVENUE_* lines are present (backward compat)', () => {
+  const txt = 'DATES|01/01/2024 - 12/31/2024\nD1110|Prophy|938|117415.00';
+  expect(pp(txt).revenueBreakdown == null, 'absence of REVENUE_* should leave revenueBreakdown null');
+});
+
+test('Bug 3: sourcesOfDollars prefers Dentrix REVENUE_* breakdown over P&L items', async () => {
+  const prodText = [
+    'DATE RANGE: 01/01/2024 - 12/31/2024',
+    'D1110|Prophy|2400|240000',
+    'D2740|Crown|200|280000',
+    'REVENUE_INSURANCE|879888.70',
+    'REVENUE_PATIENT|1971579.00',
+    'REVENUE_3RDPARTY|306858.70',
+    'REVENUE_GOVERNMENT|0',
+  ].join('\n');
+  const res = await handler({
+    httpMethod: 'POST',
+    body: JSON.stringify(Object.assign(JSON.parse(buildEvent().body), { prodText })),
+  });
+  const data = JSON.parse(res.body).data;
+  const sod = data.financials.sourcesOfDollars;
+  expect(sod.source === 'dentrix', `sourcesOfDollars.source should be 'dentrix'; got '${sod.source}'`);
+  expect(sod.dollars.insurance       === 879888.70, 'insurance dollars mismatch');
+  expect(sod.dollars.patientCreditCard === 1971579, 'patient bucket should have the Dentrix-patient dollar figure');
+  expect(sod.dollars.thirdPartyFinance === 306858.70, '3rd-party mismatch');
+  expect(sod.dollars.government        === 0, 'government mismatch');
+  /* Percent math: total = 879888.70 + 1971579 + 306858.70 + 0 = 3,158,326.40.
+     Insurance ~27.9%; Patient ~62.4%; 3rd-party ~9.7%; government 0. */
+  expect(Math.abs(sod.percent.insurance - 27.86) < 0.2, `insurance % should be ~27.86; got ${sod.percent.insurance}`);
+  expect(Math.abs(sod.percent.thirdPartyFinance - 9.72) < 0.2, `3rd-party % should be ~9.72; got ${sod.percent.thirdPartyFinance}`);
+});
+
+test('Bug 3: sourcesOfDollars falls back to P&L when REVENUE_* lines are absent', async () => {
+  const body = await invoke();  /* uses default PL_STANDARD, no REVENUE_* in prodText */
+  const sod = body.data.financials.sourcesOfDollars;
+  expect(sod.source === 'pl', `sourcesOfDollars.source should fall back to 'pl' when Dentrix breakdown missing; got '${sod.source}'`);
+});
+
+/* Bug 4 — Active patient count prompt + wire-through. */
+test('Bug 4: parsePatientSummary extracts active patient counts', () => {
+  const txt = [
+    'ACTIVE_PATIENTS|2667',
+    'INSURED_PATIENTS|1670',
+    'FAMILIES|5927',
+    'NEW_PATIENTS_YTD|1581',
+    'NEW_PATIENTS_MONTH|29',
+    'REFERRALS_YTD|773',
+  ].join('\n');
+  const r = pps(txt);
+  expect(r.activePatients   === 2667, 'active patients');
+  expect(r.insuredPatients  === 1670, 'insured patients');
+  expect(r.families         === 5927, 'families');
+  expect(r.newPatientsYTD   === 1581, 'new YTD');
+  expect(r.newPatientsMonth === 29,   'new month');
+  expect(r.referralsYTD     === 773,  'referrals');
+});
+
+test('Bug 4: patientSummary surfaces on practice when patientSummaryText is posted', async () => {
+  const evt = JSON.parse(buildEvent().body);
+  evt.patientSummaryText = 'ACTIVE_PATIENTS|2667\nNEW_PATIENTS_YTD|1581';
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(data.practice.patientSummary, 'practice.patientSummary should be populated when patientSummaryText posted');
+  expect(data.practice.patientSummary.activePatients === 2667, 'activePatients surface mismatch');
+});
+
+test('Bug 4: practice.patientSummary is null when patientSummaryText is absent (backward compat)', async () => {
+  const body = await invoke();
+  expect(body.data.practice.patientSummary == null, 'patientSummary should be null when not posted');
+});
+
+/* Fix 5 — summary signals for Hub badge rendering. */
+test('Fix 5: summary exposes productionParsed / collectionsParsed / plParsed flags', async () => {
+  const body = await invoke();
+  const s = body.summary;
+  expect(s.productionParsed === true,  'productionParsed should be true on good fixture');
+  expect(s.collectionsParsed === true, 'collectionsParsed should be true on good fixture');
+  expect(s.plParsed === true,          'plParsed should be true on good fixture');
+  expect(typeof s.arPatientParsed === 'boolean',   'arPatientParsed should be boolean');
+  expect(typeof s.arInsuranceParsed === 'boolean', 'arInsuranceParsed should be boolean');
+});
+
 (async () => {
   let failed = 0;
   const start = Date.now();

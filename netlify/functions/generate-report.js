@@ -30,6 +30,19 @@ const ENGINE_VERSION = 'v41-report-only';
 function parseProduction(text) {
   const codes = [];
   let months = 12, years = [], dateStart = null, dateEnd = null;
+  /* Payment Summary breakdown from the Dentrix Practice Analysis PDF
+     (2026-04-23). The updated production prompt emits four REVENUE_*
+     lines after the code list; parseProduction captures them so the
+     Revenue Mix card can populate from Dentrix directly instead of
+     relying on the P&L Income section (which collapses to a single
+     "Sales" line for many practices). Null when no lines were emitted. */
+  let revenueInsurance = null, revenuePatient = null, revenueThirdParty = null, revenueGovernment = null;
+  const parseMoney = (s) => {
+    let raw = String(s).replace(/[,$]/g, '').trim();
+    if (raw.startsWith('(') && raw.endsWith(')')) raw = '-' + raw.slice(1, -1);
+    const n = parseFloat(raw);
+    return isNaN(n) ? null : n;
+  };
   for (const line of (text || '').split('\n')) {
     const dm = line.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*[-–]\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
     if (dm && !years.length) {
@@ -38,6 +51,20 @@ function parseProduction(text) {
       dateStart = from.toISOString().slice(0, 10);
       dateEnd = to.toISOString().slice(0, 10);
       for (let y = from.getFullYear(); y <= to.getFullYear(); y++) years.push(y);
+      continue;
+    }
+    /* Payment Summary breakdown — checked BEFORE the code regex so
+       "REVENUE_INSURANCE|879888.70" doesn't get mis-parsed as a code. */
+    const rev = line.match(/^\s*REVENUE_(INSURANCE|PATIENT|3RDPARTY|THIRDPARTY|GOVERNMENT|GOV)\s*\|\s*(-?[\d,.$()]+)/i);
+    if (rev) {
+      const key = rev[1].toUpperCase();
+      const amt = parseMoney(rev[2]);
+      if (amt != null) {
+        if      (key === 'INSURANCE')                           revenueInsurance  = amt;
+        else if (key === 'PATIENT')                             revenuePatient    = amt;
+        else if (key === '3RDPARTY' || key === 'THIRDPARTY')    revenueThirdParty = amt;
+        else if (key === 'GOVERNMENT' || key === 'GOV')         revenueGovernment = amt;
+      }
       continue;
     }
     /* Match: CODE|DESC|QTY|TOTAL — codes can start with letter or digit */
@@ -55,7 +82,16 @@ function parseProduction(text) {
     }
   }
   if (!years.length) { const n = new Date(); years = [n.getFullYear()-1, n.getFullYear()]; }
-  return { codes, months, years, dateStart, dateEnd };
+  /* Only surface the breakdown when at least one bucket populated. */
+  const anyRevenue = [revenueInsurance, revenuePatient, revenueThirdParty, revenueGovernment]
+    .some(v => Number.isFinite(v));
+  const revenueBreakdown = anyRevenue ? {
+    insurance:       Number.isFinite(revenueInsurance)  ? revenueInsurance  : 0,
+    patient:         Number.isFinite(revenuePatient)    ? revenuePatient    : 0,
+    thirdPartyFinance: Number.isFinite(revenueThirdParty) ? revenueThirdParty : 0,
+    government:      Number.isFinite(revenueGovernment) ? revenueGovernment : 0,
+  } : null;
+  return { codes, months, years, dateStart, dateEnd, revenueBreakdown };
 }
 
 function parseCollections(text) {
@@ -75,38 +111,47 @@ function parsePL(text) {
   const items = [];
   let totalIncome = null, totalExpense = null, netIncome = null;
   let currentSection = 'Expense';
-  /* Recognize summary-line variants Claude emits in the wild: the PL prompt
-     asks for TOTAL_EXPENSE but Haiku often echoes the QB label verbatim
-     ("Total Expenses"), pluralizes the underscored key ("TOTAL_EXPENSES"),
-     or keeps the "$" / parens formatting from the source PDF. When any of
-     these slip through, totalExpense stays null and Overhead % renders as
-     "—" on the scorecard — the bug flagged in MORNING_NOTES.md (2026-04-15). */
-  const RE_INCOME  = /^total[\s_]+(?:for\s+)?(?:income|revenue|sales)\s*\|\s*([^\s|]+)/i;
-  const RE_EXPENSE = /^total[\s_]+(?:for\s+)?(?:operating\s+)?expenses?\s*\|\s*([^\s|]+)/i;
-  const RE_NET     = /^net[\s_]+(?:operating[\s_]+)?income\s*\|\s*([^\s|]+)/i;
+  /* Recognize summary-line variants Claude emits in the wild. The PL prompt
+     asks for TOTAL_INCOME / TOTAL_EXPENSE / NET_INCOME but Haiku sometimes
+     echoes the QB label verbatim ("Total Expenses"), wraps it in markdown
+     (`**TOTAL_EXPENSE**|...`), pluralizes the underscored key, or keeps
+     the "$" / parens formatting from the source PDF. The regexes below
+     tolerate all of those. A leading whitespace/markdown prefix is stripped
+     before matching so the lines don't have to start at column 0. */
+  const stripPrefix = (line) => line.replace(/^[\s>*`#\-]*\**\s*/, '').replace(/\**\s*$/, '');
+  /* Trailing `\**\s*` before the `[:|]` separator lets the regex match
+     markdown-wrapped Claude output like `**TOTAL_INCOME**|2124318.47`
+     where the trailing `**` survives stripPrefix. */
+  const RE_INCOME  = /^total[\s_]+(?:for\s+)?(?:income|revenue|sales|gross\s+revenue)\s*\**\s*[:|]\s*\**?([^\s|*]+)/i;
+  const RE_EXPENSE = /^total[\s_]+(?:for\s+)?(?:operating\s+)?expenses?\s*\**\s*[:|]\s*\**?([^\s|*]+)/i;
+  const RE_NET     = /^net[\s_]+(?:operating[\s_]+)?income\s*\**\s*[:|]\s*\**?([^\s|*]+)/i;
   const parseAmount = (s) => {
-    let raw = String(s).replace(/[,$]/g, '');
+    let raw = String(s).replace(/[,$]/g, '').replace(/\*/g, '');
     if (raw.startsWith('(') && raw.endsWith(')')) raw = '-' + raw.slice(1, -1);
     const n = parseFloat(raw);
     return isNaN(n) ? null : n;
   };
-  for (const line of (text || '').split('\n')) {
+  for (const rawLine of (text || '').split('\n')) {
+    const line = stripPrefix(rawLine);
+    /* Net income first so "Net Operating Income" doesn't trip the expense regex. */
+    const sn = line.match(RE_NET);
+    if (sn) { const v = parseAmount(sn[1]); if (v != null && netIncome == null) netIncome = v; continue; }
     const sm = line.match(RE_INCOME);
     if (sm) { const v = parseAmount(sm[1]); if (v != null) totalIncome = Math.abs(v); continue; }
     const se = line.match(RE_EXPENSE);
     if (se) { const v = parseAmount(se[1]); if (v != null) totalExpense = Math.abs(v); continue; }
-    const sn = line.match(RE_NET);
-    if (sn) { const v = parseAmount(sn[1]); if (v != null) netIncome = v; continue; }
-    const secMatch = line.match(/^SECTION\|(.+)/i);
+    const secMatch = line.match(/^SECTION\s*\|\s*(.+)/i);
     if (secMatch) { currentSection = secMatch[1].trim(); continue; }
-    if (/^DATES?\|/i.test(line)) continue;
-    const m = line.match(/^(.+?)\|([-\d,.()+]+)/);
+    if (/^DATES?\s*\|/i.test(line)) continue;
+    /* Ignore our own REVENUE_* payment-breakdown lines if they leak into the PL text. */
+    if (/^REVENUE_/i.test(line)) continue;
+    const m = line.match(/^(.+?)\|([-\d,.()+$]+)/);
     if (m) {
       const item = m[1].trim();
-      let raw = m[2].replace(/,/g,'');
-      if (raw.startsWith('(') && raw.endsWith(')')) raw = '-' + raw.slice(1,-1);
+      let raw = m[2].replace(/[,$]/g, '');
+      if (raw.startsWith('(') && raw.endsWith(')')) raw = '-' + raw.slice(1, -1);
       const amt = parseFloat(raw);
-      if (!isNaN(amt) && item && !/total income|total expense|total sales|gross profit|net income|net operating|cost of goods|cogs/i.test(item)) {
+      if (!isNaN(amt) && item && !/total income|total expense|total sales|total revenue|gross profit|net income|net operating|cost of goods|cogs/i.test(item)) {
         items.push({ item, amount: Math.abs(amt), section: currentSection });
       }
     }
@@ -119,7 +164,49 @@ function parsePL(text) {
       if (incomePatterns.test(it.item)) it.section = 'Income';
     }
   }
+  /* Defensive fallback totals (2026-04-23) — if TOTAL_INCOME / TOTAL_EXPENSE
+     didn't come through on their own lines (truncation, format mismatch), sum
+     the items by section. Better to surface ballpark numbers than silently
+     render "P&L not uploaded" on a P&L the user DID upload. */
+  if (totalIncome == null && items.some(i => i.section === 'Income')) {
+    totalIncome = items.filter(i => i.section === 'Income').reduce((s, i) => s + i.amount, 0);
+    console.warn('parsePL: totalIncome synthesized from Income items =', totalIncome);
+  }
+  if (totalExpense == null && items.some(i => i.section === 'Expense')) {
+    totalExpense = items.filter(i => i.section === 'Expense').reduce((s, i) => s + i.amount, 0);
+    console.warn('parsePL: totalExpense synthesized from Expense items =', totalExpense);
+  }
+  if (totalIncome == null && totalExpense == null && items.length === 0) {
+    console.warn('parsePL: empty result. Input head:', (text || '').slice(0, 200).replace(/\n/g, ' | '));
+  } else if (totalIncome == null || totalExpense == null) {
+    console.warn(`parsePL: partial result — items=${items.length}, totalIncome=${totalIncome}, totalExpense=${totalExpense}, netIncome=${netIncome}`);
+  }
   return { items, totalIncome, totalExpense, netIncome };
+}
+
+/* ─── Dentrix Patient Summary (2026-04-23) ───
+   Extracts top-line patient counts Dave uses to unblock hygiene-capacity
+   math. All fields optional — null when the source text didn't include
+   that metric. Safe to call with null/empty text: returns all nulls. */
+function parsePatientSummary(text) {
+  const out = {
+    activePatients: null, insuredPatients: null, families: null,
+    newPatientsYTD: null, newPatientsMonth: null, referralsYTD: null,
+  };
+  if (!text) return out;
+  const pickInt = (re) => {
+    const m = text.match(re);
+    if (!m) return null;
+    const n = parseInt(String(m[1]).replace(/[,$\s]/g, ''), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  out.activePatients   = pickInt(/(?:^|\n)\s*ACTIVE_PATIENTS\s*\|\s*(-?[\d,]+)/i);
+  out.insuredPatients  = pickInt(/(?:^|\n)\s*INSURED_PATIENTS\s*\|\s*(-?[\d,]+)/i);
+  out.families         = pickInt(/(?:^|\n)\s*FAMILIES\s*\|\s*(-?[\d,]+)/i);
+  out.newPatientsYTD   = pickInt(/(?:^|\n)\s*NEW_PATIENTS_YTD\s*\|\s*(-?[\d,]+)/i);
+  out.newPatientsMonth = pickInt(/(?:^|\n)\s*NEW_PATIENTS_MONTH\s*\|\s*(-?[\d,]+)/i);
+  out.referralsYTD     = pickInt(/(?:^|\n)\s*REFERRALS_YTD\s*\|\s*(-?[\d,]+)/i);
+  return out;
 }
 
 /* ─── P&L categorization ─── */
@@ -737,7 +824,7 @@ function computeReportData(input) {
   const {
     prodData, collData, plData, employeeCosts, practiceProfile,
     arPatient, arInsurance, swotData, practiceName,
-    totalProd, collTotal, years, prodMonths, hygieneData,
+    totalProd, collTotal, years, prodMonths, hygieneData, patientSummary,
   } = input;
 
   const codes = prodData?.codes || [];
@@ -948,14 +1035,35 @@ function computeReportData(input) {
   const overheadRawPct = (plIncome > 0 && plExpensesRaw > 0) ? (plExpensesRaw / plIncome) * 100 : null;
 
   /* ──── Sources of Dollars — where collections come from ──── */
-  /* Categorize income-section P&L items by payment source pattern. Most QB-style P&Ls
-     list patient payment methods explicitly (CC Payments, Check Payments, Cash Payments,
-     Care Credit / Lending Club) and route everything else through a generic "Sales" line
-     that represents insurance-posted revenue. Pattern matching is defensive — unknown
-     line items fall through to "Other". */
+  /* Two data paths, preferred in order:
+       1. prodData.revenueBreakdown — Dentrix Payment Summary (2026-04-23).
+          Authoritative when present because it's fed by the PM software's
+          own payment classification, not the generic "Sales" catch-all on
+          the QuickBooks P&L.
+       2. plData income-section items — legacy path, still fires for
+          practices on other PM software or when the Dentrix prompt didn't
+          emit REVENUE_* lines (older cached prodText).
+     Whichever path wins populates the same sourcesOfDollars shape below. */
   const sourcesOfDollars = { insurance: 0, patientCreditCard: 0, patientCheck: 0, patientCash: 0, thirdPartyFinance: 0, government: 0, other: 0 };
   const sourceItems = [];
-  if (plData?.items) {
+  let sourcesSource = null;  /* 'dentrix' | 'pl' | null */
+  const rb = prodData?.revenueBreakdown;
+  if (rb && (rb.insurance || rb.patient || rb.thirdPartyFinance || rb.government)) {
+    /* Dentrix path: patient lumps into a single patient bucket (the card
+       rolls the three patientCreditCard/Check/Cash slots into patientPayTotal
+       anyway), so we stuff the entire patient figure into patientCreditCard
+       as a convenience — callers that read patientPayTotal will get the
+       same answer. */
+    sourcesOfDollars.insurance        = rb.insurance        || 0;
+    sourcesOfDollars.patientCreditCard = rb.patient         || 0;
+    sourcesOfDollars.thirdPartyFinance = rb.thirdPartyFinance || 0;
+    sourcesOfDollars.government       = rb.government       || 0;
+    sourceItems.push({ item: 'Dentrix: Insurance payments',  amount: rb.insurance || 0,         bucket: 'insurance' });
+    sourceItems.push({ item: 'Dentrix: Patient payments',    amount: rb.patient || 0,           bucket: 'patientCreditCard' });
+    sourceItems.push({ item: 'Dentrix: 3rd-party financing', amount: rb.thirdPartyFinance || 0, bucket: 'thirdPartyFinance' });
+    sourceItems.push({ item: 'Dentrix: Government/capitation', amount: rb.government || 0,      bucket: 'government' });
+    sourcesSource = 'dentrix';
+  } else if (plData?.items) {
     for (const item of plData.items) {
       if (item.section !== 'Income') continue;
       const l = (item.item || '').toLowerCase();
@@ -971,6 +1079,7 @@ function computeReportData(input) {
       sourcesOfDollars[bucket] += item.amount;
       sourceItems.push({ item: item.item, amount: item.amount, bucket });
     }
+    sourcesSource = 'pl';
   }
   const sourcesTotal = Object.values(sourcesOfDollars).reduce((s, v) => s + v, 0);
   const sourcesPct = {};
@@ -1230,6 +1339,10 @@ function computeReportData(input) {
          back to what the dentist said was wrong. */
       concerns: Array.isArray(pp.concerns) ? pp.concerns : [],
       biggestChallenge: pp.biggestChallenge ? String(pp.biggestChallenge).trim() : '',
+      /* Patient Summary metrics from Dentrix Patient Summary PDF when the
+         Hub uploads it (2026-04-23). Null when that PDF wasn't included.
+         Unblocks hygiene-capacity math and Q5 dollar-opportunity work. */
+      patientSummary: patientSummary || null,
     },
 
     period: {
@@ -1290,6 +1403,11 @@ function computeReportData(input) {
         items: sourceItems,
         patientPayTotal,
         patientPayPct,
+        /* 2026-04-23: tracks which path populated these figures — 'dentrix'
+           when the Payment Summary section of the Practice Analysis PDF
+           emitted REVENUE_* lines; 'pl' when we fell back to the P&L Income
+           section; null when neither path produced any data. */
+        source: sourcesSource,
       },
     },
 
@@ -2338,6 +2456,12 @@ function filterCodes(q) {
 }
 
 /* ─── Handler ─── */
+/* Export helpers for the verify-generate-report test runner (2026-04-23). */
+exports.parseProduction    = parseProduction;
+exports.parseCollections   = parseCollections;
+exports.parsePL            = parsePL;
+exports.parsePatientSummary = parsePatientSummary;
+
 exports.handler = async function(event) {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST,OPTIONS' }, body: '' };
@@ -2349,7 +2473,7 @@ exports.handler = async function(event) {
   catch (e) { return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
   const {
-    prodText, collText, plText,
+    prodText, collText, plText, patientSummaryText = null,
     practiceName = '',
     arPatient = {}, arInsurance = {},
     hygieneData = null, employeeCosts = null,
@@ -2367,6 +2491,7 @@ exports.handler = async function(event) {
     const prodData = parseProduction(prodText);
     const collData = collText ? parseCollections(collText) : null;
     const plData = plText ? parsePL(plText) : null;
+    const patientSummary = patientSummaryText ? parsePatientSummary(patientSummaryText) : null;
 
     const codes = prodData.codes || [];
     const totalProd = codes.reduce((s, c) => s + c.total, 0);
@@ -2388,7 +2513,7 @@ exports.handler = async function(event) {
     const dataWithoutSwot = computeReportData({
       prodData, collData, plData, employeeCosts, practiceProfile,
       arPatient, arInsurance, swotData: null, practiceName,
-      totalProd, collTotal, years, prodMonths, hygieneData,
+      totalProd, collTotal, years, prodMonths, hygieneData, patientSummary,
     });
 
     const swotData = generateSWOT(
@@ -2447,9 +2572,20 @@ exports.handler = async function(event) {
           months: prodMonths,
           years,
           netCollections: collTotal,
+          /* Parse-success signals (2026-04-23). The Hub uses these to
+             distinguish "parse failed — re-upload" from "skipped by user" on
+             the completion screen. Previously `plParsed` was the only one and
+             everything else assumed presence of text meant success. */
+          productionParsed:  !!prodText && codes.length > 0,
+          collectionsParsed: !!collText && collTotal > 0,
           plParsed: plData !== null && plData.items.length > 0,
+          plTotalsPresent: !!(plData && (plData.totalIncome || plData.totalExpense)),
+          arPatientParsed:   !!(arPatient   && typeof arPatient.total   === 'number' && arPatient.total   >= 0 && Object.keys(arPatient).length > 0),
+          arInsuranceParsed: !!(arInsurance && typeof arInsurance.total === 'number' && arInsurance.total >= 0 && Object.keys(arInsurance).length > 0),
           arPatientTotal: arPatient?.total || null,
           arInsuranceTotal: arInsurance?.total || null,
+          sourcesOfDollarsSource: data?.financials?.sourcesOfDollars?.source || null,
+          patientSummaryIncluded: !!patientSummary,
           timingMs: elapsed,
         },
       }),

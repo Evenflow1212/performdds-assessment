@@ -1677,28 +1677,74 @@ async function extractARFromPdf(file, type) {
           }
           console.log('Patient AR: not enough nums, got ' + (nums ? nums.length : 0));
         } else {
-          var patterns = ['TOTALS ALL CLAIMS:', 'TOTALS ALL CLAIMS', 'TOTAL'];
-      var idx2 = -1, matchLen = 0;
-      for (var p = 0; p < patterns.length; p++) {
-        idx2 = text.toUpperCase().indexOf(patterns[p].toUpperCase());
-        if (idx2 >= 0) { matchLen = patterns[p].length; break; }
-      }
-      if (idx2 < 0) { console.log('Insurance TOTALS not found'); return {}; }
-      var after2 = text.substring(idx2 + matchLen);
-      var allNums = after2.match(/[\d,]+\.\d+/g);
-      console.log('Insurance nums found:', allNums ? allNums.length : 0, allNums);
-      if (allNums && allNums.length >= 4) {
-        var result2 = {
-          current: parseFloat(allNums[0].replace(/,/g,'')),
-          d3160: parseFloat(allNums[1].replace(/,/g,'')),
-          d6190: parseFloat(allNums[2].replace(/,/g,'')),
-          d90plus: parseFloat(allNums[3].replace(/,/g,'')),
-          total: parseFloat(allNums[0].replace(/,/g,'')) + parseFloat(allNums[1].replace(/,/g,'')) + parseFloat(allNums[2].replace(/,/g,'')) + parseFloat(allNums[3].replace(/,/g,''))
-        };
-        console.log('Insurance AR:', JSON.stringify(result2));
-        return result2;
-      }
-      console.log('Insurance AR: not enough nums, got ' + (allNums ? allNums.length : 0));
+          /* Dentrix Insurance Claim Aging Report — Six-column layout:
+             ESTIMATE | CURRENT | 31-60 | 61-90 | OVER 90 | TOTAL
+             Old parser read the 4 columns positionally starting at index 0,
+             which silently captured ESTIMATE as "current" and shifted every
+             bucket left by one. Fix (2026-04-23): skip ESTIMATE when present
+             and prefer the ALL CLAIMS row (primary + secondary). */
+          var patterns = ['TOTALS ALL CLAIMS:', 'TOTALS ALL CLAIMS', 'ALL CLAIMS TOTALS', 'PRIMARY CLAIM TOTALS:', 'PRIMARY CLAIM TOTALS', 'TOTAL'];
+          var idx2 = -1, matchLen = 0, matchedLabel = '';
+          for (var p = 0; p < patterns.length; p++) {
+            idx2 = text.toUpperCase().indexOf(patterns[p].toUpperCase());
+            if (idx2 >= 0) { matchLen = patterns[p].length; matchedLabel = patterns[p]; break; }
+          }
+          if (idx2 < 0) { console.log('Insurance TOTALS not found'); return {}; }
+          var after2 = text.substring(idx2 + matchLen);
+          /* Accept both decimal-bearing numbers ($40,317.00) and bare integers
+             ($40,317) — older PDFs and some pdf.js text flows strip trailing
+             .00 on whole-dollar amounts. */
+          var allNums = after2.match(/[\d]{1,3}(?:,\d{3})*(?:\.\d{1,2})?/g) || [];
+          /* Strip any leading one-to-two-digit noise (stray page numbers)
+             by keeping numbers that look like dollar amounts (≥ $100 OR
+             contain a comma / decimal). */
+          allNums = allNums.filter(function (s) {
+            var n = parseFloat(s.replace(/,/g, ''));
+            /* Keep legitimate aging figures (a $0 bucket is a real zero, not
+               a page-number artifact). Drop only bare 1-2 digit integers
+               that look like page-numbers — i.e., small AND no comma/decimal
+               AND not exactly zero. */
+            if (isNaN(n)) return false;
+            if (/[,.]/.test(s)) return true;
+            return n >= 100 || n === 0;
+          });
+          console.log('Insurance AR anchor="' + matchedLabel + '", nums found:', allNums.length, allNums.slice(0, 8));
+          /* Column layout detection:
+             6+ numbers → Dentrix layout WITH estimate: skip index 0
+               [0]=ESTIMATE, [1]=CURRENT, [2]=31-60, [3]=61-90, [4]=OVER 90, [5]=TOTAL
+             5 numbers → no estimate column: [0]=CURRENT, ..., [4]=TOTAL
+             4 numbers → aging buckets only, sum for total. */
+          var parseF = function (s) { return parseFloat(String(s).replace(/,/g, '')); };
+          var result2 = null;
+          if (allNums.length >= 6) {
+            result2 = {
+              estimate: parseF(allNums[0]),
+              current:  parseF(allNums[1]),
+              d3160:    parseF(allNums[2]),
+              d6190:    parseF(allNums[3]),
+              d90plus:  parseF(allNums[4]),
+              total:    parseF(allNums[5]),
+            };
+          } else if (allNums.length >= 5) {
+            result2 = {
+              current:  parseF(allNums[0]),
+              d3160:    parseF(allNums[1]),
+              d6190:    parseF(allNums[2]),
+              d90plus:  parseF(allNums[3]),
+              total:    parseF(allNums[4]),
+            };
+          } else if (allNums.length >= 4) {
+            var c  = parseF(allNums[0]);
+            var a1 = parseF(allNums[1]);
+            var a2 = parseF(allNums[2]);
+            var a3 = parseF(allNums[3]);
+            result2 = { current: c, d3160: a1, d6190: a2, d90plus: a3, total: c + a1 + a2 + a3 };
+          }
+          if (result2) {
+            console.log('Insurance AR (parsed):', JSON.stringify(result2));
+            return result2;
+          }
+          console.log('Insurance AR: not enough nums, got ' + allNums.length);
         }
         return {};
       } catch(e) {
@@ -2072,12 +2118,23 @@ async function generate() {
     document.getElementById('resultCard').classList.add('visible');
     const s = data.summary || {};
     const oppTotal = generatedData?.opportunities?.totalValue;
+    /* Parse-status label (2026-04-23): distinguish "silent parse failure"
+       from "user skipped" so dentists don't get a green checkmark on an
+       upload that silently dropped. Text-supplied + parsed-false → show
+       "Parse failed — re-upload"; text-missing + not-skipped → "Not
+       uploaded"; skipped → "Skipped". */
+    const parseLabel = (textSupplied, parsed, wasSkipped) => {
+      if (parsed) return 'Included';
+      if (textSupplied) return 'Parse failed — re-upload';
+      if (wasSkipped) return 'Skipped';
+      return 'Not uploaded';
+    };
     document.getElementById('summaryGrid').innerHTML = [
       { val: s.codesFound || '—', lbl: 'Codes Analyzed' },
       { val: s.totalProduction ? '$' + Number(s.totalProduction).toLocaleString() : '—', lbl: 'Total Production' },
       { val: s.months ? s.months + ' months' : '—', lbl: 'Period Covered' },
       { val: s.netCollections ? '$' + Number(s.netCollections).toLocaleString() : '—', lbl: 'Net Collections' },
-      { val: s.plParsed ? 'Included' : (plText ? 'Partial' : 'Skipped'), lbl: 'P&L Analysis' },
+      { val: parseLabel(!!plText, !!s.plParsed, !!skipped[3]), lbl: 'P&L Analysis' },
       { val: employeeCosts ? 'Included' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
       { val: hygieneData ? 'Included' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
       { val: oppTotal ? '$' + Math.round(oppTotal).toLocaleString() : '—', lbl: 'Opportunity Identified' },
