@@ -736,14 +736,20 @@
     </div>
     <div class="prog-step" onclick="goToStep(6)">
       <div class="prog-dot">6</div>
-      <div class="prog-label">Staff Costs</div>
+      <div class="prog-label">Patient Summary</div>
     </div>
     <div class="prog-step" onclick="goToStep(7)">
       <div class="prog-dot">7</div>
-      <div class="prog-label">Hygiene</div>
+      <div class="prog-label">Staff Costs</div>
     </div>
+
+
     <div class="prog-step" onclick="goToStep(8)">
       <div class="prog-dot">8</div>
+      <div class="prog-label">Hygiene</div>
+    </div>
+    <div class="prog-step" onclick="goToStep(9)">
+      <div class="prog-dot">9</div>
       <div class="prog-label">Generate</div>
     </div>
   </div>
@@ -1028,10 +1034,48 @@
     </div>
   </div>
 
-  <!-- STEP 6: EMPLOYEE COSTS -->
+  <!-- STEP 6: PATIENT SUMMARY (added 2026-04-23) -->
   <div class="step-card" id="step6">
     <div class="step-header">
       <div class="step-num">6</div>
+      <div>
+        <div class="step-title">Patient Summary</div>
+        <div class="step-subtitle">Dentrix — Practice Analysis Reports → Patient Summary section</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="instructions">
+        <h4>How to run this report in Dentrix</h4>
+        <ol>
+          <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Management</span> → <span class="path">Practice Analysis Reports</span></li>
+          <li>Select the <strong>Patient Summary</strong> section</li>
+          <li>Current month date range is fine — this report aggregates active patient counts regardless of date range</li>
+          <li>Save as PDF and upload below</li>
+        </ol>
+      </div>
+      <div class="upload-zone" id="upload6" onclick="document.getElementById('file6').click()">
+        <input type="file" id="file6" accept=".pdf" onchange="handleFile(6, this)">
+        <div class="upload-default">
+          <div class="upload-icon">📄</div>
+          <h4>Upload Patient Summary (PDF)</h4>
+          <p>Claude will extract active patient count, insured, new patients YTD + month, referrals</p>
+        </div>
+        <div class="file-name" id="fname6">✅ <span id="fname6-text"></span></div>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
+        <div>
+          <button class="skip-link" onclick="skipStep(6)">Skip for now</button>
+          <button class="btn btn-primary" onclick="nextStep(6)">Continue →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 7: EMPLOYEE COSTS -->
+  <div class="step-card" id="step7">
+    <div class="step-header">
+      <div class="step-num">7</div>
       <div>
         <div class="step-title">Employee Costs</div>
         <div class="step-subtitle">Enter staff and hygiene compensation details</div>
@@ -1107,19 +1151,19 @@
       </div>
 
       <div class="nav-row">
-        <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
+        <button class="btn btn-secondary" onclick="prevStep(7)">← Back</button>
         <div>
           <button class="skip-link" onclick="skipStep(6)"">Skip for now</button>
-          <button class="btn btn-primary" onclick="nextStep(6)">Continue →</button>
+          <button class="btn btn-primary" onclick="nextStep(7)">Continue →</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- STEP 7: HYGIENE SCHEDULE -->
-  <div class="step-card" id="step7">
+  <!-- STEP 8: HYGIENE SCHEDULE -->
+  <div class="step-card" id="step8">
     <div class="step-header">
-      <div class="step-num">7</div>
+      <div class="step-num">8</div>
       <div>
         <div class="step-title">Hygiene Schedule</div>
         <div class="step-subtitle">Enter weekly scheduling data — matches the printable worksheet</div>
@@ -1270,19 +1314,19 @@
       <!-- HYGIENIST SCHEDULE (kept minimal — Patient Estimates are part of the delivered assessment) -->
 
       <div class="nav-row">
-        <button class="btn btn-secondary" onclick="prevStep(7)">← Back</button>
+        <button class="btn btn-secondary" onclick="prevStep(8)">← Back</button>
         <div>
           <button class="skip-link" onclick="skipStep(7)"">Skip for now</button>
-          <button class="btn btn-primary" onclick="nextStep(7)">Continue →</button>
+          <button class="btn btn-primary" onclick="nextStep(8)">Continue →</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- STEP 8: GENERATE -->
-  <div class="step-card" id="step8">
+  <!-- STEP 9: GENERATE -->
+  <div class="step-card" id="step9">
     <div class="step-header">
-      <div class="step-num">8</div>
+      <div class="step-num">9</div>
       <div>
         <div class="step-title">Generate Assessment Report</div>
         <div class="step-subtitle">Review your uploads and generate your HTML report</div>
@@ -1295,7 +1339,7 @@
         <div>Generating your report takes approximately <strong>up to 60 seconds</strong>. Claude AI reads your reports, computes every KPI, and builds your assessment.</div>
       </div>
       <div class="nav-row">
-        <button class="btn btn-secondary" onclick="prevStep(8)">← Back</button>
+        <button class="btn btn-secondary" onclick="prevStep(9)">← Back</button>
         <button class="btn btn-generate" onclick="generate()" id="generateBtn">Generate Report ✦</button>
       </div>
       <div class="error-panel" id="genError" role="alert" aria-live="polite">
@@ -1353,7 +1397,7 @@
 <script>
 let currentStep = 1;
 let software = 'dentrix';
-let files = { 1: null, 2: null, 3: null, 4: null, 5: null };
+let files = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
 let skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
 let generatedData = null;        /* canonical data object from /generate-report */
 let generatedReportHtml = null;  /* HTML report (plain UTF-8 string) from server */
@@ -1624,6 +1668,7 @@ function buildReview() {
     { num: 3, label: 'P&L Statement', file: files[3], skippable: true },
     { num: 4, label: 'Patient AR Aging', file: files[4], skippable: true },
     { num: 5, label: 'Insurance AR Aging', file: files[5], skippable: true },
+    { num: 6, label: 'Patient Summary', file: files[6], skippable: true },
   ];
   const html = steps.map(s => {
     let status, color;
@@ -2027,7 +2072,7 @@ async function generate() {
     return;
   }
   _generating = true;
-  document.getElementById('step8').classList.remove('visible');
+  document.getElementById('step9').classList.remove('visible');
   document.getElementById('generatingState').classList.add('visible');
   try {
     const practiceName = document.getElementById('practiceName').value.trim();
@@ -2050,19 +2095,23 @@ async function generate() {
        Netlify function, which has vendor-specific prompts that normalize output to
        the same pipe-delimited schema. */
     const extractByType = (file, type) => {
-      if (!file) return Promise.resolve(type === 'pl' ? null : '');
+      if (!file) return Promise.resolve(type === 'pl' || type === 'patientSummary' ? null : '');
       if (activeSoftware === 'eaglesoft') return parseViaClaude(file, type, activeSoftware);
-      /* Dentrix (default) — client-side PDF.js path */
+      /* Dentrix (default) — client-side PDF.js path for production / collections / pl;
+         Patient Summary (added 2026-04-23) routes through parseViaClaude because the
+         prompt lives server-side in parse-pdf.js as dentrix.patientSummary. */
       if (type === 'production') return extractProductionFromPdf(file);
       if (type === 'collections') return extractCollectionsFromPdf(file);
       if (type === 'pl') return extractPLFromPdf(file);
+      if (type === 'patientSummary') return parseViaClaude(file, 'patientSummary', 'dentrix');
       return Promise.resolve('');
     };
 
-    const [prodText, collText, plText] = await Promise.all([
+    const [prodText, collText, plText, patientSummaryText] = await Promise.all([
       extractByType(files[1], 'production'),
       extractByType(files[2], 'collections'),
       extractByType(files[3], 'pl'),
+      extractByType(files[6], 'patientSummary'),
     ]);
 
     /* AR extraction — currently Dentrix-specific client-side parser. For
@@ -2078,16 +2127,16 @@ async function generate() {
     console.log('AR Insurance:', JSON.stringify(arInsurance));
 
     /* Collect hygiene schedule form data (null if skipped) */
-    const hygieneData = skipped[7] ? null : collectHygieneSchedule();
+    const hygieneData = skipped[8] ? null : collectHygieneSchedule();
     console.log('Hygiene data:', hygieneData ? 'collected' : 'skipped');
 
     /* Collect employee costs form data (null if skipped) */
-    const employeeCosts = skipped[6] ? null : collectEmployeeCosts();
+    const employeeCosts = skipped[7] ? null : collectEmployeeCosts();
     console.log('Employee costs:', employeeCosts ? 'collected' : 'skipped');
 
     /* Step 2: Build assessment report from parsed data */
     console.log('Step 2: Building assessment report from parsed data...');
-    const payload = { prodText, collText, plText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, practiceProfile };
+    const payload = { prodText, collText, plText, patientSummaryText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, practiceProfile };
     console.log('Payload keys:', Object.keys(payload), 'prodText len:', prodText?.length, 'collText len:', collText?.length, 'plText len:', plText?.length);
     console.log('practiceProfile:', JSON.stringify(practiceProfile)?.substring(0, 200));
     const resp = await fetch('/.netlify/functions/generate-report', {
@@ -2135,14 +2184,14 @@ async function generate() {
       { val: s.months ? s.months + ' months' : '—', lbl: 'Period Covered' },
       { val: s.netCollections ? '$' + Number(s.netCollections).toLocaleString() : '—', lbl: 'Net Collections' },
       { val: parseLabel(!!plText, !!s.plParsed, !!skipped[3]), lbl: 'P&L Analysis' },
-      { val: employeeCosts ? 'Included' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
-      { val: hygieneData ? 'Included' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
+      { val: employeeCosts ? 'Included' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
+      { val: hygieneData ? 'Included' : (skipped[8] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
       { val: oppTotal ? '$' + Math.round(oppTotal).toLocaleString() : '—', lbl: 'Opportunity Identified' },
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
-    document.getElementById('step8').classList.add('visible');
+    document.getElementById('step9').classList.add('visible');
     console.error('Generation error:', err);
     showGenError(
       'We hit an error while building your report. Double-check your uploaded PDFs are the correct reports and try again \u2014 or contact us and we\u2019ll help sort it out.',

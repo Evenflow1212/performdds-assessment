@@ -1074,16 +1074,17 @@ function overheadFixture({ overheadPct, suppliesPct, labPct, occupancyPct, marke
   ].join('\n');
   const coll = `DATES| 01/01/2025 - 12/31/2025\nCHARGES|1050000\nPAYMENTS|${ANNUAL_COLL}`;
   const totalExpense = Math.round(ANNUAL_COLL * overheadPct / 100);
+  /* 2026-04-23: P&L expense lines use generic labels that don't match the
+     new Overhead Breakdown P&L-precedence regexes (/suppl/, /lab|laboratory/,
+     /rent|utilit|occupan/, /advertis|marketing/) so these tests exercise
+     the questionnaire-driven path deterministically. */
   const pl = [
     'DATES| 01/01/2025 - 12/31/2025',
     'SECTION|Income', `Sales|${ANNUAL_COLL}`, `TOTAL_INCOME|${ANNUAL_COLL}`,
     'SECTION|Expense',
-    /* Legacy P&L-derived lab/supplies are kept at benchmark so they never
-       fire (double-fire guard is also present). */
     'Salaries & Wages|400000','Payroll Taxes|40000',
-    'Lab Fees|50000','Dental Supplies|50000',
-    'Rent|60000','Marketing|15000','Office Supplies|20000',
-    `Other Expenses|${Math.max(0, totalExpense - 635000)}`,
+    'Miscellaneous Expense|130000',
+    `Other Expenses|${Math.max(0, totalExpense - 570000)}`,
     `TOTAL_EXPENSE|${totalExpense}`,
     `NET_INCOME|${ANNUAL_COLL - totalExpense}`,
   ].join('\n');
@@ -1663,6 +1664,223 @@ test('Fix 5: summary exposes productionParsed / collectionsParsed / plParsed fla
   expect(s.plParsed === true,          'plParsed should be true on good fixture');
   expect(typeof s.arPatientParsed === 'boolean',   'arPatientParsed should be boolean');
   expect(typeof s.arInsuranceParsed === 'boolean', 'arInsuranceParsed should be boolean');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Bundled batch (2026-04-23): Crown Unit Value, Hygiene Capacity
+   Analysis, Q5 dollar-opportunity wiring, Patient Summary upload step,
+   Overhead Breakdown P&L precedence.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Helper: Hygiene Capacity fixture. Target a specific utilization band
+   by sizing hygiene-day count against procedure-driven days-required. */
+function hygCapFixture({ prophyAnnual, perioMaintAnnual, srpAnnual, numHygienists, patsPerHygDay, activePatients }) {
+  /* Build 12-month prodText with those visit counts. */
+  const lines = ['DATE RANGE: 01/01/2025 - 12/31/2025'];
+  if (prophyAnnual)     lines.push(`D1110|Prophy|${prophyAnnual}|${prophyAnnual * 120}`);
+  if (perioMaintAnnual) lines.push(`D4910|Perio Maint|${perioMaintAnnual}|${perioMaintAnnual * 140}`);
+  if (srpAnnual)        lines.push(`D4341|SRP 4+|${srpAnnual}|${srpAnnual * 350}`);
+  /* A minimal crown block so batting average + CUV have a denominator. */
+  lines.push('D2740|Crown|200|300000');
+  const body = Object.assign(JSON.parse(buildEvent().body), {
+    prodText: lines.join('\n'),
+    patientSummaryText: activePatients != null
+      ? `ACTIVE_PATIENTS|${activePatients}\nNEW_PATIENTS_YTD|200`
+      : null,
+  });
+  body.practiceProfile = Object.assign({}, body.practiceProfile, {
+    numHygienists: numHygienists != null ? numHygienists : 4,
+    patientsPerHygienistPerDay: patsPerHygDay || 8,
+  });
+  return { httpMethod: 'POST', body: JSON.stringify(body) };
+}
+
+test('Fix 2: Crown Unit Value computes correctly', async () => {
+  /* totalProd = $1M, hygProd = $300k (D1110 × $60 × 5000 visits via counts),
+     specialtyProd = $100k, crowns = 200 → CUV = ($1M − $300k − $100k) / 200 = $3,000.
+     Easiest synthetic: craft prodText with known totals. */
+  const prodText = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    /* Hygiene bucket: $300,000 */
+    'D1110|Prophy|2500|300000',
+    /* Specialty bucket (endo + perio surgery + oral surgery + ortho) — $100,000 */
+    'D3330|Molar RCT|40|60000',
+    'D7140|Extraction|80|24000',
+    'D8090|Ortho|4|16000',
+    /* Crowns: 200 units, $600,000 */
+    'D2740|Crown|200|600000',
+  ].join('\n');
+  /* totalProd = 300k + 60k + 24k + 16k + 600k = $1,000,000 ✓
+     specialty = 60k + 24k + 16k = $100,000 ✓
+     crowns = 200; hygiene = $300k
+     → CUV = (1,000,000 − 300,000 − 100,000) / 200 = $3,000 */
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(Object.assign(JSON.parse(buildEvent().body), { prodText })) });
+  const data = JSON.parse(res.body).data;
+  expect(Math.abs(data.kpis.crownUnitValue - 3000) < 1, `CUV should be $3,000; got $${data.kpis.crownUnitValue}`);
+});
+
+test('Fix 2: CUV card renders with neutral (empty) status', async () => {
+  const body = await invoke();
+  const html = body.reportHtml;
+  const m = html.match(/<div class="score-card ([^"]*)">\s*<div class="lbl">Crown Unit Value/);
+  expect(m, 'Crown Unit Value card not rendered');
+  expect(!/\b(good|warn|bad)\b/.test(m[1]), `CUV card should have no status class; got: "${m[1]}"`);
+  expect(/GP production per crown prepped/i.test(html), 'CUV bench subtitle missing');
+});
+
+test('Fix 3: Hygiene Capacity UNDER-UTILIZED fires at 64% utilization', async () => {
+  /* Pigneri-ish: prophy 2500 + perio maint 200 + SRP 50 = 2750 visits over 12 months.
+     Scale to 24mo: × 2 = 5500. daysReq/mo = 5500 / 24 / 8 = 28.65 — too many.
+     Scale down: prophy 1500 → 1500 × 2 / 24 / 8 = 15.6 days/mo required.
+     numHygienists=6 → daysSch = 6 × 4.33 = 25.98 → util ≈ 60% → UNDER-UTILIZED. */
+  const res = await handler(hygCapFixture({ prophyAnnual: 1500, perioMaintAnnual: 0, srpAnnual: 0, numHygienists: 6, patsPerHygDay: 8 }));
+  const data = JSON.parse(res.body).data;
+  const u = data.kpis.hygieneCapacity.utilizationPct;
+  expect(u != null && u < 70, `fixture should drive util < 70; got ${u}`);
+  const w = data.swot.weaknesses.find(x => /hygiene department is running at \d+% utilization/i.test(x));
+  expect(w, 'UNDER-UTILIZED weakness did not fire: ' + JSON.stringify(data.swot.weaknesses));
+  expect(/below the 70-90% healthy band/i.test(w), 'UNDER-UTILIZED body missing 70-90 band phrase');
+  expect(/left on the table/i.test(w), 'UNDER-UTILIZED body missing "left on the table" phrase');
+});
+
+test('Fix 3: Hygiene Capacity CAPACITY-CONSTRAINED fires above 90% utilization', async () => {
+  /* 2300 prophy + 200 perio maint + 50 srp = 2550 visits × 2 = 5100 over 24mo.
+     daysReq = 5100/24/8 = 26.56; numHygienists 6 → 25.98 scheduled; util ≈ 102% — over 90. */
+  const res = await handler(hygCapFixture({ prophyAnnual: 2300, perioMaintAnnual: 200, srpAnnual: 50, numHygienists: 6, patsPerHygDay: 8, activePatients: 2400 }));
+  const data = JSON.parse(res.body).data;
+  const u = data.kpis.hygieneCapacity.utilizationPct;
+  expect(u != null && u > 90, `fixture should drive util > 90; got ${u}`);
+  const w = data.swot.weaknesses.find(x => /above the 90% comfort ceiling/i.test(x));
+  expect(w, 'CAPACITY-CONSTRAINED weakness did not fire');
+  expect(/aren't being served at recall cadence/i.test(w), 'body missing recall-cadence phrasing');
+});
+
+test('Fix 3: Hygiene Capacity HEALTHY (80%) does NOT fire', async () => {
+  /* Target ~80% util — daysReq ~20.8, daysSch ~25.98 with 6 RDHs. */
+  const res = await handler(hygCapFixture({ prophyAnnual: 1900, perioMaintAnnual: 100, srpAnnual: 50, numHygienists: 6, patsPerHygDay: 8, activePatients: 1850 }));
+  const data = JSON.parse(res.body).data;
+  const u = data.kpis.hygieneCapacity.utilizationPct;
+  expect(u != null && u >= 70 && u <= 90, `fixture should drive 70 ≤ util ≤ 90; got ${u}`);
+  const w = data.swot.weaknesses.find(x => /running at \d+% utilization/i.test(x));
+  expect(!w, `No UNDER or CAPACITY weakness should fire in healthy band; got: "${w}"`);
+});
+
+test('Fix 3: Retention WEAKNESS fires when softPts >> procPts (>40% delta)', async () => {
+  /* procPts ~1500 from procedure counts; softPts=2800 reported → delta ≈ 46%. */
+  const res = await handler(hygCapFixture({ prophyAnnual: 2400, perioMaintAnnual: 0, srpAnnual: 0, numHygienists: 6, patsPerHygDay: 8, activePatients: 2800 }));
+  const data = JSON.parse(res.body).data;
+  const d = data.kpis.hygieneCapacity.retentionDeltaPct;
+  expect(d != null && d > 40, `fixture should drive retentionDeltaPct > 40; got ${d}`);
+  const w = data.swot.weaknesses.find(x => /represents patients the system considers active who haven't been in/i.test(x));
+  expect(w, 'RETENTION-WEAKNESS did not fire');
+  expect(/Reactivating half of those lapsed patients/i.test(w), 'body missing reactivation framing');
+});
+
+test('Fix 3: Retention STRENGTH fires when procPts tracks softPts (<15% delta)', async () => {
+  /* procPts ≈ 2400 from prophy only, softPts=2667 → delta ≈ 10%. */
+  const res = await handler(hygCapFixture({ prophyAnnual: 3840, perioMaintAnnual: 0, srpAnnual: 0, numHygienists: 6, patsPerHygDay: 8, activePatients: 2667 }));
+  const data = JSON.parse(res.body).data;
+  const d = data.kpis.hygieneCapacity.retentionDeltaPct;
+  expect(d != null && d < 15, `fixture should drive retentionDeltaPct < 15; got ${d}`);
+  const s = data.swot.strengths.find(x => /patient retention is strong/i.test(x));
+  expect(s, 'RETENTION-STRENGTH did not fire');
+  expect(/tracks closely to the software's count/i.test(s), 'strength body missing "tracks closely" phrase');
+});
+
+test('Fix 3: Graceful degradation — patientSummary null skips retention branches', async () => {
+  const res = await handler(hygCapFixture({ prophyAnnual: 2400, perioMaintAnnual: 0, srpAnnual: 0, numHygienists: 6, patsPerHygDay: 8, activePatients: null }));
+  const data = JSON.parse(res.body).data;
+  const retention = data.swot.weaknesses.find(x => /haven't been in for a recall visit/i.test(x));
+  const retStrength = data.swot.strengths.find(x => /patient retention is strong/i.test(x));
+  expect(!retention && !retStrength, 'retention branches should skip when software-derived count is null');
+});
+
+test('Fix 4: Q5 EMPTIES branch appends CUV-based dollar math', async () => {
+  /* Same fixture as the Q5 EMPTIES test (BA 10, fill 78) but CUV-derivable from
+     prodText. When CUV is computable and fill < 95, the dollar clause should
+     appear in the body. */
+  const prodText = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D1110|Prophy|500|55000','D1120|CP|200|16000',
+    'D4910|PM|200|28000','D4341|SRP4|50|17500','D4342|SRP1|50|12500',
+    'D0150|CE|200|20000','D0120|P|600|36000',
+    'D2740|Crown|120|600000',  /* 120 crowns × $5k avg → big CUV */
+  ].join('\n');
+  const evt = JSON.parse(buildEvent().body);
+  evt.prodText = prodText;
+  evt.hygieneData = { recentFillRate: 78, nearFuturePreBooking: 95 };
+  evt.practiceProfile = Object.assign({}, evt.practiceProfile, {
+    feesAttachedToScheduler: 'yes', insuranceFeeSchedulesCurrent: 'yes',
+    writeOffCalculation: 'automatic', frequentManualAdjustments: 'no',
+    hasPatientCollectionsSystem: 'yes', biteConsultApproach: 'dedicated',
+    hasProductionGoal: 'yes', knowsIfAhead: 'yes',
+  });
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const q5 = data.swot.weaknesses.find(w => /Conversion Ratio/i.test(w) && /empty chair time/i.test(w));
+  expect(q5, 'Q5 EMPTIES did not fire');
+  expect(/Recovering fill rate from \d+% to the 95% healthy floor/i.test(q5), 'EMPTIES body missing CUV-based dollar-math clause');
+  expect(/Crown Unit Value of \$/i.test(q5), 'EMPTIES body should reference Crown Unit Value');
+  expect(/additional general-dentistry production/i.test(q5), 'EMPTIES body missing GP opportunity framing');
+  expect(/direct hygiene production/i.test(q5), 'EMPTIES body missing direct hygiene opp');
+});
+
+test('Fix 5: Overhead Breakdown supplies uses P&L when line item present (questionnaire ignored)', async () => {
+  const evt = JSON.parse(buildEvent().body);
+  /* Questionnaire value says $50k (~5.4%) but P&L has "Dental Supplies|90000" → 9.8% */
+  evt.practiceProfile = Object.assign({}, evt.practiceProfile, {
+    overheadBreakdown: {
+      annualSuppliesSpend: 50000, annualLabSpend: null,
+      annualOccupancyCost: null, annualMarketingSpend: null,
+    },
+  });
+  /* Inject a supplies line in the P&L. */
+  evt.plText = PL_STANDARD.replace('Dental Supplies|45000', 'Dental Supplies|90000');
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const src = data.kpis.overheadBreakdownSource || {};
+  expect(src.supplies === 'pl', `source should be 'pl' when P&L line item present; got '${src.supplies}'`);
+  /* suppliesPct uses P&L supplies — the /suppl/ regex picks up both
+     Dental Supplies ($90k) and Office Supplies ($12k) → $102k / $920k ≈ 11.1%.
+     Either way, the number should be > 9 (well above the questionnaire's $50k
+     mapping, which would yield ~5.4%). */
+  const sp = data.kpis.overheadSuppliesPct;
+  expect(sp != null && sp > 9, `suppliesPct should reflect P&L supplies (well above the questionnaire $50k); got ${sp}`);
+});
+
+test('Fix 5: Overhead Breakdown falls back to questionnaire when P&L has no matching line', async () => {
+  const evt = JSON.parse(buildEvent().body);
+  evt.practiceProfile = Object.assign({}, evt.practiceProfile, {
+    overheadBreakdown: {
+      annualSuppliesSpend: null, annualLabSpend: null,
+      annualOccupancyCost: null, annualMarketingSpend: 23000,  /* ~2.5% */
+    },
+  });
+  /* Strip marketing/advertising lines from the P&L. */
+  evt.plText = PL_STANDARD.replace(/Marketing\|\d+/gi, 'Other Misc|18000');
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const src = data.kpis.overheadBreakdownSource || {};
+  expect(src.marketing === 'questionnaire', `source should fall back to 'questionnaire'; got '${src.marketing}'`);
+  const mp = data.kpis.overheadMarketingPct;
+  expect(mp != null && mp > 2 && mp < 3, `marketingPct should reflect questionnaire $23k (~2.5%); got ${mp}`);
+});
+
+test('Fix 1: Patient Summary upload slot + step 6 exist in assessment_hub.html', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
+  expect(/<div class="step-card" id="step6">[\s\S]{0,600}Patient Summary/i.test(html), 'step6 card with Patient Summary title not found');
+  expect(/id="file6"[^>]*accept="\.pdf"/i.test(html), 'file6 upload input missing');
+  expect(/onchange="handleFile\(6, this\)"/i.test(html), 'handleFile(6, …) wiring missing');
+  /* Renumbered downstream steps */
+  expect(/id="step7"[\s\S]{0,400}Employee Costs/i.test(html), 'step7 should be Employee Costs after renumber');
+  expect(/id="step8"[\s\S]{0,400}Hygiene Schedule/i.test(html), 'step8 should be Hygiene Schedule after renumber');
+  expect(/id="step9"[\s\S]{0,400}Generate Assessment Report/i.test(html), 'step9 should be Generate after renumber');
+  /* Progress-bar entry for Patient Summary */
+  expect(/goToStep\(6\)[\s\S]{0,200}Patient Summary/i.test(html), 'progress-bar entry for Patient Summary missing');
+  /* Payload includes patientSummaryText */
+  expect(/patientSummaryText[\s\S]{0,30}practiceName/.test(html), 'payload should include patientSummaryText');
 });
 
 (async () => {

@@ -284,7 +284,7 @@ function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
 }
 
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs, overheadInputs, hygDeptRatioInputs) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs, overheadInputs, hygDeptRatioInputs, hygCapacityInputs) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
   const pp = practiceProfile || {};
   const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
@@ -538,12 +538,39 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     const exam_gap    = haveExams && examCoverage < 0.90;
 
     let branch;
+    /* Dollar-opportunity math (2026-04-23) — appends a concrete dollar
+       figure to each branch using Crown Unit Value + annual visits/crowns.
+       Null CUV or null counts → skip the dollar clause silently. */
+    const cuv = Number.isFinite(Number(q5.crownUnitValue)) ? Number(q5.crownUnitValue) : null;
+    const annualHygProd = Number(q5.annualHygieneProduction) || 0;
+    const annualHygVisits = Number(q5.annualHygVisits) || 0;
+    const annualCrowns = Number(q5.annualCrowns) || 0;
+    const fmt$_q5 = n => '$' + Math.round(n).toLocaleString();
     if (empties_leak) {
       branch = `The leading upstream contributor is hygiene capacity. Recent fill rate is ${fillRate.toFixed(0)}%, which means roughly ${(100 - fillRate).toFixed(0)}% of hygiene slots are going empty. Empty chair time shrinks the pool of exam opportunities, and exams that can't happen can't produce diagnoses. Downstream production — crowns, specialty, and total doctor $/day — is constrained by that upstream bottleneck.`;
+      if (cuv != null && cuv > 0 && annualHygVisits > 0 && fillRate > 0 && Number.isFinite(ba_q5) && ba_q5 > 0) {
+        const target = annualHygVisits * 95 / fillRate;
+        const addedVisits = Math.max(0, target - annualHygVisits);
+        const addedCrowns = addedVisits / ba_q5;
+        const crownOpp   = addedCrowns * cuv;
+        const hygVisitOpp = annualHygVisits > 0 ? addedVisits * (annualHygProd / annualHygVisits) : 0;
+        branch += ` Recovering fill rate from ${fillRate.toFixed(0)}% to the 95% healthy floor would add roughly ${Math.round(addedVisits).toLocaleString()} hygiene visits per year. At your batting average of ${ba_q5.toFixed(1)}:1, that's ${addedCrowns.toFixed(1)} additional crowns prepped — and with a Crown Unit Value of ${fmt$_q5(cuv)}, roughly ${fmt$_q5(crownOpp)} of additional general-dentistry production (crowns plus all the supporting dentistry around them). Separately on the hygiene side, those additional ${Math.round(addedVisits).toLocaleString()} visits represent roughly ${fmt$_q5(hygVisitOpp)} of direct hygiene production.`;
+      }
     } else if (exam_gap) {
       branch = `Hygiene is filling, but the doctor isn't getting into every hygiene visit for an exam. Total exams (D0150 periodic + D0120 comprehensive) over the period are ${examsCount.toLocaleString()} against ${hygVisits.toLocaleString()} hygiene visits — roughly ${Math.round(examCoverage * 100)}% coverage, against a 90% floor where the pipeline starts to work properly. Exams that don't happen can't produce diagnoses, and undiagnosed work doesn't flow to restorative, specialty, or case acceptance.`;
+      if (cuv != null && cuv > 0 && Number.isFinite(ba_q5) && ba_q5 > 0 && hygVisits > 0) {
+        const targetExams = 0.90 * hygVisits;
+        const addedExams = Math.max(0, targetExams - examsCount);
+        const addedCrowns = addedExams / ba_q5;
+        const crownOpp = addedCrowns * cuv;
+        branch += ` Closing exam coverage from ${Math.round(examCoverage * 100)}% to the 90% floor would add roughly ${Math.round(addedExams).toLocaleString()} exams per year. At your batting average of ${ba_q5.toFixed(1)}:1, that's ${addedCrowns.toFixed(1)} additional crowns prepped — and with a Crown Unit Value of ${fmt$_q5(cuv)}, roughly ${fmt$_q5(crownOpp)} of additional general-dentistry production (crowns plus the supporting dentistry that rides with them).`;
+      }
     } else {
       branch = `Hygiene is filling at a healthy rate and the doctor is getting into exams on roughly 90%+ of hygiene visits — so the upstream clinical pipeline looks intact. The gap between diagnosis and production sits downstream: treatment plans are being generated but not converting at the rate a healthy practice shows. That points at case presentation approach or financial arrangements as the operational constraint, not the clinical pipeline.`;
+      if (cuv != null && cuv > 0 && annualCrowns > 0) {
+        const conversionOpp = 0.10 * annualCrowns * cuv;
+        branch += ` At your current Crown Unit Value of ${fmt$_q5(cuv)} per crown, improving case acceptance by 10 percentage points would capture roughly ${fmt$_q5(conversionOpp)} of annual production that's currently being diagnosed but not converting.`;
+      }
     }
     /* HIGH PRIORITY — prepended alongside the Q2 setup-foundation weaknesses
        via `highPriorityWeaknesses` below. Kept separate from `setupWeaknesses`
@@ -686,6 +713,47 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     }
   }
 
+  /* ── Hygiene Capacity SWOT (2026-04-23) — HIGH PRIORITY ─────────────────
+     Two active-patient estimates (procedure-derived vs software-reported)
+     plus a days-required-vs-scheduled utilization figure drive three
+     weakness branches and one strength branch. Graceful degradation: null
+     fields skip the dependent branches silently. */
+  const hci = hygCapacityInputs || {};
+  const hcUtil   = Number.isFinite(Number(hci.utilizationPct))       ? Number(hci.utilizationPct)       : null;
+  const hcRet    = Number.isFinite(Number(hci.retentionDeltaPct))    ? Number(hci.retentionDeltaPct)    : null;
+  const hcProcPts = Number.isFinite(Number(hci.procedureDerivedActivePatients)) ? Number(hci.procedureDerivedActivePatients) : null;
+  const hcSoftPts = Number.isFinite(Number(hci.softwareDerivedActivePatients)) ? Number(hci.softwareDerivedActivePatients) : null;
+  const hcDaysReq = Number.isFinite(Number(hci.daysRequiredPerMonth)) ? Number(hci.daysRequiredPerMonth) : null;
+  const hcDaysSch = Number.isFinite(Number(hci.daysScheduledPerMonth)) ? Number(hci.daysScheduledPerMonth) : null;
+  const hcHygProd = Number(hci.annualHygieneProduction) || 0;
+  const hcHygDaily = Number(hci.hygDailyAvg) || 0;
+  var hygCapWeaknesses = [];
+  var hygCapStrengths  = [];
+  const fmt$_hc = n => '$' + Math.round(n).toLocaleString();
+  const fmtInt_hc = n => Math.round(n).toLocaleString();
+  if (hcUtil != null && hcDaysReq != null && hcDaysSch != null) {
+    if (hcUtil < 70 && hcDaysSch > 0) {
+      const targetAnnualProd = 0.70 * hcDaysSch * 12 * hcHygDaily;
+      const underutilOpp = Math.max(0, targetAnnualProd - hcHygProd);
+      hygCapWeaknesses.push(`Your hygiene department is running at ${Math.round(hcUtil)}% utilization (${hcDaysReq.toFixed(1)} days required per month vs ${hcDaysSch.toFixed(1)} days scheduled). That's below the 70-90% healthy band. At current hygiene $/day of ${fmt$_hc(hcHygDaily)}, closing the gap to 70% utilization represents roughly ${fmt$_hc(underutilOpp)} of annual hygiene production currently left on the table — either through underused chair time or a recall system that's not bringing patients back.`);
+    } else if (hcUtil > 90 && hcProcPts != null && hcProcPts > 0 && hcHygProd > 0) {
+      const hygProdPerPatient = hcHygProd / hcProcPts;
+      const unservedPatients = hcProcPts * (1 - 90 / hcUtil);
+      const capacityOpp = unservedPatients * hygProdPerPatient;
+      hygCapWeaknesses.push(`Your hygiene department is running at ${Math.round(hcUtil)}% utilization — above the 90% comfort ceiling. Demand from the active patient base exceeds scheduled hygiene capacity, which creates recall delays, patients pushed out to other practices, and lost production. Roughly ${fmtInt_hc(unservedPatients)} patients from your active base aren't being served at recall cadence. At an average of ${fmt$_hc(hygProdPerPatient)} of annual hygiene production per active patient, that's roughly ${fmt$_hc(capacityOpp)} of hygiene production constrained by capacity.`);
+    }
+  }
+  /* Retention weakness / strength — only when both counts available. */
+  if (hcRet != null && hcSoftPts != null && hcProcPts != null && hcSoftPts > 0 && hcHygProd > 0) {
+    const hygProdPerPatient = hcHygProd / Math.max(1, hcProcPts);
+    if (hcRet > 40) {
+      const reactivationOpp = (hcSoftPts - hcProcPts) * 0.5 * hygProdPerPatient;
+      hygCapWeaknesses.push(`The software reports ${fmtInt_hc(hcSoftPts)} active patients, but the procedure history over 24 months supports only ${fmtInt_hc(hcProcPts)}. The ${fmtInt_hc(hcSoftPts - hcProcPts)}-patient gap (${hcRet.toFixed(1)}%) represents patients the system considers active who haven't been in for a recall visit. Reactivating half of those lapsed patients would add roughly ${fmt$_hc(reactivationOpp)} of annual hygiene production.`);
+    } else if (hcRet < 15) {
+      hygCapStrengths.push(`Your procedure-derived active patient count tracks closely to the software's count (${fmtInt_hc(hcProcPts)} vs ${fmtInt_hc(hcSoftPts)}). This suggests patient retention is strong — patients the system considers active are actually being seen.`);
+    }
+  }
+
   /* ── Q6 BWV operational-gate weakness (2026-04-22). Independent of Q5. ─ */
   const bca = (pp.biteConsultApproach || '').toLowerCase();
   if (bca === 'during_hygiene') {
@@ -706,8 +774,12 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   if (typeof q5Weakness            !== 'undefined' && q5Weakness)            highPriorityWeaknesses.push(q5Weakness);
   if (typeof overheadWeakness      !== 'undefined' && overheadWeakness)      highPriorityWeaknesses.push(overheadWeakness);
   if (typeof hygDeptRatioWeakness  !== 'undefined' && hygDeptRatioWeakness)  highPriorityWeaknesses.push(hygDeptRatioWeakness);
+  if (typeof hygCapWeaknesses      !== 'undefined' && hygCapWeaknesses.length) highPriorityWeaknesses.push(...hygCapWeaknesses);
   if (highPriorityWeaknesses.length > 0) {
     weaknesses.unshift(...highPriorityWeaknesses);
+  }
+  if (typeof hygCapStrengths !== 'undefined' && hygCapStrengths.length) {
+    strengths.unshift(...hygCapStrengths);
   }
 
   /* ── THREATS ──
@@ -914,6 +986,33 @@ function computeReportData(input) {
     .reduce((s, c) => s + (c.qty || 0), 0);
   const battingAverage = crownsPreppedCount > 0 ? visitsCount / crownsPreppedCount : null;
 
+  /* ──── Crown Unit Value (2026-04-23) ────
+     CUV = (totalProduction − hygieneProduction − specialtyProduction) ÷ crownsPrepped
+     = GP / restorative dollars accompanying each crown. No hard benchmark —
+     neutral diagnostic. Feeds the Q5 dollar-opportunity math.
+     Specialty bucket (different from the existing category split which
+     counts SRP/perio maint as perio): endodontics D3xxx, periodontal
+     surgery D4260-D4299 (excludes D4341/D4342/D4910), implant surgery
+     D6010-D6199 (excludes D6056+ prosthetic — those ARE in the crown
+     denominator), oral surgery D7xxx, orthodontics D8xxx. */
+  const isCuvSpecialty = (rawCode) => {
+    const c = (rawCode || '').toUpperCase();
+    if (!/^D\d{4}$/.test(c)) return false;
+    const n = parseInt(c.slice(1), 10);
+    if (c.startsWith('D3')) return true;                    /* endo */
+    if (c.startsWith('D4') && n >= 4260 && n <= 4299) return true;  /* perio surgery */
+    if (c.startsWith('D6') && n >= 6010 && n <= 6199) return true;  /* implant surgery */
+    if (c.startsWith('D7')) return true;                    /* oral surgery */
+    if (c.startsWith('D8')) return true;                    /* ortho */
+    return false;
+  };
+  const cuvSpecialtyProduction = codes
+    .filter(c => isCuvSpecialty(c.code))
+    .reduce((s, c) => s + (c.total || 0), 0);
+  const crownUnitValue = crownsPreppedCount > 0
+    ? (totalProd - prodHyg - cuvSpecialtyProduction) / crownsPreppedCount
+    : null;
+
   /* Annualize if prodMonths != 12 */
   const annualFactor = prodMonths && prodMonths !== 12 ? (12 / prodMonths) : 1;
   const annualProd = totalProd * annualFactor;
@@ -1107,23 +1206,79 @@ function computeReportData(input) {
     employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct
   ) : 0;
 
-  /* ──── Overhead Breakdown (2026-04-22) ──── */
-  /* Four optional user-supplied annual-spend figures driven by the
-     questionnaire's "Overhead Breakdown" section. Each is converted to a
-     percentage of annualCollections when both the input dollar and the
-     denominator are present; otherwise stays null. Null → the new
-     five-branch Overhead SWOT skips that sub-component silently. */
+  /* ──── Hygiene Capacity Analysis (2026-04-23) ────
+     Two independent active-patient estimates plus a days-required-vs-
+     scheduled utilization figure. Drives the HIGH-priority Hygiene
+     Capacity SWOT and a new scorecard card.
+       procedureDerivedActivePatients — built from 24 months of procedure
+         counts. Dave's formula expects 24-month data; we scale whatever
+         prodMonths the report captured to 24 months before applying it.
+       softwareDerivedActivePatients — pulled from the Patient Summary
+         PDF (Bug 4's new prompt). Null when Hub didn't upload one.
+       utilizationPct — days-required / days-scheduled. Healthy 70-90%. */
+  const scaleTo24 = prodMonths > 0 ? 24 / prodMonths : 2;
+  const prophyVisits24 = countCodeMatchingQty(['D1110', 'D1120']) * scaleTo24;
+  const perioMaint24   = countCodeMatchingQty(['D4910']) * scaleTo24;
+  const srpVisits24    = countCodeMatchingQty(['D4341', 'D4342']) * scaleTo24;
+  const procedureDerivedActivePatients = (prophyVisits24 + perioMaint24 + srpVisits24) > 0
+    ? Math.round((prophyVisits24 / 4 + perioMaint24 / 8 + srpVisits24 / 12) / 0.80)
+    : null;
+  const softwareDerivedActivePatients = (patientSummary && Number.isFinite(patientSummary.activePatients))
+    ? patientSummary.activePatients : null;
+
+  const hygVisitsPerMonth    = (prophyVisits24 + perioMaint24 + srpVisits24) / 24;
+  const patsPerHygDay        = Number(pp.patientsPerHygienistPerDay) || 8;
+  const daysRequiredPerMonth = patsPerHygDay > 0 ? hygVisitsPerMonth / patsPerHygDay : null;
+  const daysScheduledPerMonth = hygieneDaysPerWeek > 0 ? hygieneDaysPerWeek * 4.33 : null;
+  const utilizationPct = (daysRequiredPerMonth != null && daysScheduledPerMonth != null && daysScheduledPerMonth > 0)
+    ? (daysRequiredPerMonth / daysScheduledPerMonth) * 100
+    : null;
+  const retentionDeltaPct = (softwareDerivedActivePatients != null && procedureDerivedActivePatients != null && softwareDerivedActivePatients > 0)
+    ? ((softwareDerivedActivePatients - procedureDerivedActivePatients) / softwareDerivedActivePatients) * 100
+    : null;
+
+  /* ──── Overhead Breakdown (2026-04-22, P&L precedence added 2026-04-23) ──── */
+  /* Two data paths per sub-component, preferred in order:
+       1. P&L items[] (Expense section) that match the sub-component regex.
+          Authoritative when present — actuals from the accountant's books
+          beat the dentist's from-memory estimate.
+       2. Questionnaire `overheadBreakdown.annual*Spend` — fallback when
+          the P&L path produced no matching line items. */
   const ob = pp.overheadBreakdown || {};
-  const obPct = (raw) => {
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n <= 0) return null;
-    if (!(annualCollections > 0)) return null;
-    return (n / annualCollections) * 100;
+  const sumPLExpensesMatching = (re) => {
+    if (!plData || !Array.isArray(plData.items)) return null;
+    let sum = 0, hit = false;
+    for (const it of plData.items) {
+      if (it.section !== 'Expense') continue;
+      if (re.test(it.item || '')) { sum += it.amount; hit = true; }
+    }
+    return hit ? sum : null;
   };
-  const suppliesPct  = obPct(ob.annualSuppliesSpend);
-  const labPctOb     = obPct(ob.annualLabSpend);
-  const occupancyPct = obPct(ob.annualOccupancyCost);
-  const marketingPct = obPct(ob.annualMarketingSpend);
+  const suppliesFromPL   = sumPLExpensesMatching(/suppl/i);
+  const labFromPL        = sumPLExpensesMatching(/\blab\b|laboratory/i);
+  const occupancyFromPL  = sumPLExpensesMatching(/\brent\b|\butilit|occupan|property\s*tax|\bbuilding\s*maint/i);
+  const marketingFromPL  = sumPLExpensesMatching(/advertis|marketing/i);
+  const pickDollar = (fromPL, fromQ) => {
+    if (fromPL != null) return { value: fromPL, source: 'pl' };
+    const n = Number(fromQ);
+    if (Number.isFinite(n) && n > 0) return { value: n, source: 'questionnaire' };
+    return { value: null, source: null };
+  };
+  const suppliesPick  = pickDollar(suppliesFromPL,  ob.annualSuppliesSpend);
+  const labPick       = pickDollar(labFromPL,       ob.annualLabSpend);
+  const occupancyPick = pickDollar(occupancyFromPL, ob.annualOccupancyCost);
+  const marketingPick = pickDollar(marketingFromPL, ob.annualMarketingSpend);
+  const toPct = (v) => (v != null && annualCollections > 0) ? (v / annualCollections) * 100 : null;
+  const suppliesPct  = toPct(suppliesPick.value);
+  const labPctOb     = toPct(labPick.value);
+  const occupancyPct = toPct(occupancyPick.value);
+  const marketingPct = toPct(marketingPick.value);
+  const overheadBreakdownSource = {
+    supplies:  suppliesPick.source,
+    lab:       labPick.source,
+    occupancy: occupancyPick.source,
+    marketing: marketingPick.source,
+  };
 
   /* ──── Goal matrix ──── */
   const goalDocDaily = combinedDocDailyAvg || 0;
@@ -1436,6 +1591,15 @@ function computeReportData(input) {
         crownsPreppedCount,
         exam0120Count,          /* diagnostic companion for BA — compare to visitsCount when BA is high */
       },
+      /* Crown Unit Value (2026-04-23): GP production per crown. No hard
+         benchmark — neutral diagnostic. Feeds Q5 dollar-opportunity math. */
+      crownUnitValue,
+      crownUnitValueInputs: {
+        cuvSpecialtyProduction,
+        crownsPreppedCount,
+        totalProd,
+        hygieneProduction: prodHyg,
+      },
       /* Q5 exam-gap inputs (2026-04-22) — drives the three-layer production
          diagnostic. totalExams vs hygieneVisits tells us whether the doctor
          is getting into hygiene visits for the exam step. */
@@ -1445,17 +1609,33 @@ function computeReportData(input) {
          Null when no hygieneData was supplied. Renderer hides the fill-rate card when null. */
       hygieneFillRate,
       hygieneNearFuturePreBooking,
-      /* Overhead Breakdown (2026-04-22) — user-supplied sub-component % of
-         collections. Null when the corresponding questionnaire field was left
-         blank (graceful degradation). Drives the five-branch Overhead SWOT. */
+      /* Overhead Breakdown (2026-04-22, P&L precedence 2026-04-23) — sub-
+         component % of collections. Source = 'pl' when the P&L contributed
+         a matching line item, 'questionnaire' when we fell back to the
+         overheadBreakdown questionnaire value, null when neither path
+         produced data. Drives the five-branch Overhead SWOT. */
       overheadSuppliesPct:  suppliesPct,
       overheadLabPct:       labPctOb,
       overheadOccupancyPct: occupancyPct,
       overheadMarketingPct: marketingPct,
+      overheadBreakdownSource,
       /* Hygiene Department Ratio inputs (2026-04-22) — raw labor + production
          dollars backing the 3:1 methodology benchmark. Null when either is 0. */
       annualHygienistCost:       annualHygienistCost > 0 ? annualHygienistCost : null,
       annualHygieneProduction:   annualHyg > 0 ? annualHyg : null,
+      /* Hygiene Capacity Analysis (2026-04-23) — feeds the HIGH-priority
+         Hygiene Capacity SWOT. Null fields graceful-degrade individual
+         sub-findings. */
+      hygieneCapacity: {
+        procedureDerivedActivePatients,
+        softwareDerivedActivePatients,
+        daysRequiredPerMonth,
+        daysScheduledPerMonth,
+        utilizationPct,
+        retentionDeltaPct,
+        hygVisitsPerMonth,
+        patientsPerHygPerDay: patsPerHygDay,
+      },
     },
 
     goals: {
@@ -1642,6 +1822,44 @@ function renderReportHtml(data) {
          up with the Hygiene Department Ratio SWOT copy — tiers and data
          source are unchanged. */
       bench: '% of hygiene production &middot; diagnostic reference<br>Benchmark: hygiene produces at least $3 for every $1 of wages.',
+      status: '',
+    });
+  }
+
+  /* Hygiene Capacity (2026-04-23) — utilization = days required / scheduled.
+     <70 red (under-utilized), 70-90 green (healthy), >90 amber (constrained).
+     Card body cites procedure-derived vs software-reported active-patient
+     counts so the reader sees both sides. Hidden when utilization null
+     (no hygiene schedule days captured). */
+  if (kpis.hygieneCapacity && kpis.hygieneCapacity.utilizationPct != null) {
+    const hc = kpis.hygieneCapacity;
+    const u = hc.utilizationPct;
+    const capStatus = u < 70 ? 'bad' : (u <= 90 ? 'good' : 'warn');
+    const fmtInt = n => n == null ? '—' : Math.round(n).toLocaleString();
+    const procPts = hc.procedureDerivedActivePatients;
+    const softPts = hc.softwareDerivedActivePatients;
+    const delta = (softPts != null && procPts != null) ? softPts - procPts : null;
+    const deltaPct = hc.retentionDeltaPct;
+    let benchBody = `${(hc.daysRequiredPerMonth || 0).toFixed(1)} days required vs ${(hc.daysScheduledPerMonth || 0).toFixed(1)} scheduled &middot; procedure-derived active patients: ${fmtInt(procPts)}`;
+    if (softPts != null && delta != null && deltaPct != null) {
+      benchBody += `, software-reported: ${fmtInt(softPts)} (delta ${delta >= 0 ? '+' : ''}${fmtInt(delta)}, ${deltaPct.toFixed(1)}%)`;
+    }
+    scorecardCards.push({
+      lbl: 'Hygiene Capacity',
+      val: u.toFixed(0) + '%',
+      bench: benchBody,
+      status: capStatus,
+    });
+  }
+
+  /* Crown Unit Value (2026-04-23) — neutral diagnostic, no benchmark.
+     Feeds the Q5 dollar-opportunity math. Lower ≈ crown-dominated revenue;
+     higher ≈ more supporting general dentistry per crown prepped. */
+  if (kpis.crownUnitValue != null && kpis.crownUnitValue > 0) {
+    scorecardCards.push({
+      lbl: 'Crown Unit Value',
+      val: fmt$(kpis.crownUnitValue),
+      bench: 'GP production per crown prepped &middot; diagnostic reference (lower = crown-dominated mix, higher = more supporting GP per crown)',
       status: '',
     });
   }
@@ -2532,6 +2750,13 @@ exports.handler = async function(event) {
         hygieneFillRate:      dataWithoutSwot.kpis.hygieneFillRate,
         totalExamsCount:      dataWithoutSwot.kpis.totalExamsCount,
         hygieneVisitsForExamCheck: dataWithoutSwot.kpis.hygieneVisitsForExamCheck,
+        /* Q5 dollar-opportunity inputs (2026-04-23 unblock) — CUV + annual
+           hygiene visits + annual crowns let each branch append a concrete
+           dollar figure. Null fields → branch skips the dollar clause. */
+        crownUnitValue:         dataWithoutSwot.kpis.crownUnitValue,
+        annualHygieneProduction: dataWithoutSwot.kpis.annualHygieneProduction,
+        annualHygVisits:        dataWithoutSwot.kpis.hygieneVisitsForExamCheck,
+        annualCrowns:           dataWithoutSwot.kpis.battingAverageInputs?.crownsPreppedCount || null,
       },
       {
         overheadPct:       dataWithoutSwot.kpis.overheadPct,
@@ -2545,6 +2770,11 @@ exports.handler = async function(event) {
       {
         annualHygienistCost:     dataWithoutSwot.kpis.annualHygienistCost,
         annualHygieneProduction: dataWithoutSwot.kpis.annualHygieneProduction,
+      },
+      {
+        ...(dataWithoutSwot.kpis.hygieneCapacity || {}),
+        annualHygieneProduction: dataWithoutSwot.kpis.annualHygieneProduction,
+        hygDailyAvg:             dataWithoutSwot.kpis.hygDailyAvg,
       },
     );
 
