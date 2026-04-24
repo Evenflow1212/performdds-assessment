@@ -236,7 +236,7 @@ function sortedDates(arr) { return [...new Set(arr.map(r => r.date))].sort(); }
 function groupByDate(arr, dimKey, valKey) { const m = {}; arr.forEach(r => { if (!m[r.date]) m[r.date] = {}; m[r.date][r[dimKey]] = r[valKey]; }); return m; }
 
 // === AUTH ===
-const USERS = {"bilbeisi": "1e8d25e1b2534789431250a958add50bd1840e872c7d7ad20f3e3a81e8927b9a"};
+const USERS = {"bilbeisi": "0a5e932a2a836e130009d9c051a9cae7753fe094b30822d9680fbbbe33638215"};
 
 async function sha256(message) {
     const msgBuffer = new TextEncoder().encode(message);
