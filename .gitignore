@@ -24,10 +24,6 @@ REFERENCES.md
 # Local Netlify folder
 .netlify
 
-# clasp — contains scriptId / local push config; user-specific
-.clasp.json
-apps-script/.clasp.json
-
 # Node / Deno
 node_modules/
 deno.lock
