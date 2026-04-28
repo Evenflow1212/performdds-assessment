@@ -690,6 +690,7 @@ function getFormData() {
         hygiene: {
             hygienists,
             totalHygieneDays: n('hygieneDays'),
+            empties: n('emptiesHygSchedule'),
             total: parseFloat(document.getElementById('hygieneTotal').textContent.replace(/[$,]/g, '')) || 0
         },
         exams: {
@@ -739,6 +740,7 @@ function toDashboardFormat(data) {
     data.hygiene.hygienists.forEach(h => {
         if (h.production) entries.push({ category: 'hygiene', date, dimension: h.name, value: h.production });
     });
+    if (data.hygiene.empties) entries.push({ category: 'hygiene', date, dimension: 'Empties in HYG Schedule', count: data.hygiene.empties });
 
     // Visits
     if (data.visits.newPatients) entries.push({ category: 'visits', date, dimension: 'New Patients', count: data.visits.newPatients });
