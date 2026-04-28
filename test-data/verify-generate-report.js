@@ -1765,26 +1765,26 @@ test('Fix 3: Hygiene Capacity HEALTHY (80%) does NOT fire', async () => {
   expect(!w, `No UNDER or CAPACITY weakness should fire in healthy band; got: "${w}"`);
 });
 
-test('Fix 3: Retention WEAKNESS fires when softPts >> procPts (>40% delta)', async () => {
-  /* procPts ~1500 from procedure counts; softPts=2800 reported → delta ≈ 46%. */
+/* Retention SWOT removed 2026-04-24 — Day Sheet methodology pivot. The
+   software-reported active patient count (Patient Summary upload) is
+   unreliable per Danika; the comparison-against-software branches no
+   longer fire regardless of fixture state. The two regression-guard
+   tests below replace the old "fires when delta > 40%" / "fires when
+   delta < 15%" assertions. */
+test('Fix 5: Retention WEAKNESS does NOT fire (Day Sheet methodology pivot 2026-04-24)', async () => {
+  /* Same fixture that used to drive retentionDeltaPct > 40 and fire the
+     RETENTION-WEAKNESS branch. Branch is now permanently disabled. */
   const res = await handler(hygCapFixture({ prophyAnnual: 2400, perioMaintAnnual: 0, srpAnnual: 0, numHygienists: 6, patsPerHygDay: 8, activePatients: 2800 }));
   const data = JSON.parse(res.body).data;
-  const d = data.kpis.hygieneCapacity.retentionDeltaPct;
-  expect(d != null && d > 40, `fixture should drive retentionDeltaPct > 40; got ${d}`);
   const w = data.swot.weaknesses.find(x => /represents patients the system considers active who haven't been in/i.test(x));
-  expect(w, 'RETENTION-WEAKNESS did not fire');
-  expect(/Reactivating half of those lapsed patients/i.test(w), 'body missing reactivation framing');
+  expect(!w, `Retention weakness should no longer fire; got: "${w}"`);
 });
 
-test('Fix 3: Retention STRENGTH fires when procPts tracks softPts (<15% delta)', async () => {
-  /* procPts ≈ 2400 from prophy only, softPts=2667 → delta ≈ 10%. */
+test('Fix 5: Retention STRENGTH does NOT fire (Day Sheet methodology pivot 2026-04-24)', async () => {
   const res = await handler(hygCapFixture({ prophyAnnual: 3840, perioMaintAnnual: 0, srpAnnual: 0, numHygienists: 6, patsPerHygDay: 8, activePatients: 2667 }));
   const data = JSON.parse(res.body).data;
-  const d = data.kpis.hygieneCapacity.retentionDeltaPct;
-  expect(d != null && d < 15, `fixture should drive retentionDeltaPct < 15; got ${d}`);
   const s = data.swot.strengths.find(x => /patient retention is strong/i.test(x));
-  expect(s, 'RETENTION-STRENGTH did not fire');
-  expect(/tracks closely to the software's count/i.test(s), 'strength body missing "tracks closely" phrase');
+  expect(!s, `Retention strength should no longer fire; got: "${s}"`);
 });
 
 test('Fix 3: Graceful degradation — patientSummary null skips retention branches', async () => {
@@ -1866,22 +1866,204 @@ test('Fix 5: Overhead Breakdown falls back to questionnaire when P&L has no matc
   expect(mp != null && mp > 2 && mp < 3, `marketingPct should reflect questionnaire $23k (~2.5%); got ${mp}`);
 });
 
-test('Fix 1: Patient Summary upload slot + step 6 exist in assessment_hub.html', () => {
+test('Fix 5: Patient Summary upload step does NOT exist in assessment_hub.html (Day Sheet pivot 2026-04-24)', () => {
   const fs = require('fs');
   const path = require('path');
   const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
-  expect(/<div class="step-card" id="step6">[\s\S]{0,600}Patient Summary/i.test(html), 'step6 card with Patient Summary title not found');
-  expect(/id="file6"[^>]*accept="\.pdf"/i.test(html), 'file6 upload input missing');
-  expect(/onchange="handleFile\(6, this\)"/i.test(html), 'handleFile(6, …) wiring missing');
-  /* Renumbered downstream steps */
-  expect(/id="step7"[\s\S]{0,400}Employee Costs/i.test(html), 'step7 should be Employee Costs after renumber');
-  expect(/id="step8"[\s\S]{0,400}Hygiene Schedule/i.test(html), 'step8 should be Hygiene Schedule after renumber');
-  expect(/id="step9"[\s\S]{0,400}Generate Assessment Report/i.test(html), 'step9 should be Generate after renumber');
-  /* Progress-bar entry for Patient Summary */
-  expect(/goToStep\(6\)[\s\S]{0,200}Patient Summary/i.test(html), 'progress-bar entry for Patient Summary missing');
-  /* Payload includes patientSummaryText */
-  expect(/patientSummaryText[\s\S]{0,30}practiceName/.test(html), 'payload should include patientSummaryText');
+  /* The old step6 card with the Patient Summary title is gone. */
+  expect(!/id="file6"[^>]*onchange="handleFile\(6, this\)"/i.test(html), 'file6 upload input should be removed');
+  /* The progress-bar entry "Patient Summary" goToStep(6) wiring is gone. */
+  expect(!/goToStep\(6\)[\s\S]{0,200}Patient Summary/i.test(html), 'progress-bar entry "Patient Summary" should be removed');
+  /* Renumbered: step6 = Employee Costs (was step 7). */
+  expect(/id="step6"[\s\S]{0,500}Employee Costs/i.test(html), 'step6 should now be Employee Costs after renumber');
+  /* Renumbered: step7 = Hygiene Schedule (was step 8). */
+  expect(/id="step7"[\s\S]{0,500}Hygiene Schedule/i.test(html), 'step7 should now be Hygiene Schedule after renumber');
+  /* Renumbered: step8 = Generate (was step 9). */
+  expect(/id="step8"[\s\S]{0,500}Generate Assessment Report/i.test(html), 'step8 should now be Generate after renumber');
+  /* Day Sheet × 3 sub-uploads must be present. */
+  expect(/id="file2a"/.test(html), 'file2a (Day Sheet YTD) input missing');
+  expect(/id="file2b"/.test(html), 'file2b (Day Sheet Last Year) input missing');
+  expect(/id="file2c"/.test(html), 'file2c (Day Sheet Year Before) input missing');
 });
+
+/* ──────────────────────────────────────────────────────────────────────
+   Day Sheet methodology batch (2026-04-24): replace single Collections
+   upload with three Day Sheet uploads (YTD, last full year, year before).
+   New tests cover parseDaySheet, handler thread-through, Collections
+   Trend SWOT, image vs PDF routing, partial-period math.
+   ────────────────────────────────────────────────────────────────────── */
+
+const { parseDaySheet: pds } = require(require('path').resolve(__dirname, '..', 'netlify', 'functions', 'generate-report.js'));
+
+/* Synthetic last-page Day Sheet text (output of the dentrixDaySheet prompt). */
+const DAY_SHEET_LAST_FULL_YEAR = [
+  'CHARGES_TOTAL|1340000',
+  'PAYMENTS_TOTAL|1280000',
+  'CREDIT_ADJUSTMENTS|45000',
+  'CHARGE_ADJUSTMENTS|12000',
+  'CHARGES_BILLED_INSURANCE|820000',
+  'NEW_PATIENTS|380',
+  'PATIENTS_SEEN|9420',
+  'AVG_PROD_PER_PATIENT|142',
+  'AVG_CHARGE_PER_PROCEDURE|310',
+  'PERIOD_FROM|2025-01-01',
+  'PERIOD_TO|2025-12-31',
+].join('\n');
+
+/* New test #1 — parseDaySheet extracts CHARGES, PAYMENTS, PATIENTS_SEEN
+   from synthetic last-page text. */
+test('Day Sheet new #1: parseDaySheet extracts canonical fields from last-page text', () => {
+  const r = pds(DAY_SHEET_LAST_FULL_YEAR);
+  expect(r.charges      === 1340000, `charges should be 1,340,000; got ${r.charges}`);
+  expect(r.payments     === 1280000, `payments should be 1,280,000; got ${r.payments}`);
+  expect(r.creditAdjustments === 45000,  'creditAdjustments mismatch');
+  expect(r.chargeAdjustments === 12000,  'chargeAdjustments mismatch');
+  expect(r.chargesBilledToInsurance === 820000, 'chargesBilledToInsurance mismatch');
+  expect(r.newPatientsOfRecord === 380,  'newPatientsOfRecord mismatch');
+  expect(r.patientsSeen === 9420,        'patientsSeen mismatch (captured but not used as active patient count)');
+  expect(r.avgProdPerPatient === 142,    'avgProdPerPatient mismatch');
+  expect(r.avgChargePerProcedure === 310, 'avgChargePerProcedure mismatch');
+  expect(r.periodFrom === '2025-01-01',  'periodFrom mismatch');
+  expect(r.periodTo === '2025-12-31',    'periodTo mismatch');
+});
+
+/* New test #2 — three Day Sheets thread through to daySheets.{ytd,lastYear,yearBefore}.
+   Computed monthly averages match expected math. */
+test('Day Sheet new #2: three Day Sheets thread through to daySheets + monthly averages', async () => {
+  /* YTD: Q1 2026 — 3 months, $300k payments → $100k/mo
+     Last full year: 2025 — 12 months, $1.2M payments → $100k/mo
+     Year before: 2024 — 12 months, $1.08M payments → $90k/mo */
+  const ytdText = ['CHARGES_TOTAL|330000','PAYMENTS_TOTAL|300000','PERIOD_FROM|2026-01-01','PERIOD_TO|2026-03-31'].join('\n');
+  const lyText  = ['CHARGES_TOTAL|1320000','PAYMENTS_TOTAL|1200000','PERIOD_FROM|2025-01-01','PERIOD_TO|2025-12-31'].join('\n');
+  const ybText  = ['CHARGES_TOTAL|1188000','PAYMENTS_TOTAL|1080000','PERIOD_FROM|2024-01-01','PERIOD_TO|2024-12-31'].join('\n');
+  const evt = JSON.parse(buildEvent().body);
+  evt.daySheetYtdText = ytdText;
+  evt.daySheetLastYearText = lyText;
+  evt.daySheetYearBeforeText = ybText;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const ds = data.collections.daySheets;
+  expect(ds.ytd && ds.ytd.payments === 300000, 'daySheets.ytd.payments should be 300,000');
+  expect(ds.lastYear && ds.lastYear.payments === 1200000, 'daySheets.lastYear.payments should be 1,200,000');
+  expect(ds.yearBefore && ds.yearBefore.payments === 1080000, 'daySheets.yearBefore.payments should be 1,080,000');
+  const t = data.collections.trend;
+  expect(Math.abs(t.ytdMonthlyAvgCollections      - 100000) < 1, `ytd monthly avg should be $100k; got ${t.ytdMonthlyAvgCollections}`);
+  expect(Math.abs(t.lastYearMonthlyAvgCollections - 100000) < 1, `last year monthly avg should be $100k; got ${t.lastYearMonthlyAvgCollections}`);
+  expect(Math.abs(t.yearBeforeMonthlyAvgCollections - 90000) < 1, `year before monthly avg should be $90k; got ${t.yearBeforeMonthlyAvgCollections}`);
+  expect(t.ytdMonthsCompleted === 3, `ytd months should be 3 (parsed period); got ${t.ytdMonthsCompleted}`);
+});
+
+/* New test #3 — Collections shrinking SWOT fires when YTD monthly avg is 10%
+   below last year monthly avg. */
+test('Day Sheet new #3: Collections shrinking SWOT fires at 10% below last year', async () => {
+  /* YTD = $90k/mo, Last Year = $100k/mo → 10% below. */
+  const ytdText = ['CHARGES_TOTAL|300000','PAYMENTS_TOTAL|270000','PERIOD_FROM|2026-01-01','PERIOD_TO|2026-03-31'].join('\n');
+  const lyText  = ['CHARGES_TOTAL|1320000','PAYMENTS_TOTAL|1200000','PERIOD_FROM|2025-01-01','PERIOD_TO|2025-12-31'].join('\n');
+  const ybText  = ['CHARGES_TOTAL|1188000','PAYMENTS_TOTAL|1080000','PERIOD_FROM|2024-01-01','PERIOD_TO|2024-12-31'].join('\n');
+  const evt = JSON.parse(buildEvent().body);
+  evt.daySheetYtdText = ytdText;
+  evt.daySheetLastYearText = lyText;
+  evt.daySheetYearBeforeText = ybText;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const w = data.swot.weaknesses.find(x => /Year-to-date monthly collections average/i.test(x));
+  expect(w, 'Collections shrinking weakness did not fire at 10% below: ' + JSON.stringify(data.swot.weaknesses.slice(0, 5)));
+  expect(/10% below/.test(w), `body should cite 10% below; got: ${w}`);
+  expect(/3-year window/i.test(w), 'body should cite 3-year window when year-before present');
+});
+
+/* New test #4 — Collections shrinking SWOT does NOT fire within ±5%. */
+test('Day Sheet new #4: Collections shrinking SWOT does NOT fire within ±5%', async () => {
+  /* YTD = $97k/mo, Last Year = $100k/mo → 3% below (within ±5% band). */
+  const ytdText = ['CHARGES_TOTAL|320000','PAYMENTS_TOTAL|291000','PERIOD_FROM|2026-01-01','PERIOD_TO|2026-03-31'].join('\n');
+  const lyText  = ['CHARGES_TOTAL|1320000','PAYMENTS_TOTAL|1200000','PERIOD_FROM|2025-01-01','PERIOD_TO|2025-12-31'].join('\n');
+  const evt = JSON.parse(buildEvent().body);
+  evt.daySheetYtdText = ytdText;
+  evt.daySheetLastYearText = lyText;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const w = data.swot.weaknesses.find(x => /Year-to-date monthly collections average/i.test(x));
+  expect(!w, `Collections shrinking weakness should not fire within ±5%; fired: ${w}`);
+});
+
+/* New test #7 — Hygiene Capacity card renders procedure-derived active
+   patient count only (no software / delta numbers). */
+test('Day Sheet new #7: Hygiene Capacity card renders procedure-derived count only (no software/delta)', async () => {
+  /* Use the existing hygCapFixture which can supply both procedure-derived
+     and software-reported counts. After the methodology pivot, the card
+     should render only the procedure-derived figure. */
+  const res = await handler(hygCapFixture({ prophyAnnual: 2300, perioMaintAnnual: 200, srpAnnual: 50, numHygienists: 6, patsPerHygDay: 8, activePatients: 2400 }));
+  const body = JSON.parse(res.body);
+  const html = body.reportHtml;
+  /* Card is rendered. */
+  expect(/Hygiene Capacity[\s\S]{0,400}days required/i.test(html), 'Hygiene Capacity card should render with utilization body');
+  /* Card body must NOT include software-reported count or delta phrasing. */
+  expect(!/software-reported:/i.test(html), 'Hygiene Capacity card should no longer cite "software-reported" count');
+  expect(!/\(delta [+-]/i.test(html),       'Hygiene Capacity card should no longer cite a software-vs-procedure delta');
+});
+
+/* New test #8 — extract-pdf.js accepts both PDF and PNG inputs. Verifies the
+   buildContentBlock helper routes to the right Anthropic content-block shape
+   based on media type. (No network call — pure routing rule.) */
+test('Day Sheet new #8: extract-pdf.js routes PDF vs PNG to correct Anthropic content block', () => {
+  const path = require('path');
+  const ep = require(path.resolve(__dirname, '..', 'netlify', 'functions', 'extract-pdf.js'));
+  /* PDF inputs land in a 'document' block. */
+  const pdfBlock = ep.buildContentBlock('application/pdf', 'BASE64DATA');
+  expect(pdfBlock.type === 'document', `pdf should map to type=document; got ${pdfBlock.type}`);
+  expect(pdfBlock.source.media_type === 'application/pdf', 'pdf media_type should pass through');
+  /* PNG inputs land in an 'image' block. */
+  const pngBlock = ep.buildContentBlock('image/png', 'BASE64DATA');
+  expect(pngBlock.type === 'image', `png should map to type=image; got ${pngBlock.type}`);
+  expect(pngBlock.source.media_type === 'image/png', 'png media_type should pass through');
+  /* JPEG inputs land in an 'image' block. */
+  const jpgBlock = ep.buildContentBlock('image/jpeg', 'BASE64DATA');
+  expect(jpgBlock.type === 'image', `jpeg should map to type=image; got ${jpgBlock.type}`);
+  /* sniffMediaType infers from URL extension. */
+  expect(ep.sniffMediaType('foo.png') === 'image/png',   'sniffMediaType should detect .png');
+  expect(ep.sniffMediaType('foo.jpg') === 'image/jpeg',  'sniffMediaType should detect .jpg');
+  expect(ep.sniffMediaType('foo.heic') === 'image/heic', 'sniffMediaType should detect .heic');
+  expect(ep.sniffMediaType('foo.pdf') === 'application/pdf', 'sniffMediaType should detect .pdf');
+  expect(ep.sniffMediaType('foo')     === 'application/pdf', 'sniffMediaType should default to PDF');
+});
+
+/* New test #9 — PERIOD_FROM/PERIOD_TO emitted by parseDaySheet match the
+   date range stamped on the Day Sheet. monthsCovered derives from those. */
+test('Day Sheet new #9: parseDaySheet preserves PERIOD_FROM/PERIOD_TO + computes monthsCovered', () => {
+  /* Full year — 12 months. */
+  const fullYear = pds(DAY_SHEET_LAST_FULL_YEAR);
+  expect(fullYear.periodFrom === '2025-01-01', 'full year periodFrom');
+  expect(fullYear.periodTo   === '2025-12-31', 'full year periodTo');
+  expect(fullYear.monthsCovered === 12, `full year monthsCovered should be 12; got ${fullYear.monthsCovered}`);
+  /* YTD — 3 months. */
+  const ytd = pds(['CHARGES_TOTAL|300000','PAYMENTS_TOTAL|275000','PERIOD_FROM|2026-01-01','PERIOD_TO|2026-03-31'].join('\n'));
+  expect(ytd.periodFrom === '2026-01-01', 'ytd periodFrom');
+  expect(ytd.periodTo   === '2026-03-31', 'ytd periodTo');
+  expect(ytd.monthsCovered === 3, `ytd monthsCovered should be 3; got ${ytd.monthsCovered}`);
+});
+
+/* New test #10 — Edge case: Day Sheet covering a partial period. Parser uses
+   PERIOD_FROM/PERIOD_TO to compute monthly averages rather than assuming 12. */
+test('Day Sheet new #10: partial-period Day Sheet uses parsed dates for monthly average', async () => {
+  /* User uploads a 6-month Day Sheet by mistake. PERIOD_FROM/TO drive the
+     divisor — $600k payments over 6 months = $100k/mo, NOT $50k/mo. */
+  const partial = ['CHARGES_TOTAL|650000','PAYMENTS_TOTAL|600000','PERIOD_FROM|2025-07-01','PERIOD_TO|2025-12-31'].join('\n');
+  const r = pds(partial);
+  expect(r.monthsCovered === 6, `partial monthsCovered should be 6; got ${r.monthsCovered}`);
+  /* Thread it through the handler as last-year's sheet — $100k/mo expected. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.daySheetLastYearText = partial;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const t = data.collections.trend;
+  expect(Math.abs(t.lastYearMonthlyAvgCollections - 100000) < 1,
+    `partial-period monthly avg should use parsed months (=$100k/mo, not $50k/mo from /12); got ${t.lastYearMonthlyAvgCollections}`);
+});
+
+/* Test #5 (Retention SWOT no longer fires) and Test #6 (Patient Summary
+   upload step does not exist) live above next to the existing test
+   library — they replaced the prior "Fix 3: Retention WEAKNESS fires"
+   and "Fix 1: Patient Summary upload slot exists" tests respectively. */
 
 (async () => {
   let failed = 0;

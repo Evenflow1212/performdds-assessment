@@ -184,10 +184,82 @@ function parsePL(text) {
   return { items, totalIncome, totalExpense, netIncome };
 }
 
+/* ─── Dentrix Day Sheet parser (2026-04-24) ───
+   Day Sheet is the canonical source for collection totals (Danika confirmed
+   2026-04-24 — Practice Analysis depends on month-end being run on time;
+   Day Sheet doesn't). Parser consumes the pipe-delimited output of the
+   `dentrixDaySheet` prompt in parse-pdf.js. Returns nulls for any field the
+   prompt omitted; downstream code skips dependent computations gracefully.
+   PERIOD_FROM/PERIOD_TO drive monthly-average math — using parsed period
+   dates lets us handle YTD partial periods correctly without hard-coding 12. */
+function parseDaySheet(text) {
+  const out = {
+    charges: null,
+    payments: null,
+    creditAdjustments: null,
+    chargeAdjustments: null,
+    chargesBilledToInsurance: null,
+    newPatientsOfRecord: null,
+    patientsSeen: null,         /* visits not unique patients — captured but
+                                   NEVER used as active-patient count */
+    avgProdPerPatient: null,
+    avgChargePerProcedure: null,
+    periodFrom: null,
+    periodTo: null,
+    monthsCovered: null,
+  };
+  if (!text) return out;
+  const parseMoney = (s) => {
+    let raw = String(s).replace(/[,$]/g, '').trim();
+    if (raw.startsWith('(') && raw.endsWith(')')) raw = '-' + raw.slice(1, -1);
+    const n = parseFloat(raw);
+    return isNaN(n) ? null : n;
+  };
+  const parseInt2 = (s) => {
+    const n = parseInt(String(s).replace(/[,$\s]/g, ''), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  const pickMoney = (re, abs) => {
+    const m = text.match(re);
+    if (!m) return null;
+    const v = parseMoney(m[1]);
+    if (v == null) return null;
+    return abs ? Math.abs(v) : v;
+  };
+  const pickInt = (re) => {
+    const m = text.match(re);
+    return m ? parseInt2(m[1]) : null;
+  };
+  out.charges                 = pickMoney(/(?:^|\n)\s*CHARGES_TOTAL\s*\|\s*(-?[\d,.$()]+)/i);
+  out.payments                = pickMoney(/(?:^|\n)\s*PAYMENTS_TOTAL\s*\|\s*(-?[\d,.$()]+)/i, /* abs */ true);
+  out.creditAdjustments       = pickMoney(/(?:^|\n)\s*CREDIT_ADJUSTMENTS\s*\|\s*(-?[\d,.$()]+)/i);
+  out.chargeAdjustments       = pickMoney(/(?:^|\n)\s*CHARGE_ADJUSTMENTS\s*\|\s*(-?[\d,.$()]+)/i);
+  out.chargesBilledToInsurance = pickMoney(/(?:^|\n)\s*CHARGES_BILLED_INSURANCE\s*\|\s*(-?[\d,.$()]+)/i);
+  out.newPatientsOfRecord     = pickInt(/(?:^|\n)\s*NEW_PATIENTS\s*\|\s*(-?[\d,]+)/i);
+  out.patientsSeen            = pickInt(/(?:^|\n)\s*PATIENTS_SEEN\s*\|\s*(-?[\d,]+)/i);
+  out.avgProdPerPatient       = pickMoney(/(?:^|\n)\s*AVG_PROD_PER_PATIENT\s*\|\s*(-?[\d,.$()]+)/i);
+  out.avgChargePerProcedure   = pickMoney(/(?:^|\n)\s*AVG_CHARGE_PER_PROCEDURE\s*\|\s*(-?[\d,.$()]+)/i);
+  const fromMatch = text.match(/(?:^|\n)\s*PERIOD_FROM\s*\|\s*(\d{4}-\d{2}-\d{2})/i);
+  const toMatch   = text.match(/(?:^|\n)\s*PERIOD_TO\s*\|\s*(\d{4}-\d{2}-\d{2})/i);
+  if (fromMatch) out.periodFrom = fromMatch[1];
+  if (toMatch)   out.periodTo   = toMatch[1];
+  if (out.periodFrom && out.periodTo) {
+    const f = new Date(out.periodFrom + 'T00:00:00Z');
+    const t = new Date(out.periodTo   + 'T00:00:00Z');
+    if (!isNaN(f) && !isNaN(t) && t >= f) {
+      out.monthsCovered = Math.max(1, Math.round((t - f) / (1000 * 60 * 60 * 24 * 30.44)));
+    }
+  }
+  return out;
+}
+
 /* ─── Dentrix Patient Summary (2026-04-23) ───
    Extracts top-line patient counts Dave uses to unblock hygiene-capacity
    math. All fields optional — null when the source text didn't include
-   that metric. Safe to call with null/empty text: returns all nulls. */
+   that metric. Safe to call with null/empty text: returns all nulls.
+   2026-04-24: Patient Summary upload step removed from the Hub per Danika
+   ("shit, this is nothing"). Parser preserved as dead code in case Dentrix
+   ships a reliable active-patient report later — no code path calls this. */
 function parsePatientSummary(text) {
   const out = {
     activePatients: null, insuredPatients: null, families: null,
@@ -284,7 +356,7 @@ function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
 }
 
 /* ─── SWOT Analysis Generator ─── */
-function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs, overheadInputs, hygDeptRatioInputs, hygCapacityInputs) {
+function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs, overheadInputs, hygDeptRatioInputs, hygCapacityInputs, collTrendInputs) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
   const pp = practiceProfile || {};
   const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
@@ -743,15 +815,31 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
       hygCapWeaknesses.push(`Your hygiene department is running at ${Math.round(hcUtil)}% utilization — above the 90% comfort ceiling. Demand from the active patient base exceeds scheduled hygiene capacity, which creates recall delays, patients pushed out to other practices, and lost production. Roughly ${fmtInt_hc(unservedPatients)} patients from your active base aren't being served at recall cadence. At an average of ${fmt$_hc(hygProdPerPatient)} of annual hygiene production per active patient, that's roughly ${fmt$_hc(capacityOpp)} of hygiene production constrained by capacity.`);
     }
   }
-  /* Retention weakness / strength — only when both counts available. */
-  if (hcRet != null && hcSoftPts != null && hcProcPts != null && hcSoftPts > 0 && hcHygProd > 0) {
-    const hygProdPerPatient = hcHygProd / Math.max(1, hcProcPts);
-    if (hcRet > 40) {
-      const reactivationOpp = (hcSoftPts - hcProcPts) * 0.5 * hygProdPerPatient;
-      hygCapWeaknesses.push(`The software reports ${fmtInt_hc(hcSoftPts)} active patients, but the procedure history over 24 months supports only ${fmtInt_hc(hcProcPts)}. The ${fmtInt_hc(hcSoftPts - hcProcPts)}-patient gap (${hcRet.toFixed(1)}%) represents patients the system considers active who haven't been in for a recall visit. Reactivating half of those lapsed patients would add roughly ${fmt$_hc(reactivationOpp)} of annual hygiene production.`);
-    } else if (hcRet < 15) {
-      hygCapStrengths.push(`Your procedure-derived active patient count tracks closely to the software's count (${fmtInt_hc(hcProcPts)} vs ${fmtInt_hc(hcSoftPts)}). This suggests patient retention is strong — patients the system considers active are actually being seen.`);
+  /* Retention SWOT branches REMOVED 2026-04-24 — were keyed to comparing a
+     procedure-derived count against the unreliable Patient Summary report.
+     Per Danika ("shit, this is nothing"), the software-reported active patient
+     count cannot be trusted, so a delta against it can't drive a coaching
+     finding. Hygiene Capacity utilization (above) keeps firing on the
+     procedure-derived count alone, which is reliable. */
+
+  /* ── Collections Trend SWOT (2026-04-24) — fires when YTD monthly
+     collections average is more than 5% below last year's monthly average,
+     across the three Day Sheet uploads. Cites the year-before number as a
+     third data point so the reader sees a 3-year direction. Graceful
+     degradation: missing YTD or last-year input → branch silently skipped. */
+  const ct = collTrendInputs || {};
+  const ytdAvg_c      = Number.isFinite(Number(ct.ytdMonthlyAvgCollections))      ? Number(ct.ytdMonthlyAvgCollections)      : null;
+  const lastYearAvg_c = Number.isFinite(Number(ct.lastYearMonthlyAvgCollections)) ? Number(ct.lastYearMonthlyAvgCollections) : null;
+  const yearBefAvg_c  = Number.isFinite(Number(ct.yearBeforeMonthlyAvgCollections)) ? Number(ct.yearBeforeMonthlyAvgCollections) : null;
+  var collectionsShrinkingWeakness = '';
+  if (ytdAvg_c != null && lastYearAvg_c != null && lastYearAvg_c > 0 && ytdAvg_c < lastYearAvg_c * 0.95) {
+    const fmt$_ct = n => '$' + Math.round(n).toLocaleString();
+    const pctBelow = ((1 - ytdAvg_c / lastYearAvg_c) * 100).toFixed(0);
+    let body = `Year-to-date monthly collections average ${fmt$_ct(ytdAvg_c)} is ${pctBelow}% below last year's monthly average ${fmt$_ct(lastYearAvg_c)}.`;
+    if (yearBefAvg_c != null) {
+      body += ` Combined with the year-before average ${fmt$_ct(yearBefAvg_c)}, the trend direction is downward over a 3-year window.`;
     }
+    collectionsShrinkingWeakness = body;
   }
 
   /* ── Q6 BWV operational-gate weakness (2026-04-22). Independent of Q5. ─ */
@@ -771,10 +859,11 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     opportunities.push('Building out your data foundation and scorekeeping rhythm is typically the first 30 days of coaching. It\'s what makes every other recommendation in this report actionable.');
   }
   const highPriorityWeaknesses = [...setupWeaknesses];
-  if (typeof q5Weakness            !== 'undefined' && q5Weakness)            highPriorityWeaknesses.push(q5Weakness);
-  if (typeof overheadWeakness      !== 'undefined' && overheadWeakness)      highPriorityWeaknesses.push(overheadWeakness);
-  if (typeof hygDeptRatioWeakness  !== 'undefined' && hygDeptRatioWeakness)  highPriorityWeaknesses.push(hygDeptRatioWeakness);
-  if (typeof hygCapWeaknesses      !== 'undefined' && hygCapWeaknesses.length) highPriorityWeaknesses.push(...hygCapWeaknesses);
+  if (typeof q5Weakness                  !== 'undefined' && q5Weakness)                  highPriorityWeaknesses.push(q5Weakness);
+  if (typeof overheadWeakness            !== 'undefined' && overheadWeakness)            highPriorityWeaknesses.push(overheadWeakness);
+  if (typeof hygDeptRatioWeakness        !== 'undefined' && hygDeptRatioWeakness)        highPriorityWeaknesses.push(hygDeptRatioWeakness);
+  if (typeof hygCapWeaknesses            !== 'undefined' && hygCapWeaknesses.length)     highPriorityWeaknesses.push(...hygCapWeaknesses);
+  if (typeof collectionsShrinkingWeakness !== 'undefined' && collectionsShrinkingWeakness) highPriorityWeaknesses.push(collectionsShrinkingWeakness);
   if (highPriorityWeaknesses.length > 0) {
     weaknesses.unshift(...highPriorityWeaknesses);
   }
@@ -897,6 +986,12 @@ function computeReportData(input) {
     prodData, collData, plData, employeeCosts, practiceProfile,
     arPatient, arInsurance, swotData, practiceName,
     totalProd, collTotal, years, prodMonths, hygieneData, patientSummary,
+    /* Day Sheet × 3 (2026-04-24): per Danika, Day Sheet is the canonical
+       source for collections; Practice Analysis is unreliable for totals.
+       Three uploads (YTD + last full year + year before) feed the Collections
+       Trend card and the year-over-year SWOT weakness. Each value is the
+       output of parseDaySheet() or null when not provided. */
+    daySheets,
   } = input;
 
   const codes = prodData?.codes || [];
@@ -1471,6 +1566,47 @@ function computeReportData(input) {
     { label: 'Specialty', value: annualSpecialty },
   ].filter(c => c.value > 0);
 
+  /* ──── Day Sheet trend (2026-04-24) ────
+     Three Day Sheet uploads — YTD, last full year, year before — drive the
+     Collections Trend scorecard card and the YoY weakness branch. Monthly
+     averages use parsed PERIOD_FROM/PERIOD_TO when available so partial
+     YTD windows compute correctly without assuming 12 months. */
+  const ds = daySheets || {};
+  const ytdSheet         = ds.ytd        || null;
+  const lastYearSheet    = ds.lastYear   || null;
+  const yearBeforeSheet  = ds.yearBefore || null;
+  const _monthsOf = (sheet, fallback) => {
+    if (!sheet) return null;
+    const m = Number(sheet.monthsCovered);
+    if (Number.isFinite(m) && m > 0) return m;
+    return fallback;
+  };
+  const ytdMonthsCompleted        = _monthsOf(ytdSheet, null);
+  const lastYearMonthsCovered     = _monthsOf(lastYearSheet, 12);
+  const yearBeforeMonthsCovered   = _monthsOf(yearBeforeSheet, 12);
+  const _safeDiv = (n, d) => (n != null && d != null && d > 0) ? n / d : null;
+  const ytdMonthlyAvgCollections        = ytdSheet        ? _safeDiv(ytdSheet.payments,        ytdMonthsCompleted)      : null;
+  const ytdMonthlyAvgProduction         = ytdSheet        ? _safeDiv(ytdSheet.charges,         ytdMonthsCompleted)      : null;
+  const lastYearMonthlyAvgCollections   = lastYearSheet   ? _safeDiv(lastYearSheet.payments,   lastYearMonthsCovered)   : null;
+  const lastYearMonthlyAvgProduction    = lastYearSheet   ? _safeDiv(lastYearSheet.charges,    lastYearMonthsCovered)   : null;
+  const yearBeforeMonthlyAvgCollections = yearBeforeSheet ? _safeDiv(yearBeforeSheet.payments, yearBeforeMonthsCovered) : null;
+  const yearBeforeMonthlyAvgProduction  = yearBeforeSheet ? _safeDiv(yearBeforeSheet.charges,  yearBeforeMonthsCovered) : null;
+  const yoyCollectionsDelta = (ytdMonthlyAvgCollections != null && lastYearMonthlyAvgCollections != null)
+    ? ytdMonthlyAvgCollections - lastYearMonthlyAvgCollections
+    : null;
+  const yoyProductionDelta = (ytdMonthlyAvgProduction != null && lastYearMonthlyAvgProduction != null)
+    ? ytdMonthlyAvgProduction - lastYearMonthlyAvgProduction
+    : null;
+  /* Direction band: green if YTD > last year by >5%, neutral within ±5%,
+     red below. Used by the scorecard color and the SWOT shrinking rule. */
+  let collectionsTrendDirection = null;  /* 'up' | 'flat' | 'down' | null */
+  if (ytdMonthlyAvgCollections != null && lastYearMonthlyAvgCollections != null && lastYearMonthlyAvgCollections > 0) {
+    const ratio = ytdMonthlyAvgCollections / lastYearMonthlyAvgCollections;
+    if (ratio > 1.05) collectionsTrendDirection = 'up';
+    else if (ratio < 0.95) collectionsTrendDirection = 'down';
+    else collectionsTrendDirection = 'flat';
+  }
+
   /* ──── Assemble canonical data object ──── */
   return {
     version: ENGINE_VERSION,
@@ -1535,6 +1671,27 @@ function computeReportData(input) {
       total: collTotal,
       annualized: annualCollections,
       collectionRate,
+      /* Day Sheet trend (2026-04-24) — three uploads keyed by period.
+         Each daySheets[period] is the parseDaySheet() output (or null when
+         the user didn't upload that period). Monthly averages and YoY
+         deltas are pre-computed; the renderer reads them directly. */
+      daySheets: {
+        ytd:        ytdSheet,
+        lastYear:   lastYearSheet,
+        yearBefore: yearBeforeSheet,
+      },
+      trend: {
+        ytdMonthsCompleted,
+        ytdMonthlyAvgCollections,
+        ytdMonthlyAvgProduction,
+        lastYearMonthlyAvgCollections,
+        lastYearMonthlyAvgProduction,
+        yearBeforeMonthlyAvgCollections,
+        yearBeforeMonthlyAvgProduction,
+        yoyCollectionsDelta,
+        yoyProductionDelta,
+        direction: collectionsTrendDirection,
+      },
     },
 
     financials: {
@@ -1826,29 +1983,45 @@ function renderReportHtml(data) {
     });
   }
 
-  /* Hygiene Capacity (2026-04-23) — utilization = days required / scheduled.
-     <70 red (under-utilized), 70-90 green (healthy), >90 amber (constrained).
-     Card body cites procedure-derived vs software-reported active-patient
-     counts so the reader sees both sides. Hidden when utilization null
-     (no hygiene schedule days captured). */
+  /* Hygiene Capacity (2026-04-23, simplified 2026-04-24) — utilization =
+     days required / scheduled. <70 red (under-utilized), 70-90 green
+     (healthy), >90 amber (constrained). Card body cites procedure-derived
+     active patient count only — Patient Summary upload was removed per
+     Danika's 2026-04-24 review (software-reported count is unreliable).
+     Hidden when utilization null (no hygiene schedule days captured). */
   if (kpis.hygieneCapacity && kpis.hygieneCapacity.utilizationPct != null) {
     const hc = kpis.hygieneCapacity;
     const u = hc.utilizationPct;
     const capStatus = u < 70 ? 'bad' : (u <= 90 ? 'good' : 'warn');
     const fmtInt = n => n == null ? '—' : Math.round(n).toLocaleString();
     const procPts = hc.procedureDerivedActivePatients;
-    const softPts = hc.softwareDerivedActivePatients;
-    const delta = (softPts != null && procPts != null) ? softPts - procPts : null;
-    const deltaPct = hc.retentionDeltaPct;
-    let benchBody = `${(hc.daysRequiredPerMonth || 0).toFixed(1)} days required vs ${(hc.daysScheduledPerMonth || 0).toFixed(1)} scheduled &middot; procedure-derived active patients: ${fmtInt(procPts)}`;
-    if (softPts != null && delta != null && deltaPct != null) {
-      benchBody += `, software-reported: ${fmtInt(softPts)} (delta ${delta >= 0 ? '+' : ''}${fmtInt(delta)}, ${deltaPct.toFixed(1)}%)`;
-    }
+    const benchBody = `${(hc.daysRequiredPerMonth || 0).toFixed(1)} days required vs ${(hc.daysScheduledPerMonth || 0).toFixed(1)} scheduled &middot; procedure-derived active patients: ${fmtInt(procPts)}`;
     scorecardCards.push({
       lbl: 'Hygiene Capacity',
       val: u.toFixed(0) + '%',
       bench: benchBody,
       status: capStatus,
+    });
+  }
+
+  /* Collections Trend (2026-04-24) — three monthly averages from the Day
+     Sheet × 3 uploads. Direction color comes from YoY ratio: >5% above
+     last year is green; ±5% neutral; >5% below is red. Hidden when no
+     YTD or last-year sheet was uploaded. */
+  const trend = (collections && collections.trend) || {};
+  if (trend.ytdMonthlyAvgCollections != null || trend.lastYearMonthlyAvgCollections != null) {
+    const ytdAvg  = trend.ytdMonthlyAvgCollections;
+    const lyAvg   = trend.lastYearMonthlyAvgCollections;
+    const ybAvg   = trend.yearBeforeMonthlyAvgCollections;
+    const dir     = trend.direction;
+    const status  = dir === 'up' ? 'good' : (dir === 'down' ? 'bad' : (dir === 'flat' ? '' : ''));
+    const seg = (label, v) => v == null ? '' : `${label} <strong>${fmt$(v)}</strong>`;
+    const parts = [seg('YTD', ytdAvg), seg('Last Yr', lyAvg), seg('Yr Before', ybAvg)].filter(s => s);
+    scorecardCards.push({
+      lbl: 'Collections Trend (monthly avg)',
+      val: ytdAvg != null ? fmt$(ytdAvg) : (lyAvg != null ? fmt$(lyAvg) : '—'),
+      bench: parts.join(' &middot; ') + (dir ? ` &middot; ${dir === 'up' ? 'growing' : (dir === 'down' ? 'shrinking' : 'stable')} year-over-year` : ''),
+      status,
     });
   }
 
@@ -2679,6 +2852,7 @@ exports.parseProduction    = parseProduction;
 exports.parseCollections   = parseCollections;
 exports.parsePL            = parsePL;
 exports.parsePatientSummary = parsePatientSummary;
+exports.parseDaySheet      = parseDaySheet;
 
 exports.handler = async function(event) {
   if (event.httpMethod === 'OPTIONS') {
@@ -2692,6 +2866,10 @@ exports.handler = async function(event) {
 
   const {
     prodText, collText, plText, patientSummaryText = null,
+    /* Day Sheet × 3 (2026-04-24) — three pipe-delimited texts, one per period.
+       The Hub posts these alongside the legacy collText for backward compat;
+       when daySheets are present they are the canonical collections source. */
+    daySheetYtdText = null, daySheetLastYearText = null, daySheetYearBeforeText = null,
     practiceName = '',
     arPatient = {}, arInsurance = {},
     hygieneData = null, employeeCosts = null,
@@ -2707,9 +2885,29 @@ exports.handler = async function(event) {
 
     /* Parse PDFs → structured data */
     const prodData = parseProduction(prodText);
-    const collData = collText ? parseCollections(collText) : null;
     const plData = plText ? parsePL(plText) : null;
     const patientSummary = patientSummaryText ? parsePatientSummary(patientSummaryText) : null;
+    /* Day Sheet × 3 — each parseDaySheet returns null fields when not
+       uploaded. When at least one Day Sheet is present, it overrides the
+       legacy collText path for collTotal / annualCollections. */
+    const daySheets = {
+      ytd:        daySheetYtdText        ? parseDaySheet(daySheetYtdText)        : null,
+      lastYear:   daySheetLastYearText   ? parseDaySheet(daySheetLastYearText)   : null,
+      yearBefore: daySheetYearBeforeText ? parseDaySheet(daySheetYearBeforeText) : null,
+    };
+    /* Synthesize a collData-shaped object from the Day Sheet trend so the
+       rest of the engine (collection rate, annualization) keeps working
+       without a parallel data path. Last full year is the canonical 12-month
+       baseline; falls back to YTD if last year wasn't uploaded. Falls back
+       to legacy collText parser when no Day Sheets came through. */
+    let collData = null;
+    if (daySheets.lastYear && daySheets.lastYear.payments != null) {
+      collData = { charges: daySheets.lastYear.charges, payments: daySheets.lastYear.payments, months: daySheets.lastYear.monthsCovered || 12 };
+    } else if (daySheets.ytd && daySheets.ytd.payments != null) {
+      collData = { charges: daySheets.ytd.charges, payments: daySheets.ytd.payments, months: daySheets.ytd.monthsCovered || null };
+    } else if (collText) {
+      collData = parseCollections(collText);
+    }
 
     const codes = prodData.codes || [];
     const totalProd = codes.reduce((s, c) => s + c.total, 0);
@@ -2732,6 +2930,7 @@ exports.handler = async function(event) {
       prodData, collData, plData, employeeCosts, practiceProfile,
       arPatient, arInsurance, swotData: null, practiceName,
       totalProd, collTotal, years, prodMonths, hygieneData, patientSummary,
+      daySheets,
     });
 
     const swotData = generateSWOT(
@@ -2775,6 +2974,12 @@ exports.handler = async function(event) {
         ...(dataWithoutSwot.kpis.hygieneCapacity || {}),
         annualHygieneProduction: dataWithoutSwot.kpis.annualHygieneProduction,
         hygDailyAvg:             dataWithoutSwot.kpis.hygDailyAvg,
+      },
+      /* Collections Trend inputs — drives the YoY shrinking weakness. */
+      {
+        ytdMonthlyAvgCollections:        dataWithoutSwot.collections.trend?.ytdMonthlyAvgCollections,
+        lastYearMonthlyAvgCollections:   dataWithoutSwot.collections.trend?.lastYearMonthlyAvgCollections,
+        yearBeforeMonthlyAvgCollections: dataWithoutSwot.collections.trend?.yearBeforeMonthlyAvgCollections,
       },
     );
 

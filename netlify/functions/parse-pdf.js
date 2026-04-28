@@ -76,6 +76,41 @@ Return ONLY these 3 lines:
 DATES|[start] - [end]
 CHARGES|[number]
 PAYMENTS|[number as positive]`,
+
+    /* Day Sheet (2026-04-24 methodology pivot) — Danika confirmed this is the
+       ONLY reliable Dentrix report for collection totals. The full report runs
+       200+ pages but the totals live on the LAST PAGE; users upload either the
+       last-page screenshot (image) or the full PDF. Prompt is page-agnostic —
+       Claude scans for the GRAND TOTALS row regardless of which page it's on.
+       Token-limit lesson from 88c5538: emit critical totals AT THE TOP so any
+       truncation eats the diagnostic fields, not the canonical numbers. */
+    dentrixDaySheet: `Dentrix Day Sheet report. The user may upload the full PDF (200+ pages of transactions) OR a screenshot of just the last page. Either way, you only need the GRAND TOTALS row at the END of the report — NOT per-provider subtotals, daily totals, or section totals.
+
+OUTPUT ORDER — totals first, then diagnostic fields, then date range. The first two lines MUST be CHARGES_TOTAL and PAYMENTS_TOTAL because they're load-bearing for downstream KPI math; truncation past those is acceptable.
+
+Emit these lines in this exact order, one per line, pipe-delimited (omit a line entirely if the figure isn't present in the report):
+CHARGES_TOTAL|<number>
+PAYMENTS_TOTAL|<number>
+CREDIT_ADJUSTMENTS|<number>
+CHARGE_ADJUSTMENTS|<number>
+CHARGES_BILLED_INSURANCE|<number>
+NEW_PATIENTS|<integer>
+PATIENTS_SEEN|<integer>
+AVG_PROD_PER_PATIENT|<number>
+AVG_CHARGE_PER_PROCEDURE|<number>
+PERIOD_FROM|YYYY-MM-DD
+PERIOD_TO|YYYY-MM-DD
+
+Rules:
+- CHARGES_TOTAL = production for the period (the "Charges" column on the totals row).
+- PAYMENTS_TOTAL = collections for the period (the "Payments" column; emit as a positive number even if shown negative).
+- Per-provider rows can be ignored — we want the GRAND TOTALS row.
+- Patients Seen counts visits not unique patients (broken/missed appointments included). Capture it but do NOT use it as an active-patient count downstream.
+- PERIOD_FROM / PERIOD_TO come from the date range stamped on the report header (typical Dentrix format: MM/DD/YYYY - MM/DD/YYYY). Convert to ISO YYYY-MM-DD.
+- Numbers: plain digits, no $, no commas, no parens. Use a leading minus for negatives.
+- If a line you'd emit isn't present in the source, OMIT THAT LINE entirely. Do NOT emit "0" as a placeholder for missing data — that masks parse failures downstream.
+
+Return ONLY the lines above — no commentary, no markdown, no preamble.`,
   },
 
   eaglesoft: {
@@ -172,7 +207,19 @@ ItemName|Amount
 Include EVERY line item. Use the exact QuickBooks label for each item's ItemName.
 Return ONLY these lines — no prose, no preamble, no summary, no markdown.`;
 
-const TOKEN_LIMITS = { production: 8192, collections: 4096, pl: 8192, patientSummary: 1024 };
+const TOKEN_LIMITS = { production: 8192, collections: 4096, pl: 8192, patientSummary: 1024, dentrixDaySheet: 1024 };
+
+/* Map a media type string to the right Anthropic content block. PDFs use the
+   'document' source shape; screenshots (image/png|jpeg|heic|webp|gif) use the
+   'image' source shape. Surfaced separately so the test runner can assert the
+   routing rule without hitting the network (Fix 2 test #8). */
+function buildContentBlock(mediaType, b64) {
+  if (mediaType && /^image\//i.test(mediaType)) {
+    return { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } };
+  }
+  return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } };
+}
+exports.buildContentBlock = buildContentBlock;
 
 exports.handler = async function(event) {
   if (event.httpMethod === 'OPTIONS') {
@@ -186,13 +233,20 @@ exports.handler = async function(event) {
   let body;
   try { body = JSON.parse(event.body); } catch (e) { return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { pdfBase64, rawText, type, software = 'dentrix' } = body;
-  /* Accept EITHER pdfBase64 (document attachment — expensive input tokens)
-     OR rawText (text already extracted by client-side pdf.js — cheap).
-     Prefer rawText when available to stay well under the per-minute input
+  const { pdfBase64, fileBase64, mediaType, rawText, type, software = 'dentrix' } = body;
+  /* Accept three input shapes:
+       1. rawText        — already extracted by client-side pdf.js (cheap, fast)
+       2. fileBase64 + mediaType — image (image/png|jpeg|heic) or PDF; routes
+          to the right Anthropic content block via buildContentBlock
+       3. pdfBase64      — legacy alias for fileBase64 with mediaType=PDF
+     Prefer rawText when available to stay under the per-minute input
      token rate limit. */
-  if (!pdfBase64 && !rawText) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'pdfBase64 or rawText required' }) };
+  const fileB64 = fileBase64 || pdfBase64 || null;
+  if (!fileB64 && !rawText) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'fileBase64/pdfBase64 or rawText required' }) };
   if (!type) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'type required' }) };
+  /* Default to PDF for legacy `pdfBase64` callers; otherwise use whatever the
+     client passed. Anthropic expects mediaType for image inputs. */
+  const effectiveMediaType = mediaType || (pdfBase64 ? 'application/pdf' : 'application/pdf');
 
   /* Prompt lookup: P&L is vendor-agnostic; production/collections dispatch by software. */
   let prompt;
@@ -202,15 +256,15 @@ exports.handler = async function(event) {
   if (!prompt) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: `Invalid type "${type}" or software "${software}"` }) };
 
   try {
-    const mode = rawText ? 'rawText' : 'pdfBase64';
-    console.log(`parse-pdf: calling Claude for type=${type}, software=${software}, mode=${mode}, size=${rawText ? rawText.length + ' chars' : Math.round(pdfBase64.length * 0.75) + ' bytes'}`);
+    const mode = rawText ? 'rawText' : (effectiveMediaType.startsWith('image/') ? 'image' : 'pdf');
+    console.log(`parse-pdf: calling Claude for type=${type}, software=${software}, mode=${mode}, mediaType=${effectiveMediaType}, size=${rawText ? rawText.length + ' chars' : Math.round(fileB64.length * 0.75) + ' bytes'}`);
 
     /* Build message content: prefer rawText (cheap, fast, no rate-limit hazard).
-       Fall back to PDF document attachment only if no rawText provided. */
+       Fall back to file attachment — image or PDF — based on mediaType. */
     const content = rawText
       ? [{ type: 'text', text: prompt + '\n\nRAW TEXT EXTRACTED FROM PDF:\n\n' + rawText }]
       : [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+          buildContentBlock(effectiveMediaType, fileB64),
           { type: 'text', text: prompt }
         ];
 
@@ -294,6 +348,14 @@ function validateShape(type, text) {
   if (type === 'patientSummary') {
     const hasActive = /(^|\n)\s*ACTIVE_PATIENTS\s*\|/i.test(text);
     if (!hasActive) return { ok: false, reason: 'patientSummary missing ACTIVE_PATIENTS line' };
+    return { ok: true };
+  }
+  if (type === 'dentrixDaySheet') {
+    const hasCharges  = /(^|\n)\s*CHARGES_TOTAL\s*\|/i.test(text);
+    const hasPayments = /(^|\n)\s*PAYMENTS_TOTAL\s*\|/i.test(text);
+    if (!hasCharges || !hasPayments) {
+      return { ok: false, reason: 'dentrixDaySheet missing CHARGES_TOTAL or PAYMENTS_TOTAL line' };
+    }
     return { ok: true };
   }
   return { ok: true };  /* unknown type — don't block */

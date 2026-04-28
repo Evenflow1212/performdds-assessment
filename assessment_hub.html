@@ -720,7 +720,7 @@
     </div>
     <div class="prog-step" onclick="goToStep(2)">
       <div class="prog-dot">2</div>
-      <div class="prog-label">Collections</div>
+      <div class="prog-label">Day Sheet</div>
     </div>
     <div class="prog-step" onclick="goToStep(3)">
       <div class="prog-dot">3</div>
@@ -736,20 +736,14 @@
     </div>
     <div class="prog-step" onclick="goToStep(6)">
       <div class="prog-dot">6</div>
-      <div class="prog-label">Patient Summary</div>
+      <div class="prog-label">Staff Costs</div>
     </div>
     <div class="prog-step" onclick="goToStep(7)">
       <div class="prog-dot">7</div>
-      <div class="prog-label">Staff Costs</div>
-    </div>
-
-
-    <div class="prog-step" onclick="goToStep(8)">
-      <div class="prog-dot">8</div>
       <div class="prog-label">Hygiene</div>
     </div>
-    <div class="prog-step" onclick="goToStep(9)">
-      <div class="prog-dot">9</div>
+    <div class="prog-step" onclick="goToStep(8)">
+      <div class="prog-dot">8</div>
       <div class="prog-label">Generate</div>
     </div>
   </div>
@@ -798,7 +792,7 @@
         <div><strong>Report too long?</strong> If your report is more than 5–6 pages, you may have accidentally included patient-level detail. Uncheck <em>Patient Summary</em> and re-run.</div>
       </div>
       <div class="upload-zone" id="upload1" onclick="document.getElementById('file1').click()">
-        <input type="file" id="file1" accept=".pdf" onchange="handleFile(1, this)">
+        <input type="file" id="file1" accept="application/pdf,image/png,image/jpeg,image/heic,image/heif" onchange="handleFile(1, this)">
         <div class="upload-default">
           <div class="upload-icon">📄</div>
           <h4>Upload Production Report (PDF)</h4>
@@ -813,47 +807,79 @@
     </div>
   </div>
 
-  <!-- STEP 2: COLLECTIONS -->
+  <!-- STEP 2: DAY SHEET × 3 (2026-04-24 methodology pivot) -->
   <div class="step-card" id="step2">
     <div class="step-header">
       <div class="step-num">2</div>
       <div>
-        <div class="step-title">Collections Summary</div>
-        <div class="step-subtitle" id="step2-sub">Dentrix — Analysis Summary (Provider)</div>
+        <div class="step-title">Day Sheet — three periods</div>
+        <div class="step-subtitle" id="step2-sub">Dentrix — Day Sheet (year-to-date + last full year + year before)</div>
       </div>
     </div>
     <div class="step-body">
       <div class="instructions">
         <h4>How to run this report in Dentrix</h4>
         <ol>
-          <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Management</span> → <span class="path">Analysis Summary...</span></li>
-          <li>Set your date range to the same <strong>24 complete months</strong>:<br>
-            <div class="date-flex">
-              <div class="date-badge"><span class="label">From</span> <span id="date24from2">—</span></div>
-              <div class="date-badge"><span class="label">To</span> <span id="date24to2">—</span></div>
-            </div>
-          </li>
-          <li>Switch date type to <strong>Procedure Date</strong></li>
-          <li>All Providers, All Billing Types</li>
-          <li>Under <em>Select Report Types</em>, check: Provider Summary, Inc MTD/YTD Totals, Include All Totals, Print Condensed Report</li>
-          <li>Click <strong>Batch</strong>, open from Batch Processor</li>
-          <li>The <strong>TOTAL row</strong> at the bottom right of the last page shows your Charges and Payments</li>
-          <li>Upload the PDF below</li>
+          <li>In the <strong>Office Manager</strong>, click the chair icon at the bottom toolbar (Day Sheet shortcut) — or <span class="path">Reports</span> → <span class="path">Management</span> → <span class="path">Day Sheet</span></li>
+          <li>Set <strong>Provider range</strong> to <em>&lt;ALL&gt;</em> and <strong>Billing Type range</strong> to <em>&lt;ALL&gt;</em></li>
+          <li>Set <strong>Date Type</strong> to <strong>PROCEDURE Date</strong> (NOT Entry Date — important)</li>
+          <li>Choose <strong>Format: Chronological Day Sheet</strong></li>
+          <li>Under <em>Print Totals</em>, check <strong>Include MTD totals</strong> and <strong>Include Provider Totals</strong> (skip extended MTD)</li>
+          <li>Run the Day Sheet THREE times — once per period below — and upload each one</li>
+          <li>Click <strong>Batch</strong> (not Print). When the report appears in the Batch Processor, double-click to open it.</li>
         </ol>
       </div>
-      <div class="callout success">
-        <div class="callout-icon">📊</div>
-        <div>The <strong>TOTALS row</strong> at the bottom of this report shows total Charges and Payments for the full period. That's what drives your Collection Rate and related KPIs.</div>
+      <div class="callout warn">
+        <div class="callout-icon">📸</div>
+        <div>The Day Sheet runs <strong>200+ pages</strong>. <strong>You only need the LAST PAGE</strong> (the totals row). Easiest path: navigate to the last page, take a screenshot of just that page (Cmd+Shift+4 on Mac, Snipping Tool on Windows), and upload the screenshot. Slower alternative: print the entire report to PDF and upload the PDF. Both work — the screenshot just uploads faster.</div>
       </div>
-      <div class="upload-zone" id="upload2" onclick="document.getElementById('file2').click()">
-        <input type="file" id="file2" accept=".pdf" onchange="handleFile(2, this)">
+
+      <!-- 2A: Year-to-date -->
+      <div class="form-section-label" style="margin-top:18px;">2A. Year-to-Date <span id="ds-ytd-range" style="color:var(--text-muted);font-weight:500;font-size:0.85rem;"></span></div>
+      <div id="ds-ytd-container">
+        <div class="upload-zone" id="upload2a" onclick="document.getElementById('file2a').click()">
+          <input type="file" id="file2a" accept="application/pdf,image/png,image/jpeg,image/heic,image/heif" onchange="handleFile('2a', this)">
+          <div class="upload-default">
+            <div class="upload-icon">📄</div>
+            <h4>Upload Day Sheet — Year to Date (PDF or screenshot)</h4>
+            <p>Last-page screenshot preferred · PDF accepted</p>
+          </div>
+          <div class="file-name" id="fname2a">✅ <span id="fname2a-text"></span></div>
+        </div>
+        <div id="ds-ytd-skip-note" style="display:none;color:var(--text-muted);font-size:0.85rem;margin-top:6px;">
+          No completed months in the current calendar year yet — skip this upload, the engine reduces to two Day Sheets automatically.
+        </div>
+      </div>
+
+      <!-- 2B: Last full year -->
+      <div class="form-section-label" style="margin-top:18px;">2B. Last Full Year <span id="ds-ly-range" style="color:var(--text-muted);font-weight:500;font-size:0.85rem;"></span></div>
+      <div class="upload-zone" id="upload2b" onclick="document.getElementById('file2b').click()">
+        <input type="file" id="file2b" accept="application/pdf,image/png,image/jpeg,image/heic,image/heif" onchange="handleFile('2b', this)">
         <div class="upload-default">
           <div class="upload-icon">📄</div>
-          <h4>Upload Analysis Summary (PDF)</h4>
-          <p>Click to browse or drag and drop your PDF here</p>
+          <h4>Upload Day Sheet — Last Full Year</h4>
+          <p>Last-page screenshot preferred · PDF accepted</p>
         </div>
-        <div class="file-name" id="fname2">✅ <span id="fname2-text"></span></div>
+        <div class="file-name" id="fname2b">✅ <span id="fname2b-text"></span></div>
       </div>
+
+      <!-- 2C: Year before that -->
+      <div class="form-section-label" style="margin-top:18px;">2C. Year Before That <span id="ds-yb-range" style="color:var(--text-muted);font-weight:500;font-size:0.85rem;"></span></div>
+      <div class="upload-zone" id="upload2c" onclick="document.getElementById('file2c').click()">
+        <input type="file" id="file2c" accept="application/pdf,image/png,image/jpeg,image/heic,image/heif" onchange="handleFile('2c', this)">
+        <div class="upload-default">
+          <div class="upload-icon">📄</div>
+          <h4>Upload Day Sheet — Year Before That</h4>
+          <p>Last-page screenshot preferred · PDF accepted</p>
+        </div>
+        <div class="file-name" id="fname2c">✅ <span id="fname2c-text"></span></div>
+      </div>
+
+      <div class="callout success" style="margin-top:14px;">
+        <div class="callout-icon">📊</div>
+        <div>What we extract: <strong>Charges</strong> (production for the period), <strong>Payments</strong> (collections), Adjustments, and other practice-wide totals. Three periods give a year-over-year trend that drives the Collections Trend card and flags shrinking-collections findings in your SWOT.</div>
+      </div>
+
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(2)">← Back</button>
         <button class="btn btn-primary" id="next2" onclick="nextStep(2)" disabled>Continue →</button>
@@ -890,7 +916,7 @@
         <div><strong>Always use 12 months</strong> for the P&amp;L — one full calendar year. Use the dates shown above.</div>
       </div>
       <div class="upload-zone" id="upload3" onclick="document.getElementById('file3').click()">
-        <input type="file" id="file3" accept=".pdf" onchange="handleFile(3, this)">
+        <input type="file" id="file3" accept="application/pdf,image/png,image/jpeg,image/heic,image/heif" onchange="handleFile(3, this)">
         <div class="upload-default">
           <div class="upload-icon">📄</div>
           <h4>Upload P&amp;L Statement (PDF)</h4>
@@ -914,7 +940,7 @@
       <div class="step-num">4</div>
       <div>
         <div class="step-title">Patient AR Aging</div>
-        <div class="step-subtitle" id="step4-sub">Dentrix — Aging Report (manual entry)</div>
+        <div class="step-subtitle" id="step4-sub">Dentrix — Aging Report (last-page screenshot or full PDF)</div>
       </div>
     </div>
     <div class="step-body">
@@ -925,9 +951,8 @@
           <li>Set: All Guarantors, All Providers, All Billing Types, Standard Aging only</li>
           <li>Set <strong>Min Balance to Print</strong> to <strong>1.00</strong></li>
           <li>Set <strong>Minimum Days Past Due</strong> to <strong>Over 0</strong></li>
-          <li>Click <strong>OK</strong>, then <strong>Batch</strong></li>
-          <li>Open from Batch Processor — scroll to the <strong>very last page</strong></li>
-          <li>Screenshot the TOTALS summary box at the bottom, then enter the numbers below</li>
+          <li>Click <strong>OK</strong>, then <strong>Batch</strong>, open from Batch Processor</li>
+          <li><strong>You only need the last page</strong> — the per-patient detail in front of it is irrelevant. Easiest: scroll to the last page, take a screenshot of the TOTALS row (Cmd+Shift+4 on Mac, Snipping Tool on Windows), upload it. Alternative: print the full report to PDF and upload the PDF — both work, the screenshot just uploads faster.</li>
         </ol>
       </div>
       <div class="callout warn">
@@ -948,11 +973,11 @@
         </div>
       </div>
       <div class="upload-zone" id="upload4" onclick="document.getElementById('file4').click()">
-        <input type="file" id="file4" accept=".pdf" onchange="handleFile(4, this)">
+        <input type="file" id="file4" accept="application/pdf,image/png,image/jpeg,image/heic,image/heif" onchange="handleFile(4, this)">
         <div class="upload-default">
           <div class="upload-icon">📄</div>
-          <h4>Upload Patient Aging Report (PDF)</h4>
-          <p>Upload the full report — Claude reads the TOTALS row automatically</p>
+          <h4>Upload Patient Aging Report (PDF or last-page screenshot)</h4>
+          <p>Last-page screenshot preferred · full PDF accepted — Claude reads the TOTALS row automatically</p>
         </div>
         <div class="file-name" id="fname4">✅ <span id="fname4-text"></span></div>
       </div>
@@ -972,7 +997,7 @@
       <div class="step-num">5</div>
       <div>
         <div class="step-title">Insurance AR Aging</div>
-        <div class="step-subtitle" id="step5-sub">Dentrix — Insurance Claim Aging Report (manual entry)</div>
+        <div class="step-subtitle" id="step5-sub">Dentrix — Insurance Claim Aging Report (last-page screenshot or full PDF)</div>
       </div>
     </div>
     <div class="step-body">
@@ -982,9 +1007,8 @@
           <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Ledger</span> → <span class="path">Insurance Aging Report...</span></li>
           <li>Select: <strong>Dental</strong> (not Medical), All Patients, All Providers, All Carriers, Over 0 Days</li>
           <li>Leave "Exclude Partially Paid Claims" unchecked</li>
-          <li>Click <strong>OK</strong>, then <strong>Batch</strong></li>
-          <li>Open from Batch Processor — scroll to the <strong>very last page</strong></li>
-          <li>Enter the numbers from the <strong>TOTALS ALL CLAIMS</strong> row below</li>
+          <li>Click <strong>OK</strong>, then <strong>Batch</strong>, open from Batch Processor</li>
+          <li><strong>You only need the last page</strong> — the TOTALS ALL CLAIMS row. Easiest: scroll to the last page, take a screenshot of just the TOTALS row (Cmd+Shift+4 on Mac, Snipping Tool on Windows), upload it. Alternative: print the full report to PDF and upload the PDF.</li>
         </ol>
       </div>
       <div class="screenshot-guide">
@@ -1006,11 +1030,11 @@
         </div>
       </div>
       <div class="upload-zone" id="upload5" onclick="document.getElementById('file5').click()">
-        <input type="file" id="file5" accept=".pdf" onchange="handleFile(5, this)">
+        <input type="file" id="file5" accept="application/pdf,image/png,image/jpeg,image/heic,image/heif" onchange="handleFile(5, this)">
         <div class="upload-default">
           <div class="upload-icon">📄</div>
-          <h4>Upload Insurance Claim Aging Report (PDF)</h4>
-          <p>Upload the full report — Claude will find the TOTALS ALL CLAIMS row automatically</p>
+          <h4>Upload Insurance Claim Aging Report (PDF or last-page screenshot)</h4>
+          <p>Last-page screenshot preferred · full PDF accepted — Claude finds the TOTALS ALL CLAIMS row</p>
         </div>
         <div class="file-name" id="fname5">✅ <span id="fname5-text"></span></div>
       </div>
@@ -1034,48 +1058,10 @@
     </div>
   </div>
 
-  <!-- STEP 6: PATIENT SUMMARY (added 2026-04-23) -->
+  <!-- STEP 6: EMPLOYEE COSTS (was step 7 — Patient Summary removed 2026-04-24) -->
   <div class="step-card" id="step6">
     <div class="step-header">
       <div class="step-num">6</div>
-      <div>
-        <div class="step-title">Patient Summary</div>
-        <div class="step-subtitle">Dentrix — Practice Analysis Reports → Patient Summary section</div>
-      </div>
-    </div>
-    <div class="step-body">
-      <div class="instructions">
-        <h4>How to run this report in Dentrix</h4>
-        <ol>
-          <li>In the <strong>Office Manager</strong>, click <span class="path">Reports</span> → <span class="path">Management</span> → <span class="path">Practice Analysis Reports</span></li>
-          <li>Select the <strong>Patient Summary</strong> section</li>
-          <li>Current month date range is fine — this report aggregates active patient counts regardless of date range</li>
-          <li>Save as PDF and upload below</li>
-        </ol>
-      </div>
-      <div class="upload-zone" id="upload6" onclick="document.getElementById('file6').click()">
-        <input type="file" id="file6" accept=".pdf" onchange="handleFile(6, this)">
-        <div class="upload-default">
-          <div class="upload-icon">📄</div>
-          <h4>Upload Patient Summary (PDF)</h4>
-          <p>Claude will extract active patient count, insured, new patients YTD + month, referrals</p>
-        </div>
-        <div class="file-name" id="fname6">✅ <span id="fname6-text"></span></div>
-      </div>
-      <div class="nav-row">
-        <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
-        <div>
-          <button class="skip-link" onclick="skipStep(6)">Skip for now</button>
-          <button class="btn btn-primary" onclick="nextStep(6)">Continue →</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- STEP 7: EMPLOYEE COSTS -->
-  <div class="step-card" id="step7">
-    <div class="step-header">
-      <div class="step-num">7</div>
       <div>
         <div class="step-title">Employee Costs</div>
         <div class="step-subtitle">Enter staff and hygiene compensation details</div>
@@ -1151,19 +1137,19 @@
       </div>
 
       <div class="nav-row">
-        <button class="btn btn-secondary" onclick="prevStep(7)">← Back</button>
+        <button class="btn btn-secondary" onclick="prevStep(6)">← Back</button>
         <div>
-          <button class="skip-link" onclick="skipStep(6)"">Skip for now</button>
-          <button class="btn btn-primary" onclick="nextStep(7)">Continue →</button>
+          <button class="skip-link" onclick="skipStep(6)">Skip for now</button>
+          <button class="btn btn-primary" onclick="nextStep(6)">Continue →</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- STEP 8: HYGIENE SCHEDULE -->
-  <div class="step-card" id="step8">
+  <!-- STEP 7: HYGIENE SCHEDULE (was step 8) -->
+  <div class="step-card" id="step7">
     <div class="step-header">
-      <div class="step-num">8</div>
+      <div class="step-num">7</div>
       <div>
         <div class="step-title">Hygiene Schedule</div>
         <div class="step-subtitle">Enter weekly scheduling data — matches the printable worksheet</div>
@@ -1314,19 +1300,19 @@
       <!-- HYGIENIST SCHEDULE (kept minimal — Patient Estimates are part of the delivered assessment) -->
 
       <div class="nav-row">
-        <button class="btn btn-secondary" onclick="prevStep(8)">← Back</button>
+        <button class="btn btn-secondary" onclick="prevStep(7)">← Back</button>
         <div>
-          <button class="skip-link" onclick="skipStep(7)"">Skip for now</button>
-          <button class="btn btn-primary" onclick="nextStep(8)">Continue →</button>
+          <button class="skip-link" onclick="skipStep(7)">Skip for now</button>
+          <button class="btn btn-primary" onclick="nextStep(7)">Continue →</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- STEP 9: GENERATE -->
-  <div class="step-card" id="step9">
+  <!-- STEP 8: GENERATE (was step 9) -->
+  <div class="step-card" id="step8">
     <div class="step-header">
-      <div class="step-num">9</div>
+      <div class="step-num">8</div>
       <div>
         <div class="step-title">Generate Assessment Report</div>
         <div class="step-subtitle">Review your uploads and generate your HTML report</div>
@@ -1339,7 +1325,7 @@
         <div>Generating your report takes approximately <strong>up to 60 seconds</strong>. Claude AI reads your reports, computes every KPI, and builds your assessment.</div>
       </div>
       <div class="nav-row">
-        <button class="btn btn-secondary" onclick="prevStep(9)">← Back</button>
+        <button class="btn btn-secondary" onclick="prevStep(8)">← Back</button>
         <button class="btn btn-generate" onclick="generate()" id="generateBtn">Generate Report ✦</button>
       </div>
       <div class="error-panel" id="genError" role="alert" aria-live="polite">
@@ -1397,8 +1383,12 @@
 <script>
 let currentStep = 1;
 let software = 'dentrix';
-let files = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
-let skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
+/* Step 2 (Day Sheet) holds three sub-uploads keyed '2a' (year-to-date),
+   '2b' (last full year), '2c' (year before that) instead of a single PDF.
+   Steps 6/7 are Employee Costs / Hygiene Schedule (renumbered after the
+   Patient Summary upload was removed 2026-04-24). */
+let files = { 1: null, '2a': null, '2b': null, '2c': null, 3: null, 4: null, 5: null };
+let skipped = { 3: false, 4: false, 5: false, 6: false, 7: false, '2a': false };
 let generatedData = null;        /* canonical data object from /generate-report */
 let generatedReportHtml = null;  /* HTML report (plain UTF-8 string) from server */
 let generatedReviewHtml = null;  /* Internal HTML review page — Dave's verification view, not a client deliverable */
@@ -1448,13 +1438,72 @@ function calcDates() {
   return { from24: fmt(from24), to: fmt(toDate), from12: fmt(from12) };
 }
 
+/* Day Sheet × 3 dynamic date ranges (2026-04-24).
+   YTD = 01/01/{currentYear} → last day of last completed month
+       (running 04/24/2026 → 03/31/2026; 01/15/2027 → 12/31/2026, where
+       "last completed month" sits in the prior calendar year and the YTD
+       slot collapses into "last full year").
+   Last Full Year = 01/01/{currentYear-1} → 12/31/{currentYear-1}
+   Year Before    = 01/01/{currentYear-2} → 12/31/{currentYear-2}
+   Edge case: when no completed months exist in the current calendar year
+   (it's January and current month is the first), the YTD slot is
+   suppressed and the engine reduces to two Day Sheets automatically. */
+function calcDaySheetRanges() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = now.getMonth();  /* 0-indexed; January = 0 */
+  /* "Last completed month" = the last day of (mm - 1). When mm === 0
+     (January), there is no completed month in the current year; YTD
+     window collapses to the prior year's full window. */
+  const fmt = (d) => {
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${mo}/${dd}/${d.getFullYear()}`;
+  };
+  let ytdFrom = null, ytdTo = null, ytdAvailable = false;
+  if (mm > 0) {
+    /* Last day of month (mm - 1) of the current year */
+    ytdTo   = new Date(yyyy, mm, 0);
+    ytdFrom = new Date(yyyy, 0, 1);
+    ytdAvailable = true;
+  }
+  const lyFrom = new Date(yyyy - 1, 0, 1);
+  const lyTo   = new Date(yyyy - 1, 11, 31);
+  const ybFrom = new Date(yyyy - 2, 0, 1);
+  const ybTo   = new Date(yyyy - 2, 11, 31);
+  return {
+    ytd: ytdAvailable ? { from: fmt(ytdFrom), to: fmt(ytdTo) } : null,
+    lastYear:   { from: fmt(lyFrom), to: fmt(lyTo) },
+    yearBefore: { from: fmt(ybFrom), to: fmt(ybTo) },
+  };
+}
+
 function populateDates() {
   const d = calcDates();
-  ['date24from','date24from2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d.from24; });
-  ['date24to','date24to2'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d.to; });
+  ['date24from'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d.from24; });
+  ['date24to'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = d.to; });
   const f12 = document.getElementById('date12from'); const t12 = document.getElementById('date12to');
   if (f12) f12.textContent = d.from12;
   if (t12) t12.textContent = d.to;
+  /* Day Sheet × 3 dynamic date labels. */
+  const ds = calcDaySheetRanges();
+  const ytdRangeEl    = document.getElementById('ds-ytd-range');
+  const ytdSkipNoteEl = document.getElementById('ds-ytd-skip-note');
+  const ytdContainer  = document.getElementById('ds-ytd-container');
+  if (ds.ytd) {
+    if (ytdRangeEl) ytdRangeEl.textContent = `(${ds.ytd.from} – ${ds.ytd.to})`;
+    if (ytdSkipNoteEl) ytdSkipNoteEl.style.display = 'none';
+    if (ytdContainer) ytdContainer.classList.remove('disabled');
+  } else {
+    /* January edge case — suppress the YTD label and surface the friendly note. */
+    if (ytdRangeEl) ytdRangeEl.textContent = '(skip — no completed months in current year)';
+    if (ytdSkipNoteEl) ytdSkipNoteEl.style.display = 'block';
+    skipped['2a'] = true;
+  }
+  const lyRangeEl = document.getElementById('ds-ly-range');
+  if (lyRangeEl) lyRangeEl.textContent = `(${ds.lastYear.from} – ${ds.lastYear.to})`;
+  const ybRangeEl = document.getElementById('ds-yb-range');
+  if (ybRangeEl) ybRangeEl.textContent = `(${ds.yearBefore.from} – ${ds.yearBefore.to})`;
 }
 
 function setSoftware(sw, btn) {
@@ -1466,9 +1515,9 @@ function setSoftware(sw, btn) {
 
 function updateSubtitles() {
   const labels = {
-    dentrix: { 1: 'Dentrix — Practice Analysis Reports', 2: 'Dentrix — Analysis Summary (Provider)', 4: 'Dentrix — Aging Report (manual entry)', 5: 'Dentrix — Insurance Claim Aging Report (manual entry)' },
-    eaglesoft: { 1: 'Eaglesoft — Procedures By Provider', 2: 'Eaglesoft — Provider Productivity', 4: 'Eaglesoft — AR by Responsible Party (manual entry)', 5: 'Eaglesoft — Outstanding Insurance Claims (manual entry)' },
-    opendental: { 1: 'Open Dental — Production by Procedure', 2: 'Open Dental — Production and Income Report', 4: 'Open Dental — Aging of A/R (manual entry)', 5: 'Open Dental — Aging of A/R Insurance (manual entry)' }
+    dentrix:    { 1: 'Dentrix — Practice Analysis Reports',     2: 'Dentrix — Day Sheet (year-to-date + last full year + year before)',     4: 'Dentrix — Aging Report (last-page screenshot or full PDF)', 5: 'Dentrix — Insurance Claim Aging Report (last-page screenshot or full PDF)' },
+    eaglesoft:  { 1: 'Eaglesoft — Procedures By Provider',      2: 'Eaglesoft — Day Sheet equivalent (three periods)',                       4: 'Eaglesoft — AR by Responsible Party',                       5: 'Eaglesoft — Outstanding Insurance Claims' },
+    opendental: { 1: 'Open Dental — Production by Procedure',   2: 'Open Dental — Production and Income (three periods)',                   4: 'Open Dental — Aging of A/R',                                5: 'Open Dental — Aging of A/R Insurance' }
   };
   const sw = labels[software] || labels.dentrix;
   Object.entries(sw).forEach(([step, label]) => { const el = document.getElementById(`step${step}-sub`); if (el) el.textContent = label; });
@@ -1479,10 +1528,21 @@ function handleFile(step, input) {
   if (!file) return;
   files[step] = file;
   const zone = document.getElementById(`upload${step}`);
-  zone.classList.add('has-file');
-  document.getElementById(`fname${step}-text`).textContent = file.name;
-  const nextBtn = document.getElementById(`next${step}`);
-  if (nextBtn) nextBtn.disabled = false;
+  if (zone) zone.classList.add('has-file');
+  const fnameEl = document.getElementById(`fname${step}-text`);
+  if (fnameEl) fnameEl.textContent = file.name;
+  /* Day Sheet × 3 sub-uploads (2a/2b/2c) all gate Step 2's Continue button.
+     Continue enables once 2B (last full year — the canonical baseline) lands;
+     2A YTD is skippable in January when no prior months have completed, and
+     2C is helpful but not strictly required to compute the Collections Trend. */
+  const stepStr = String(step);
+  if (/^2[abc]$/.test(stepStr)) {
+    const next2 = document.getElementById('next2');
+    if (next2) next2.disabled = !files['2b'];
+  } else {
+    const nextBtn = document.getElementById(`next${step}`);
+    if (nextBtn) nextBtn.disabled = false;
+  }
   const statusEl = document.getElementById(`status${step}`);
   if (statusEl) statusEl.textContent = '✅ File ready — click Continue';
 }
@@ -1492,11 +1552,13 @@ document.querySelectorAll('.upload-zone').forEach(zone => {
   zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
   zone.addEventListener('drop', e => {
     e.preventDefault(); zone.classList.remove('drag');
-    const stepNum = zone.id.replace('upload', '');
-    const input = document.getElementById(`file${stepNum}`);
+    const stepKey = zone.id.replace('upload', '');
+    const input = document.getElementById(`file${stepKey}`);
     if (e.dataTransfer.files[0] && input) {
       const dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]); input.files = dt.files;
-      handleFile(parseInt(stepNum), input);
+      /* Pass the raw key so 2a/2b/2c reach handleFile as strings, not NaN. */
+      const numericKey = /^[0-9]+$/.test(stepKey) ? parseInt(stepKey, 10) : stepKey;
+      handleFile(numericKey, input);
     }
   });
 });
@@ -1512,6 +1574,7 @@ function goToStep(n) {
   });
   currentStep = n;
   window.location.hash = 'step=' + n;
+  /* Step 8 = Generate (renumbered from 9 after Patient Summary removal 2026-04-24). */
   if (n === 8) buildReview();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1523,6 +1586,8 @@ function skipStep(n) {
   if (n === 3) { document.getElementById('next3').disabled = false; nextStep(3); }
   if (n === 4) { document.getElementById('next4').disabled = false; nextStep(4); }
   if (n === 5) { document.getElementById('next5').disabled = false; nextStep(5); }
+  /* Steps 6 (Employee Costs) and 7 (Hygiene Schedule) are skippable — were
+     7/8 prior to the 2026-04-24 Patient Summary removal renumber. */
   if (n === 6 || n === 7) { nextStep(n); }
 }
 
@@ -1662,26 +1727,27 @@ function collectHygieneSchedule() {
 }
 
 function buildReview() {
+  /* Day Sheet × 3 surfaces as three separate review rows so dentists can see
+     which periods landed and which didn't. Generate gates on Production
+     (Step 1) + Day Sheet 2B (last full year — canonical baseline). */
   const steps = [
-    { num: 1, label: 'Production Report', file: files[1] },
-    { num: 2, label: 'Collections Report', file: files[2] },
-    { num: 3, label: 'P&L Statement', file: files[3], skippable: true },
-    { num: 4, label: 'Patient AR Aging', file: files[4], skippable: true },
-    { num: 5, label: 'Insurance AR Aging', file: files[5], skippable: true },
-    { num: 6, label: 'Patient Summary', file: files[6], skippable: true },
+    { key: 1,    label: 'Production Report',                     file: files[1] },
+    { key: '2a', label: 'Day Sheet — Year to Date',              file: files['2a'], skippable: true },
+    { key: '2b', label: 'Day Sheet — Last Full Year',            file: files['2b'] },
+    { key: '2c', label: 'Day Sheet — Year Before That',          file: files['2c'], skippable: true },
+    { key: 3,    label: 'P&L Statement',                         file: files[3],    skippable: true },
+    { key: 4,    label: 'Patient AR Aging',                      file: files[4],    skippable: true },
+    { key: 5,    label: 'Insurance AR Aging',                    file: files[5],    skippable: true },
   ];
   const html = steps.map(s => {
-    let status, color;
-    if (false) {
-      // manual entry removed
-    } else {
-      status = s.file ? `✅ ${s.file.name}` : (skipped[s.num] ? '⏭ Skipped' : '⚠️ Not uploaded');
-      color = s.file ? 'var(--success)' : (skipped[s.num] ? 'var(--text-muted)' : 'var(--warning)');
-    }
+    const status = s.file
+      ? `✅ ${s.file.name}`
+      : (s.skippable ? '⏭ Optional — not uploaded' : '⚠️ Not uploaded');
+    const color = s.file ? 'var(--success)' : (s.skippable ? 'var(--text-muted)' : 'var(--warning)');
     return `<div class="review-item"><div class="label">${s.label}</div><div class="status" style="color:${color};">${status}</div></div>`;
   }).join('');
   document.getElementById('review-list').innerHTML = html;
-  document.getElementById('generateBtn').disabled = !(files[1] && files[2]);
+  document.getElementById('generateBtn').disabled = !(files[1] && files['2b']);
 }
 
 async function fileToBase64(file) {
@@ -1823,6 +1889,56 @@ async function parseViaClaude(file, type, software) {
   const data = await resp.json();
   if (!data.success || !data.text) throw new Error(`parse-pdf (${type}/${software}) returned no text: ${JSON.stringify(data).slice(0, 200)}`);
   console.log(`parseViaClaude: got ${data.text.length} chars back for ${type}`);
+  return data.text;
+}
+
+/* ─── Read the file as base64 + return its mime type. Used by the image-
+   capable extractors (Day Sheet, AR last-page screenshots). For HEIC,
+   browsers may not natively render but Claude's API accepts image/heic. ─── */
+async function fileToBase64WithType(file) {
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  /* Build base64 in chunks to avoid call-stack limits on large PDFs. */
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  const b64 = btoa(bin);
+  /* Trust file.type when present; else sniff from extension. */
+  let mediaType = file.type || '';
+  if (!mediaType) {
+    const lower = (file.name || '').toLowerCase();
+    if (lower.endsWith('.png'))   mediaType = 'image/png';
+    else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) mediaType = 'image/jpeg';
+    else if (lower.endsWith('.heic') || lower.endsWith('.heif')) mediaType = 'image/heic';
+    else                          mediaType = 'application/pdf';
+  }
+  /* Browsers sometimes emit application/octet-stream for PDFs without an
+     extension hint — normalize back to PDF when that happens. */
+  if (mediaType === 'application/octet-stream') mediaType = 'application/pdf';
+  return { b64, mediaType };
+}
+
+/* ─── Send a file (image OR PDF) directly to Claude via parse-pdf with the
+   correct media_type. Used for Day Sheet uploads (last-page screenshots)
+   and last-page AR screenshots — the existing pdf.js client-side parsers
+   only handle PDFs, so when the dentist uploads a PNG/JPG we need the
+   server-side image-input path. ─── */
+async function parseViaImage(file, type, software) {
+  const { b64, mediaType } = await fileToBase64WithType(file);
+  console.log(`parseViaImage: type=${type}, software=${software}, mediaType=${mediaType}, size=${Math.round(b64.length * 0.75)} bytes`);
+  const resp = await fetch('/.netlify/functions/parse-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileBase64: b64, mediaType, type, software })
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`parse-pdf (${type}/${software}, image) returned ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  if (!data.success || !data.text) throw new Error(`parse-pdf (${type}/${software}, image) returned no text: ${JSON.stringify(data).slice(0, 200)}`);
   return data.text;
 }
 
@@ -2067,12 +2183,12 @@ function hideGenError() {
 async function generate() {
   if (_generating) { console.warn('Generate already in progress, ignoring duplicate click'); return; }
   hideGenError();
-  if (!files[1] || !files[2]) {
-    showGenError('Please upload both the Production Report (Step 1) and the Collections Summary (Step 2) before generating.');
+  if (!files[1] || !files['2b']) {
+    showGenError('Please upload the Production Report (Step 1) and at least the Day Sheet for Last Full Year (Step 2B) before generating.');
     return;
   }
   _generating = true;
-  document.getElementById('step9').classList.remove('visible');
+  document.getElementById('step8').classList.remove('visible');
   document.getElementById('generatingState').classList.add('visible');
   try {
     const practiceName = document.getElementById('practiceName').value.trim();
@@ -2091,53 +2207,72 @@ async function generate() {
     console.log('Step 1: Parsing PDFs, software=' + activeSoftware);
 
     /* Software-aware extractor dispatch. Dentrix uses the existing PDF.js client-side
-       parsers. Eaglesoft (and unknowns) route to the Claude-Vision-based parse-pdf
-       Netlify function, which has vendor-specific prompts that normalize output to
-       the same pipe-delimited schema. */
+       parsers when the upload is a PDF. Image uploads (PNG/JPG/HEIC last-page
+       screenshots) route through parseViaImage — server-side Claude vision
+       call with the right media_type. Eaglesoft (and unknowns) always route
+       through parseViaClaude (text-extraction path). */
+    const isImageFile = (f) => !!f && (
+      (f.type && /^image\//i.test(f.type)) ||
+      /\.(png|jpe?g|heic|heif|webp|gif)$/i.test(f.name || '')
+    );
     const extractByType = (file, type) => {
-      if (!file) return Promise.resolve(type === 'pl' || type === 'patientSummary' ? null : '');
+      if (!file) return Promise.resolve(type === 'pl' || type === 'dentrixDaySheet' ? null : '');
       if (activeSoftware === 'eaglesoft') return parseViaClaude(file, type, activeSoftware);
-      /* Dentrix (default) — client-side PDF.js path for production / collections / pl;
-         Patient Summary (added 2026-04-23) routes through parseViaClaude because the
-         prompt lives server-side in parse-pdf.js as dentrix.patientSummary. */
+      /* Day Sheet always goes through Claude — the report is 200+ pages
+         and the prompt lives server-side. Image OR PDF: parseViaImage
+         routes either to the right Anthropic content block. */
+      if (type === 'dentrixDaySheet') return parseViaImage(file, 'dentrixDaySheet', 'dentrix');
+      /* For other report types, route image uploads through the image
+         path; PDFs through the existing pdf.js client-side parsers. */
+      if (isImageFile(file)) return parseViaImage(file, type, 'dentrix');
       if (type === 'production') return extractProductionFromPdf(file);
-      if (type === 'collections') return extractCollectionsFromPdf(file);
       if (type === 'pl') return extractPLFromPdf(file);
-      if (type === 'patientSummary') return parseViaClaude(file, 'patientSummary', 'dentrix');
       return Promise.resolve('');
     };
 
-    const [prodText, collText, plText, patientSummaryText] = await Promise.all([
+    const [prodText, plText, daySheetYtdText, daySheetLastYearText, daySheetYearBeforeText] = await Promise.all([
       extractByType(files[1], 'production'),
-      extractByType(files[2], 'collections'),
       extractByType(files[3], 'pl'),
-      extractByType(files[6], 'patientSummary'),
+      extractByType(files['2a'], 'dentrixDaySheet'),
+      extractByType(files['2b'], 'dentrixDaySheet'),
+      extractByType(files['2c'], 'dentrixDaySheet'),
     ]);
+    /* Legacy collText path retained for backward compat with older test
+       fixtures and the smoke test — set to null since Day Sheets now drive
+       collections. */
+    const collText = null;
+    const patientSummaryText = null;  /* Patient Summary upload removed 2026-04-24. */
 
-    /* AR extraction — currently Dentrix-specific client-side parser. For
-       Eaglesoft, the "Accounts receivable by responsible party" report has
-       no aging buckets, so for now we fall through to the Dentrix extractor
-       and accept that aging fields may come back null. Full Eaglesoft AR
-       support requires a separate Aging Report — see BACKLOG. */
+    /* AR extraction. PDFs use the existing client-side Dentrix parser.
+       Image uploads (last-page screenshots) skip client parsing — the
+       handler will receive empty AR objects, which is acceptable since
+       Step 4/5 are skippable. Future: add a server-side image-to-AR
+       prompt so screenshot uploads round-trip too. */
     const [arPatient, arInsurance] = await Promise.all([
-      files[4] ? extractARFromPdf(files[4], 'patient') : Promise.resolve({}),
-      files[5] ? extractARFromPdf(files[5], 'insurance') : Promise.resolve({})
+      (files[4] && !isImageFile(files[4])) ? extractARFromPdf(files[4], 'patient') : Promise.resolve({}),
+      (files[5] && !isImageFile(files[5])) ? extractARFromPdf(files[5], 'insurance') : Promise.resolve({})
     ]);
     console.log('AR Patient:', JSON.stringify(arPatient));
     console.log('AR Insurance:', JSON.stringify(arInsurance));
 
-    /* Collect hygiene schedule form data (null if skipped) */
-    const hygieneData = skipped[8] ? null : collectHygieneSchedule();
+    /* Collect hygiene schedule form data (null if skipped). Step 7 in the
+       renumbered hub (was step 8 before Patient Summary removal). */
+    const hygieneData = skipped[7] ? null : collectHygieneSchedule();
     console.log('Hygiene data:', hygieneData ? 'collected' : 'skipped');
 
-    /* Collect employee costs form data (null if skipped) */
-    const employeeCosts = skipped[7] ? null : collectEmployeeCosts();
+    /* Collect employee costs form data (null if skipped). Step 6 in the
+       renumbered hub (was step 7). */
+    const employeeCosts = skipped[6] ? null : collectEmployeeCosts();
     console.log('Employee costs:', employeeCosts ? 'collected' : 'skipped');
 
     /* Step 2: Build assessment report from parsed data */
     console.log('Step 2: Building assessment report from parsed data...');
-    const payload = { prodText, collText, plText, patientSummaryText, practiceName, arPatient, arInsurance, hygieneData, employeeCosts, practiceProfile };
-    console.log('Payload keys:', Object.keys(payload), 'prodText len:', prodText?.length, 'collText len:', collText?.length, 'plText len:', plText?.length);
+    const payload = {
+      prodText, collText, plText, patientSummaryText,
+      daySheetYtdText, daySheetLastYearText, daySheetYearBeforeText,
+      practiceName, arPatient, arInsurance, hygieneData, employeeCosts, practiceProfile,
+    };
+    console.log('Payload keys:', Object.keys(payload), 'prodText len:', prodText?.length, 'plText len:', plText?.length, 'daySheets:', !!daySheetYtdText, !!daySheetLastYearText, !!daySheetYearBeforeText);
     console.log('practiceProfile:', JSON.stringify(practiceProfile)?.substring(0, 200));
     const resp = await fetch('/.netlify/functions/generate-report', {
       method: 'POST',
@@ -2184,14 +2319,14 @@ async function generate() {
       { val: s.months ? s.months + ' months' : '—', lbl: 'Period Covered' },
       { val: s.netCollections ? '$' + Number(s.netCollections).toLocaleString() : '—', lbl: 'Net Collections' },
       { val: parseLabel(!!plText, !!s.plParsed, !!skipped[3]), lbl: 'P&L Analysis' },
-      { val: employeeCosts ? 'Included' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
-      { val: hygieneData ? 'Included' : (skipped[8] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
+      { val: employeeCosts ? 'Included' : (skipped[6] ? 'Skipped' : 'Not entered'), lbl: 'Staff Costs' },
+      { val: hygieneData ? 'Included' : (skipped[7] ? 'Skipped' : 'Not entered'), lbl: 'Hygiene Schedule' },
       { val: oppTotal ? '$' + Math.round(oppTotal).toLocaleString() : '—', lbl: 'Opportunity Identified' },
     ].map(item => `<div class="summary-stat"><div class="val">${item.val}</div><div class="lbl">${item.lbl}</div></div>`).join('');
   } catch (err) {
     _generating = false;
     document.getElementById('generatingState').classList.remove('visible');
-    document.getElementById('step9').classList.add('visible');
+    document.getElementById('step8').classList.add('visible');
     console.error('Generation error:', err);
     showGenError(
       'We hit an error while building your report. Double-check your uploaded PDFs are the correct reports and try again \u2014 or contact us and we\u2019ll help sort it out.',
@@ -2859,17 +2994,19 @@ function viewIntakeData() {
 }
 
 function resetAll() {
-  files = { 1: null, 2: null, 3: null, 4: null, 5: null };
-  skipped = { 3: false, 4: false, 5: false, 6: false, 7: false };
+  files = { 1: null, '2a': null, '2b': null, '2c': null, 3: null, 4: null, 5: null };
+  skipped = { 3: false, 4: false, 5: false, 6: false, 7: false, '2a': false };
   generatedData = null;
   generatedReportHtml = null;
   generatedReviewHtml = null;
   document.getElementById('resultCard').classList.remove('visible');
   document.getElementById('practiceName').value = '';
-  [1,2,3,4,5].forEach(n => {
-    const zone = document.getElementById(`upload${n}`); if (zone) zone.classList.remove('has-file');
-    const btn = document.getElementById(`next${n}`); if (btn && n !== 1) btn.disabled = true;
-    const input = document.getElementById(`file${n}`); if (input) input.value = '';
+  ['1','2a','2b','2c','3','4','5'].forEach(k => {
+    const zone = document.getElementById(`upload${k}`); if (zone) zone.classList.remove('has-file');
+    const input = document.getElementById(`file${k}`); if (input) input.value = '';
+  });
+  ['next2','next3','next4','next5'].forEach(id => {
+    const btn = document.getElementById(id); if (btn) btn.disabled = true;
   });
   ['ar_pat_total','ar_pat_current','ar_pat_3160','ar_pat_6190','ar_pat_90plus','ar_pat_insr',
    'ar_ins_total','ar_ins_current','ar_ins_3160','ar_ins_6190','ar_ins_90plus'].forEach(id => {
