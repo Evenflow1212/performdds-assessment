@@ -659,8 +659,11 @@ function getFormData() {
 
     const imaging = {};
     document.querySelectorAll('.imaging-input').forEach(el => {
-        const val = parseInt(el.value) || null;
-        if (val) imaging[el.dataset.name] = val;
+        // Treat empty string as not entered; treat 0 as a real value.
+        const raw = el.value;
+        if (raw === '' || raw == null) return;
+        const val = parseInt(raw, 10);
+        if (Number.isFinite(val)) imaging[el.dataset.name] = val;
     });
 
     return {
@@ -841,6 +844,10 @@ function emailReport() {
     body += `Empties: ${d.hygiene.empties || '--'}\nTotal: $${d.hygiene.total.toLocaleString()}\n`;
 
     body += `\nââ EXAMS ââ\n`;
+    body += `0150 Comp Exam: ${d.exams.comp != null ? d.exams.comp : '--'}\n`;
+    body += `0120 Periodic Exam: ${d.exams.periodic != null ? d.exams.periodic : '--'}\n`;
+    body += `0140 Limited Exam: ${d.exams.limited != null ? d.exams.limited : '--'}\n`;
+    body += `Bite Wellness: ${d.exams.biteWellness != null ? d.exams.biteWellness : '--'}\n`;
 
     body += `\nââ IMAGING ââ\n`;
     Object.entries(d.imaging).forEach(([k,v]) => { body += `${k}: ${v}\n`; });
