@@ -2976,6 +2976,43 @@ test('Staff Cost regex coverage #6: real-world Pigneri-shaped expanded P&L', () 
     `expected loading factor ~1.190; got ${factor}`);
 });
 
+test('Day Sheet new #11: assessment renders end-to-end with no Day Sheets (skip-Step-2 path)', async () => {
+  /* 2026-04-29 — Step 2 (Day Sheet × 3) is skippable on the front end.
+     Backend already degrades gracefully: collData falls back to legacy
+     parseCollections when no Day Sheets posted, and onward to
+     plData.totalIncome when collText is also absent. This test exercises
+     the worst case: only Production + P&L + AR + employeeCosts +
+     practiceProfile, no day-sheet anything. */
+  const evt = JSON.parse(buildEvent().body);
+  delete evt.daySheetYtdText;
+  delete evt.daySheetLastYearText;
+  delete evt.daySheetYearBeforeText;
+  evt.collText = null;  /* force no legacy collections fallback either */
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  expect(res.statusCode === 200, 'handler must return 200 with no Day Sheets: ' + res.body.slice(0, 200));
+  const body = JSON.parse(res.body);
+  /* Day Sheets all null in the data payload. */
+  expect(body.data.collections.daySheets.ytd       == null, 'daySheets.ytd should be null');
+  expect(body.data.collections.daySheets.lastYear  == null, 'daySheets.lastYear should be null');
+  expect(body.data.collections.daySheets.yearBefore == null, 'daySheets.yearBefore should be null');
+  /* Annual collections fell back to P&L totalIncome (PL_STANDARD has $975k). */
+  expect(body.data.collections.annualized > 0,
+    `collections.annualized should fall back to P&L; got ${body.data.collections.annualized}`);
+  /* Collections shrinking SWOT must not fire — no trend data. */
+  const w = body.data.swot.weaknesses.find(x => /Year-to-date monthly collections average/i.test(x));
+  expect(!w, `Collections shrinking SWOT must be silent without Day Sheets; fired: ${w}`);
+  /* Sanity floor on the rendered HTML — populated report. The smoke
+     fixture renders ~29k chars without Day Sheets and without legacy
+     collText (sections that depend on either are silently omitted).
+     25k is a tight-but-fair floor that catches a totally-broken render
+     while accepting the legitimate shrink. */
+  expect(body.reportHtml.length > 25000,
+    `reportHtml suspiciously short without Day Sheets: ${body.reportHtml.length} chars`);
+  /* Collections Trend card must NOT be rendered (no YTD or last-year avg). */
+  expect(!/Collections Trend \(monthly avg\)/.test(body.reportHtml),
+    'Collections Trend card should be hidden when no Day Sheets uploaded');
+});
+
 test('Front 5 row is removed from the staff table (2026-04-29)', () => {
   /* Regression guard for the Front-5 drop. Most practices have 1–3
      front office staff; row 5 was dead space. Back 5 stays — back-of-

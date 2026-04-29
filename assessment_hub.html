@@ -880,9 +880,17 @@
         <div>What we extract: <strong>Charges</strong> (production for the period), <strong>Payments</strong> (collections), Adjustments, and other practice-wide totals. Three periods give a year-over-year trend that drives the Collections Trend card and flags shrinking-collections findings in your SWOT.</div>
       </div>
 
+      <div class="callout warn" id="step2SkipWarn" style="display:none;margin-top:14px;">
+        <div class="callout-icon">ℹ️</div>
+        <div>Skipping Day Sheets means no <strong>Collections Trend</strong> card and no year-over-year collections shrinkage SWOT signal. Annual collections will fall back to your P&amp;L income line. You can come back and add Day Sheets later.</div>
+      </div>
+
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="prevStep(2)">← Back</button>
-        <button class="btn btn-primary" id="next2" onclick="nextStep(2)" disabled>Continue →</button>
+        <div>
+          <button class="skip-link" onclick="skipStep(2)">Skip for now</button>
+          <button class="btn btn-primary" id="next2" onclick="nextStep(2)" disabled>Continue →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1563,6 +1571,17 @@ function nextStep(n) { goToStep(n + 1); }
 function prevStep(n) { goToStep(n - 1); }
 function skipStep(n) {
   skipped[n] = true;
+  /* Step 2 (Day Sheet × 3) is skippable as of 2026-04-29 — backend
+     falls back to legacy parseCollections (collText) and then to
+     plData.totalIncome when no Day Sheets are uploaded. The skip-warn
+     callout is hidden by default; reveal it so the dentist sees the
+     consequence (no Collections Trend card, no shrinkage SWOT). */
+  if (n === 2) {
+    const warn = document.getElementById('step2SkipWarn');
+    if (warn) warn.style.display = '';
+    document.getElementById('next2').disabled = false;
+    nextStep(2);
+  }
   if (n === 3) { document.getElementById('next3').disabled = false; nextStep(3); }
   if (n === 4) { document.getElementById('next4').disabled = false; nextStep(4); }
   if (n === 5) { document.getElementById('next5').disabled = false; nextStep(5); }
@@ -1738,13 +1757,15 @@ function collectHygieneSchedule() {
 }
 
 function buildReview() {
-  /* Day Sheet × 3 surfaces as three separate review rows so dentists can see
-     which periods landed and which didn't. Generate gates on Production
-     (Step 1) + Day Sheet 2B (last full year — canonical baseline). */
+  /* Day Sheet × 3 surfaces as three separate review rows. Generate gates
+     on Production (Step 1) + Day Sheet 2B (last full year — canonical
+     baseline) UNLESS step 2 was skipped via the new skip link, in which
+     case 2b is no longer required and collections fall back to P&L
+     totalIncome. (2026-04-29 Day-Sheet-optional change.) */
   const steps = [
     { key: 1,    label: 'Production Report',                     file: files[1] },
     { key: '2a', label: 'Day Sheet — Year to Date',              file: files['2a'], skippable: true },
-    { key: '2b', label: 'Day Sheet — Last Full Year',            file: files['2b'] },
+    { key: '2b', label: 'Day Sheet — Last Full Year',            file: files['2b'], skippable: true },
     { key: '2c', label: 'Day Sheet — Year Before That',          file: files['2c'], skippable: true },
     { key: 3,    label: 'P&L Statement',                         file: files[3],    skippable: true },
     { key: 4,    label: 'Patient AR Aging',                      file: files[4],    skippable: true },
@@ -1758,7 +1779,9 @@ function buildReview() {
     return `<div class="review-item"><div class="label">${s.label}</div><div class="status" style="color:${color};">${status}</div></div>`;
   }).join('');
   document.getElementById('review-list').innerHTML = html;
-  document.getElementById('generateBtn').disabled = !(files[1] && files['2b']);
+  /* Production required; Day Sheet 2B required UNLESS step 2 was skipped. */
+  document.getElementById('generateBtn').disabled =
+    !files[1] || (!files['2b'] && !skipped[2]);
 }
 
 async function fileToBase64(file) {
@@ -2194,8 +2217,12 @@ function hideGenError() {
 async function generate() {
   if (_generating) { console.warn('Generate already in progress, ignoring duplicate click'); return; }
   hideGenError();
-  if (!files[1] || !files['2b']) {
-    showGenError('Please upload the Production Report (Step 1) and at least the Day Sheet for Last Full Year (Step 2B) before generating.');
+  if (!files[1]) {
+    showGenError('Please upload the Production Report (Step 1) before generating.');
+    return;
+  }
+  if (!files['2b'] && !skipped[2]) {
+    showGenError('Upload at least the Day Sheet for Last Full Year (Step 2B) — or use the Skip-for-now link on Step 2 to proceed without Day Sheets.');
     return;
   }
   _generating = true;
