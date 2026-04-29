@@ -355,86 +355,46 @@ function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
   return hygAnnual > 0 ? (hygAnnual / annualHygieneProduction) * 100 : null;
 }
 
-/* ─── Benefits Package evaluation (2026-04-28) ───
-   Reads the free-form benefits notes from employeeCosts.benefits and scores
-   each of seven criteria: 401K match ≥3%, employer medical, vacation ≥2 wk,
-   sick days ≥5, annual bonus, dental coverage, CE allowance. Returns the
-   per-criterion result + counts so the SWOT generator can emit a strength
-   ("all 7 met"), weakness ("2+ missing"), or skip entirely (one missing,
-   unknown — borderline).
-   Benefits fields are free-text (Sick Pay = "Per State law", 401K = "3%
-   match", etc.), so we parse pragmatically: extract the first number for
-   numeric thresholds, treat "no/none/n/a/0/empty" as the criterion missing,
-   and treat anything else non-empty as the criterion met for yes/no items. */
-function evaluateBenefitsPackage(benefits) {
-  const b = benefits || {};
-  const negativeRe = /^\s*(no|none|n\/a|na|not\s*offered|n\.a\.|—|-|–|0|0%)\s*$/i;
-  const isPresent = (s) => {
-    const v = String(s || '').trim();
-    if (!v) return false;
-    if (negativeRe.test(v)) return false;
-    return true;
-  };
-  const firstNumber = (s) => {
-    const m = String(s || '').match(/(-?\d+(?:\.\d+)?)/);
-    return m ? parseFloat(m[1]) : null;
-  };
-  /* "1 week after 1 year" → 1; "2 weeks" → 2; "10 days" treated as days/5 weekdays → 2 weeks. */
-  const parseVacationWeeks = (s) => {
-    const v = String(s || '').toLowerCase();
-    if (!v || negativeRe.test(v)) return null;
-    /* Days first — "10 days" should be ~2 weeks. */
-    const dayMatch = v.match(/(\d+(?:\.\d+)?)\s*day/);
-    if (dayMatch && !/week/.test(v)) return parseFloat(dayMatch[1]) / 5;
-    const weekMatch = v.match(/(\d+(?:\.\d+)?)\s*(?:week|wk)/);
-    if (weekMatch) return parseFloat(weekMatch[1]);
-    /* Bare number → assume weeks (matches "2", "1.5"). */
-    const n = firstNumber(v);
-    return n;
-  };
-  const k401Pct = (() => {
-    const v = String(b.k401 || '').toLowerCase();
-    if (!v || negativeRe.test(v)) return null;
-    /* "3% match", "matches 3%", "match up to 4%", "3% safe harbor". */
-    const m = v.match(/(\d+(?:\.\d+)?)\s*%/);
-    return m ? parseFloat(m[1]) : firstNumber(v);
-  })();
-  const sickDays = (() => {
-    const v = String(b.sick || '').toLowerCase();
-    if (!v || negativeRe.test(v)) return null;
-    /* "5 days/year" → 5; "Per State law" → null (can't verify). */
-    const m = v.match(/(\d+(?:\.\d+)?)\s*day/);
-    return m ? parseFloat(m[1]) : firstNumber(v);
-  })();
-  const vacationWeeks = parseVacationWeeks(b.vacation);
-  const criteria = [
-    { key: 'k401',     label: '401K with ≥3% employer match', met: k401Pct != null && k401Pct >= 3 },
-    { key: 'medical',  label: 'employer-paid medical insurance', met: isPresent(b.medical) },
-    { key: 'vacation', label: 'vacation ≥2 weeks',                met: vacationWeeks != null && vacationWeeks >= 2 },
-    { key: 'sick',     label: 'sick days ≥5',                    met: sickDays != null && sickDays >= 5 },
-    { key: 'bonus',    label: 'annual bonus structure',          met: isPresent(b.bonus) },
-    { key: 'dental',   label: 'dental coverage',                 met: isPresent(b.dental) },
-    { key: 'ce',       label: 'CE allowance',                    met: isPresent(b.ce) },
+/* ─── Benefits summary (2026-04-29) ───
+   The 2026-04-28 free-text parser (evaluateBenefitsPackage) is gone:
+   dentists weren't filling in detail like "% match" or "days of vacation"
+   reliably. Benefits Policy Notes is now 7 yes/no toggles, each value is
+   'yes' | 'no' | null. summarizeBenefits returns the buckets so the SWOT
+   generator can emit a per-field strength bullet for each yes and a
+   per-field weakness bullet for each no. anyAnswered=false → silent skip
+   (and the Hygiene Department Ratio cross-suppression also does not fire). */
+function summarizeBenefits(b) {
+  const items = [
+    { key: 'holidays', label: 'paid holidays' },
+    { key: 'vacation', label: 'paid vacations' },
+    { key: 'bonus',    label: 'bonus structure' },
+    { key: 'k401',     label: '401K' },
+    { key: 'medical',  label: 'medical insurance' },
+    { key: 'dental',   label: 'dental coverage' },
+    { key: 'ce',       label: 'CE allowance' },
   ];
-  const missing = criteria.filter(c => !c.met);
-  const metCount = criteria.length - missing.length;
-  /* "Has any benefits data?" — if every relevant field is empty, the practice
-     simply didn't fill in the benefits notes section. We treat that as
-     'unknown' so the SWOT (and the cross-methodology suppression with
-     Hygiene Department Ratio) doesn't fire. Without this, every test fixture
-     that omits benefits data would falsely trigger the WEAKNESS branch. */
-  const anyBenefitsData = ['k401','medical','vacation','sick','bonus','dental','ce']
-    .some(k => String(b[k] || '').trim().length > 0);
-  let state = 'unknown';
-  if (!anyBenefitsData)                  state = 'unknown';
-  else if (metCount === criteria.length) state = 'strong';
-  else if (missing.length >= 2)          state = 'weak';
-  else                                    state = 'borderline';   /* exactly one missing → no SWOT either way */
-  return {
-    criteria, missing, metCount, missingCount: missing.length, state,
-    /* Surface raw parsed values so the SWOT body can quote specifics. */
-    values: { k401Pct, vacationWeeks, sickDays },
-  };
+  const yes = items.filter(i => (b || {})[i.key] === 'yes');
+  const no  = items.filter(i => (b || {})[i.key] === 'no');
+  return { yes, no, items, anyAnswered: yes.length + no.length > 0 };
+}
+
+/* ─── Staff tenure evaluation (2026-04-29) ───
+   Aggregates tenureYears across the front-office/back-office staff and
+   hygiene team. Returns null when fewer than 2 tenure values are filled in
+   (insufficient signal to fire either branch — practices may not know exact
+   tenure for every position, and we don't want to false-fire on a 2-person
+   sample). The SWOT generator decides which branch (weakness / strength /
+   silent) based on avg + under-1yr percentage. */
+function evaluateStaffTenure(staff, hygiene) {
+  const all = [...(staff || []), ...(hygiene || [])];
+  const filled = all
+    .map(p => Number(p && p.tenureYears))
+    .filter(t => Number.isFinite(t) && t >= 0);
+  if (filled.length < 2) return null;
+  const avg = filled.reduce((s, t) => s + t, 0) / filled.length;
+  const underOneCount = filled.filter(t => t < 1).length;
+  const underOnePct = (underOneCount / filled.length) * 100;
+  return { avg, underOnePct, total: filled.length, underOneCount };
 }
 
 /* ─── SWOT Analysis Generator ─── */
@@ -853,12 +813,15 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
      paths to close it (raise $/day via empties/perio/adjuncts, or align
      compensation to production). Does NOT prescribe the how.
      Graceful degradation: null or zero on either side → no fire. */
-  /* Benefits Package evaluation (2026-04-28). Computed BEFORE the Hygiene
-     Department Ratio block because the ratio's "align comp" remedy path is
-     conditionally suppressed when benefits are weak — funding benefits is a
-     prerequisite for compensation realignment. */
-  const benefitsEval = evaluateBenefitsPackage(employeeCosts && employeeCosts.benefits);
-  const benefitsWeak = benefitsEval.state === 'weak';
+  /* Benefits summary (2026-04-29 yes/no restructure). Computed BEFORE the
+     Hygiene Department Ratio block because the ratio's "align comp" remedy
+     path is conditionally suppressed when 2+ benefits are answered "no" —
+     funding benefits is a prerequisite for compensation realignment. */
+  const benefitsSummary = summarizeBenefits(employeeCosts && employeeCosts.benefits);
+  /* benefitsWeak threshold mirrors the 2026-04-28 design: 2+ "no" answers
+     trips the cross-suppression. anyAnswered=false → unknown → no
+     suppression. 1 "no" with 6 "yes" → mixed → no suppression either. */
+  const benefitsWeak = benefitsSummary.anyAnswered && benefitsSummary.no.length >= 2;
 
   const hri = hygDeptRatioInputs || {};
   const hrCost = Number(hri.annualHygienistCost);
@@ -883,26 +846,56 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     }
   }
 
-  /* Benefits Package SWOT branches (2026-04-28). STRENGTH when all 7 criteria
-     are met; WEAKNESS when 2+ are missing; SKIP when exactly 1 is missing
-     (borderline — no firm signal either way) or when no benefits data was
-     supplied at all. The body of the weakness branch references the existing
-     Hygiene Department Ratio finding when both fire — names funding benefits
-     as the prerequisite to comp realignment. */
-  var benefitsStrength = '';
-  var benefitsWeakness = '';
-  if (benefitsEval.state === 'strong') {
-    const v = benefitsEval.values;
-    const matchTxt = v.k401Pct != null ? `${v.k401Pct}%` : '≥3%';
-    const vacTxt   = v.vacationWeeks != null ? `${v.vacationWeeks}` : '≥2';
-    const sickTxt  = v.sickDays != null ? `${v.sickDays}` : '≥5';
-    benefitsStrength = `Your benefits package — 401K with ${matchTxt} match, employer medical, ${vacTxt} weeks vacation, ${sickTxt} sick days, bonus structure, dental, and CE — clears every benchmark we score against. Strong benefits compress turnover risk and let you compete for hygiene talent against bigger groups.`;
-  } else if (benefitsEval.state === 'weak') {
-    const missingList = benefitsEval.missing.map(c => c.label).join(', ');
-    const ratioCrossRef = (typeof hygDeptRatioWeakness !== 'undefined' && hygDeptRatioWeakness)
-      ? ' This also constrains the remedies available when Hygiene Department Ratio is out of range — see below.'
-      : '';
-    benefitsWeakness = `Benefits package below market standard. Your benefits package is missing ${benefitsEval.missingCount} of the 7 components we benchmark against: ${missingList}. Weak benefits raise turnover risk and limit your ability to recruit hygiene against bigger groups.${ratioCrossRef}`;
+  /* Per-field benefits SWOT bullets (2026-04-29). Each "yes" emits its own
+     strength entry; each "no" emits its own weakness entry (HIGH PRIORITY).
+     Unanswered (null) toggles emit nothing. Replaces the prior aggregate
+     "Benefits package above/below market standard" entries — Dave's call
+     was to surface each missing benefit as its own turnover-driver line in
+     the report rather than consolidate. Capitalization: sentence-case at
+     start of each bullet, abbreviations (401K, CE) preserved. */
+  const _capFirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  var benefitsStrengthBullets = [];
+  var benefitsWeaknessBullets = [];
+  if (benefitsSummary.anyAnswered) {
+    for (const item of benefitsSummary.yes) {
+      benefitsStrengthBullets.push(
+        `${_capFirst(item.label)} offered. Confirmed benefit — supports retention and helps recruit against bigger groups.`
+      );
+    }
+    for (const item of benefitsSummary.no) {
+      benefitsWeaknessBullets.push(
+        `${_capFirst(item.label)} not offered. Missing this benefit raises turnover risk — staff frequently leave practices that don't offer it for ones that do.`
+      );
+    }
+  }
+
+  /* Staff tenure SWOT (2026-04-29). Combined logic per Dave: WEAKNESS when
+     avg < 2 yrs OR ≥30% under-1-year; STRENGTH when avg ≥ 5 AND <10%
+     under-1-year; otherwise silent. Cross-references missing-benefits when
+     turnover weakness fires alongside benefits "no" answers — the recurring
+     real-world story is turnover risk + benefits gap, and naming both in one
+     finding is more useful than two disconnected SWOT cards. */
+  const tenureEval = evaluateStaffTenure(
+    employeeCosts && employeeCosts.staff,
+    employeeCosts && employeeCosts.hygiene
+  );
+  var staffTurnoverWeakness = '';
+  var staffTurnoverStrength = '';
+  if (tenureEval) {
+    const turnoverFires = tenureEval.avg < 2 || tenureEval.underOnePct >= 30;
+    const stableFires   = tenureEval.avg >= 5 && tenureEval.underOnePct < 10;
+    if (turnoverFires) {
+      let body = `Staff turnover risk. Your team's average tenure is ${tenureEval.avg.toFixed(1)} years across ${tenureEval.total} positions, and ${tenureEval.underOneCount} of ${tenureEval.total} (${tenureEval.underOnePct.toFixed(0)}%) have been with the practice less than a year. High turnover compounds every operational issue — training cost, patient continuity, scheduling stability — and it's frequently a leading indicator of compensation or culture problems that the practice owner doesn't see until staff have already started leaving.`;
+      /* Cross-reference: when benefits.no is non-empty, name the missing
+         benefits as the most direct lever. */
+      if (benefitsSummary.no.length > 0) {
+        const missingNames = benefitsSummary.no.map(i => i.label).join(', ');
+        body += ` You are also missing ${benefitsSummary.no.length} benefits that drive retention (${missingNames}). Closing those gaps is the most direct lever to slow turnover.`;
+      }
+      staffTurnoverWeakness = body;
+    } else if (stableFires) {
+      staffTurnoverStrength = `Stable team. Your team averages ${tenureEval.avg.toFixed(1)} years with the practice across ${tenureEval.total} positions, with only ${tenureEval.underOneCount} of ${tenureEval.total} (${tenureEval.underOnePct.toFixed(0)}%) under a year. A stable team compounds — training investment retained, patient relationships built, internal systems known. This is the foundation that lets every other operational improvement land.`;
+    }
   }
 
   /* "I don't know" scorekeeping-gap SWOT (2026-04-28). The questionnaire has
@@ -1004,16 +997,23 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   if (typeof hygCapWeaknesses            !== 'undefined' && hygCapWeaknesses.length)     highPriorityWeaknesses.push(...hygCapWeaknesses);
   if (typeof collectionsShrinkingWeakness !== 'undefined' && collectionsShrinkingWeakness) highPriorityWeaknesses.push(collectionsShrinkingWeakness);
   if (typeof scorekeepingGapWeakness     !== 'undefined' && scorekeepingGapWeakness)     highPriorityWeaknesses.push(scorekeepingGapWeakness);
-  if (typeof benefitsWeakness            !== 'undefined' && benefitsWeakness)            highPriorityWeaknesses.push(benefitsWeakness);
+  if (typeof staffTurnoverWeakness       !== 'undefined' && staffTurnoverWeakness)       highPriorityWeaknesses.push(staffTurnoverWeakness);
+  if (typeof benefitsWeaknessBullets     !== 'undefined' && benefitsWeaknessBullets.length) highPriorityWeaknesses.push(...benefitsWeaknessBullets);
   if (highPriorityWeaknesses.length > 0) {
     weaknesses.unshift(...highPriorityWeaknesses);
   }
   if (typeof hygCapStrengths !== 'undefined' && hygCapStrengths.length) {
     strengths.unshift(...hygCapStrengths);
   }
-  /* Benefits Package strength sits among other strengths (no priority unshift). */
-  if (typeof benefitsStrength !== 'undefined' && benefitsStrength) {
-    strengths.push('Benefits package above market standard. ' + benefitsStrength);
+  /* Per-field benefits strengths sit among other strengths (no priority
+     unshift). One bullet per "yes" toggle. */
+  if (typeof benefitsStrengthBullets !== 'undefined' && benefitsStrengthBullets.length) {
+    strengths.push(...benefitsStrengthBullets);
+  }
+  /* Stable-team strength fires when tenure is high AND under-1yr is low.
+     Sits among other strengths. */
+  if (typeof staffTurnoverStrength !== 'undefined' && staffTurnoverStrength) {
+    strengths.push(staffTurnoverStrength);
   }
 
   /* ── THREATS ──

@@ -2119,18 +2119,35 @@ test('Label bug new #2: literal "What you told us is wrong" does NOT appear in a
    (commit d53440c) and Practice Profile label fix (commit 2a9d356).
    ────────────────────────────────────────────────────────────────────── */
 
-/* Helper — build a fixture with explicit benefits values + the IDK / score-
-   keeping fields. Pass `benefits` as an object with keys matching the form
-   IDs (k401, medical, vacation, sick, bonus, dental, ce). Pass `idk` as
-   an array of practiceProfile keys to set to the literal string 'idk'. */
-function methodologyFixture({ benefits, idk, profileOverrides }) {
+/* Helper — build a fixture with explicit benefits yes/no toggles + the IDK
+   scorekeeping fields. `benefits` is an object with keys matching the
+   summarizeBenefits canonical names (holidays, vacation, bonus, k401,
+   medical, dental, ce) and values 'yes' | 'no' | null. Defaults to all
+   nulls if not supplied. `idk` is an array of practiceProfile keys to set
+   to the literal string 'idk'. `tenureYears` lets a test seed staff/hygiene
+   tenure values directly without going through the hub parser. */
+function methodologyFixture({ benefits, idk, profileOverrides, staffTenure, hygTenure }) {
   const evt = JSON.parse(buildEvent().body);
+  /* Default to fully-unanswered benefits — the new yes/no design treats null
+     as "didn't fill in" and emits no SWOT bullets. Tests opt in to specific
+     yes/no values per scenario. */
+  const baseBenefits = { holidays: null, vacation: null, bonus: null, k401: null, medical: null, dental: null, ce: null };
   evt.employeeCosts = Object.assign({}, evt.employeeCosts, {
-    benefits: Object.assign(
-      { sick: '', holidays: '', vacation: '', bonus: '', k401: '', medical: '', dental: '', ce: '', other: '' },
-      benefits || {}
-    ),
+    benefits: Object.assign({}, baseBenefits, benefits || {}),
   });
+  /* Seed tenureYears onto staff / hygiene arrays. The base fixture has 3
+     admin + 2 hygienists; tests can pass arrays of any length and the
+     helper REPLACES the staff/hygiene array with that count of synthetic
+     rows (uniform rate/hours so staffRoleAnnualCost still computes a
+     sane number — only the tenure values vary). Pass an empty array
+     to clear the array entirely. */
+  const _mkRow = (tenureYears) => ({ rate: 20, hours: 160, tenureYears });
+  if (Array.isArray(staffTenure)) {
+    evt.employeeCosts.staff = staffTenure.map(t => _mkRow(t == null ? null : t));
+  }
+  if (Array.isArray(hygTenure)) {
+    evt.employeeCosts.hygiene = hygTenure.map(t => _mkRow(t == null ? null : t));
+  }
   if (Array.isArray(idk) && idk.length) {
     const profileIdk = {};
     idk.forEach(k => { profileIdk[k] = 'idk'; });
@@ -2147,76 +2164,96 @@ async function invokeMethodology(opts) {
   return JSON.parse(res.body);
 }
 
-/* Benefits set that meets all 7 criteria. */
-const BENEFITS_FULL = {
-  k401:     '4% match',
-  medical:  'Kaiser HMO, 100% employer-paid',
-  vacation: '2 weeks',
-  sick:     '5 days/year',
-  bonus:    'Quarterly production bonus',
-  dental:   'Family, lab cost only',
-  ce:       '$1,500/year per RDH',
+/* All 7 toggles set to 'yes'. */
+const BENEFITS_ALL_YES = {
+  holidays: 'yes', vacation: 'yes', bonus: 'yes',
+  k401: 'yes', medical: 'yes', dental: 'yes', ce: 'yes',
 };
 
-test('Methodology #1: Benefits Package STRENGTH SWOT fires when all 7 criteria are met', async () => {
-  const body = await invokeMethodology({ benefits: BENEFITS_FULL });
-  const s = body.data.swot.strengths.find(x => /Benefits package above market standard/i.test(x));
-  expect(s, 'STRENGTH did not fire on full-benefits fixture: ' + JSON.stringify(body.data.swot.strengths));
-  /* Body should cite specific values pulled from the fixture. */
-  expect(/4%/.test(s) && /2 weeks/.test(s) && /5 sick days/i.test(s) || /5 sick/i.test(s),
-    `body should cite parsed benefit values; got: ${s}`);
+test('Methodology #1: Per-field strength bullets fire — one per "yes" toggle (7 distinct entries when all 7 yes)', async () => {
+  const body = await invokeMethodology({ benefits: BENEFITS_ALL_YES });
+  /* Each of the 7 labels should appear in its own strength bullet. */
+  const labels = ['paid holidays','paid vacations','bonus structure','401K','medical insurance','dental coverage','CE allowance'];
+  for (const label of labels) {
+    const re = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' offered\\. Confirmed benefit', 'i');
+    const found = body.data.swot.strengths.find(x => re.test(x));
+    expect(found, `strength bullet for "${label}" did not fire: ` + JSON.stringify(body.data.swot.strengths));
+  }
+  /* Aggregate "Benefits package above market standard" copy is GONE per
+     Dave's per-field design — regression guard against the old aggregate. */
+  const aggregateGone = !body.data.swot.strengths.some(x => /Benefits package above market standard/i.test(x));
+  expect(aggregateGone, 'old aggregate "Benefits package above market standard" copy must be removed');
 });
 
-test('Methodology #2: Benefits Package STRENGTH does NOT fire when 1 of 7 is missing (borderline)', async () => {
-  /* Drop CE only — exactly one missing → borderline → no SWOT either way. */
-  const benefits = Object.assign({}, BENEFITS_FULL, { ce: '' });
+test('Methodology #2: Per-field weakness bullets fire — one per "no" toggle (3 distinct entries when 3 no, 4 yes)', async () => {
+  const benefits = {
+    holidays: 'yes', vacation: 'yes', bonus: 'yes', k401: 'yes',
+    medical: 'no', dental: 'no', ce: 'no',
+  };
   const body = await invokeMethodology({ benefits });
-  const s = body.data.swot.strengths.find(x => /Benefits package above market standard/i.test(x));
-  expect(!s, `STRENGTH should not fire with 1 missing (borderline); fired: ${s}`);
-  /* Weakness should also NOT fire — that branch needs 2+ missing. */
-  const w = body.data.swot.weaknesses.find(x => /Benefits package below market standard/i.test(x));
-  expect(!w, `WEAKNESS should not fire with only 1 missing (need 2+); fired: ${w}`);
+  const noLabels = ['medical insurance','dental coverage','CE allowance'];
+  for (const label of noLabels) {
+    const re = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' not offered\\. Missing this benefit raises turnover risk', 'i');
+    const found = body.data.swot.weaknesses.find(x => re.test(x));
+    expect(found, `weakness bullet for "${label}" did not fire: ` + JSON.stringify(body.data.swot.weaknesses.slice(0, 10)));
+  }
+  /* The 4 yes labels emit strengths and NO weaknesses. */
+  const yesLabels = ['paid holidays','paid vacations','bonus structure','401K'];
+  for (const label of yesLabels) {
+    const reW = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' not offered', 'i');
+    expect(!body.data.swot.weaknesses.some(x => reW.test(x)),
+      `"${label}" was set to yes; should not appear in weaknesses`);
+  }
+  /* Old aggregate weakness copy gone. */
+  const aggregateGone = !body.data.swot.weaknesses.some(x => /Benefits package below market standard/i.test(x));
+  expect(aggregateGone, 'old aggregate "Benefits package below market standard" copy must be removed');
 });
 
-test('Methodology #3: Benefits Package WEAKNESS fires when 2+ missing; body lists specific gaps', async () => {
-  /* Drop CE + bonus — 2 missing → WEAKNESS. */
-  const benefits = Object.assign({}, BENEFITS_FULL, { ce: '', bonus: 'none' });
+test('Methodology #3: Unanswered (null) toggles emit nothing — no strength/weakness mention for null fields', async () => {
+  /* Mix: 2 yes, 1 no, 4 null. The 4 null labels must not appear in either
+     strengths or weaknesses. */
+  const benefits = { holidays: 'yes', medical: 'yes', dental: 'no' };
   const body = await invokeMethodology({ benefits });
-  const w = body.data.swot.weaknesses.find(x => /Benefits package below market standard/i.test(x));
-  expect(w, 'WEAKNESS did not fire with 2 missing: ' + JSON.stringify(body.data.swot.weaknesses.slice(0, 6)));
-  expect(/missing 2 of the 7/i.test(w), `body should cite "missing 2 of the 7"; got: ${w}`);
-  expect(/CE allowance/i.test(w), 'body should list CE allowance as missing');
-  expect(/annual bonus structure/i.test(w), 'body should list annual bonus structure as missing');
+  const nullLabels = ['paid vacations','bonus structure','401K','CE allowance'];
+  for (const label of nullLabels) {
+    const re = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    /* Look only for "label offered" / "label not offered" patterns — the
+       label might appear in body text from other SWOTs, so we tighten. */
+    const reS = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' offered\\.', 'i');
+    const reW = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' not offered', 'i');
+    expect(!body.data.swot.strengths.some(x => reS.test(x)),
+      `null label "${label}" should not appear as a strength bullet`);
+    expect(!body.data.swot.weaknesses.some(x => reW.test(x)),
+      `null label "${label}" should not appear as a weakness bullet`);
+  }
 });
 
-test('Methodology #4: Cross-suppression — Hyg Dept Ratio + Benefits weak swaps "align comp" for "address benefits gap"', async () => {
-  /* Drive ratio < 3 with a heavy hygiene wage fixture, while benefits weak. */
-  const benefits = { k401: 'none', medical: '', vacation: '', sick: '', bonus: '', dental: '', ce: '' };  /* all 7 missing */
+test('Methodology #4: Cross-suppression — ratio body suppresses "align comp" when 2+ benefits = no', async () => {
+  /* Drive ratio < 3 with a sparse hygiene fixture; benefits = 2 no, 5 yes. */
   const evt = JSON.parse(buildEvent().body);
-  /* Sparse hygiene production → ratio well below 3. */
   evt.prodText = [
     'DATE RANGE: 01/01/2025 - 12/31/2025',
     'D0120|Periodic Eval|1200|78000',
     'D1110|Prophy|2400|120000',
     'D2740|Crown|140|420000',
   ].join('\n');
-  evt.employeeCosts = Object.assign({}, evt.employeeCosts, { benefits });
+  evt.employeeCosts = Object.assign({}, evt.employeeCosts, {
+    benefits: { holidays: 'yes', vacation: 'yes', bonus: 'yes', k401: 'yes', medical: 'yes', dental: 'no', ce: 'no' },
+  });
   const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
   const data = JSON.parse(res.body).data;
   const ratioW = data.swot.weaknesses.find(x => /hygiene department produces \$[\d.]+ for every \$1 of hygiene labor cost/i.test(x));
   expect(ratioW, 'Hyg Dept Ratio weakness must fire on this fixture');
-  /* Cross-suppression: "align hygiene compensation to production" remedy literal must be GONE. */
   expect(!/align hygiene compensation to production/i.test(ratioW),
-    `align-comp remedy must be suppressed when benefits are weak; got: ${ratioW}`);
-  /* Replacement: "address the benefits gap above" / "funding benefits is the prerequisite" must be present. */
+    `align-comp remedy must be suppressed when benefits.no.length >= 2; got: ${ratioW}`);
   expect(/Address the benefits gap above/i.test(ratioW),
-    'replacement remedy must reference the benefits gap');
+    'replacement text "Address the benefits gap above" must be present');
   expect(/funding benefits is the prerequisite/i.test(ratioW),
-    'replacement remedy must name funding benefits as the prerequisite');
+    'replacement must name funding benefits as the prerequisite');
 });
 
-test('Methodology #5: Cross-pass-through — Hyg Dept Ratio + Benefits strong keeps original "align comp" remedy', async () => {
-  /* Same ratio fixture, but benefits are full (all 7 met). */
+test('Methodology #5: Cross-pass-through — ratio body retains "align comp" when only 1 benefit = no', async () => {
+  /* Same ratio fixture, but only 1 "no" — under the 2+ threshold. */
   const evt = JSON.parse(buildEvent().body);
   evt.prodText = [
     'DATE RANGE: 01/01/2025 - 12/31/2025',
@@ -2224,22 +2261,188 @@ test('Methodology #5: Cross-pass-through — Hyg Dept Ratio + Benefits strong ke
     'D1110|Prophy|2400|120000',
     'D2740|Crown|140|420000',
   ].join('\n');
-  evt.employeeCosts = Object.assign({}, evt.employeeCosts, { benefits: BENEFITS_FULL });
+  evt.employeeCosts = Object.assign({}, evt.employeeCosts, {
+    benefits: { holidays: 'yes', vacation: 'yes', bonus: 'yes', k401: 'yes', medical: 'yes', dental: 'yes', ce: 'no' },
+  });
   const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
   const data = JSON.parse(res.body).data;
   const ratioW = data.swot.weaknesses.find(x => /hygiene department produces \$[\d.]+ for every \$1 of hygiene labor cost/i.test(x));
   expect(ratioW, 'Hyg Dept Ratio weakness must fire on this fixture');
-  /* Pass-through: original "align hygiene compensation to production" must be present. */
   expect(/align hygiene compensation to production/i.test(ratioW),
-    `align-comp remedy must be present when benefits are not weak; got: ${ratioW}`);
-  /* No suppression text. */
+    `align-comp remedy must be retained when only 1 benefit = no; got: ${ratioW}`);
   expect(!/Address the benefits gap above/i.test(ratioW),
-    'suppression text must NOT appear when benefits are strong');
+    'replacement text must NOT appear when only 1 benefit = no');
+});
+
+test('Methodology #5b: Cross-pass-through #2 — ratio body retains two-path remedy when ALL benefits null', async () => {
+  /* Ratio fixture with no benefits answered (anyAnswered=false → no
+     suppression). */
+  const evt = JSON.parse(buildEvent().body);
+  evt.prodText = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D0120|Periodic Eval|1200|78000',
+    'D1110|Prophy|2400|120000',
+    'D2740|Crown|140|420000',
+  ].join('\n');
+  /* Don't override benefits — base fixture has none. */
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const ratioW = data.swot.weaknesses.find(x => /hygiene department produces \$[\d.]+ for every \$1 of hygiene labor cost/i.test(x));
+  expect(ratioW, 'Hyg Dept Ratio weakness must fire on this fixture');
+  expect(/align hygiene compensation to production/i.test(ratioW),
+    `align-comp remedy must be retained when no benefits answered; got: ${ratioW}`);
+  expect(/There are two structural paths/i.test(ratioW),
+    'two-path remedy phrasing must be present when benefits unknown');
+});
+
+/* ── Staff tenure SWOT (2026-04-29) ── */
+
+test('Methodology #5c: Staff tenure WEAKNESS fires on avg < 2 years', async () => {
+  /* 3 staff @ 1, 1.5, 2 → avg 1.5 → fires (under 2 years). underOnePct = 33%
+     also fires the second condition; both paths converge on the weakness. */
+  const body = await invokeMethodology({
+    benefits: BENEFITS_ALL_YES,  /* full yes — keep cross-ref short */
+    staffTenure: [1, 1.5, 2],
+    hygTenure: [],
+  });
+  const w = body.data.swot.weaknesses.find(x => /Staff turnover risk\./.test(x));
+  expect(w, 'Staff turnover weakness did not fire at avg 1.5: ' + JSON.stringify(body.data.swot.weaknesses.slice(0, 10)));
+  expect(/average tenure is 1\.5 years/i.test(w), `body should cite avg 1.5 years; got: ${w}`);
+});
+
+test('Methodology #5d: Staff tenure WEAKNESS fires on ≥30% under 1 year (regardless of avg)', async () => {
+  /* 5 staff @ 0.5, 0.5, 5, 6, 8 → avg ≈ 4.0 (above 2), under-1 = 40% → fires
+     on the underOnePct path despite a healthy average. */
+  const body = await invokeMethodology({
+    benefits: BENEFITS_ALL_YES,
+    staffTenure: [0.5, 0.5, 5, 6, 8],
+    hygTenure: [],
+  });
+  const w = body.data.swot.weaknesses.find(x => /Staff turnover risk\./.test(x));
+  expect(w, 'Staff turnover weakness did not fire at 40% under-1yr: ' + JSON.stringify(body.data.swot.weaknesses.slice(0, 10)));
+  expect(/40% .* less than a year/i.test(w) || /\(40%\) have been with the practice less than a year/i.test(w),
+    `body should cite 40% under a year; got: ${w}`);
+});
+
+test('Methodology #5e: Staff tenure STRENGTH fires on avg ≥5 AND <10% under 1 year', async () => {
+  /* 5 staff @ 4, 5, 6, 8, 10 → avg 6.6, 0% under 1 → fires. */
+  const body = await invokeMethodology({
+    benefits: BENEFITS_ALL_YES,
+    staffTenure: [4, 5, 6, 8, 10],
+    hygTenure: [],
+  });
+  const s = body.data.swot.strengths.find(x => /Stable team\./.test(x));
+  expect(s, 'Stable-team strength did not fire: ' + JSON.stringify(body.data.swot.strengths));
+  expect(/averages 6\.6 years/i.test(s), `body should cite avg 6.6 years; got: ${s}`);
+  expect(/0 of 5 \(0%\)/i.test(s), `body should cite 0/5 (0%) under a year; got: ${s}`);
+});
+
+test('Methodology #5f: Staff tenure SILENT on borderline (avg 3, 0% under 1)', async () => {
+  /* 3 staff @ 2, 3, 4 → avg 3, 0% under 1 → neither branch fires. */
+  const body = await invokeMethodology({
+    staffTenure: [2, 3, 4],
+    hygTenure: [],
+  });
+  const w = body.data.swot.weaknesses.find(x => /Staff turnover risk\./.test(x));
+  const s = body.data.swot.strengths.find(x => /Stable team\./.test(x));
+  expect(!w, `Weakness should not fire on borderline (avg 3, 0% under 1); fired: ${w}`);
+  expect(!s, `Strength should not fire on borderline (avg 3 < 5); fired: ${s}`);
+});
+
+test('Methodology #5g: Staff tenure SILENT when fewer than 2 tenure values supplied', async () => {
+  /* Only 1 tenure value supplied — insufficient signal. */
+  const body = await invokeMethodology({
+    staffTenure: [5],
+    hygTenure: [],
+  });
+  const w = body.data.swot.weaknesses.find(x => /Staff turnover risk\./.test(x));
+  const s = body.data.swot.strengths.find(x => /Stable team\./.test(x));
+  expect(!w && !s, 'Neither tenure branch should fire with <2 tenure values supplied');
+});
+
+test('Methodology #5h: Cross-reference appended to turnover weakness when benefits.no is non-empty', async () => {
+  /* Tenure → weakness; benefits → 2 no answers. Body should append the
+     "{n} benefits that drive retention" cross-reference sentence. */
+  const body = await invokeMethodology({
+    benefits: { holidays: 'yes', vacation: 'yes', bonus: 'yes', k401: 'yes', medical: 'no', dental: 'no', ce: 'yes' },
+    staffTenure: [1, 1.5, 2],
+    hygTenure: [],
+  });
+  const w = body.data.swot.weaknesses.find(x => /Staff turnover risk\./.test(x));
+  expect(w, 'Staff turnover weakness must fire to test cross-ref');
+  expect(/missing 2 benefits that drive retention/i.test(w),
+    `body should append cross-ref naming 2 benefits; got: ${w}`);
+  expect(/medical insurance/i.test(w) && /dental coverage/i.test(w),
+    'cross-ref should list the two missing benefits');
+  expect(/most direct lever to slow turnover/i.test(w),
+    'cross-ref should close with "most direct lever to slow turnover"');
+});
+
+test('Methodology #5i: Cross-reference NOT appended when benefits.no is empty', async () => {
+  /* Tenure → weakness; benefits → all null (anyAnswered false → no.length=0).
+     Body must NOT include the cross-reference. */
+  const body = await invokeMethodology({
+    /* No benefits override — defaults to all nulls. */
+    staffTenure: [1, 1.5, 2],
+    hygTenure: [],
+  });
+  const w = body.data.swot.weaknesses.find(x => /Staff turnover risk\./.test(x));
+  expect(w, 'Staff turnover weakness must fire to test cross-ref absence');
+  expect(!/benefits that drive retention/i.test(w),
+    `cross-ref must NOT appear when benefits.no is empty; got: ${w}`);
+});
+
+test('Methodology #5j: Tenure parser handles "8 yrs", "1.5", "6 months", "<1 year", and empty', () => {
+  /* Extract parseTenureYears from assessment_hub.html and exercise it
+     against the documented input forms. */
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
+  const match = html.match(/function\s+parseTenureYears\s*\(([^)]*)\)\s*\{([\s\S]*?)\n\}/);
+  expect(match, 'parseTenureYears function not found in assessment_hub.html');
+  const [, argList, body] = match;
+  const fn = new Function(argList.trim(), body);
+  expect(fn('8 yrs')      === 8,   `"8 yrs" → 8; got ${fn('8 yrs')}`);
+  expect(fn('8 years')    === 8,   `"8 years" → 8; got ${fn('8 years')}`);
+  expect(fn('8')          === 8,   `"8" → 8; got ${fn('8')}`);
+  expect(fn('1.5')        === 1.5, `"1.5" → 1.5; got ${fn('1.5')}`);
+  expect(Math.abs(fn('6 months') - 0.5) < 1e-9, `"6 months" → 0.5; got ${fn('6 months')}`);
+  expect(Math.abs(fn('6 mo') - 0.5) < 1e-9,     `"6 mo" → 0.5; got ${fn('6 mo')}`);
+  expect(fn('<1 year')    === 0.5, `"<1 year" → 0.5; got ${fn('<1 year')}`);
+  expect(fn('less than 1') === 0.5, `"less than 1" → 0.5; got ${fn('less than 1')}`);
+  expect(fn('') === null,       `"" → null; got ${fn('')}`);
+  expect(fn(null) === null,     `null → null; got ${fn(null)}`);
+});
+
+test('Methodology #5k: Hub form regression — old benefits free-text inputs are gone, new yes/no radios are present', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
+  /* Old free-text Sick Pay + Other inputs must be removed. */
+  expect(!/id="ec_ben_sick"/.test(html), 'old ec_ben_sick input must be removed');
+  expect(!/id="ec_ben_other"/.test(html), 'old ec_ben_other input must be removed');
+  /* Old free-text holidays/vacation/bonus/401k/medical/dental/ce inputs gone
+     too — replaced by _yn radio groups. */
+  for (const oldId of ['ec_ben_holidays','ec_ben_vacation','ec_ben_bonus','ec_ben_401k','ec_ben_medical','ec_ben_dental','ec_ben_ce']) {
+    const re = new RegExp(`id="${oldId}"`);
+    expect(!re.test(html), `old free-text input id="${oldId}" must be removed (replaced by _yn radio)`);
+  }
+  /* New yes/no radio groups must be present. */
+  for (const ynName of ['ec_ben_holidays_yn','ec_ben_vacation_yn','ec_ben_bonus_yn','ec_ben_401k_yn','ec_ben_medical_yn','ec_ben_dental_yn','ec_ben_ce_yn']) {
+    const re = new RegExp(`name="${ynName}"`);
+    expect(re.test(html), `new yes/no radio name="${ynName}" must be present`);
+  }
+  /* Tenure column inputs must be present on at least the office manager + RDH 1 rows. */
+  expect(/id="ec_tenure_om"/.test(html),  'tenure input for Office Manager must be present');
+  expect(/id="ec_tenure_h1"/.test(html),  'tenure input for RDH 1 must be present');
+  /* Existing methodology #9 label regression guard still holds. */
+  expect(html.includes('Hygiene team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
+    'verbose hygiene-benefits LOADED-COST label must still be present (separate from the policy-notes restructure)');
 });
 
 test('Methodology #6: Scorekeeping-gap SWOT fires when 2+ "I don\'t know" boxes are checked', async () => {
   const body = await invokeMethodology({
-    benefits: BENEFITS_FULL,  /* keep benefits clean to isolate the IDK signal */
+    benefits: BENEFITS_ALL_YES,  /* keep benefits clean to isolate the IDK signal */
     idk: ['docDailyAvg', 'crownsPerMonth'],
   });
   const w = body.data.swot.weaknesses.find(x => /You marked "I don't know" on/i.test(x));
@@ -2254,7 +2457,7 @@ test('Methodology #6: Scorekeeping-gap SWOT fires when 2+ "I don\'t know" boxes 
 
 test('Methodology #7: Scorekeeping-gap SWOT does NOT fire when only 1 "I don\'t know" box is checked', async () => {
   const body = await invokeMethodology({
-    benefits: BENEFITS_FULL,
+    benefits: BENEFITS_ALL_YES,
     idk: ['docDailyAvg'],  /* exactly 1 — under threshold */
   });
   const w = body.data.swot.weaknesses.find(x => /You marked "I don't know" on/i.test(x));
@@ -2266,7 +2469,7 @@ test('Methodology #8: Scorekeeping-gap SWOT co-exists with the existing Q2 setup
      Scorekeeping-gap fires on 2+ IDK fields.
      Both should be present in the SWOT weaknesses list — separate signals. */
   const body = await invokeMethodology({
-    benefits: BENEFITS_FULL,
+    benefits: BENEFITS_ALL_YES,
     idk: ['docDailyAvg', 'crownsPerMonth', 'hygDailyAvg'],
     profileOverrides: { hasProductionGoal: 'no', knowsIfAhead: 'no' },
   });
