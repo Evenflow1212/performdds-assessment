@@ -2976,6 +2976,24 @@ test('Staff Cost regex coverage #6: real-world Pigneri-shaped expanded P&L', () 
     `expected loading factor ~1.190; got ${factor}`);
 });
 
+test('Front 5 row is removed from the staff table (2026-04-29)', () => {
+  /* Regression guard for the Front-5 drop. Most practices have 1–3
+     front office staff; row 5 was dead space. Back 5 stays — back-of-
+     house scales with operatory count. */
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
+  expect(!html.includes('ec_name_f5'), 'ec_name_f5 must be removed');
+  expect(!html.includes('ec_rate_f5'), 'ec_rate_f5 must be removed');
+  expect(!html.includes('ec_hrs_f5'),  'ec_hrs_f5 must be removed');
+  expect(!html.includes('ec_tenure_f5'), 'ec_tenure_f5 must be removed');
+  expect(!/Front 5/.test(html),  '"Front 5" label must be removed');
+  /* Adjacent slots still present — guards against accidentally trimming too much. */
+  expect(/Front 4/.test(html),   '"Front 4" must still be present (only Front 5 dropped)');
+  expect(/Back 5/.test(html),    '"Back 5" must still be present (intentionally kept)');
+  expect(/ec_name_f4/.test(html), 'ec_name_f4 still present (only Front 5 dropped)');
+});
+
 (async () => {
   let failed = 0;
   const start = Date.now();
