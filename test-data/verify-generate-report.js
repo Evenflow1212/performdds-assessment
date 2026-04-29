@@ -2076,20 +2076,25 @@ test('Day Sheet new #10: partial-period Day Sheet uses parsed dates for monthly 
    was sufficient (case b would have required a separate render path).
    ────────────────────────────────────────────────────────────────────── */
 
-test('Label bug new #1: affirmative pain-points sub-header reads "What you told us" (no "is wrong")', async () => {
-  /* Drive the painPoints block by passing concerns + biggestChallenge. */
+test('Label bug new #1: affirmative pain-points sub-header reads "Your stated concerns" (Fix 4 cleanup of duplicate header)', async () => {
+  /* Drive the painPoints block by passing concerns + biggestChallenge.
+     Updated 2026-04-28 (methodology mini-bundle Fix 4): the inner orange-
+     callout was renamed from "What you told us" to "Your stated concerns"
+     to eliminate the duplicate-header collision with the outer h2 in
+     assessment-report-template.html that already reads "What you told us". */
   const body = await invoke(null, {
     concerns: ['more_profitable', 'overhead_high', 'staff_issues'],
     biggestChallenge: 'Hygiene production has been flat for two years.',
   });
   const html = body.reportHtml;
-  /* The orange-styled inner div should now read exactly "What you told us"
-     with no "is wrong" suffix. We anchor on the orange color marker
-     #e8872a so we don't false-match against the section-title h2 above. */
   const innerHeaderMatch = html.match(/color:#e8872a[^>]*>([^<]+)</);
   expect(innerHeaderMatch, 'pain-points inner sub-header (orange #e8872a) not found in HTML');
-  expect(innerHeaderMatch[1].trim() === 'What you told us',
-    `inner sub-header should be exactly "What you told us"; got "${innerHeaderMatch[1].trim()}"`);
+  expect(innerHeaderMatch[1].trim() === 'Your stated concerns',
+    `inner sub-header should be exactly "Your stated concerns"; got "${innerHeaderMatch[1].trim()}"`);
+  /* Outer h2 in the template still reads "What you told us" — the inner
+     callout no longer duplicates it. */
+  expect(/<h2[^>]*class="section-title"[^>]*>\s*What you told us\s*<\/h2>/.test(html),
+    'Outer Practice Profile h2 should still read exactly "What you told us"');
 });
 
 test('Label bug new #2: literal "What you told us is wrong" does NOT appear in any rendered report (no contradictions block)', async () => {
@@ -2105,6 +2110,210 @@ test('Label bug new #2: literal "What you told us is wrong" does NOT appear in a
   const noPainPoints = await invoke();  /* default fixture has no concerns */
   expect(!/What you told us is wrong/i.test(noPainPoints.reportHtml),
     'Executive Report should not contain "What you told us is wrong" without concerns');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Methodology mini-bundle batch (2026-04-28). Benefits Package SWOT,
+   "I don't know" scorekeeping-gap SWOT, label copy-pass verbatim guards,
+   painPoints sub-header rename regression. Builds on Day Sheet bundle
+   (commit d53440c) and Practice Profile label fix (commit 2a9d356).
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Helper — build a fixture with explicit benefits values + the IDK / score-
+   keeping fields. Pass `benefits` as an object with keys matching the form
+   IDs (k401, medical, vacation, sick, bonus, dental, ce). Pass `idk` as
+   an array of practiceProfile keys to set to the literal string 'idk'. */
+function methodologyFixture({ benefits, idk, profileOverrides }) {
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = Object.assign({}, evt.employeeCosts, {
+    benefits: Object.assign(
+      { sick: '', holidays: '', vacation: '', bonus: '', k401: '', medical: '', dental: '', ce: '', other: '' },
+      benefits || {}
+    ),
+  });
+  if (Array.isArray(idk) && idk.length) {
+    const profileIdk = {};
+    idk.forEach(k => { profileIdk[k] = 'idk'; });
+    evt.practiceProfile = Object.assign({}, evt.practiceProfile, profileIdk);
+  }
+  if (profileOverrides) {
+    evt.practiceProfile = Object.assign({}, evt.practiceProfile, profileOverrides);
+  }
+  return { httpMethod: 'POST', body: JSON.stringify(evt) };
+}
+async function invokeMethodology(opts) {
+  const res = await handler(methodologyFixture(opts));
+  if (res.statusCode !== 200) throw new Error('HTTP ' + res.statusCode + ': ' + res.body);
+  return JSON.parse(res.body);
+}
+
+/* Benefits set that meets all 7 criteria. */
+const BENEFITS_FULL = {
+  k401:     '4% match',
+  medical:  'Kaiser HMO, 100% employer-paid',
+  vacation: '2 weeks',
+  sick:     '5 days/year',
+  bonus:    'Quarterly production bonus',
+  dental:   'Family, lab cost only',
+  ce:       '$1,500/year per RDH',
+};
+
+test('Methodology #1: Benefits Package STRENGTH SWOT fires when all 7 criteria are met', async () => {
+  const body = await invokeMethodology({ benefits: BENEFITS_FULL });
+  const s = body.data.swot.strengths.find(x => /Benefits package above market standard/i.test(x));
+  expect(s, 'STRENGTH did not fire on full-benefits fixture: ' + JSON.stringify(body.data.swot.strengths));
+  /* Body should cite specific values pulled from the fixture. */
+  expect(/4%/.test(s) && /2 weeks/.test(s) && /5 sick days/i.test(s) || /5 sick/i.test(s),
+    `body should cite parsed benefit values; got: ${s}`);
+});
+
+test('Methodology #2: Benefits Package STRENGTH does NOT fire when 1 of 7 is missing (borderline)', async () => {
+  /* Drop CE only — exactly one missing → borderline → no SWOT either way. */
+  const benefits = Object.assign({}, BENEFITS_FULL, { ce: '' });
+  const body = await invokeMethodology({ benefits });
+  const s = body.data.swot.strengths.find(x => /Benefits package above market standard/i.test(x));
+  expect(!s, `STRENGTH should not fire with 1 missing (borderline); fired: ${s}`);
+  /* Weakness should also NOT fire — that branch needs 2+ missing. */
+  const w = body.data.swot.weaknesses.find(x => /Benefits package below market standard/i.test(x));
+  expect(!w, `WEAKNESS should not fire with only 1 missing (need 2+); fired: ${w}`);
+});
+
+test('Methodology #3: Benefits Package WEAKNESS fires when 2+ missing; body lists specific gaps', async () => {
+  /* Drop CE + bonus — 2 missing → WEAKNESS. */
+  const benefits = Object.assign({}, BENEFITS_FULL, { ce: '', bonus: 'none' });
+  const body = await invokeMethodology({ benefits });
+  const w = body.data.swot.weaknesses.find(x => /Benefits package below market standard/i.test(x));
+  expect(w, 'WEAKNESS did not fire with 2 missing: ' + JSON.stringify(body.data.swot.weaknesses.slice(0, 6)));
+  expect(/missing 2 of the 7/i.test(w), `body should cite "missing 2 of the 7"; got: ${w}`);
+  expect(/CE allowance/i.test(w), 'body should list CE allowance as missing');
+  expect(/annual bonus structure/i.test(w), 'body should list annual bonus structure as missing');
+});
+
+test('Methodology #4: Cross-suppression — Hyg Dept Ratio + Benefits weak swaps "align comp" for "address benefits gap"', async () => {
+  /* Drive ratio < 3 with a heavy hygiene wage fixture, while benefits weak. */
+  const benefits = { k401: 'none', medical: '', vacation: '', sick: '', bonus: '', dental: '', ce: '' };  /* all 7 missing */
+  const evt = JSON.parse(buildEvent().body);
+  /* Sparse hygiene production → ratio well below 3. */
+  evt.prodText = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D0120|Periodic Eval|1200|78000',
+    'D1110|Prophy|2400|120000',
+    'D2740|Crown|140|420000',
+  ].join('\n');
+  evt.employeeCosts = Object.assign({}, evt.employeeCosts, { benefits });
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const ratioW = data.swot.weaknesses.find(x => /hygiene department produces \$[\d.]+ for every \$1 of hygiene labor cost/i.test(x));
+  expect(ratioW, 'Hyg Dept Ratio weakness must fire on this fixture');
+  /* Cross-suppression: "align hygiene compensation to production" remedy literal must be GONE. */
+  expect(!/align hygiene compensation to production/i.test(ratioW),
+    `align-comp remedy must be suppressed when benefits are weak; got: ${ratioW}`);
+  /* Replacement: "address the benefits gap above" / "funding benefits is the prerequisite" must be present. */
+  expect(/Address the benefits gap above/i.test(ratioW),
+    'replacement remedy must reference the benefits gap');
+  expect(/funding benefits is the prerequisite/i.test(ratioW),
+    'replacement remedy must name funding benefits as the prerequisite');
+});
+
+test('Methodology #5: Cross-pass-through — Hyg Dept Ratio + Benefits strong keeps original "align comp" remedy', async () => {
+  /* Same ratio fixture, but benefits are full (all 7 met). */
+  const evt = JSON.parse(buildEvent().body);
+  evt.prodText = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D0120|Periodic Eval|1200|78000',
+    'D1110|Prophy|2400|120000',
+    'D2740|Crown|140|420000',
+  ].join('\n');
+  evt.employeeCosts = Object.assign({}, evt.employeeCosts, { benefits: BENEFITS_FULL });
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const ratioW = data.swot.weaknesses.find(x => /hygiene department produces \$[\d.]+ for every \$1 of hygiene labor cost/i.test(x));
+  expect(ratioW, 'Hyg Dept Ratio weakness must fire on this fixture');
+  /* Pass-through: original "align hygiene compensation to production" must be present. */
+  expect(/align hygiene compensation to production/i.test(ratioW),
+    `align-comp remedy must be present when benefits are not weak; got: ${ratioW}`);
+  /* No suppression text. */
+  expect(!/Address the benefits gap above/i.test(ratioW),
+    'suppression text must NOT appear when benefits are strong');
+});
+
+test('Methodology #6: Scorekeeping-gap SWOT fires when 2+ "I don\'t know" boxes are checked', async () => {
+  const body = await invokeMethodology({
+    benefits: BENEFITS_FULL,  /* keep benefits clean to isolate the IDK signal */
+    idk: ['docDailyAvg', 'crownsPerMonth'],
+  });
+  const w = body.data.swot.weaknesses.find(x => /You marked "I don't know" on/i.test(x));
+  expect(w, 'Scorekeeping-gap SWOT did not fire with 2 IDK fields: ' + JSON.stringify(body.data.swot.weaknesses.slice(0, 6)));
+  expect(/2 of our operational-tracking questions/i.test(w),
+    `body should cite "2 of our operational-tracking questions"; got: ${w}`);
+  expect(/doctor daily production target/i.test(w), 'body should list doctor daily production target');
+  expect(/monthly crown count/i.test(w), 'body should list monthly crown count');
+  expect(/can't fix what you don't measure/i.test(w),
+    'body should include the "can\'t fix what you don\'t measure" closing line');
+});
+
+test('Methodology #7: Scorekeeping-gap SWOT does NOT fire when only 1 "I don\'t know" box is checked', async () => {
+  const body = await invokeMethodology({
+    benefits: BENEFITS_FULL,
+    idk: ['docDailyAvg'],  /* exactly 1 — under threshold */
+  });
+  const w = body.data.swot.weaknesses.find(x => /You marked "I don't know" on/i.test(x));
+  expect(!w, `Scorekeeping-gap SWOT should not fire with only 1 IDK field; fired: ${w}`);
+});
+
+test('Methodology #8: Scorekeeping-gap SWOT co-exists with the existing Q2 setup-foundation scorekeeping SWOT', async () => {
+  /* Q2 fires on hasProductionGoal=no / knowsIfAhead=no.
+     Scorekeeping-gap fires on 2+ IDK fields.
+     Both should be present in the SWOT weaknesses list — separate signals. */
+  const body = await invokeMethodology({
+    benefits: BENEFITS_FULL,
+    idk: ['docDailyAvg', 'crownsPerMonth', 'hygDailyAvg'],
+    profileOverrides: { hasProductionGoal: 'no', knowsIfAhead: 'no' },
+  });
+  const q2 = body.data.swot.weaknesses.find(x => /weekly scorecard/i.test(x));
+  expect(q2, 'Q2 setup-foundation scorekeeping SWOT must still fire');
+  const newGap = body.data.swot.weaknesses.find(x => /You marked "I don't know" on/i.test(x));
+  expect(newGap, 'New scorekeeping-gap SWOT must also fire alongside Q2');
+  /* They are distinct entries — different opening text. */
+  expect(q2 !== newGap, 'Q2 and new SWOT should be distinct weakness entries');
+});
+
+test('Methodology #9: Hygiene team benefits label rewrite is verbatim in assessment_hub.html', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
+  expect(html.includes('Hygiene team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
+    'New verbose hygiene-benefits label not found in assessment_hub.html');
+  expect(html.includes('Staff team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
+    'New verbose staff-benefits label not found in assessment_hub.html');
+  /* Old accountant-shorthand labels must be gone. */
+  expect(!/<label>Hygiene Benefits \(monthly avg\)<\/label>/.test(html),
+    'Old "Hygiene Benefits (monthly avg)" label still present');
+  expect(!/<label>Staff Benefits \(monthly avg\)<\/label>/.test(html),
+    'Old "Staff Benefits (monthly avg)" label still present');
+});
+
+test('Methodology #10: painPoints inner sub-header reads "Your stated concerns" (carryover from 2a9d356 cleanup)', async () => {
+  const body = await invoke(null, {
+    concerns: ['more_profitable', 'overhead_high'],
+    biggestChallenge: 'Cleanup carryover.',
+  });
+  const html = body.reportHtml;
+  /* Outer h2 in template — "What you told us". */
+  expect(/<h2[^>]*class="section-title"[^>]*>\s*What you told us\s*<\/h2>/.test(html),
+    'Outer h2 should read exactly "What you told us"');
+  /* Inner orange-callout sub-header — "Your stated concerns" (no longer duplicates the h2). */
+  const innerMatch = html.match(/color:#e8872a[^>]*>([^<]+)</);
+  expect(innerMatch && innerMatch[1].trim() === 'Your stated concerns',
+    `inner sub-header should be "Your stated concerns"; got "${innerMatch ? innerMatch[1].trim() : '(no match)'}"`);
+  /* Verbatim "What you told us" must appear ONLY in the outer h2, not inside
+     the orange-callout block. Anchor on the orange-callout opening div and
+     scan within it. */
+  const blockStart = html.indexOf('border-left:3px solid #e8872a');
+  expect(blockStart >= 0, 'painPoints block not found');
+  const blockSlice = html.slice(blockStart, blockStart + 600);
+  expect(!/What you told us/i.test(blockSlice),
+    'literal "What you told us" must not appear inside the orange-callout block (duplication regression guard)');
 });
 
 test('Label bug new #3: affirmative pain-points block uses ✓ checkmarks, no ⚠ warning iconography leaks in', async () => {

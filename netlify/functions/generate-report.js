@@ -355,6 +355,88 @@ function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
   return hygAnnual > 0 ? (hygAnnual / annualHygieneProduction) * 100 : null;
 }
 
+/* ─── Benefits Package evaluation (2026-04-28) ───
+   Reads the free-form benefits notes from employeeCosts.benefits and scores
+   each of seven criteria: 401K match ≥3%, employer medical, vacation ≥2 wk,
+   sick days ≥5, annual bonus, dental coverage, CE allowance. Returns the
+   per-criterion result + counts so the SWOT generator can emit a strength
+   ("all 7 met"), weakness ("2+ missing"), or skip entirely (one missing,
+   unknown — borderline).
+   Benefits fields are free-text (Sick Pay = "Per State law", 401K = "3%
+   match", etc.), so we parse pragmatically: extract the first number for
+   numeric thresholds, treat "no/none/n/a/0/empty" as the criterion missing,
+   and treat anything else non-empty as the criterion met for yes/no items. */
+function evaluateBenefitsPackage(benefits) {
+  const b = benefits || {};
+  const negativeRe = /^\s*(no|none|n\/a|na|not\s*offered|n\.a\.|—|-|–|0|0%)\s*$/i;
+  const isPresent = (s) => {
+    const v = String(s || '').trim();
+    if (!v) return false;
+    if (negativeRe.test(v)) return false;
+    return true;
+  };
+  const firstNumber = (s) => {
+    const m = String(s || '').match(/(-?\d+(?:\.\d+)?)/);
+    return m ? parseFloat(m[1]) : null;
+  };
+  /* "1 week after 1 year" → 1; "2 weeks" → 2; "10 days" treated as days/5 weekdays → 2 weeks. */
+  const parseVacationWeeks = (s) => {
+    const v = String(s || '').toLowerCase();
+    if (!v || negativeRe.test(v)) return null;
+    /* Days first — "10 days" should be ~2 weeks. */
+    const dayMatch = v.match(/(\d+(?:\.\d+)?)\s*day/);
+    if (dayMatch && !/week/.test(v)) return parseFloat(dayMatch[1]) / 5;
+    const weekMatch = v.match(/(\d+(?:\.\d+)?)\s*(?:week|wk)/);
+    if (weekMatch) return parseFloat(weekMatch[1]);
+    /* Bare number → assume weeks (matches "2", "1.5"). */
+    const n = firstNumber(v);
+    return n;
+  };
+  const k401Pct = (() => {
+    const v = String(b.k401 || '').toLowerCase();
+    if (!v || negativeRe.test(v)) return null;
+    /* "3% match", "matches 3%", "match up to 4%", "3% safe harbor". */
+    const m = v.match(/(\d+(?:\.\d+)?)\s*%/);
+    return m ? parseFloat(m[1]) : firstNumber(v);
+  })();
+  const sickDays = (() => {
+    const v = String(b.sick || '').toLowerCase();
+    if (!v || negativeRe.test(v)) return null;
+    /* "5 days/year" → 5; "Per State law" → null (can't verify). */
+    const m = v.match(/(\d+(?:\.\d+)?)\s*day/);
+    return m ? parseFloat(m[1]) : firstNumber(v);
+  })();
+  const vacationWeeks = parseVacationWeeks(b.vacation);
+  const criteria = [
+    { key: 'k401',     label: '401K with ≥3% employer match', met: k401Pct != null && k401Pct >= 3 },
+    { key: 'medical',  label: 'employer-paid medical insurance', met: isPresent(b.medical) },
+    { key: 'vacation', label: 'vacation ≥2 weeks',                met: vacationWeeks != null && vacationWeeks >= 2 },
+    { key: 'sick',     label: 'sick days ≥5',                    met: sickDays != null && sickDays >= 5 },
+    { key: 'bonus',    label: 'annual bonus structure',          met: isPresent(b.bonus) },
+    { key: 'dental',   label: 'dental coverage',                 met: isPresent(b.dental) },
+    { key: 'ce',       label: 'CE allowance',                    met: isPresent(b.ce) },
+  ];
+  const missing = criteria.filter(c => !c.met);
+  const metCount = criteria.length - missing.length;
+  /* "Has any benefits data?" — if every relevant field is empty, the practice
+     simply didn't fill in the benefits notes section. We treat that as
+     'unknown' so the SWOT (and the cross-methodology suppression with
+     Hygiene Department Ratio) doesn't fire. Without this, every test fixture
+     that omits benefits data would falsely trigger the WEAKNESS branch. */
+  const anyBenefitsData = ['k401','medical','vacation','sick','bonus','dental','ce']
+    .some(k => String(b[k] || '').trim().length > 0);
+  let state = 'unknown';
+  if (!anyBenefitsData)                  state = 'unknown';
+  else if (metCount === criteria.length) state = 'strong';
+  else if (missing.length >= 2)          state = 'weak';
+  else                                    state = 'borderline';   /* exactly one missing → no SWOT either way */
+  return {
+    criteria, missing, metCount, missingCount: missing.length, state,
+    /* Surface raw parsed values so the SWOT body can quote specifics. */
+    values: { k401Pct, vacationWeeks, sickDays },
+  };
+}
+
 /* ─── SWOT Analysis Generator ─── */
 function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, arPatient, arInsurance, practiceProfile, canonicalStaffPct, staffExHygPct, hygienistPct, hygieneNearFuturePreBooking, q5Inputs, overheadInputs, hygDeptRatioInputs, hygCapacityInputs, collTrendInputs) {
   /* practiceProfile carries survey answers — used for payor-mix + goals-absent rules */
@@ -771,6 +853,13 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
      paths to close it (raise $/day via empties/perio/adjuncts, or align
      compensation to production). Does NOT prescribe the how.
      Graceful degradation: null or zero on either side → no fire. */
+  /* Benefits Package evaluation (2026-04-28). Computed BEFORE the Hygiene
+     Department Ratio block because the ratio's "align comp" remedy path is
+     conditionally suppressed when benefits are weak — funding benefits is a
+     prerequisite for compensation realignment. */
+  const benefitsEval = evaluateBenefitsPackage(employeeCosts && employeeCosts.benefits);
+  const benefitsWeak = benefitsEval.state === 'weak';
+
   const hri = hygDeptRatioInputs || {};
   const hrCost = Number(hri.annualHygienistCost);
   const hrProd = Number(hri.annualHygieneProduction);
@@ -781,8 +870,58 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
       const fmt$ = n => '$' + Math.round(n).toLocaleString();
       const productionToHitBench = 3 * hrCost;
       const productionGap = productionToHitBench - hrProd;
-      hygDeptRatioWeakness = `Your hygiene department produces $${hrRatio.toFixed(2)} for every $1 of hygiene labor cost — against a 3:1 benchmark. At current hygiene wages of ${fmt$(hrCost)}, hitting 3:1 would require annual hygiene production of ${fmt$(productionToHitBench)} against the current ${fmt$(hrProd)}, a gap of roughly ${fmt$(productionGap)}. There are two structural paths to close that gap: raise hygiene $/day (through reducing empties, building a perio program, or adjunctive therapies like Arestin and laser perio), or align hygiene compensation to production. The numbers name the gap; they don't tell you which path fits this practice.`;
+      const lead = `Your hygiene department produces $${hrRatio.toFixed(2)} for every $1 of hygiene labor cost — against a 3:1 benchmark. At current hygiene wages of ${fmt$(hrCost)}, hitting 3:1 would require annual hygiene production of ${fmt$(productionToHitBench)} against the current ${fmt$(hrProd)}, a gap of roughly ${fmt$(productionGap)}.`;
+      /* Cross-methodology interaction (2026-04-28): when benefits are weak,
+         suppress the "align hygiene compensation to production" remedy path —
+         compensation realignment via benefits requires funding the benefits
+         package first. The other remedies (empties, perio program, adjuncts)
+         stay; only the comp-alignment alternative is replaced. */
+      const remedy = benefitsWeak
+        ? `The structural path to close that gap here is raising hygiene $/day (through reducing empties, building a perio program, or adjunctive therapies like Arestin and laser perio). Address the benefits gap above before pursuing hygiene comp realignment — funding benefits is the prerequisite.`
+        : `There are two structural paths to close that gap: raise hygiene $/day (through reducing empties, building a perio program, or adjunctive therapies like Arestin and laser perio), or align hygiene compensation to production. The numbers name the gap; they don't tell you which path fits this practice.`;
+      hygDeptRatioWeakness = `${lead} ${remedy}`;
     }
+  }
+
+  /* Benefits Package SWOT branches (2026-04-28). STRENGTH when all 7 criteria
+     are met; WEAKNESS when 2+ are missing; SKIP when exactly 1 is missing
+     (borderline — no firm signal either way) or when no benefits data was
+     supplied at all. The body of the weakness branch references the existing
+     Hygiene Department Ratio finding when both fire — names funding benefits
+     as the prerequisite to comp realignment. */
+  var benefitsStrength = '';
+  var benefitsWeakness = '';
+  if (benefitsEval.state === 'strong') {
+    const v = benefitsEval.values;
+    const matchTxt = v.k401Pct != null ? `${v.k401Pct}%` : '≥3%';
+    const vacTxt   = v.vacationWeeks != null ? `${v.vacationWeeks}` : '≥2';
+    const sickTxt  = v.sickDays != null ? `${v.sickDays}` : '≥5';
+    benefitsStrength = `Your benefits package — 401K with ${matchTxt} match, employer medical, ${vacTxt} weeks vacation, ${sickTxt} sick days, bonus structure, dental, and CE — clears every benchmark we score against. Strong benefits compress turnover risk and let you compete for hygiene talent against bigger groups.`;
+  } else if (benefitsEval.state === 'weak') {
+    const missingList = benefitsEval.missing.map(c => c.label).join(', ');
+    const ratioCrossRef = (typeof hygDeptRatioWeakness !== 'undefined' && hygDeptRatioWeakness)
+      ? ' This also constrains the remedies available when Hygiene Department Ratio is out of range — see below.'
+      : '';
+    benefitsWeakness = `Benefits package below market standard. Your benefits package is missing ${benefitsEval.missingCount} of the 7 components we benchmark against: ${missingList}. Weak benefits raise turnover risk and limit your ability to recruit hygiene against bigger groups.${ratioCrossRef}`;
+  }
+
+  /* "I don't know" scorekeeping-gap SWOT (2026-04-28). The questionnaire has
+     "I don't know" checkboxes on docDailyAvg, assocDailyAvg, hygDailyAvg, and
+     crownsPerMonth — the toggle stores the literal string 'idk'. Fires when
+     2+ are checked. Co-exists with the Q2 setup-foundation scorekeeping
+     SWOT — these are separate signals (Q2 fires on no-tracking-system; this
+     fires on tracking-but-owner-doesn't-know-the-number). */
+  const idkFields = [
+    { key: 'docDailyAvg',    label: 'doctor daily production target' },
+    { key: 'assocDailyAvg',  label: 'associate daily production target' },
+    { key: 'hygDailyAvg',    label: 'hygiene daily production target' },
+    { key: 'crownsPerMonth', label: 'monthly crown count' },
+  ];
+  const idkChecked = idkFields.filter(f => String(pp[f.key] || '').toLowerCase() === 'idk');
+  var scorekeepingGapWeakness = '';
+  if (idkChecked.length >= 2) {
+    const list = idkChecked.map(f => f.label).join(', ');
+    scorekeepingGapWeakness = `You marked "I don't know" on ${idkChecked.length} of our operational-tracking questions (${list}). Without knowing daily production targets, hygiene production benchmarks, or monthly crown count, the data foundation for diagnosing performance gaps and measuring improvement is incomplete. Building these tracking habits is the prerequisite for every other remedy in this report — you can't fix what you don't measure.`;
   }
 
   /* ── Hygiene Capacity SWOT (2026-04-23) — HIGH PRIORITY ─────────────────
@@ -864,11 +1003,17 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
   if (typeof hygDeptRatioWeakness        !== 'undefined' && hygDeptRatioWeakness)        highPriorityWeaknesses.push(hygDeptRatioWeakness);
   if (typeof hygCapWeaknesses            !== 'undefined' && hygCapWeaknesses.length)     highPriorityWeaknesses.push(...hygCapWeaknesses);
   if (typeof collectionsShrinkingWeakness !== 'undefined' && collectionsShrinkingWeakness) highPriorityWeaknesses.push(collectionsShrinkingWeakness);
+  if (typeof scorekeepingGapWeakness     !== 'undefined' && scorekeepingGapWeakness)     highPriorityWeaknesses.push(scorekeepingGapWeakness);
+  if (typeof benefitsWeakness            !== 'undefined' && benefitsWeakness)            highPriorityWeaknesses.push(benefitsWeakness);
   if (highPriorityWeaknesses.length > 0) {
     weaknesses.unshift(...highPriorityWeaknesses);
   }
   if (typeof hygCapStrengths !== 'undefined' && hygCapStrengths.length) {
     strengths.unshift(...hygCapStrengths);
+  }
+  /* Benefits Package strength sits among other strengths (no priority unshift). */
+  if (typeof benefitsStrength !== 'undefined' && benefitsStrength) {
+    strengths.push('Benefits package above market standard. ' + benefitsStrength);
   }
 
   /* ── THREATS ──
@@ -2236,7 +2381,7 @@ function renderReportHtml(data) {
   const hasPainPoints = concerns.length > 0 || biggestChallenge.length > 0;
   const painPointsHtml = hasPainPoints ? `
     <div style="background:linear-gradient(135deg,rgba(232,135,42,.08),rgba(232,135,42,.02));border-left:3px solid #e8872a;padding:16px 20px;border-radius:8px;margin-bottom:20px;">
-      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#e8872a;font-weight:700;margin-bottom:10px;">What you told us</div>
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#e8872a;font-weight:700;margin-bottom:10px;">Your stated concerns</div>
       ${concerns.length > 0 ? `
         <ul style="list-style:none;padding:0;margin:0 0 ${biggestChallenge ? '14px' : '0'} 0;">
           ${concerns.map(c => `<li style="padding:4px 0;color:#e2e8f0;">✓  ${htmlEscape(concernLabels[c] || c)}</li>`).join('')}
