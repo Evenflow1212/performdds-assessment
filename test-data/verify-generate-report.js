@@ -300,14 +300,21 @@ test('staff-cost decomposition: hygienistCostPct denominator is hygiene producti
   const k = body.data.kpis;
   const hygProd = body.data.production.byCategory.hygiene;
   const annualColl = body.data.collections.annualized;
-  /* Recompute from hygiene employee-cost fixture to verify denominator. */
+  /* Recompute under the 2026-04-29 worksheet × loading-factor methodology.
+     Smoke fixture's PL_STANDARD has 'Salaries & Wages|250000' +
+     'Payroll Taxes|25000' = $275k staff-related expense. annualWages =
+     staff (25+22+20)×160×12 + hyg (42+40)×136×12 = 128640 + 133824 =
+     $262,464. loading = 275000/262464 = 1.0478 (in bounds → pl-actual).
+     hygCost = 133824 × 1.0478 = $140,217.
+     hygienistCostPct = 140217 / hygProd ≈ 29.46%. */
   const hygWages = (42 * 136 + 40 * 136) * 12;
-  const hygBenefits = 1800 * 12;
-  const hygEmp = hygWages * 0.10;
-  const hygAnnual = hygWages + hygBenefits + hygEmp;
-  const expectedFromHyg = (hygAnnual / hygProd) * 100;
-  const expectedFromColl = (hygAnnual / annualColl) * 100;
-  expect(Math.abs(k.hygienistCostPct - expectedFromHyg) < 0.5, `hygienistCostPct=${k.hygienistCostPct} expected≈${expectedFromHyg} (from hygiene production=${hygProd})`);
+  const adminWages = (25 * 160 + 22 * 160 + 20 * 160) * 12;
+  const plStaffTotal = 250000 + 25000;
+  const loading = plStaffTotal / (adminWages + hygWages);
+  const hygCost = hygWages * loading;
+  const expectedFromHyg = (hygCost / hygProd) * 100;
+  const expectedFromColl = (hygCost / annualColl) * 100;
+  expect(Math.abs(k.hygienistCostPct - expectedFromHyg) < 0.5, `hygienistCostPct=${k.hygienistCostPct} expected≈${expectedFromHyg} (from hygiene production=${hygProd}, loading=${loading.toFixed(4)})`);
   /* If the denominator were collections, hygienistCostPct would equal this
      alternate value — assert it's DIFFERENT to prove the denominator. */
   expect(Math.abs(k.hygienistCostPct - expectedFromColl) > 1, `hygienistCostPct looks like it was divided by collections (${expectedFromColl}) not hygiene production (${expectedFromHyg})`);
@@ -701,7 +708,11 @@ test('Pigneri-scale probe: total staff cost ≈ 36%, opportunity ≈ (36-20)%×$
   expect(staffOpp, 'Pigneri: staff cost opp missing');
   const expectedSavings = annualColl * (k.staffCostPct / 100 - 0.20);
   expect(Math.abs(staffOpp.value - expectedSavings) < 1, `Pigneri opp ${staffOpp.value} != (${k.staffCostPct}-20)% × ${annualColl} = ${expectedSavings}`);
-  expect(staffOpp.value > 150000 && staffOpp.value < 300000, `Pigneri opp in 150k-300k band; got ${staffOpp.value}`);
+  /* Band widened 2026-04-29 — staff-cost methodology shifted from
+     wages+benefits+empCost overlay to wages × loading-factor. Pigneri's
+     PL-actual loading lands ~1.08, dropping staff cost % from ~36 to
+     ~31, which trims opp dollars proportionally. */
+  expect(staffOpp.value > 100000 && staffOpp.value < 300000, `Pigneri opp in 100k-300k band; got ${staffOpp.value}`);
   /* ── 5. Supplies text "6% target" (fixture at ~6.3%). ── */
   const supplyW = body.data.swot.weaknesses.find(x => /supply/i.test(x));
   if (supplyW) expect(/6% target/.test(supplyW), `Pigneri supplies must say "6% target", got: ${supplyW}`);
@@ -1384,7 +1395,12 @@ test('Hygiene Dept Ratio SWOT: FIRES at ratio 2.2 (wages $100k, prod $220k)', as
 });
 
 test('Hygiene Dept Ratio SWOT: AT THRESHOLD — ratio exactly 3.0 does NOT fire', async () => {
-  const res = await handler(hygRatioFixture({ targetHygWagesAnnual: 100000, targetHygProdAnnual: 300000 }));
+  /* 2026-04-29: bumped targetHygProdAnnual to 300100 to avoid an IEEE-754
+     edge where 300000 / (rate × 1920 × 1.10) lands a hair *below* 3.0 and
+     trips the strict `< 3` rule. The methodology rule is unchanged — at
+     the threshold, the SWOT must not fire — but the test fixture needs a
+     small margin to be FP-stable across loading-factor source paths. */
+  const res = await handler(hygRatioFixture({ targetHygWagesAnnual: 100000, targetHygProdAnnual: 300100 }));
   const data = JSON.parse(res.body).data;
   const w = findHygRatioWeakness(data);
   expect(!w, `Hygiene Dept Ratio SWOT should not fire at ratio=3.0 (strict < threshold); fired: ${w}`);
@@ -2435,9 +2451,19 @@ test('Methodology #5k: Hub form regression — old benefits free-text inputs are
   /* Tenure column inputs must be present on at least the office manager + RDH 1 rows. */
   expect(/id="ec_tenure_om"/.test(html),  'tenure input for Office Manager must be present');
   expect(/id="ec_tenure_h1"/.test(html),  'tenure input for RDH 1 must be present');
-  /* Existing methodology #9 label regression guard still holds. */
-  expect(html.includes('Hygiene team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
-    'verbose hygiene-benefits LOADED-COST label must still be present (separate from the policy-notes restructure)');
+  /* 2026-04-29: the verbose "Hygiene team benefits: monthly cost…" label
+     is now ALSO removed alongside the underlying ec_hyg_benefits input —
+     loading factor is modeled from the binary toggles + P&L, no manual
+     dollar overlay. Regression guard inverts: label must be ABSENT. */
+  expect(!html.includes('Hygiene team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
+    'verbose hygiene-benefits LOADED-COST label must be removed (input dropped 2026-04-29)');
+  expect(!html.includes('Staff team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
+    'verbose staff-benefits LOADED-COST label must be removed (input dropped 2026-04-29)');
+  /* Underlying inputs gone too. */
+  expect(!/id="ec_hyg_benefits"/.test(html), 'ec_hyg_benefits input must be removed');
+  expect(!/id="ec_staff_benefits"/.test(html), 'ec_staff_benefits input must be removed');
+  expect(!/id="ec_hyg_empcost"/.test(html), 'ec_hyg_empcost input must be removed');
+  expect(!/id="ec_staff_empcost"/.test(html), 'ec_staff_empcost input must be removed');
 });
 
 test('Methodology #6: Scorekeeping-gap SWOT fires when 2+ "I don\'t know" boxes are checked', async () => {
@@ -2481,19 +2507,28 @@ test('Methodology #8: Scorekeeping-gap SWOT co-exists with the existing Q2 setup
   expect(q2 !== newGap, 'Q2 and new SWOT should be distinct weakness entries');
 });
 
-test('Methodology #9: Hygiene team benefits label rewrite is verbatim in assessment_hub.html', () => {
+test('Methodology #9: All staff-cost overlay inputs + labels removed from assessment_hub.html (2026-04-29)', () => {
+  /* 2026-04-29 superseded the 2026-04-28 verbose-label rewrite by dropping
+     the underlying inputs entirely. Loading factor now comes from binary
+     toggles + P&L. Both the old accountant-shorthand labels AND the
+     verbose 2026-04-28 rewrites must now be absent. */
   const fs = require('fs');
   const path = require('path');
   const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
-  expect(html.includes('Hygiene team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
-    'New verbose hygiene-benefits label not found in assessment_hub.html');
-  expect(html.includes('Staff team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
-    'New verbose staff-benefits label not found in assessment_hub.html');
-  /* Old accountant-shorthand labels must be gone. */
+  /* Verbose 2026-04-28 rewrites — gone. */
+  expect(!html.includes('Hygiene team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
+    'Verbose hygiene-benefits label must be absent (input dropped 2026-04-29)');
+  expect(!html.includes('Staff team benefits: monthly cost of health insurance, retirement, and payroll taxes'),
+    'Verbose staff-benefits label must be absent (input dropped 2026-04-29)');
+  /* Original accountant-shorthand labels — also gone (already from 2026-04-28). */
   expect(!/<label>Hygiene Benefits \(monthly avg\)<\/label>/.test(html),
-    'Old "Hygiene Benefits (monthly avg)" label still present');
+    'Old "Hygiene Benefits (monthly avg)" label must remain absent');
   expect(!/<label>Staff Benefits \(monthly avg\)<\/label>/.test(html),
-    'Old "Staff Benefits (monthly avg)" label still present');
+    'Old "Staff Benefits (monthly avg)" label must remain absent');
+  expect(!/<label>Hygiene Employment Cost %<\/label>/.test(html),
+    'Old "Hygiene Employment Cost %" label must remain absent');
+  expect(!/<label>Staff Employment Cost %<\/label>/.test(html),
+    'Old "Staff Employment Cost %" label must remain absent');
 });
 
 test('Methodology #10: painPoints inner sub-header reads "Your stated concerns" (carryover from 2a9d356 cleanup)', async () => {
@@ -2539,6 +2574,280 @@ test('Label bug new #3: affirmative pain-points block uses ✓ checkmarks, no �
      the affirmative block — that's reserved for a future contradictions block. */
   expect(!/⚠/.test(blockSlice),
     'painPoints block must not contain ⚠ warning iconography (reserved for future contradictions block)');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Staff cost from worksheet × loading factor (2026-04-29).
+   Replaces the 4-input numeric overlay (staffBenefits$ + staffEmpCostPct +
+   hygBenefits$ + hygEmpCostPct) with: staff worksheet wages × loading
+   factor, where loading is sourced from the P&L when available (sanity-
+   bounded 1.0–1.5) or modeled from the binary benefits toggles otherwise.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Loading-factor + staff-cost helpers exported from generate-report.js
+   for unit testing without invoking the full handler. */
+const {
+  modeledLoadingFactor: _modeledLoadingFactor,
+  annualWageSum:        _annualWageSum,
+  staffCostFromPL:      _staffCostFromPL,
+  actualLoadingFactor:  _actualLoadingFactor,
+  deriveStaffCosts:     _deriveStaffCosts,
+} = require(require('path').resolve(__dirname, '..', 'netlify', 'functions', 'generate-report.js'));
+
+test('Staff Cost #1: modeledLoadingFactor returns 1.10 when all benefits null', () => {
+  expect(Math.abs(_modeledLoadingFactor(null) - 1.10) < 1e-9,
+    `null benefits should yield 1.10; got ${_modeledLoadingFactor(null)}`);
+  expect(Math.abs(_modeledLoadingFactor({}) - 1.10) < 1e-9,
+    `empty benefits should yield 1.10; got ${_modeledLoadingFactor({})}`);
+  expect(Math.abs(_modeledLoadingFactor({ medical: null, k401: null, bonus: null, dental: null, ce: null }) - 1.10) < 1e-9,
+    'all-null toggles should yield 1.10');
+});
+
+test('Staff Cost #2: modeledLoadingFactor returns 1.27 when all 5 cost-loading toggles = yes', () => {
+  /* medical 0.07 + k401 0.04 + bonus 0.03 + dental 0.02 + ce 0.01 = +0.17 over 1.10 = 1.27. */
+  const factor = _modeledLoadingFactor({
+    medical: 'yes', k401: 'yes', bonus: 'yes', dental: 'yes', ce: 'yes',
+  });
+  expect(Math.abs(factor - 1.27) < 1e-9, `all-yes cost-loading should yield 1.27; got ${factor}`);
+});
+
+test('Staff Cost #3: modeledLoadingFactor weights vacation/holidays as 0 (already in wages)', () => {
+  /* Vacation + holidays = yes, all cost-loading = no → factor stays at 1.10. */
+  const factor = _modeledLoadingFactor({
+    vacation: 'yes', holidays: 'yes',
+    medical: 'no', k401: 'no', bonus: 'no', dental: 'no', ce: 'no',
+  });
+  expect(Math.abs(factor - 1.10) < 1e-9,
+    `vacation+holidays should not change loading; got ${factor}`);
+});
+
+test('Staff Cost #4: actualLoadingFactor returns null when P&L is null', async () => {
+  /* End-to-end check: drop plText so plData is null; loadingSource should
+     be 'modeled-from-toggles' regardless of staff content. */
+  const evt = JSON.parse(buildEvent().body);
+  delete evt.plText;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(data.kpis.staffCostLoadingSource === 'modeled-from-toggles',
+    `expected modeled when no P&L; got ${data.kpis.staffCostLoadingSource}`);
+});
+
+test('Staff Cost #5: actualLoadingFactor returns null when wages = 0 (empty staff table)', async () => {
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = { staff: [], hygiene: [], benefits: { medical: 'yes' } };
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  /* Empty worksheet — totalCost null, loadingSource null, staffCostPct null. */
+  expect(data.kpis.staffCostPct == null, `expected null staffCostPct; got ${data.kpis.staffCostPct}`);
+  expect(data.kpis.staffCostLoadingSource == null, `loadingSource null when no wages`);
+});
+
+test('Staff Cost #6: actualLoadingFactor returns the P&L-derived factor in sanity bounds', async () => {
+  /* Fixture: wages staff $400k, hygiene $0, P&L staff line $440k → 1.10 actual. */
+  const evt = JSON.parse(buildEvent().body);
+  /* Single staff entry sized so wages = exactly $400k.  rate × 160 × 12 =
+     400000  →  rate = 400000 / 1920 = 208.333...  */
+  evt.employeeCosts = {
+    staff: [{ rate: 208.333333333, hours: 160 }],
+    hygiene: [],
+    benefits: {},
+  };
+  evt.plText = [
+    'TOTAL_INCOME|2000000','TOTAL_EXPENSE|1500000','NET_INCOME|500000',
+    'SECTION|Income','Sales|2000000',
+    'SECTION|Expense',
+    'Salaries & Wages|400000', 'Payroll Taxes|40000',
+  ].join('\n');
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(data.kpis.staffCostLoadingSource === 'pl-actual',
+    `expected pl-actual; got ${data.kpis.staffCostLoadingSource}`);
+  expect(Math.abs(data.kpis.staffCostLoadingFactor - 1.10) < 0.01,
+    `factor should be ~1.10; got ${data.kpis.staffCostLoadingFactor}`);
+});
+
+test('Staff Cost #7: actualLoadingFactor returns null when loading > 1.5 (sanity-fail → modeled fallback)', async () => {
+  /* Tiny worksheet wages, huge P&L staff total — implausible loading > 1.5
+     should reject the P&L pull and fall back to modeled. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = {
+    staff: [{ rate: 10, hours: 160 }],   /* wages = $19,200 */
+    hygiene: [],
+    benefits: {},
+  };
+  evt.plText = [
+    'TOTAL_INCOME|2000000','TOTAL_EXPENSE|1500000','NET_INCOME|500000',
+    'SECTION|Expense',
+    'Salaries & Wages|400000','Payroll Taxes|40000',  /* loading would be ~22.9× */
+  ].join('\n');
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(data.kpis.staffCostLoadingSource === 'modeled-from-toggles',
+    `out-of-bounds P&L should fall back to modeled; got ${data.kpis.staffCostLoadingSource}`);
+  expect(Math.abs(data.kpis.staffCostLoadingFactor - 1.10) < 1e-9,
+    `modeled factor with no toggles → 1.10; got ${data.kpis.staffCostLoadingFactor}`);
+});
+
+test('Staff Cost #8: canonicalStaffCostPct uses P&L actual loading when present', async () => {
+  /* admin $400k wages, hyg $200k wages, P&L staff $750k → loading 1.25,
+     totalCost $750k. Collections $2.5M → staffCostPct 30.0%. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = {
+    staff:   [{ rate: 208.333333333, hours: 160 }],   /* $400k */
+    hygiene: [{ rate: 104.166666667, hours: 160 }],   /* $200k */
+    benefits: {},
+  };
+  evt.collText = ['DATES| 01/01/2025 - 12/31/2025','CHARGES|2750000','PAYMENTS|2500000'].join('\n');
+  evt.plText = [
+    'TOTAL_INCOME|2500000','TOTAL_EXPENSE|2000000','NET_INCOME|500000',
+    'SECTION|Expense',
+    'Salaries & Wages|700000','Payroll Taxes|50000',
+  ].join('\n');
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(data.kpis.staffCostLoadingSource === 'pl-actual', 'expected pl-actual');
+  expect(Math.abs(data.kpis.staffCostLoadingFactor - 1.25) < 0.01,
+    `loading should be ~1.25; got ${data.kpis.staffCostLoadingFactor}`);
+  expect(Math.abs(data.kpis.staffCostPct - 30.0) < 0.5,
+    `staffCostPct should be ~30%; got ${data.kpis.staffCostPct}`);
+});
+
+test('Staff Cost #9: canonicalStaffCostPct uses modeled loading when P&L absent', async () => {
+  /* Same wages, no P&L, all-yes benefits → loading 1.27. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = {
+    staff:   [{ rate: 208.333333333, hours: 160 }],
+    hygiene: [{ rate: 104.166666667, hours: 160 }],
+    benefits: { medical: 'yes', k401: 'yes', bonus: 'yes', dental: 'yes', ce: 'yes' },
+  };
+  evt.collText = ['DATES| 01/01/2025 - 12/31/2025','CHARGES|2750000','PAYMENTS|2500000'].join('\n');
+  delete evt.plText;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(data.kpis.staffCostLoadingSource === 'modeled-from-toggles', 'expected modeled');
+  expect(Math.abs(data.kpis.staffCostLoadingFactor - 1.27) < 0.01,
+    `loading should be 1.27 (all-yes); got ${data.kpis.staffCostLoadingFactor}`);
+  /* totalCost = 600000 × 1.27 = 762000; pct = 762000 / 2500000 = 30.48%. */
+  expect(Math.abs(data.kpis.staffCostPct - 30.48) < 0.5,
+    `staffCostPct should be ~30.48%; got ${data.kpis.staffCostPct}`);
+});
+
+test('Staff Cost #10: staffCostExHygPct splits correctly by wage proportion', async () => {
+  /* admin $400k wages, hyg $200k wages, all-yes benefits (loading 1.27),
+     no P&L → adminCost = 400k × 1.27 = $508k. exHyg vs $2.5M coll = 20.32%. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = {
+    staff:   [{ rate: 208.333333333, hours: 160 }],
+    hygiene: [{ rate: 104.166666667, hours: 160 }],
+    benefits: { medical: 'yes', k401: 'yes', bonus: 'yes', dental: 'yes', ce: 'yes' },
+  };
+  evt.collText = ['DATES| 01/01/2025 - 12/31/2025','CHARGES|2750000','PAYMENTS|2500000'].join('\n');
+  delete evt.plText;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(Math.abs(data.kpis.staffCostExHygPct - 20.32) < 0.5,
+    `exHyg should be ~20.32%; got ${data.kpis.staffCostExHygPct}`);
+});
+
+test('Staff Cost #11: hygienistCostPct denominator is hygiene production (not collections)', async () => {
+  /* hyg wages $200k, all-yes benefits → hygCost $254k. Engineer hygiene
+     production to $700k via D1110 quantity. Expected pct ≈ 36.3%. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.prodText = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D0150|Comp Eval|400|36000',
+    'D1110|Adult Prophy|2400|700000',  /* hygiene = $700k */
+    'D2740|Crown|140|420000',
+  ].join('\n');
+  evt.employeeCosts = {
+    staff:   [{ rate: 208.333333333, hours: 160 }],
+    hygiene: [{ rate: 104.166666667, hours: 160 }],
+    benefits: { medical: 'yes', k401: 'yes', bonus: 'yes', dental: 'yes', ce: 'yes' },
+  };
+  evt.collText = ['DATES| 01/01/2025 - 12/31/2025','CHARGES|1300000','PAYMENTS|1156000'].join('\n');
+  delete evt.plText;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  /* hygCost = 200000 × 1.27 = 254000; hygProd = 700000; pct = 36.286 */
+  expect(Math.abs(data.kpis.hygienistCostPct - 36.29) < 0.5,
+    `hygienistCostPct should be ~36.29%; got ${data.kpis.hygienistCostPct}`);
+});
+
+test('Staff Cost #12: loading source field is exposed in the data payload', async () => {
+  /* P&L present → pl-actual. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = { staff: [{ rate: 208.333333333, hours: 160 }], hygiene: [], benefits: {} };
+  evt.plText = [
+    'TOTAL_INCOME|2000000','TOTAL_EXPENSE|1500000','NET_INCOME|500000',
+    'SECTION|Expense','Salaries & Wages|400000','Payroll Taxes|40000',
+  ].join('\n');
+  let res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  let data = JSON.parse(res.body).data;
+  expect(data.kpis.staffCostLoadingSource === 'pl-actual', `pl-actual when P&L drives; got ${data.kpis.staffCostLoadingSource}`);
+  expect(data.financials.staffCostLoadingSource === 'pl-actual', 'financials.staffCostLoadingSource also surfaced');
+  /* No P&L → modeled. */
+  delete evt.plText;
+  res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  data = JSON.parse(res.body).data;
+  expect(data.kpis.staffCostLoadingSource === 'modeled-from-toggles', 'modeled when toggles drive');
+});
+
+test('Staff Cost #13: SWOT staff-cost weakness still fires correctly with new compute (>20%)', async () => {
+  /* Smoke fixture (PL_STANDARD has $275k staff line) yields ~31% staffCostPct.
+     The 20% benchmark weakness must still fire under the new path. */
+  const body = await invoke();
+  const w = body.data.swot.weaknesses.find(x => /total staff cost at/i.test(x));
+  expect(w, 'staff-cost weakness must fire on smoke fixture (>20%): ' + JSON.stringify(body.data.swot.weaknesses.slice(0, 6)));
+  expect(/20% benchmark/.test(w), 'weakness must reference 20% benchmark');
+});
+
+test('Staff Cost #14: SWOT staff-cost weakness does NOT fire when staff worksheet empty', async () => {
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = { staff: [], hygiene: [], benefits: {} };
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  /* totalCost null → staffCostPct null → weakness can't fire on a null
+     comparison. */
+  const w = data.swot.weaknesses.find(x => /total staff cost at \d/i.test(x));
+  expect(!w, `weakness must not fire when staff worksheet empty; fired: ${w}`);
+});
+
+test('Staff Cost #15: backward-compat — old fixtures with ec_staff_benefits / staffEmpCostPct still work (fields ignored)', async () => {
+  /* Fixture passes the dropped fields verbatim — handler must accept,
+     ignore them, and produce a valid response (no thrown error). */
+  const evt = JSON.parse(buildEvent().body);
+  evt.employeeCosts = Object.assign({}, evt.employeeCosts, {
+    staffBenefits: 5000, staffEmpCostPct: 0.15,
+    hygBenefits: 2000, hygEmpCostPct: 0.12,
+  });
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  expect(res.statusCode === 200, 'handler must accept legacy fields without erroring');
+  const data = JSON.parse(res.body).data;
+  expect(data.kpis.staffCostPct != null, 'staffCostPct still computes when legacy fields are present');
+});
+
+test('Staff Cost #16: Hyg Dept Ratio cross-suppression with benefits weakness still works (sanity integration)', async () => {
+  /* Combine a ratio-tripping fixture with 2+ "no" benefits — the prior
+     batch's cross-suppression must continue working under the new
+     loading-factor compute. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.prodText = [
+    'DATE RANGE: 01/01/2025 - 12/31/2025',
+    'D0120|Periodic Eval|1200|78000',
+    'D1110|Prophy|2400|120000',
+    'D2740|Crown|140|420000',
+  ].join('\n');
+  evt.employeeCosts = Object.assign({}, evt.employeeCosts, {
+    benefits: { holidays: 'yes', vacation: 'yes', bonus: 'yes', k401: 'yes', medical: 'yes', dental: 'no', ce: 'no' },
+  });
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const ratioW = data.swot.weaknesses.find(x => /hygiene department produces \$[\d.]+ for every \$1 of hygiene labor cost/i.test(x));
+  expect(ratioW, 'Hyg Dept Ratio weakness must fire on this fixture');
+  expect(!/align hygiene compensation to production/i.test(ratioW),
+    'cross-suppression must still hide align-comp remedy when benefits.no.length >= 2');
+  expect(/Address the benefits gap above/i.test(ratioW),
+    'replacement text must still appear');
 });
 
 (async () => {

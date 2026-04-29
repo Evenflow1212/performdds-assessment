@@ -1091,17 +1091,6 @@
           <tr><td class="pos-label">Back 5</td><td><input type="text" id="ec_name_b5" placeholder="First Name Only"></td><td><input type="number" id="ec_rate_b5" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_b5" placeholder="0"></td><td><input type="text" id="ec_tenure_b5" placeholder=""></td></tr>
         </tbody>
       </table>
-      <div class="flex-row">
-        <div>
-          <label>Staff team benefits: monthly cost of health insurance, retirement, and payroll taxes</label>
-          <input type="number" id="ec_staff_benefits" placeholder="0.00" step="0.01">
-        </div>
-        <div>
-          <label>Staff employment cost % (employer share of FICA, unemployment, and workers' comp on top of wages)</label>
-          <input type="number" id="ec_staff_empcost" placeholder="10" step="1" value="10">
-        </div>
-      </div>
-
       <div class="form-section-label">Hygiene Staff</div>
       <table class="form-table" id="hygTable">
         <thead><tr><th>Position</th><th>Name</th><th>Hourly Rate</th><th>Hours / Month</th><th>How long with the practice</th></tr></thead>
@@ -1113,17 +1102,6 @@
           <tr><td class="pos-label">RDH 5</td><td><input type="text" id="ec_name_h5" placeholder="First Name Only"></td><td><input type="number" id="ec_rate_h5" placeholder="0.00" step="0.01"></td><td><input type="number" id="ec_hrs_h5" placeholder="0"></td><td><input type="text" id="ec_tenure_h5" placeholder=""></td></tr>
         </tbody>
       </table>
-      <div class="flex-row">
-        <div>
-          <label>Hygiene team benefits: monthly cost of health insurance, retirement, and payroll taxes</label>
-          <input type="number" id="ec_hyg_benefits" placeholder="0.00" step="0.01">
-        </div>
-        <div>
-          <label>Hygiene employment cost % (employer share of FICA, unemployment, and workers' comp on top of wages)</label>
-          <input type="number" id="ec_hyg_empcost" placeholder="10" step="1" value="10">
-        </div>
-      </div>
-
       <div class="form-section-label">Benefits Policy Notes</div>
       <div class="q-hint" style="font-size:0.82rem;color:var(--text-muted);margin-bottom:10px;">Do you offer each of these? Skip any you're not sure about — only "yes" and "no" answers feed the SWOT.</div>
       <table class="form-table" id="benefitsTable">
@@ -1654,12 +1632,10 @@ function collectEmployeeCosts() {
   })).filter(p => p.name || p.rate || p.hours || p.tenureYears != null);
   return {
     staff, hygiene,
-    staffBenefits: gn('ec_staff_benefits'),
-    staffEmpCostPct: gn('ec_staff_empcost') / 100 || 0.10,
-    hygBenefits: gn('ec_hyg_benefits'),
-    hygEmpCostPct: gn('ec_hyg_empcost') / 100 || 0.10,
-    /* Benefits Policy Notes restructured 2026-04-29: 7 yes/no toggles,
-       no Sick Pay, no Other. Each value is 'yes' | 'no' | null. */
+    /* Benefits Policy Notes — 7 yes/no toggles. Each value is
+       'yes' | 'no' | null. The backend uses these to model the
+       loading factor (modeledLoadingFactor) when no P&L is available
+       and to fire per-field benefits SWOT bullets (c1a58ae). */
     benefits: {
       holidays: radioVal('ec_ben_holidays_yn'),
       vacation: radioVal('ec_ben_vacation_yn'),

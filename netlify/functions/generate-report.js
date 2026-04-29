@@ -307,52 +307,150 @@ function plCategory(item) {
   return 'M';
 }
 
-/* Role-scoped annualized staff cost: wages + benefits×12 + wages × empCostPct.
-   Called separately for the admin/clinical `staff` and the `hygiene` arrays
-   so Dave's three-way decomposition (admin-only, hygienist-only, total) can
-   use a single source of truth. */
-function staffRoleAnnualCost(arr, benefits, empCostPct) {
-  const wages = (arr || []).reduce((s, p) => s + (Number(p.rate) || 0) * (Number(p.hours) || 0) * 12, 0);
-  const benefitsAnnual = (Number(benefits) || 0) * 12;
-  const empCosts = wages * (Number(empCostPct) || 0);
-  return wages + benefitsAnnual + empCosts;
+/* ─── Staff cost computation (2026-04-29 — worksheet × loading factor) ───
+   Replaces the prior 4-input overlay (staffBenefits$ + staffEmpCostPct +
+   hygBenefits$ + hygEmpCostPct). Dentists weren't filling those numeric
+   fields reliably, so we now derive total staff cost from the wage worksheet
+   alone × a loading factor that comes from one of two sources:
+
+     1. P&L actual — when a P&L is uploaded, sum the staff-related expense
+        line items (wages, salaries, payroll taxes/fees, uniforms, 401K /
+        retirement, bonus, but NOT associate/owner/doctor comp) and divide
+        by total wages-from-worksheet to get the practice's actual loading.
+        Sanity-bounded to [1.0, 1.5]; outside that range distrust the P&L
+        pull (likely categorization issue) and fall back to modeled.
+
+     2. Modeled from binary-toggle benefits — base 1.10 covers payroll taxes
+        (FICA + unemployment + workers' comp ≈ 10% of wages, near-universal
+        in dental). Each cost-loading benefit toggle that's "yes" adds a
+        fixed weight on top: medical 7%, k401 4%, bonus 3%, dental 2%, CE 1%.
+        Vacation and holidays don't load — paid time off is already counted
+        in wages. All-yes ceiling: 1.27. All-no / null floor: 1.10. */
+
+const BENEFITS_LOADING_WEIGHTS = {
+  medical:  0.07,   /* health insurance premiums — the big one */
+  k401:     0.04,   /* employer 401K match */
+  bonus:    0.03,   /* annual bonus structure */
+  dental:   0.02,   /* dental coverage (often in-house) */
+  ce:       0.01,   /* CE allowance */
+  /* vacation + holidays excluded — already in wages line */
+};
+const BASE_LOADING = 1.10;
+
+function modeledLoadingFactor(benefits) {
+  let load = BASE_LOADING - 1.0;  /* 0.10 payroll-tax cushion */
+  if (benefits) {
+    for (const [key, weight] of Object.entries(BENEFITS_LOADING_WEIGHTS)) {
+      if (benefits[key] === 'yes') load += weight;
+      /* 'no' or null adds nothing — null benefits assumed missing for
+         loading-factor purposes (the per-field SWOT separately distinguishes
+         null from no). */
+    }
+  }
+  return 1.0 + load;
 }
 
-/* Canonical TOTAL staff-cost-% calc: admin + hygiene, all annualized, divided
-   by annualized collections. Kept for backward compat and industry-reference
-   benchmarking (25-28%). Per Dave's methodology this is NOT the primary
-   coaching metric — use staffCostExHygPct + hygienistCostPct instead. */
-function canonicalStaffCostPct(employeeCosts, annualCollections) {
-  if (!employeeCosts || !(annualCollections > 0)) return null;
-  const staffAnnual =
-    staffRoleAnnualCost(employeeCosts.staff,   employeeCosts.staffBenefits, employeeCosts.staffEmpCostPct) +
-    staffRoleAnnualCost(employeeCosts.hygiene, employeeCosts.hygBenefits,   employeeCosts.hygEmpCostPct);
-  return staffAnnual > 0 ? (staffAnnual / annualCollections) * 100 : null;
+function annualWageSum(arr) {
+  return (arr || []).reduce(
+    (s, p) => s + (Number(p.rate) || 0) * (Number(p.hours) || 0) * 12,
+    0
+  );
+}
+
+function staffCostFromPL(plData) {
+  if (!plData || !Array.isArray(plData.items)) return null;
+  let sum = 0, hit = false;
+  for (const it of plData.items) {
+    if (it.section !== 'Expense') continue;
+    const item = it.item || '';
+    /* Sum wages, salary, payroll tax, payroll fee, uniform/laundry,
+       retirement/401K, bonus. Mirrors the categorizer's H/I buckets. */
+    const isStaff = (
+      /payroll.*(wage|salar)|\bwages?\b|\bsalary\b|\bsalaries\b/i.test(item) ||
+      /payroll.*tax/i.test(item) ||
+      /payroll.*fee/i.test(item) ||
+      /uniform|laundry/i.test(item) ||
+      /401k|retirement/i.test(item) ||
+      /\bbonus\b/i.test(item)
+    );
+    if (!isStaff) continue;
+    /* Exclude provider compensation — those lines often match \bwages?\b
+       but they're owner / associate draws, not staff cost. */
+    if (/\bassociate\b/i.test(item) ||
+        /\bdoctor\b|\bdr\b|\bowner\b/i.test(item)) continue;
+    sum += Number(it.amount) || 0;
+    hit = true;
+  }
+  return hit ? sum : null;
+}
+
+function actualLoadingFactor(employeeCosts, plData) {
+  const wages = annualWageSum(employeeCosts && employeeCosts.staff)
+              + annualWageSum(employeeCosts && employeeCosts.hygiene);
+  if (!(wages > 0)) return null;
+  const plTotal = staffCostFromPL(plData);
+  if (plTotal == null) return null;
+  const loading = plTotal / wages;
+  /* Sanity bound: real loading factors fall in 1.0–1.5. Outside that range
+     distrust the P&L pull (likely categorization issue) and let the modeled
+     factor take over. */
+  if (loading < 1.0 || loading > 1.5) return null;
+  return loading;
+}
+
+function resolveLoadingFactor(employeeCosts, plData) {
+  const actual = actualLoadingFactor(employeeCosts, plData);
+  if (actual != null) return { factor: actual, source: 'pl-actual' };
+  const modeled = modeledLoadingFactor(employeeCosts && employeeCosts.benefits);
+  return { factor: modeled, source: 'modeled-from-toggles' };
+}
+
+function deriveStaffCosts(employeeCosts, plData) {
+  const adminWages   = annualWageSum(employeeCosts && employeeCosts.staff);
+  const hygieneWages = annualWageSum(employeeCosts && employeeCosts.hygiene);
+  if (adminWages <= 0 && hygieneWages <= 0) {
+    return { adminCost: null, hygieneCost: null, totalCost: null,
+             loadingFactor: null, loadingSource: null,
+             adminWages: 0, hygieneWages: 0 };
+  }
+  const { factor, source } = resolveLoadingFactor(employeeCosts, plData);
+  return {
+    adminCost:   adminWages   * factor,
+    hygieneCost: hygieneWages * factor,
+    totalCost:   (adminWages + hygieneWages) * factor,
+    loadingFactor: factor,
+    loadingSource: source,
+    adminWages, hygieneWages,
+  };
+}
+
+/* Canonical TOTAL staff-cost-% calc: admin + hygiene, divided by annualized
+   collections. Industry reference (target ≤20% per current methodology). */
+function canonicalStaffCostPct(employeeCosts, plData, annualCollections) {
+  if (!(annualCollections > 0)) return null;
+  const c = deriveStaffCosts(employeeCosts, plData);
+  return c.totalCost != null ? (c.totalCost / annualCollections) * 100 : null;
 }
 
 /* Admin + clinical staff cost as % of annualized collections — excludes the
-   hygiene array entirely. This isolates how efficiently the non-clinical
-   and non-hygiene team runs; hygiene days/week swing the total-staff figure
-   and muddy the signal. Target ≤15%, flag >18%. */
-function staffCostExHygPctCalc(employeeCosts, annualCollections) {
-  if (!employeeCosts || !(annualCollections > 0)) return null;
-  const adminAnnual = staffRoleAnnualCost(
-    employeeCosts.staff, employeeCosts.staffBenefits, employeeCosts.staffEmpCostPct
-  );
-  return adminAnnual > 0 ? (adminAnnual / annualCollections) * 100 : null;
+   hygiene array entirely. Diagnostic reference; isolates non-hygiene team
+   efficiency from hygiene-day-count swings. */
+function staffCostExHygPctCalc(employeeCosts, plData, annualCollections) {
+  if (!(annualCollections > 0)) return null;
+  const c = deriveStaffCosts(employeeCosts, plData);
+  return c.adminCost != null ? (c.adminCost / annualCollections) * 100 : null;
 }
 
 /* Hygienist wages as % of HYGIENE PRODUCTION (NOT total collections).
-   This normalizes for how many days/week the hygiene department runs —
-   a 5-day hygiene practice and a 3-day hygiene practice can have the same
-   underlying hygienist productivity but different total-staff ratios.
-   Target 30–33%, flag >38%. */
-function hygienistCostPctCalc(employeeCosts, annualHygieneProduction) {
-  if (!employeeCosts || !(annualHygieneProduction > 0)) return null;
-  const hygAnnual = staffRoleAnnualCost(
-    employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct
-  );
-  return hygAnnual > 0 ? (hygAnnual / annualHygieneProduction) * 100 : null;
+   Normalizes for how many days/week the hygiene department runs.
+   Diagnostic reference; the 3:1 production-to-labor benchmark lives in the
+   Hygiene Department Ratio SWOT. */
+function hygienistCostPctCalc(employeeCosts, plData, annualHygieneProduction) {
+  if (!(annualHygieneProduction > 0)) return null;
+  const c = deriveStaffCosts(employeeCosts, plData);
+  return c.hygieneCost != null
+    ? (c.hygieneCost / annualHygieneProduction) * 100
+    : null;
 }
 
 /* ─── Benefits summary (2026-04-29) ───
@@ -1430,21 +1528,19 @@ function computeReportData(input) {
   const patientPayPct = sourcesTotal > 0 ? (patientPayTotal / sourcesTotal) * 100 : 0;
   const profitPct = overheadPct != null ? 100 - overheadPct : null;
 
-  /* Staff cost — three metrics per Dave's methodology:
+  /* Staff cost (2026-04-29 — worksheet × loading factor):
        staffCostPct       = total (admin + hygiene) ÷ annualCollections  — industry reference
-       staffCostExHygPct  = admin/clinical only       ÷ annualCollections  — primary coaching anchor
-       hygienistCostPct   = hygiene wages             ÷ annualHygieneProd — isolates hygienist productivity
-     The last normalizes for how many days/week hygiene runs, so it's
-     apples-to-apples across practices with different hygiene footprints. */
-  const staffCostPct      = canonicalStaffCostPct(employeeCosts, annualCollections);
-  const staffCostExHygPct = staffCostExHygPctCalc(employeeCosts, annualCollections);
-  const hygienistCostPct  = hygienistCostPctCalc(employeeCosts, annualHyg);
-  /* Raw hygiene labor + production dollars — needed for the Hygiene
-     Department Ratio SWOT (2026-04-22). Exposed separately from the
-     percentage so the SWOT copy can cite both sides of the 3:1 benchmark. */
-  const annualHygienistCost = employeeCosts ? staffRoleAnnualCost(
-    employeeCosts.hygiene, employeeCosts.hygBenefits, employeeCosts.hygEmpCostPct
-  ) : 0;
+       staffCostExHygPct  = admin/clinical only       ÷ annualCollections  — diagnostic reference
+       hygienistCostPct   = hygiene wages             ÷ annualHygieneProd — diagnostic reference
+     Loading factor is sourced from the P&L when available (within sanity
+     bounds 1.0–1.5) or modeled from the binary benefits toggles otherwise. */
+  const staffCostPct      = canonicalStaffCostPct(employeeCosts, plData, annualCollections);
+  const staffCostExHygPct = staffCostExHygPctCalc(employeeCosts, plData, annualCollections);
+  const hygienistCostPct  = hygienistCostPctCalc(employeeCosts, plData, annualHyg);
+  /* deriveStaffCosts is called multiple times above; derive once for the
+     downstream consumers that need the raw dollars + loadingSource. */
+  const _staffCostBundle = deriveStaffCosts(employeeCosts, plData);
+  const annualHygienistCost = _staffCostBundle.hygieneCost || 0;
 
   /* ──── Hygiene Capacity Analysis (2026-04-23) ────
      Two independent active-patient estimates plus a days-required-vs-
@@ -1853,6 +1949,10 @@ function computeReportData(input) {
       staffCostPct,                   /* total — admin + hygiene, ÷ annualCollections (industry ref) */
       staffCostExHygPct,              /* admin/clinical only, ÷ annualCollections (primary coaching anchor) */
       hygienistCostPct,               /* hygiene-only, ÷ annualHygieneProduction (normalized) */
+      /* Staff cost provenance (2026-04-29) — also surfaced on financials so
+         the renderer doesn't have to dip into kpis for the footnote. */
+      staffCostLoadingSource: _staffCostBundle.loadingSource,
+      staffCostLoadingFactor: _staffCostBundle.loadingFactor,
       sourcesOfDollars: {
         dollars: sourcesOfDollars,
         percent: sourcesPct,
@@ -1887,6 +1987,20 @@ function computeReportData(input) {
       staffCostPct,
       staffCostExHygPct,
       hygienistCostPct,
+      /* Staff cost provenance (2026-04-29). loadingSource is either
+         'pl-actual' (P&L pulled, in-bounds) or 'modeled-from-toggles'
+         (P&L absent or out-of-bounds — modeled from binary benefits).
+         Surface to the renderer so the scorecard can footnote which
+         source drove the figures and build user trust. */
+      staffCostLoadingSource: _staffCostBundle.loadingSource,
+      staffCostLoadingFactor: _staffCostBundle.loadingFactor,
+      staffCostBundle: {
+        adminCost:   _staffCostBundle.adminCost,
+        hygieneCost: _staffCostBundle.hygieneCost,
+        totalCost:   _staffCostBundle.totalCost,
+        adminWages:  _staffCostBundle.adminWages,
+        hygieneWages: _staffCostBundle.hygieneWages,
+      },
       battingAverage,           /* visits ÷ crowns prepped (lower is better; sweet spot 4-6:1) */
       battingAverageInputs: {
         visitsCount,
@@ -2106,12 +2220,27 @@ function renderReportHtml(data) {
      financials section; these two are here to show WHERE the total cost
      lives (front-desk/admin vs hygiene), not as individually-benchmarked
      metrics. No color status; no "Target" phrasing. */
+  /* Loading-factor footnote (2026-04-29). Names whether the staff cost
+     figure was calibrated against the practice's P&L or modeled from the
+     binary benefits toggles. Rendered alongside the bench copy on each
+     staff-cost card so users can see at a glance whether the number is
+     estimated or actual. */
+  const loadingFootnote = (() => {
+    const src = kpis.staffCostLoadingSource;
+    const f   = kpis.staffCostLoadingFactor;
+    if (src == null || f == null) return '';
+    const fStr = f.toFixed(2);
+    if (src === 'pl-actual') {
+      return `<br><span style="font-size:11px;color:#94a3b8;">Loading factor calibrated from your P&amp;L (actual: ${fStr}× wages)</span>`;
+    }
+    return `<br><span style="font-size:11px;color:#94a3b8;">Loading factor modeled from your benefits selections (estimated: ${fStr}× wages). Upload a P&amp;L for actuals.</span>`;
+  })();
   if (kpis.staffCostExHygPct != null) {
     const v = kpis.staffCostExHygPct;
     scorecardCards.push({
       lbl: 'Staff Cost (Admin + Clinical)',
       val: v.toFixed(1) + '%',
-      bench: 'Front desk, OM, assistants &mdash; excludes hygiene &middot; diagnostic reference',
+      bench: 'Front desk, OM, assistants &mdash; excludes hygiene &middot; diagnostic reference' + loadingFootnote,
       status: '',
     });
   }
@@ -2123,7 +2252,7 @@ function renderReportHtml(data) {
       /* 2026-04-22: added the 3:1 benchmark note so the card framing lines
          up with the Hygiene Department Ratio SWOT copy — tiers and data
          source are unchanged. */
-      bench: '% of hygiene production &middot; diagnostic reference<br>Benchmark: hygiene produces at least $3 for every $1 of wages.',
+      bench: '% of hygiene production &middot; diagnostic reference<br>Benchmark: hygiene produces at least $3 for every $1 of wages.' + loadingFootnote,
       status: '',
     });
   }
@@ -2258,7 +2387,7 @@ function renderReportHtml(data) {
        the 2026-04-21 hybrid methodology. Target ≤20%; the admin/clinical
        and hygienist-ratio decomposition lives on the scorecard as
        benchmark-free diagnostic reference only. */
-    { lbl: 'Total Staff Cost (incl. hygiene)', val: (financials.staffCostPct != null && financials.staffCostPct > 0) ? financials.staffCostPct.toFixed(1) + '%' : '—', bench: 'Target <strong>&le;20%</strong> &middot; includes all staff + hygiene (excludes owner draws)', status: statusVs(financials.staffCostPct, 20, false) },
+    { lbl: 'Total Staff Cost (incl. hygiene)', val: (financials.staffCostPct != null && financials.staffCostPct > 0) ? financials.staffCostPct.toFixed(1) + '%' : '—', bench: 'Target <strong>&le;20%</strong> &middot; includes all staff + hygiene (excludes owner draws)' + loadingFootnote, status: statusVs(financials.staffCostPct, 20, false) },
   ];
   /* AR full aging table replaces the compact 90+ cards (Dave 2026-04-16: "show
      the AR as it ages: current, 30-60, 60-90, and over 90"). */
@@ -2998,6 +3127,13 @@ exports.parseCollections   = parseCollections;
 exports.parsePL            = parsePL;
 exports.parsePatientSummary = parsePatientSummary;
 exports.parseDaySheet      = parseDaySheet;
+/* Staff cost helpers (2026-04-29) — exposed for unit testing the loading-
+   factor logic without invoking the full handler. */
+exports.modeledLoadingFactor = modeledLoadingFactor;
+exports.annualWageSum        = annualWageSum;
+exports.staffCostFromPL      = staffCostFromPL;
+exports.actualLoadingFactor  = actualLoadingFactor;
+exports.deriveStaffCosts     = deriveStaffCosts;
 
 exports.handler = async function(event) {
   if (event.httpMethod === 'OPTIONS') {
