@@ -1,0 +1,6 @@
+# Block crawlers from the internal verification page.
+# /verify_8f3c2a1d7e9b.html is gated by a hidden hex suffix and must
+# never be indexed — it surfaces uploaded PDFs (potentially containing
+# patient names on AR aging reports) for QA inspection.
+User-agent: *
+Disallow: /verify_8f3c2a1d7e9b.html

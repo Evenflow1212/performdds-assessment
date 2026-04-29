@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<title>Internal Verification — DO NOT SHARE</title>
+<style>
+  :root {
+    --fg:#1a1a1a; --muted:#6b7280; --border:#d4d8dd; --bg:#f4f5f7;
+    --row-alt:#fafafa; --accent:#1e40af; --header:#111827;
+    --tab-bg:#e5e7eb; --tab-active:#1e40af; --warn:#b45309;
+    --warn-bg:#fff7ed; --bad:#b91c1c; --bad-bg:#fee2e2;
+    --good:#15803d; --good-bg:#dcfce7;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font:13px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Helvetica,Arial,sans-serif;
+         color:var(--fg); background:var(--bg); }
+  /* ─── Header ─── */
+  #pageHeader {
+    background:var(--header); color:#fff; padding:10px 18px;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    border-bottom:3px solid #c026d3;
+  }
+  #pageHeader strong { font-size:14px; letter-spacing:.04em; }
+  .pill {
+    display:inline-block; padding:2px 8px; border-radius:10px;
+    font-size:10px; font-weight:700; letter-spacing:.05em;
+    background:#c026d3; color:#fff;
+  }
+  #renderMeta { color:#cbd5e1; font-size:12px; margin-left:auto; }
+  /* ─── Layout ─── */
+  #wrap { display:flex; min-height:calc(100vh - 47px); }
+  #sidebar {
+    width:240px; background:#fff; border-right:1px solid var(--border);
+    flex:0 0 auto; overflow-y:auto; max-height:calc(100vh - 47px);
+  }
+  .side-h {
+    padding:10px 14px; font-size:11px; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--muted); font-weight:700;
+    border-bottom:1px solid var(--border); position:sticky; top:0;
+    background:#fff; z-index:1;
+  }
+  .render-item {
+    padding:10px 14px; border-bottom:1px solid #eef0f3; cursor:pointer;
+    transition:background .12s;
+  }
+  .render-item:hover { background:#f9fafb; }
+  .render-item.active { background:#eff6ff; border-left:3px solid var(--accent); padding-left:11px; }
+  .render-item .name { font-weight:600; color:var(--fg); margin-bottom:2px; }
+  .render-item .sub  { font-size:11px; color:var(--muted); }
+  #main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
+  /* ─── Tabs ─── */
+  #tabbar {
+    display:flex; gap:1px; padding:0 14px; background:var(--header);
+    overflow-x:auto;
+  }
+  .tab-btn {
+    padding:9px 14px; border:none; border-radius:6px 6px 0 0;
+    background:var(--tab-bg); color:#475569; font-size:11px;
+    font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    cursor:pointer; border-bottom:3px solid transparent;
+    flex:0 0 auto; white-space:nowrap;
+  }
+  .tab-btn:hover { background:#cbd5e1; }
+  .tab-btn.active { background:#fff; color:var(--tab-active); border-bottom-color:var(--tab-active); }
+  .tab-btn[disabled] { background:#3f4350; color:#6b7280; cursor:not-allowed; opacity:.55; }
+  /* ─── Pane ─── */
+  .pane { display:none; flex:1 1 auto; }
+  .pane.active { display:flex; }
+  .pane-left, .pane-right {
+    flex:1 1 0; padding:14px 18px; overflow-y:auto;
+    max-height:calc(100vh - 47px - 38px);
+  }
+  .pane-left  { border-right:1px solid var(--border); background:#fff; }
+  .pane-right { background:#fbfcfd; }
+  .pane-left h3, .pane-right h3 {
+    font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--muted); margin:0 0 8px; font-weight:700;
+  }
+  /* ─── PDF viewer ─── */
+  #pdfControls {
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+    padding:6px 8px; background:#f3f4f6; border-radius:6px;
+    font-size:12px;
+  }
+  #pdfControls button {
+    background:#fff; border:1px solid var(--border); border-radius:4px;
+    padding:4px 9px; font-size:12px; cursor:pointer;
+  }
+  #pdfControls button:hover { background:#f9fafb; }
+  #pdfControls button:disabled { opacity:.45; cursor:not-allowed; }
+  .pdf-canvas-wrap {
+    border:1px solid var(--border); border-radius:6px; overflow:auto;
+    max-height:calc(100vh - 180px); background:#e5e7eb;
+    text-align:center; padding:8px;
+  }
+  .pdf-canvas-wrap canvas { box-shadow:0 1px 4px rgba(0,0,0,.12); background:#fff; }
+  .img-wrap { border:1px solid var(--border); border-radius:6px; overflow:auto;
+              max-height:calc(100vh - 130px); background:#e5e7eb; padding:8px; }
+  .img-wrap img { max-width:100%; display:block; margin:0 auto; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+  .no-source {
+    padding:30px 16px; color:var(--muted); text-align:center;
+    background:#f9fafb; border:1px dashed var(--border); border-radius:6px;
+  }
+  /* ─── Tables ─── */
+  table.kv { width:100%; border-collapse:collapse; margin-bottom:14px; }
+  table.kv td { padding:5px 8px; border-bottom:1px solid #eef0f3; vertical-align:top; }
+  table.kv td:first-child { width:40%; color:var(--muted); }
+  table.kv td:last-child  { font-variant-numeric:tabular-nums; font-weight:500; }
+  table.list { width:100%; border-collapse:collapse; font-size:12px; }
+  table.list th, table.list td {
+    padding:5px 8px; border-bottom:1px solid #eef0f3; text-align:left;
+    vertical-align:top;
+  }
+  table.list th {
+    background:#f3f4f6; color:#475569; font-size:10px;
+    text-transform:uppercase; letter-spacing:.05em; font-weight:700;
+    position:sticky; top:0; z-index:1;
+  }
+  table.list td.num, table.list th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.flag-yellow td { background:#fefce8; }
+  /* ─── Misc ─── */
+  pre.json {
+    background:#1e293b; color:#cbd5e1; padding:14px; border-radius:6px;
+    font:12px/1.5 ui-monospace,SFMono-Regular,'SF Mono',Menlo,monospace;
+    overflow:auto; max-height:calc(100vh - 180px);
+  }
+  .empty {
+    padding:30px 16px; color:var(--muted); text-align:center;
+    border:1px dashed var(--border); border-radius:6px; background:#fff;
+  }
+  #footer {
+    padding:10px 18px; background:#fff; border-top:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12px; color:var(--muted);
+  }
+  #footer button, #footer a {
+    background:#fff; border:1px solid var(--border); border-radius:4px;
+    padding:4px 10px; font-size:12px; cursor:pointer; color:var(--fg);
+    text-decoration:none;
+  }
+  #footer button.danger { color:var(--bad); border-color:#fecaca; }
+  #footer button:hover { background:#f9fafb; }
+  .group-h { font-size:13px; font-weight:700; margin:14px 0 6px; color:var(--header); }
+</style>
+</head>
+<body>
+<div id="pageHeader">
+  <strong>Internal Verification</strong>
+  <span class="pill">DO NOT SHARE</span>
+  <span style="color:#9ca3af;font-size:12px;">parser-fidelity v1</span>
+  <span id="renderMeta"></span>
+</div>
+<div id="wrap">
+  <div id="sidebar">
+    <div class="side-h">Saved renders</div>
+    <div id="renderList"><div class="empty" style="margin:10px;">No renders saved yet — generate an assessment to populate this list.</div></div>
+  </div>
+  <div id="main">
+    <div id="tabbar">
+      <button class="tab-btn active" data-tab="pa">Practice Analysis</button>
+      <button class="tab-btn" data-tab="pl">P&amp;L</button>
+      <button class="tab-btn" data-tab="arP">AR Patient</button>
+      <button class="tab-btn" data-tab="arI">AR Insurance</button>
+      <button class="tab-btn" data-tab="ds-ytd">Day Sheet YTD</button>
+      <button class="tab-btn" data-tab="ds-ly">Day Sheet -1yr</button>
+      <button class="tab-btn" data-tab="ds-yb">Day Sheet -2yr</button>
+      <button class="tab-btn" data-tab="hyg">Hygiene Schedule</button>
+      <button class="tab-btn" data-tab="qst">Questionnaire</button>
+      <button class="tab-btn" data-tab="raw">Raw Data</button>
+    </div>
+    <div id="paneArea" style="flex:1;display:flex;overflow:hidden;">
+      <!-- panes injected by JS -->
+    </div>
+    <div id="footer">
+      <span id="footerLastSaved"></span>
+      <span style="display:flex;gap:8px;">
+        <button id="exportAllBtn">Export all renders (JSON)</button>
+        <button id="deleteRenderBtn" class="danger">Delete this render</button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- PDF.js v4 ESM build from cloudflare CDN. Loads as a module so we
+     can configure the worker URL inline. -->
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.mjs';
+window.__pdfjs = pdfjsLib;
+</script>
+
+<script>
+/* ─── IndexedDB read helpers (mirror the hub's writer) ─── */
+const VERIFY_DB_NAME = 'performdds-verify';
+const VERIFY_DB_VERSION = 1;
+const VERIFY_STORE = 'renders';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(VERIFY_DB_NAME, VERIFY_DB_VERSION);
+    req.onupgradeneeded = (ev) => {
+      const db = ev.target.result;
+      if (!db.objectStoreNames.contains(VERIFY_STORE)) {
+        const store = db.createObjectStore(VERIFY_STORE, { keyPath: 'id' });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+async function loadAll() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(VERIFY_STORE, 'readonly');
+    const store = tx.objectStore(VERIFY_STORE);
+    const out = [];
+    store.openCursor(null, 'prev').onsuccess = (ev) => {
+      const c = ev.target.result;
+      if (!c) { out.sort((a, b) => b.timestamp - a.timestamp); resolve(out); return; }
+      out.push(c.value); c.continue();
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function deleteRender(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(VERIFY_STORE, 'readwrite');
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(VERIFY_STORE).delete(id);
+  });
+}
+
+/* ─── State ─── */
+let renders = [];
+let activeRender = null;
+let activeTab = 'pa';
+let pdfState = { tabKey: null, pdf: null, page: 1, scale: 1.2 };
+
+/* ─── Helpers ─── */
+const fmt$  = n => (n == null || !isFinite(n)) ? '—' : '$' + Math.round(Number(n)).toLocaleString();
+const fmtInt= n => (n == null || !isFinite(n)) ? '—' : Math.round(Number(n)).toLocaleString();
+const fmtPct= n => (n == null || !isFinite(n)) ? '—' : Number(n).toFixed(1) + '%';
+const esc   = s => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+function timeAgo(ts) {
+  const d = (Date.now() - ts) / 1000;
+  if (d < 60)    return Math.floor(d) + 's ago';
+  if (d < 3600)  return Math.floor(d / 60) + 'm ago';
+  if (d < 86400) return Math.floor(d / 3600) + 'h ago';
+  return Math.floor(d / 86400) + 'd ago';
+}
+
+/* ─── Render selection ─── */
+function renderSidebar() {
+  const list = document.getElementById('renderList');
+  if (!renders.length) {
+    list.innerHTML = '<div class="empty" style="margin:10px;">No renders saved yet — generate an assessment to populate this list.</div>';
+    return;
+  }
+  list.innerHTML = renders.map(r => `
+    <div class="render-item ${activeRender && activeRender.id === r.id ? 'active' : ''}" data-id="${esc(r.id)}">
+      <div class="name">${esc(r.practiceName || 'Unnamed')}</div>
+      <div class="sub">${new Date(r.timestamp).toLocaleString()} · ${timeAgo(r.timestamp)}</div>
+    </div>
+  `).join('');
+  list.querySelectorAll('.render-item').forEach(el => {
+    el.addEventListener('click', () => switchRender(el.dataset.id));
+  });
+}
+
+function switchRender(id) {
+  const r = renders.find(x => x.id === id);
+  if (!r) return;
+  activeRender = r;
+  location.hash = 'render=' + id;
+  document.getElementById('renderMeta').textContent =
+    r.practiceName + ' · ' + new Date(r.timestamp).toLocaleString() + ' · ' +
+    Object.entries(r.uploads || {}).filter(([_, v]) => v).map(([k]) => k).join(', ');
+  document.getElementById('footerLastSaved').textContent =
+    'Last saved: ' + new Date(r.timestamp).toLocaleString();
+  renderSidebar();
+  updateTabAvailability();
+  renderPane(activeTab);
+}
+
+/* ─── Tab routing ─── */
+const TAB_TO_UPLOAD = {
+  'pa':     '1',    /* Practice Analysis */
+  'pl':     '3',    /* P&L */
+  'arP':    '4',    /* Patient AR */
+  'arI':    '5',    /* Insurance AR */
+  'ds-ytd': '2a',
+  'ds-ly':  '2b',
+  'ds-yb':  '2c',
+  /* hyg, qst, raw — no source upload */
+};
+
+function updateTabAvailability() {
+  const r = activeRender;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const t = btn.dataset.tab;
+    const uk = TAB_TO_UPLOAD[t];
+    if (!uk) { btn.disabled = false; return; }  /* form-data tabs always enabled */
+    const has = r && r.uploads && r.uploads[uk] && r.uploads[uk].base64;
+    /* For PA / PL / Day Sheet, also enabled when parsedData exists even
+       if upload is missing — Dave may have re-uploaded under a different
+       fixture key. Safest default: enable if we have any data for it. */
+    const hasParsed = (() => {
+      if (!r || !r.parsedData) return false;
+      if (t === 'pa') return Array.isArray(r.parsedData.production?.codes) && r.parsedData.production.codes.length > 0;
+      if (t === 'pl') return r.parsedData.financials?.plIncome != null;
+      if (t === 'arP') return r.parsedData.ar?.patient?.total != null;
+      if (t === 'arI') return r.parsedData.ar?.insurance?.total != null;
+      if (t === 'ds-ytd') return r.parsedData.collections?.daySheets?.ytd != null;
+      if (t === 'ds-ly')  return r.parsedData.collections?.daySheets?.lastYear != null;
+      if (t === 'ds-yb')  return r.parsedData.collections?.daySheets?.yearBefore != null;
+      return false;
+    })();
+    btn.disabled = !(has || hasParsed);
+  });
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    renderPane(activeTab);
+  });
+});
+
+/* ─── Pane rendering ─── */
+function renderPane(tab) {
+  const area = document.getElementById('paneArea');
+  area.innerHTML = '';
+  if (!activeRender) {
+    area.innerHTML = '<div class="empty" style="margin:30px;flex:1;">Pick a render from the sidebar.</div>';
+    return;
+  }
+  const pane = document.createElement('div');
+  pane.className = 'pane active';
+  const left  = document.createElement('div'); left.className  = 'pane-left';
+  const right = document.createElement('div'); right.className = 'pane-right';
+  pane.appendChild(left); pane.appendChild(right);
+  area.appendChild(pane);
+  /* Source pane (left). */
+  const uk = TAB_TO_UPLOAD[tab];
+  if (uk) {
+    const upload = activeRender.uploads && activeRender.uploads[uk];
+    if (upload && upload.base64) renderSource(left, upload, uk);
+    else left.innerHTML = '<div class="no-source">No source document for this tab — upload was skipped or unavailable.</div>';
+  } else if (tab === 'hyg') {
+    renderHygieneFormView(left);
+  } else if (tab === 'qst') {
+    renderQuestionnaireFormView(left);
+  } else if (tab === 'raw') {
+    left.innerHTML = '<h3>Notes</h3><div style="color:#6b7280;font-size:12px;">Raw view — full parsedData JSON on the right. Use this when no UI exists yet for a field, or for spot-checking.</div>';
+  }
+  /* Parsed-data pane (right). */
+  switch (tab) {
+    case 'pa':  renderPaParsed(right); break;
+    case 'pl':  renderPlParsed(right); break;
+    case 'arP': renderArParsed(right, 'patient'); break;
+    case 'arI': renderArParsed(right, 'insurance'); break;
+    case 'ds-ytd': renderDaySheetParsed(right, 'ytd'); break;
+    case 'ds-ly':  renderDaySheetParsed(right, 'lastYear'); break;
+    case 'ds-yb':  renderDaySheetParsed(right, 'yearBefore'); break;
+    case 'hyg':    renderHygieneEngineView(right); break;
+    case 'qst':    renderQuestionnaireParsed(right); break;
+    case 'raw':    renderRawJson(right); break;
+  }
+}
+
+/* ─── Source: PDF or image ─── */
+async function renderSource(container, upload, uk) {
+  const isPdf = upload.type === 'application/pdf';
+  const isImg = upload.type && upload.type.startsWith('image/');
+  if (isPdf) {
+    container.innerHTML = `
+      <h3>Source — ${esc(upload.name)} <span style="color:#9ca3af;font-weight:400;">(${(upload.size/1024).toFixed(0)} KB)</span></h3>
+      <div id="pdfControls">
+        <button id="prevPg">‹ Prev</button>
+        <span>Page <span id="pgCur">—</span> / <span id="pgMax">—</span></span>
+        <button id="nextPg">Next ›</button>
+        <span style="margin-left:auto;">
+          <button id="zoomOut">−</button>
+          <span id="zoomLvl">${Math.round(pdfState.scale * 100)}%</span>
+          <button id="zoomIn">+</button>
+        </span>
+      </div>
+      <div class="pdf-canvas-wrap"><canvas id="pdfCanvas"></canvas></div>
+    `;
+    pdfState.tabKey = uk;
+    pdfState.page = 1;
+    try {
+      const bin = atob(upload.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const pdfjs = window.__pdfjs;
+      if (!pdfjs) throw new Error('pdf.js not loaded yet');
+      const pdf = await pdfjs.getDocument({ data: bytes }).promise;
+      pdfState.pdf = pdf;
+      document.getElementById('pgMax').textContent = pdf.numPages;
+      await renderPdfPage();
+      document.getElementById('prevPg').onclick = () => { if (pdfState.page > 1) { pdfState.page--; renderPdfPage(); } };
+      document.getElementById('nextPg').onclick = () => { if (pdfState.page < pdfState.pdf.numPages) { pdfState.page++; renderPdfPage(); } };
+      document.getElementById('zoomIn').onclick  = () => { pdfState.scale = Math.min(3.0, pdfState.scale + 0.2); renderPdfPage(); };
+      document.getElementById('zoomOut').onclick = () => { pdfState.scale = Math.max(0.4, pdfState.scale - 0.2); renderPdfPage(); };
+    } catch (e) {
+      container.innerHTML += `<div class="no-source" style="color:var(--bad)">PDF render failed: ${esc(e.message)}</div>`;
+    }
+  } else if (isImg) {
+    container.innerHTML = `
+      <h3>Source — ${esc(upload.name)} <span style="color:#9ca3af;font-weight:400;">(${(upload.size/1024).toFixed(0)} KB · ${esc(upload.type)})</span></h3>
+      <div class="img-wrap"><img src="data:${esc(upload.type)};base64,${upload.base64}"></div>
+    `;
+  } else {
+    container.innerHTML = `<div class="no-source">Unknown file type: ${esc(upload.type)}</div>`;
+  }
+}
+async function renderPdfPage() {
+  const page = await pdfState.pdf.getPage(pdfState.page);
+  const viewport = page.getViewport({ scale: pdfState.scale });
+  const canvas = document.getElementById('pdfCanvas');
+  if (!canvas) return;
+  canvas.width = viewport.width; canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  document.getElementById('pgCur').textContent = pdfState.page;
+  document.getElementById('zoomLvl').textContent = Math.round(pdfState.scale * 100) + '%';
+}
+
+/* ─── Parsed-data renderers ─── */
+function renderPaParsed(c) {
+  const p = activeRender.parsedData?.production || {};
+  const period = activeRender.parsedData?.period || {};
+  const codes = (p.codes || []).slice().sort((a, b) => (b.total || 0) - (a.total || 0));
+  const totalProd = p.total || 0;
+  const cat = p.byCategory || {};
+  c.innerHTML = `
+    <h3>Production summary</h3>
+    <table class="kv"><tbody>
+      <tr><td>Period</td><td>${esc(period.dateStart || '—')} → ${esc(period.dateEnd || '—')}</td></tr>
+      <tr><td>Months covered</td><td>${fmtInt(period.prodMonths)}</td></tr>
+      <tr><td>Total production (period)</td><td>${fmt$(p.total)}</td></tr>
+      <tr><td>Annualized production</td><td>${fmt$(p.annualized)}</td></tr>
+      <tr><td>Codes parsed</td><td>${codes.length}</td></tr>
+    </tbody></table>
+    <h3>By category</h3>
+    <table class="kv"><tbody>
+      ${['doctor','hygiene','perio','endo','oralSurgery','ortho','cosmetic'].map(k => `
+        <tr><td>${k}</td><td>${fmt$(cat[k])}</td></tr>`).join('')}
+    </tbody></table>
+    <h3>Codes (${codes.length}, sorted by $)</h3>
+    <table class="list">
+      <thead><tr><th>Code</th><th>Description</th><th class="num">Qty</th><th class="num">Total</th><th class="num">% of prod</th></tr></thead>
+      <tbody>
+        ${codes.map(co => `
+          <tr>
+            <td>${esc(co.code)}</td>
+            <td>${esc(co.desc || '')}</td>
+            <td class="num">${fmtInt(co.qty)}</td>
+            <td class="num">${fmt$(co.total)}</td>
+            <td class="num">${totalProd > 0 ? ((co.total||0)/totalProd*100).toFixed(2) + '%' : '—'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderPlParsed(c) {
+  const fin = activeRender.parsedData?.financials || {};
+  const items = (activeRender.parsedData?.financials?.sourcesOfDollars?.items || []);
+  /* The parser's items[] sit on parsedTexts/plData ideally; fall back
+     to the raw plText if needed. For v1, surface whatever fields the
+     payload has on financials. */
+  c.innerHTML = `
+    <h3>P&amp;L summary</h3>
+    <table class="kv"><tbody>
+      <tr><td>Total income</td><td>${fmt$(fin.plIncome)}</td></tr>
+      <tr><td>Total expense (raw)</td><td>${fmt$(fin.plExpensesRaw)}</td></tr>
+      <tr><td>Owner add-backs</td><td>${fmt$(fin.ownerAddBacks)}</td></tr>
+      <tr><td>Patient reimbursements</td><td>${fmt$(fin.patientReimbursements)}</td></tr>
+      <tr><td>Total expense (adjusted)</td><td>${fmt$(fin.plExpenses)}</td></tr>
+      <tr><td>Net income</td><td>${fmt$(fin.netIncome)}</td></tr>
+      <tr><td>Overhead % (adjusted)</td><td>${fmtPct(fin.overheadPct)}</td></tr>
+      <tr><td>Profit margin</td><td>${fmtPct(fin.profitPct)}</td></tr>
+      <tr><td>Staff cost % (loading source)</td><td>${fmtPct(fin.staffCostPct)} · ${esc(fin.staffCostLoadingSource || '—')} (${fin.staffCostLoadingFactor != null ? fin.staffCostLoadingFactor.toFixed(3) + '×' : '—'})</td></tr>
+    </tbody></table>
+    ${(fin.ownerAddBackItems || []).length > 0 ? `
+      <h3>Owner add-back items (subtracted from raw expense)</h3>
+      <table class="list">
+        <thead><tr><th>Item</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+          ${fin.ownerAddBackItems.map(i => `<tr><td>${esc(i.item)}</td><td class="num">${fmt$(i.amount)}</td></tr>`).join('')}
+        </tbody>
+      </table>` : ''}
+    <h3>Raw P&amp;L text (parser input)</h3>
+    <pre class="json" style="background:#fafafa;color:#1f2937;font-size:11px;max-height:400px;">${esc(activeRender.parsedTexts?.plText || '(no plText captured)')}</pre>
+  `;
+}
+
+function renderArParsed(c, side) {
+  const a = activeRender.parsedData?.ar?.[side] || {};
+  c.innerHTML = `
+    <h3>${side === 'patient' ? 'Patient' : 'Insurance'} AR aging</h3>
+    <table class="kv"><tbody>
+      <tr><td>Current</td><td>${fmt$(a.current)}</td></tr>
+      <tr><td>31–60 days</td><td>${fmt$(a.d3160)}</td></tr>
+      <tr><td>61–90 days</td><td>${fmt$(a.d6190)}</td></tr>
+      <tr><td>Over 90 days</td><td>${fmt$(a.d90plus ?? a.over90)}</td></tr>
+      ${side === 'insurance' && a.estimate != null ? `<tr><td>Estimate column</td><td>${fmt$(a.estimate)}</td></tr>` : ''}
+      <tr style="font-weight:700;border-top:2px solid #cbd5e1;"><td>Total</td><td>${fmt$(a.total)}</td></tr>
+    </tbody></table>
+  `;
+}
+
+function renderDaySheetParsed(c, key) {
+  const ds = activeRender.parsedData?.collections?.daySheets?.[key];
+  if (!ds) {
+    c.innerHTML = '<div class="empty">Day Sheet not uploaded for this period.</div>';
+    return;
+  }
+  c.innerHTML = `
+    <h3>Day Sheet — ${key === 'ytd' ? 'Year to Date' : key === 'lastYear' ? 'Last Full Year' : 'Year Before That'}</h3>
+    <table class="kv"><tbody>
+      <tr><td>Period from</td><td>${esc(ds.periodFrom || '—')}</td></tr>
+      <tr><td>Period to</td><td>${esc(ds.periodTo || '—')}</td></tr>
+      <tr><td>Months covered</td><td>${fmtInt(ds.monthsCovered)}</td></tr>
+      <tr><td><strong>Charges (production)</strong></td><td><strong>${fmt$(ds.charges)}</strong></td></tr>
+      <tr><td><strong>Payments (collections)</strong></td><td><strong>${fmt$(ds.payments)}</strong></td></tr>
+      <tr><td>Credit adjustments</td><td>${fmt$(ds.creditAdjustments)}</td></tr>
+      <tr><td>Charge adjustments</td><td>${fmt$(ds.chargeAdjustments)}</td></tr>
+      <tr><td>Charges billed to insurance</td><td>${fmt$(ds.chargesBilledToInsurance)}</td></tr>
+      <tr><td>New patients of record</td><td>${fmtInt(ds.newPatientsOfRecord)}</td></tr>
+      <tr><td>Patients seen <span style="color:var(--warn);font-size:11px;">(visits, not unique)</span></td><td>${fmtInt(ds.patientsSeen)}</td></tr>
+      <tr><td>Avg production / patient</td><td>${fmt$(ds.avgProdPerPatient)}</td></tr>
+      <tr><td>Avg charge / procedure</td><td>${fmt$(ds.avgChargePerProcedure)}</td></tr>
+    </tbody></table>
+  `;
+}
+
+function renderHygieneFormView(c) {
+  const h = activeRender.intake?.hygieneData;
+  if (!h) {
+    c.innerHTML = '<div class="empty">No hygiene schedule data captured for this render.</div>';
+    return;
+  }
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+  const renderGrid = (weeks, labels) => {
+    if (!Array.isArray(weeks) || weeks.length === 0) return '<div class="empty">Empty</div>';
+    const rows = weeks.map((w, wi) => {
+      const data = w.data || [];
+      const cells = days.map((_, di) => {
+        const a = data[di * 2] || 0;
+        const b = data[di * 2 + 1] || 0;
+        return `<td class="num">${a}/${b}</td>`;
+      }).join('');
+      return `<tr><td>${labels ? labels[wi] || ('Week ' + (wi+1)) : ('Week ' + (wi+1))}</td>${cells}</tr>`;
+    }).join('');
+    return `<table class="list"><thead><tr><th>Week</th>${days.map(d => `<th class="num">${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+  };
+  c.innerHTML = `
+    <h3>Hygiene staffing</h3>
+    <table class="kv"><tbody>
+      <tr><td>Days scheduled (RDH > 0)</td><td>${fmtInt(h.daysScheduled)}</td></tr>
+      <tr><td>Patients per hygienist / day</td><td>${fmtInt(h.ptsPerHygDay)}</td></tr>
+      <tr><td>RDH per day (Mon–Sat)</td><td>${(h.rdhPerDay || []).join(' / ')}</td></tr>
+    </tbody></table>
+    <h3>Recent past — 3 weeks (total appt / pat seen)</h3>
+    ${renderGrid(h.recentPast)}
+    <h3>Next 7 days (total appt / appt filled)</h3>
+    ${renderGrid(h.next7Days)}
+    <h3>Near future — 3 weeks (total appt / appt filled)</h3>
+    ${renderGrid(h.nearFuture)}
+    <h3>Future future — 2 weeks (total appt / appt filled)</h3>
+    ${renderGrid(h.futureFuture)}
+  `;
+}
+function renderHygieneEngineView(c) {
+  const k = activeRender.parsedData?.kpis || {};
+  c.innerHTML = `
+    <h3>Engine interpretation</h3>
+    <table class="kv"><tbody>
+      <tr><td>Hygiene fill rate (recent past)</td><td>${fmtPct(k.hygieneFillRate)}</td></tr>
+      <tr><td>Hygiene near-future pre-booking</td><td>${fmtPct(k.hygieneNearFuturePreBooking)}</td></tr>
+      <tr><td>Hygiene capacity utilization %</td><td>${fmtPct(k.hygieneCapacity?.utilizationPct)}</td></tr>
+      <tr><td>Days required / month</td><td>${k.hygieneCapacity?.daysRequiredPerMonth?.toFixed?.(1) ?? '—'}</td></tr>
+      <tr><td>Days scheduled / month</td><td>${k.hygieneCapacity?.daysScheduledPerMonth?.toFixed?.(1) ?? '—'}</td></tr>
+      <tr><td>Procedure-derived active patients</td><td>${fmtInt(k.hygieneCapacity?.procedureDerivedActivePatients)}</td></tr>
+    </tbody></table>
+  `;
+}
+
+function renderQuestionnaireFormView(c) {
+  const pp = activeRender.intake?.practiceProfile || {};
+  const ec = activeRender.intake?.employeeCosts || {};
+  const mix = pp.payorMix || {};
+  const benefits = ec.benefits || {};
+  const yn = (v) => v == null ? '—' : (v === 'yes' ? '✅ yes' : '❌ no');
+  const concerns = Array.isArray(pp.concerns) ? pp.concerns : [];
+  const staffRows = (ec.staff || []).concat(ec.hygiene || [])
+    .filter(p => p && (p.name || p.rate || p.hours || p.tenureYears != null));
+  c.innerHTML = `
+    <h3>Practice profile</h3>
+    <table class="kv"><tbody>
+      <tr><td>Practice name</td><td>${esc(pp.name)}</td></tr>
+      <tr><td>Website</td><td>${esc(pp.website)}</td></tr>
+      <tr><td>ZIP</td><td>${esc(pp.zipCode)}</td></tr>
+      <tr><td>PM software</td><td>${esc(pp.pmSoftware)}</td></tr>
+      <tr><td>Years owned / owner age</td><td>${esc(pp.yearsOwned)} / ${esc(pp.ownerAge)}</td></tr>
+      <tr><td>Operatories (active / total)</td><td>${esc(pp.opsActive)} / ${esc(pp.opsTotal)}</td></tr>
+      <tr><td>Doctor days / month</td><td>${esc(pp.doctorDays)}</td></tr>
+      <tr><td>Hygiene days / week (RDH-person-days)</td><td>${esc(pp.numHygienists || pp.hygieneDays)}</td></tr>
+      <tr><td>Patients / hygienist / day</td><td>${esc(pp.patientsPerHygienistPerDay)}</td></tr>
+      <tr><td>Has associate</td><td>${pp.hasAssociate ? 'Yes' : 'No'}</td></tr>
+      <tr><td>Crowns / month</td><td>${esc(pp.crownsPerMonth)}</td></tr>
+    </tbody></table>
+    <h3>Payor mix</h3>
+    <table class="kv"><tbody>
+      <tr><td>PPO</td><td>${esc(mix.ppo)}%</td></tr>
+      <tr><td>HMO</td><td>${esc(mix.hmo)}%</td></tr>
+      <tr><td>Government / Medicaid</td><td>${esc(mix.gov)}%</td></tr>
+      <tr><td>FFS / OON</td><td>${esc(mix.ffs)}%</td></tr>
+    </tbody></table>
+    <h3>Benefits Policy Notes (yes/no toggles)</h3>
+    <table class="kv"><tbody>
+      <tr><td>Paid Holidays</td><td>${yn(benefits.holidays)}</td></tr>
+      <tr><td>Paid Vacations</td><td>${yn(benefits.vacation)}</td></tr>
+      <tr><td>Bonus</td><td>${yn(benefits.bonus)}</td></tr>
+      <tr><td>401K</td><td>${yn(benefits.k401)}</td></tr>
+      <tr><td>Medical</td><td>${yn(benefits.medical)}</td></tr>
+      <tr><td>Dental</td><td>${yn(benefits.dental)}</td></tr>
+      <tr><td>CE Allowance</td><td>${yn(benefits.ce)}</td></tr>
+    </tbody></table>
+    <h3>Staff worksheet (with tenure)</h3>
+    <table class="list">
+      <thead><tr><th>Position</th><th>Name</th><th class="num">Rate</th><th class="num">Hours/mo</th><th class="num">Tenure (yrs)</th></tr></thead>
+      <tbody>
+        ${staffRows.map(p => `
+          <tr>
+            <td>${esc(p.label || p.key || '')}</td>
+            <td>${esc(p.name || '')}</td>
+            <td class="num">${p.rate ? '$' + p.rate.toFixed(2) : ''}</td>
+            <td class="num">${p.hours || ''}</td>
+            <td class="num">${p.tenureYears != null ? Number(p.tenureYears).toFixed(1) : ''}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <h3>Concerns (checkbox values, raw)</h3>
+    <div style="font-size:12px;color:#475569;">${concerns.length ? esc(concerns.join(', ')) : '<em>none</em>'}</div>
+    <h3>Biggest challenge (freeform)</h3>
+    <blockquote style="margin:0;padding:8px 12px;border-left:3px solid var(--warn);background:var(--warn-bg);font-style:italic;">${esc(pp.biggestChallenge || '<em>none</em>')}</blockquote>
+  `;
+}
+
+function renderQuestionnaireParsed(c) {
+  /* Right side mirrors form view but flagged with engine-derived fields. */
+  const k = activeRender.parsedData?.kpis || {};
+  const fin = activeRender.parsedData?.financials || {};
+  c.innerHTML = `
+    <h3>Engine-derived from intake</h3>
+    <table class="kv"><tbody>
+      <tr><td>Owner doctor $/day</td><td>${fmt$(k.ownerDocDailyAvg)}</td></tr>
+      <tr><td>Combined doctor $/day</td><td>${fmt$(k.combinedDocDailyAvg)}</td></tr>
+      <tr><td>Hygienist $/day</td><td>${fmt$(k.hygDailyAvg)}</td></tr>
+      <tr><td>Conversion ratio</td><td>${k.battingAverage != null ? k.battingAverage.toFixed(1) + ':1' : '—'}</td></tr>
+      <tr><td>Crown unit value</td><td>${fmt$(k.crownUnitValue)}</td></tr>
+      <tr><td>Total staff cost %</td><td>${fmtPct(k.staffCostPct)}</td></tr>
+      <tr><td>Loading factor (source)</td><td>${k.staffCostLoadingFactor != null ? k.staffCostLoadingFactor.toFixed(3) + '×' : '—'} (${esc(k.staffCostLoadingSource || '—')})</td></tr>
+      <tr><td>Hygiene % of production</td><td>${fmtPct(k.hygienePercent)}</td></tr>
+      <tr><td>Collection rate</td><td>${fmtPct(k.collectionRate)}</td></tr>
+      <tr><td>Overhead %</td><td>${fmtPct(k.overheadPct)}</td></tr>
+      <tr><td>Profit %</td><td>${fmtPct(k.profitPct)}</td></tr>
+    </tbody></table>
+  `;
+}
+
+function renderRawJson(c) {
+  c.innerHTML = `<h3>Raw parsed data</h3><pre class="json">${esc(JSON.stringify(activeRender.parsedData, null, 2))}</pre>`;
+}
+
+/* ─── Footer actions ─── */
+document.getElementById('exportAllBtn').addEventListener('click', () => {
+  const payload = JSON.stringify(renders, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'performdds-verify-renders-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+});
+document.getElementById('deleteRenderBtn').addEventListener('click', async () => {
+  if (!activeRender) return;
+  if (!confirm('Delete this render permanently? Cannot be undone.')) return;
+  await deleteRender(activeRender.id);
+  renders = renders.filter(r => r.id !== activeRender.id);
+  activeRender = renders[0] || null;
+  if (activeRender) switchRender(activeRender.id);
+  else { document.getElementById('renderMeta').textContent = ''; document.getElementById('paneArea').innerHTML = ''; renderSidebar(); }
+});
+
+/* ─── Init ─── */
+(async function init() {
+  try {
+    renders = await loadAll();
+    renderSidebar();
+    if (renders.length) {
+      /* Restore from URL hash if present, else default to most recent. */
+      const m = location.hash.match(/render=([\w-]+)/);
+      const initialId = (m && renders.find(r => r.id === m[1])) ? m[1] : renders[0].id;
+      switchRender(initialId);
+    }
+  } catch (e) {
+    console.error('init failed', e);
+    document.getElementById('paneArea').innerHTML =
+      `<div class="empty" style="margin:30px;flex:1;color:var(--bad)">IndexedDB error: ${esc(e.message)}</div>`;
+  }
+})();
+</script>
+</body>
+</html>

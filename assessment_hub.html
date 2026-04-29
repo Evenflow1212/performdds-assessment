@@ -2194,6 +2194,121 @@ async function extractProductionFromPdf(file) {
 }
 
 
+/* ─── Verification-page IndexedDB persistence (2026-04-29) ───
+   Internal QA tool: saves the last 20 generate() invocations into a
+   browser-local IndexedDB store ('performdds-verify' / 'renders') so
+   Dave can open /verify_8f3c2a1d7e9b.html and review parsed values
+   side-by-side with the source PDFs. FIFO eviction past 20.
+   Browser-local only — never round-trips to a server (PHI on AR aging
+   PDFs would create compliance scope we're not ready for).
+   Failures are non-fatal: a broken save must never block the dentist
+   from seeing their report. */
+const VERIFY_DB_NAME    = 'performdds-verify';
+const VERIFY_DB_VERSION = 1;
+const VERIFY_STORE      = 'renders';
+const VERIFY_MAX        = 20;
+
+function _verifyOpenDB() {
+  return new Promise((resolve, reject) => {
+    if (!self.indexedDB) return reject(new Error('indexedDB unavailable'));
+    const req = self.indexedDB.open(VERIFY_DB_NAME, VERIFY_DB_VERSION);
+    req.onupgradeneeded = (ev) => {
+      const db = ev.target.result;
+      if (!db.objectStoreNames.contains(VERIFY_STORE)) {
+        const store = db.createObjectStore(VERIFY_STORE, { keyPath: 'id' });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error || new Error('indexedDB open failed'));
+  });
+}
+
+function _verifyUuid() {
+  if (self.crypto && typeof self.crypto.randomUUID === 'function') return self.crypto.randomUUID();
+  /* RFC4122 v4 fallback. */
+  return 'rrxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+function _verifySlugify(s) {
+  return String(s || 'unnamed').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+async function _verifyFileToB64(file) {
+  if (!file) return null;
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = () => resolve({
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: file.size,
+      base64: String(r.result || '').split(',')[1] || '',
+    });
+    r.onerror = () => reject(r.error || new Error('FileReader failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function saveVerifyRender(payload) {
+  /* Convert each File in the uploads dict to base64. Skip slots that
+     are null (the user didn't upload that step). */
+  const uploadsB64 = {};
+  for (const [k, f] of Object.entries(payload.uploads || {})) {
+    if (f instanceof File || f instanceof Blob) {
+      uploadsB64[k] = await _verifyFileToB64(f);
+    }
+  }
+  const now = Date.now();
+  const id = _verifyUuid();
+  const rec = {
+    id,
+    timestamp: now,
+    practiceName: payload.practiceName || 'Unnamed',
+    slug: _verifySlugify(payload.practiceName) + '-' + new Date(now).toISOString().slice(0, 10),
+    uploads:      uploadsB64,
+    intake:       payload.intake || {},
+    parsedTexts:  payload.parsedTexts || {},
+    parsedData:   payload.parsedData || null,
+    reportHtml:   payload.reportHtml || null,
+    summary:      payload.summary || null,
+  };
+  const db = await _verifyOpenDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(VERIFY_STORE, 'readwrite');
+    tx.oncomplete = resolve;
+    tx.onerror    = () => reject(tx.error);
+    tx.objectStore(VERIFY_STORE).put(rec);
+  });
+  /* FIFO eviction — keep only the 20 newest. */
+  await new Promise((resolve) => {
+    const tx = db.transaction(VERIFY_STORE, 'readwrite');
+    const store = tx.objectStore(VERIFY_STORE);
+    const idx = store.index('timestamp');
+    const all = [];
+    idx.openCursor(null, 'prev').onsuccess = (ev) => {
+      const c = ev.target.result;
+      if (!c) {
+        const toDelete = all.slice(VERIFY_MAX);
+        toDelete.forEach(rec2 => store.delete(rec2.id));
+        return;
+      }
+      all.push(c.value);
+      c.continue();
+    };
+    tx.oncomplete = resolve;
+    tx.onerror    = resolve;  /* don't fail the parent on eviction errors */
+  });
+  db.close();
+  console.log('saveVerifyRender: stored render', id, 'for', payload.practiceName);
+  return id;
+}
+
 let _generating = false;
 function showGenError(message, detail) {
   const panel = document.getElementById('genError');
@@ -2326,6 +2441,23 @@ async function generate() {
     generatedData = data.data;
     generatedReportHtml = data.reportHtml || null;
     generatedReviewHtml = data.reviewHtml || null;
+    /* Stash the render to IndexedDB for the internal verification page
+       (hidden URL: /verify_8f3c2a1d7e9b.html). FIFO last 20. Failures
+       are non-fatal — log and continue so a broken save never blocks
+       the dentist from seeing their report. */
+    try {
+      await saveVerifyRender({
+        uploads: files,
+        intake: { practiceProfile, employeeCosts, hygieneData, arPatient, arInsurance, practiceName },
+        parsedTexts: { prodText, collText, plText, daySheetYtdText, daySheetLastYearText, daySheetYearBeforeText },
+        parsedData: data.data,
+        reportHtml: data.reportHtml || null,
+        summary: data.summary || null,
+        practiceName,
+      });
+    } catch (e) {
+      console.warn('saveVerifyRender failed (non-fatal):', e.message);
+    }
     /* Hide the "View Online Report" button if the server didn't produce one */
     const vrBtn = document.getElementById('viewReportBtn');
     if (vrBtn) vrBtn.style.display = generatedReportHtml ? 'inline-flex' : 'none';
