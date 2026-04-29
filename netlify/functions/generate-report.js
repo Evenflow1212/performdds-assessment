@@ -295,11 +295,35 @@ function plCategory(item) {
   if (/\blab\b|laboratory/i.test(l)) return 'E';
   if (/dental.*suppl|job.*suppl/i.test(l)) return 'F';
   if (/specialist.*suppl/i.test(l)) return 'G';
+  /* Provider-compensation exclusion (2026-04-29) — same guards as
+     staffCostFromPL. Line items containing doctor/dr/dr./owner/provider
+     should never land in the staff bucket even when they match a wage /
+     insurance / bonus pattern below. Falls through to category 'M'
+     (other) so the line still tallies in overhead but doesn't inflate
+     staff cost. Associate is already routed to 'B' above. */
+  if (/\bdoctor\b|\bdr\b|\bdr\.|\bowner\b|\bprovider\b/i.test(l)) return 'M';
+  if (/^\s*continuing\s+education\s*$/i.test(l)) return 'M';  /* unscoped CE → other */
+  /* Wages and salary — singular and plural */
   if (/payroll.*(wage|salar)|\bwages?\b|\bsalary\b|\bsalaries\b/i.test(l)) return 'H';
   if (/payroll.*tax/i.test(l)) return 'H';
   if (/payroll.*fee/i.test(l)) return 'H';
+  /* Workers' compensation insurance (2026-04-29 broadened — covers
+     "Workers Comp" / "Worker's Comp" / "Workers Compensation" /
+     "Workers' Compensation"). */
+  if (/worker[s'’]*\s+comp(ensation)?/i.test(l)) return 'H';
+  /* Health / medical / group insurance — staff scoped (2026-04-29). */
+  if (/\b(health|medical|group)\s+insurance/i.test(l)) return 'H';
+  if (/\bgroup\s+health/i.test(l)) return 'H';
+  if (/\bemployee.*insurance/i.test(l)) return 'H';
+  /* Generic employee benefits (2026-04-29). */
+  if (/\bemployee.*benefits?/i.test(l)) return 'H';
+  /* Staff training / staff-scoped CE (2026-04-29). */
+  if (/staff\s+training/i.test(l)) return 'H';
+  if (/\bcontinuing\s+education.*staff/i.test(l)) return 'H';
+  if (/\bstaff.*continuing\s+education/i.test(l)) return 'H';
   if (/uniform|laundry/i.test(l)) return 'H';
-  if (/\bbonus\b/i.test(l)) return 'I';
+  /* Bonuses — plural fix (2026-04-29). */
+  if (/\bbonus(es)?\b/i.test(l)) return 'I';
   if (/^rent|lease/i.test(l)) return 'J';
   if (/repair|maintenance/i.test(l)) return 'J';
   if (/advertis|marketing/i.test(l)) return 'K';
@@ -363,21 +387,53 @@ function staffCostFromPL(plData) {
   for (const it of plData.items) {
     if (it.section !== 'Expense') continue;
     const item = it.item || '';
-    /* Sum wages, salary, payroll tax, payroll fee, uniform/laundry,
-       retirement/401K, bonus. Mirrors the categorizer's H/I buckets. */
+    /* 2026-04-29 broadened: real-world dental P&Ls itemize health
+       insurance, workers comp, employee benefits, plural bonuses, and
+       staff-scoped CE separately. The original 6-pattern set silently
+       dropped 13/32 expected-positives in QA. */
     const isStaff = (
+      /* Wages and salary — singular and plural */
       /payroll.*(wage|salar)|\bwages?\b|\bsalary\b|\bsalaries\b/i.test(item) ||
+      /* Payroll taxes and processing fees */
       /payroll.*tax/i.test(item) ||
       /payroll.*fee/i.test(item) ||
+      /* Workers' compensation — staff-related by definition. Character
+         class catches all four variants: "Workers Comp" (s), "Worker's
+         Comp" (singular possessive — apostrophe BEFORE the s), "Workers'
+         Compensation" (plural possessive — apostrophe AFTER the s),
+         "Workers Compensation" (full word, no apostrophe). The unicode
+         right single-quote U+2019 is included for Office-source labels. */
+      /worker[s'’]*\s+comp(ensation)?/i.test(item) ||
+      /* Health/medical/group insurance — when applied to staff */
+      /\b(health|medical|group)\s+insurance/i.test(item) ||
+      /\bgroup\s+health/i.test(item) ||
+      /\bemployee.*insurance/i.test(item) ||
+      /* Generic employee benefits line — accountants love this label */
+      /\bemployee.*benefits?/i.test(item) ||
+      /* Retirement / 401K / pension */
+      /401\s*k|retirement|pension/i.test(item) ||
+      /* Bonuses — plural fix (\bbonus\b chokes on "bonuses") */
+      /\bbonus(es)?\b/i.test(item) ||
+      /* Uniforms and laundry */
       /uniform|laundry/i.test(item) ||
-      /401k|retirement/i.test(item) ||
-      /\bbonus\b/i.test(item)
+      /* Staff training / staff-scoped continuing education */
+      /staff\s+training/i.test(item) ||
+      /\bcontinuing\s+education.*staff/i.test(item) ||
+      /\bstaff.*continuing\s+education/i.test(item)
     );
     if (!isStaff) continue;
-    /* Exclude provider compensation — those lines often match \bwages?\b
-       but they're owner / associate draws, not staff cost. */
-    if (/\bassociate\b/i.test(item) ||
-        /\bdoctor\b|\bdr\b|\bowner\b/i.test(item)) continue;
+    /* Exclusion guard — reject lines that match a staff pattern but are
+       actually owner / provider compensation. Catches "Doctor's Health
+       Insurance" (owner-paid), "Dr. Smith Compensation", "Owner Wages",
+       "Associate Wages", "Provider Compensation". The original guard
+       missed "Dr." (period-terminated abbreviation) and "Provider"
+       entirely. */
+    if (/\bassociate\b/i.test(item)) continue;
+    if (/\bdoctor\b|\bdr\b|\bdr\.|\bowner\b|\bprovider\b/i.test(item)) continue;
+    /* "Continuing Education" with no qualifier defaults to doctor's CE.
+       Only count CE when it's clearly staff-scoped (handled by the
+       positive matchers above — "staff" must appear). */
+    if (/^\s*continuing\s+education\s*$/i.test(item)) continue;
     sum += Number(it.amount) || 0;
     hit = true;
   }

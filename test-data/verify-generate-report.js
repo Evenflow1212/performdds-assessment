@@ -638,6 +638,12 @@ test('Pigneri-scale probe: total staff cost ≈ 36%, opportunity ≈ (36-20)%×$
     'CHARGES|1480000',
     'PAYMENTS|1340000',
   ].join('\n');
+  /* 2026-04-29: itemized benefits added to match real-world dental
+     practices — health insurance, workers comp, employee bonuses, and
+     401K match are commonly broken out separately on QuickBooks P&Ls
+     rather than rolled into "Other Expenses." Replacing the lean
+     2-line synthetic P&L with this expanded shape lifts Pigneri's
+     loading factor from 1.078 (unrealistic) to 1.190 (representative). */
   const pigneriPL = [
     'DATES| 01/01/2025 - 12/31/2025',
     'SECTION|Income',
@@ -646,14 +652,18 @@ test('Pigneri-scale probe: total staff cost ≈ 36%, opportunity ≈ (36-20)%×$
     'SECTION|Expense',
     'Salaries & Wages|380000',
     'Payroll Taxes|38000',
+    'Health Insurance|22000',     /* NEW 2026-04-29 — staff-scoped */
+    'Workers Comp|4500',          /* NEW */
+    'Employee Bonuses|8000',      /* NEW — plural variant */
+    '401K Match|9000',            /* NEW */
     'Lab Fees|70000',     /* 5.2% — under new 6% threshold */
     'Dental Supplies|85000',  /* 6.3% — just over new 6% threshold */
     'Rent|52000',
     'Marketing|24000',
     'Office Supplies|18000',
     'Other Expenses|75000',
-    'TOTAL_EXPENSE|742000',
-    'NET_INCOME|598000',
+    'TOTAL_EXPENSE|785500',
+    'NET_INCOME|554500',
   ].join('\n');
   /* Employee costs sized to yield ~36% total staff cost on $1.34M:
        admin $317k + hyg $164k ≈ $481k → 35.9%. */
@@ -2848,6 +2858,122 @@ test('Staff Cost #16: Hyg Dept Ratio cross-suppression with benefits weakness st
     'cross-suppression must still hide align-comp remedy when benefits.no.length >= 2');
   expect(/Address the benefits gap above/i.test(ratioW),
     'replacement text must still appear');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Staff Cost regex-coverage suite (2026-04-29). Locks in the broadened
+   staffCostFromPL matcher so itemized dental P&Ls (health insurance,
+   workers comp, employee benefits, plural bonuses, staff-scoped CE)
+   stop getting silently dropped — and so doctor/owner/provider-paid
+   benefit lines stay correctly excluded.
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Helper — turn a {item: amount, ...} map into the parsePL() items[]
+   shape that staffCostFromPL consumes. */
+function _plItems(map) {
+  return {
+    items: Object.entries(map).map(([item, amount]) => ({
+      section: 'Expense', item, amount,
+    })),
+    totalIncome: 2000000, totalExpense: Object.values(map).reduce((s, v) => s + v, 0),
+  };
+}
+
+test('Staff Cost regex coverage #1: itemized P&L sums all staff-related lines', () => {
+  const plData = _plItems({
+    'Salaries & Wages':         300000,
+    'Payroll Taxes':             30000,
+    'Health Insurance — Staff':  35000,
+    'Workers Compensation':       8000,
+    '401K Match':                10000,
+    'Employee Bonuses':           5000,
+    'Uniforms':                   2000,
+    'Lab Fees':                  50000,   /* excluded — not staff */
+    'Rent':                      48000,   /* excluded — not staff */
+  });
+  const total = _staffCostFromPL(plData);
+  expect(total === 390000, `expected $390,000 staff; got ${total}`);
+});
+
+test('Staff Cost regex coverage #2: doctor-paid health insurance excluded', () => {
+  const plData = _plItems({
+    'Salaries & Wages':              200000,
+    'Health Insurance — Staff':       25000,   /* included */
+    "Doctor's Health Insurance":      18000,   /* EXCLUDED — owner */
+    'Dr. Smith Medical Insurance':    20000,   /* EXCLUDED — owner */
+  });
+  const total = _staffCostFromPL(plData);
+  expect(total === 225000,
+    `expected $225,000 (only staff-scoped lines); got ${total}. Doctor/Dr. lines must be excluded.`);
+});
+
+test('Staff Cost regex coverage #3: workers comp variants — apostrophe + full word', () => {
+  const plData = _plItems({
+    'Wages':                  200000,
+    'Workers Comp':              4000,    /* no apostrophe, abbreviated */
+    "Worker's Comp":             4000,    /* singular possessive */
+    'Workers Compensation':      4000,    /* full word, no apostrophe */
+    "Workers' Compensation":     4000,    /* plural possessive + full word */
+  });
+  const total = _staffCostFromPL(plData);
+  expect(total === 216000,
+    `expected $216,000 (all 4 WC variants caught); got ${total}`);
+});
+
+test('Staff Cost regex coverage #4: plural bonuses caught', () => {
+  const plData = _plItems({
+    'Wages':              200000,
+    'Annual Bonus':         5000,   /* singular — was already caught */
+    'Employee Bonuses':    10000,   /* plural — was MISSED before fix */
+  });
+  const total = _staffCostFromPL(plData);
+  expect(total === 215000,
+    `expected $215,000 (singular + plural bonus both caught); got ${total}`);
+});
+
+test('Staff Cost regex coverage #5: continuing education ambiguity — unscoped CE excluded, staff-scoped included', () => {
+  const plData = _plItems({
+    'Wages':                            200000,
+    'Continuing Education':               5000,   /* EXCLUDED — defaults to doctor */
+    'Staff Continuing Education':         3000,   /* included — staff-scoped */
+    'Continuing Education — Staff':       4000,   /* included — staff-scoped */
+  });
+  const total = _staffCostFromPL(plData);
+  expect(total === 207000,
+    `expected $207,000 (only staff-scoped CE counted); got ${total}`);
+});
+
+test('Staff Cost regex coverage #6: real-world Pigneri-shaped expanded P&L', () => {
+  /* Same lines as the original Pigneri probe + itemized benefits.
+     Real practices itemize health insurance, WC, bonuses, 401K
+     separately rather than rolling them into "Other Expenses". */
+  const plData = _plItems({
+    'Salaries & Wages':       380000,
+    'Payroll Taxes':           38000,
+    'Health Insurance':        22000,   /* NEW — staff-scoped */
+    'Workers Comp':             4500,   /* NEW */
+    'Employee Bonuses':         8000,   /* NEW — plural */
+    '401K Match':               9000,   /* NEW */
+    'Lab Fees':                70000,
+    'Dental Supplies':         85000,
+    'Rent':                    52000,
+    'Marketing':               24000,
+    'Office Supplies':         18000,
+    'Other Expenses':          75000,
+  });
+  const total = _staffCostFromPL(plData);
+  expect(total === 461500,
+    `expected $461,500 itemized staff total; got ${total}`);
+  /* With staff worksheet wages $387,840 (Pigneri staff [32,28,24,22] +
+     hygiene [50,46]) → loading = 461500/387840 = 1.190 (in bounds). */
+  const employeeCosts = {
+    staff:   [{ rate: 32, hours: 160 }, { rate: 28, hours: 160 }, { rate: 24, hours: 160 }, { rate: 22, hours: 160 }],
+    hygiene: [{ rate: 50, hours: 160 }, { rate: 46, hours: 160 }],
+    benefits: {},
+  };
+  const factor = _actualLoadingFactor(employeeCosts, plData);
+  expect(factor != null && Math.abs(factor - 1.190) < 0.005,
+    `expected loading factor ~1.190; got ${factor}`);
 });
 
 (async () => {
