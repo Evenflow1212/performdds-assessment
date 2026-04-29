@@ -2236,7 +2236,7 @@ function renderReportHtml(data) {
   const hasPainPoints = concerns.length > 0 || biggestChallenge.length > 0;
   const painPointsHtml = hasPainPoints ? `
     <div style="background:linear-gradient(135deg,rgba(232,135,42,.08),rgba(232,135,42,.02));border-left:3px solid #e8872a;padding:16px 20px;border-radius:8px;margin-bottom:20px;">
-      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#e8872a;font-weight:700;margin-bottom:10px;">What you told us is wrong</div>
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#e8872a;font-weight:700;margin-bottom:10px;">What you told us</div>
       ${concerns.length > 0 ? `
         <ul style="list-style:none;padding:0;margin:0 0 ${biggestChallenge ? '14px' : '0'} 0;">
           ${concerns.map(c => `<li style="padding:4px 0;color:#e2e8f0;">✓  ${htmlEscape(concernLabels[c] || c)}</li>`).join('')}

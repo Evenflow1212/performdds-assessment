@@ -2065,6 +2065,70 @@ test('Day Sheet new #10: partial-period Day Sheet uses parsed dates for monthly 
    library — they replaced the prior "Fix 3: Retention WEAKNESS fires"
    and "Fix 1: Patient Summary upload slot exists" tests respectively. */
 
+/* ──────────────────────────────────────────────────────────────────────
+   Practice Profile label-bug batch (2026-04-28). Single copy fix to the
+   affirmative pain-points sub-header on the Executive Report. Root
+   cause: case (a) — the literal "What you told us is wrong" was
+   attached to a block that affirms (✓) the dentist's stated concerns.
+   The "is wrong" wording made the consultant appear to be telling the
+   client they were wrong about their own pain points. Fix: drop the
+   misleading suffix. No contradictions block exists yet, so renaming
+   was sufficient (case b would have required a separate render path).
+   ────────────────────────────────────────────────────────────────────── */
+
+test('Label bug new #1: affirmative pain-points sub-header reads "What you told us" (no "is wrong")', async () => {
+  /* Drive the painPoints block by passing concerns + biggestChallenge. */
+  const body = await invoke(null, {
+    concerns: ['more_profitable', 'overhead_high', 'staff_issues'],
+    biggestChallenge: 'Hygiene production has been flat for two years.',
+  });
+  const html = body.reportHtml;
+  /* The orange-styled inner div should now read exactly "What you told us"
+     with no "is wrong" suffix. We anchor on the orange color marker
+     #e8872a so we don't false-match against the section-title h2 above. */
+  const innerHeaderMatch = html.match(/color:#e8872a[^>]*>([^<]+)</);
+  expect(innerHeaderMatch, 'pain-points inner sub-header (orange #e8872a) not found in HTML');
+  expect(innerHeaderMatch[1].trim() === 'What you told us',
+    `inner sub-header should be exactly "What you told us"; got "${innerHeaderMatch[1].trim()}"`);
+});
+
+test('Label bug new #2: literal "What you told us is wrong" does NOT appear in any rendered report (no contradictions block)', async () => {
+  /* No contradictions block exists in the current architecture, so the
+     "is wrong" header literal must not appear anywhere — including when
+     concerns and biggestChallenge are populated, or when neither is. */
+  const withPainPoints = await invoke(null, {
+    concerns: ['more_profitable', 'overhead_high'],
+    biggestChallenge: 'Test challenge.',
+  });
+  expect(!/What you told us is wrong/i.test(withPainPoints.reportHtml),
+    'Executive Report should not contain "What you told us is wrong" with concerns populated');
+  const noPainPoints = await invoke();  /* default fixture has no concerns */
+  expect(!/What you told us is wrong/i.test(noPainPoints.reportHtml),
+    'Executive Report should not contain "What you told us is wrong" without concerns');
+});
+
+test('Label bug new #3: affirmative pain-points block uses ✓ checkmarks, no ⚠ warning iconography leaks in', async () => {
+  const body = await invoke(null, {
+    concerns: ['more_profitable', 'pay_staff_more', 'new_patients'],
+    biggestChallenge: 'Need more new patients.',
+  });
+  const html = body.reportHtml;
+  /* Locate the painPoints block by its orange left-border + checkmark. The
+     block's outer div uses border-left:3px solid #e8872a — anchor there. */
+  const blockStart = html.indexOf('border-left:3px solid #e8872a');
+  expect(blockStart >= 0, 'painPoints block (orange left-border) not found in HTML');
+  /* Slice from the block's opening div to the next closing </div>...</div>
+     pair. Keep it simple: take a 2,000-char window past the marker. */
+  const blockSlice = html.slice(blockStart, blockStart + 2000);
+  /* Affirmative iconography: ✓ must appear next to each concern. */
+  expect(/✓/.test(blockSlice),
+    'painPoints block should contain ✓ checkmark iconography for affirmative concerns');
+  /* Warning iconography (⚠ U+26A0 or ⚠️ with VS16) must NOT appear inside
+     the affirmative block — that's reserved for a future contradictions block. */
+  expect(!/⚠/.test(blockSlice),
+    'painPoints block must not contain ⚠ warning iconography (reserved for future contradictions block)');
+});
+
 (async () => {
   let failed = 0;
   const start = Date.now();
