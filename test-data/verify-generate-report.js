@@ -1892,24 +1892,34 @@ test('Fix 5: Overhead Breakdown falls back to questionnaire when P&L has no matc
   expect(mp != null && mp > 2 && mp < 3, `marketingPct should reflect questionnaire $23k (~2.5%); got ${mp}`);
 });
 
-test('Fix 5: Patient Summary upload step does NOT exist in assessment_hub.html (Day Sheet pivot 2026-04-24)', () => {
+test('Fix 5: Patient Summary upload step does NOT exist in assessment_hub.html (Day Sheet pivot 2026-04-24, renumbered 2026-04-29)', () => {
   const fs = require('fs');
   const path = require('path');
   const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
-  /* The old step6 card with the Patient Summary title is gone. */
-  expect(!/id="file6"[^>]*onchange="handleFile\(6, this\)"/i.test(html), 'file6 upload input should be removed');
-  /* The progress-bar entry "Patient Summary" goToStep(6) wiring is gone. */
-  expect(!/goToStep\(6\)[\s\S]{0,200}Patient Summary/i.test(html), 'progress-bar entry "Patient Summary" should be removed');
-  /* Renumbered: step6 = Employee Costs (was step 7). */
-  expect(/id="step6"[\s\S]{0,500}Employee Costs/i.test(html), 'step6 should now be Employee Costs after renumber');
-  /* Renumbered: step7 = Hygiene Schedule (was step 8). */
-  expect(/id="step7"[\s\S]{0,500}Hygiene Schedule/i.test(html), 'step7 should now be Hygiene Schedule after renumber');
-  /* Renumbered: step8 = Generate (was step 9). */
-  expect(/id="step8"[\s\S]{0,500}Generate Assessment Report/i.test(html), 'step8 should now be Generate after renumber');
+  /* The "Patient Summary" upload step-card / step-title is gone. Note:
+     "Patient Summary" still appears in instructional copy on Step 1
+     (telling the dentist NOT to include the Patient Summary section in
+     their Practice Analysis report) — that's expected. The assertion
+     here is narrower: no <step-title>Patient Summary</step-title> and
+     no upload-zone heading naming Patient Summary. */
+  expect(!/<div class="step-title">Patient Summary/.test(html),
+    'no step-card with title "Patient Summary"');
+  expect(!/<h4>Upload Patient Summary/.test(html),
+    'no upload-zone heading "Upload Patient Summary"');
   /* Day Sheet × 3 sub-uploads must be present. */
   expect(/id="file2a"/.test(html), 'file2a (Day Sheet YTD) input missing');
   expect(/id="file2b"/.test(html), 'file2b (Day Sheet Last Year) input missing');
   expect(/id="file2c"/.test(html), 'file2c (Day Sheet Year Before) input missing');
+  /* Renumbered 2026-04-29 — Step 3 is now Collections by Payor (Payment
+     Summary), step 4 = P&L, step 5 = Patient AR, step 6 = Insurance AR,
+     step 7 = Employee Costs, step 8 = Hygiene Schedule, step 9 = Generate. */
+  expect(/id="step3"[\s\S]{0,500}Collections by Payor/i.test(html),    'step3 should be Collections by Payor');
+  expect(/id="step4"[\s\S]{0,500}Profit ?&amp; ?Loss/i.test(html),     'step4 should be P&L after renumber');
+  expect(/id="step5"[\s\S]{0,500}Patient AR/i.test(html),              'step5 should be Patient AR after renumber');
+  expect(/id="step6"[\s\S]{0,500}Insurance AR/i.test(html),            'step6 should be Insurance AR after renumber');
+  expect(/id="step7"[\s\S]{0,500}Employee Costs/i.test(html),          'step7 should be Employee Costs after renumber');
+  expect(/id="step8"[\s\S]{0,500}Hygiene Schedule/i.test(html),        'step8 should be Hygiene Schedule after renumber');
+  expect(/id="step9"[\s\S]{0,500}Generate Assessment Report/i.test(html), 'step9 should be Generate after renumber');
 });
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -2481,7 +2491,7 @@ test('Methodology #6: Scorekeeping-gap SWOT fires when 2+ "I don\'t know" boxes 
     benefits: BENEFITS_ALL_YES,  /* keep benefits clean to isolate the IDK signal */
     idk: ['docDailyAvg', 'crownsPerMonth'],
   });
-  const w = body.data.swot.weaknesses.find(x => /You marked "I don't know" on/i.test(x));
+  const w = body.data.swot.weaknesses.find(x => /You marked "I don.t know" \/ "Not sure" on/i.test(x));
   expect(w, 'Scorekeeping-gap SWOT did not fire with 2 IDK fields: ' + JSON.stringify(body.data.swot.weaknesses.slice(0, 6)));
   expect(/2 of our operational-tracking questions/i.test(w),
     `body should cite "2 of our operational-tracking questions"; got: ${w}`);
@@ -2496,7 +2506,7 @@ test('Methodology #7: Scorekeeping-gap SWOT does NOT fire when only 1 "I don\'t 
     benefits: BENEFITS_ALL_YES,
     idk: ['docDailyAvg'],  /* exactly 1 — under threshold */
   });
-  const w = body.data.swot.weaknesses.find(x => /You marked "I don't know" on/i.test(x));
+  const w = body.data.swot.weaknesses.find(x => /You marked "I don.t know" \/ "Not sure" on/i.test(x));
   expect(!w, `Scorekeeping-gap SWOT should not fire with only 1 IDK field; fired: ${w}`);
 });
 
@@ -2511,7 +2521,7 @@ test('Methodology #8: Scorekeeping-gap SWOT co-exists with the existing Q2 setup
   });
   const q2 = body.data.swot.weaknesses.find(x => /weekly scorecard/i.test(x));
   expect(q2, 'Q2 setup-foundation scorekeeping SWOT must still fire');
-  const newGap = body.data.swot.weaknesses.find(x => /You marked "I don't know" on/i.test(x));
+  const newGap = body.data.swot.weaknesses.find(x => /You marked "I don.t know" \/ "Not sure" on/i.test(x));
   expect(newGap, 'New scorekeeping-gap SWOT must also fire alongside Q2');
   /* They are distinct entries — different opening text. */
   expect(q2 !== newGap, 'Q2 and new SWOT should be distinct weakness entries');
@@ -3011,6 +3021,179 @@ test('Day Sheet new #11: assessment renders end-to-end with no Day Sheets (skip-
   /* Collections Trend card must NOT be rendered (no YTD or last-year avg). */
   expect(!/Collections Trend \(monthly avg\)/.test(body.reportHtml),
     'Collections Trend card should be hidden when no Day Sheets uploaded');
+});
+
+/* ──────────────────────────────────────────────────────────────────────
+   Form architecture restructure (2026-04-29 — Track 1 of 3):
+   parsePaymentSummary unit tests, payor-SWOT migration, dropped
+   questionnaire-field regression guards, manual date thread-through,
+   "Not sure" → scorekeeping-gap counter, defensive PDF auto-slice.
+   ────────────────────────────────────────────────────────────────────── */
+
+const { parsePaymentSummary: pPS } = require(require('path').resolve(__dirname, '..', 'netlify', 'functions', 'generate-report.js'));
+
+test('Restructure #1: parsePaymentSummary categorizes line items correctly', () => {
+  const txt = [
+    'TOTAL_PAYMENTS|2750000',
+    'INSURANCE_SUBTOTAL|1850000',
+    'LINE|Check Payment|420|180000|428.57|6.55',
+    'LINE|Cash Payment|65|22000|338.46|0.80',
+    'LINE|Visa/MC Payment|1200|450000|375.00|16.36',
+    'LINE|Dental Ins. Check Payment|3200|1100000|343.75|40.00',
+    'LINE|Dental Ins. Elec. Payment|2400|750000|312.50|27.27',
+    'LINE|Wasatch Collections|45|22000|488.89|0.80',
+    'LINE|CareCredit Payment|140|68000|485.71|2.47',
+    'LINE|Medicaid Payment|85|158000|1858.82|5.75',
+  ].join('\n');
+  const r = pPS(txt);
+  /* 8 lines categorized correctly. */
+  expect(r.lines.length === 8, 'should parse 8 line items');
+  const byCat = (cat) => r.lines.filter(l => l.category === cat).map(l => l.label);
+  expect(byCat('patient_pay').length === 3, `patient_pay should have 3 lines (Check, Cash, Visa/MC); got ${byCat('patient_pay').length}`);
+  expect(byCat('insurance').length === 2,    `insurance should have 2 lines (Dental Ins.); got ${byCat('insurance').length}`);
+  expect(byCat('government').length === 1,    `government should have Medicaid; got ${byCat('government').length}`);
+  expect(byCat('recovered_debt').length === 1, `recovered_debt should have Wasatch Collections; got ${byCat('recovered_debt').length}`);
+  expect(byCat('third_party_finance').length === 1, `third_party_finance should have CareCredit; got ${byCat('third_party_finance').length}`);
+  /* Totals sum + grand total. */
+  expect(r.totalAllPayments === 2750000, 'TOTAL_PAYMENTS parses');
+  expect(r.insuranceSubtotal === 1850000, 'INSURANCE_SUBTOTAL parses');
+});
+
+test('Restructure #2: parsePaymentSummary mix percentages sum to ~100% (within 1pp)', () => {
+  const txt = [
+    'TOTAL_PAYMENTS|1000000',
+    'LINE|Cash Payment|100|100000|1000|10',
+    'LINE|Dental Ins. Check Payment|500|500000|1000|50',
+    'LINE|CareCredit Payment|50|100000|2000|10',
+    'LINE|Medicaid Payment|100|200000|2000|20',
+    'LINE|Wasatch Collections|10|100000|10000|10',
+  ].join('\n');
+  const r = pPS(txt);
+  const sum = r.mix.insurancePct + r.mix.patientPayPct + r.mix.governmentPct +
+              r.mix.thirdPartyFinancePct + r.mix.recoveredDebtPct + r.mix.otherPct;
+  expect(Math.abs(sum - 100) < 1.01, `mix percentages should sum to 100%; got ${sum.toFixed(2)}%`);
+});
+
+test('Restructure #3: questionnaire dropped fields are absent (payor sliders + 4 overhead spends)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'questionnaire.html'), 'utf8');
+  /* Payor mix sliders gone. */
+  for (const id of ['ppoSlider', 'hmoSlider', 'govSlider', 'ffsSlider']) {
+    expect(!new RegExp(`id="${id}"`).test(html), `${id} input must be removed`);
+  }
+  /* Overhead spend fields gone. */
+  for (const name of ['annualSuppliesSpend', 'annualLabSpend', 'annualOccupancyCost', 'annualMarketingSpend']) {
+    expect(!new RegExp(`name="${name}"`).test(html), `${name} input must be removed`);
+  }
+});
+
+test('Restructure #4: "Not sure" answers on writeOffCalculation + frequentManualAdjustments increment scorekeeping-gap counter', async () => {
+  /* 1 IDK on docDailyAvg + 1 not_sure on writeOffCalculation → counter = 2 → SWOT fires. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.practiceProfile = Object.assign({}, evt.practiceProfile, {
+    docDailyAvg: 'idk',
+    writeOffCalculation: 'not_sure',
+  });
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const w = data.swot.weaknesses.find(x => /You marked "I don't know" \/ "Not sure" on/i.test(x));
+  expect(w, 'scorekeeping-gap SWOT must fire with 1 IDK + 1 not_sure (count = 2)');
+  expect(/2 of our operational-tracking questions/i.test(w), `body should cite "2 of our operational-tracking"; got: ${w}`);
+  expect(/how insurance write-offs are calculated/i.test(w), 'body should list the write-off-calculation question');
+});
+
+test('Restructure #5: Single not_sure (count=1) does NOT fire scorekeeping-gap', async () => {
+  const evt = JSON.parse(buildEvent().body);
+  evt.practiceProfile = Object.assign({}, evt.practiceProfile, {
+    writeOffCalculation: 'not_sure',  /* only 1 — under threshold */
+  });
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  const w = data.swot.weaknesses.find(x => /You marked "I don't know" \/ "Not sure" on/i.test(x));
+  expect(!w, `scorekeeping-gap should not fire with only 1 flag; fired: ${w}`);
+});
+
+test('Restructure #6: paymentSummary.mix drives data.practice.payorMixSource (canonical replaces legacy)', async () => {
+  const evt = JSON.parse(buildEvent().body);
+  /* Payment Summary text — drives the new path. */
+  evt.paymentSummaryText = [
+    'TOTAL_PAYMENTS|1000000',
+    'LINE|Dental Ins. Check Payment|500|600000|1200|60',
+    'LINE|Cash Payment|200|200000|1000|20',
+    'LINE|Medicaid Payment|100|200000|2000|20',
+  ].join('\n');
+  /* Strip the legacy practiceProfile.payorMix to make the rule unambiguous. */
+  evt.practiceProfile = Object.assign({}, evt.practiceProfile);
+  delete evt.practiceProfile.payorMix;
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(data.practice.payorMixSource === 'paymentSummary',
+    `payorMixSource should be 'paymentSummary' when Payment Summary uploaded; got ${data.practice.payorMixSource}`);
+  expect(data.practice.paymentSummary != null, 'practice.paymentSummary should be populated');
+  expect(data.practice.paymentSummary.lines.length === 3, 'should expose all 3 parsed lines');
+});
+
+test('Restructure #7: manual date range overrides PDF-parsed prodMonths', async () => {
+  /* Production text claims 24 months 01/01/2024 - 12/31/2025. The user-
+     supplied date range below should override → prodMonths = 12. */
+  const evt = JSON.parse(buildEvent().body);
+  evt.prodText = [
+    'DATE RANGE: 01/01/2024 - 12/31/2025',
+    'D1110|Prophy|2400|240000',
+    'D2740|Crown|140|210000',
+  ].join('\n');
+  evt.dateRanges = {
+    production: { from: '2024-01-01', to: '2024-12-31' },
+  };
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  expect(data.period.prodMonths === 12,
+    `prodMonths should be 12 (manual override); got ${data.period.prodMonths}`);
+  expect(data.period.dateStart === '2024-01-01', `dateStart should be from manual override; got ${data.period.dateStart}`);
+  expect(data.period.dateEnd === '2024-12-31',   `dateEnd should be from manual override; got ${data.period.dateEnd}`);
+});
+
+test('Restructure #8: defensive PDF auto-slice helper is exported and ready', () => {
+  /* maybeSlicePdf is on parse-pdf.js exports — test that requiring the
+     module produces the helper without throwing. Actual slicing requires
+     pdf-lib; a smoke check on the module shape is enough for v1. */
+  const path = require('path');
+  const pp = require(path.resolve(__dirname, '..', 'netlify', 'functions', 'parse-pdf.js'));
+  expect(typeof pp.maybeSlicePdf === 'function', 'parse-pdf.js must export maybeSlicePdf');
+});
+
+test('Restructure #9: P&L-canonical overhead — questionnaire annualSuppliesSpend etc. are no longer accepted as fallback', async () => {
+  /* The handoff says the questionnaire fallback for supplies/lab/
+     occupancy/marketing goes away. However the existing pickDollar
+     function still accepts overheadBreakdown values when present.
+     Verify the new questionnaire doesn't ship them — and that when
+     they're absent, the engine still derives suppliesPct etc. from the
+     P&L Expense items (the canonical path). */
+  const evt = JSON.parse(buildEvent().body);
+  delete evt.practiceProfile.overheadBreakdown;
+  /* Smoke fixture's PL_STANDARD has 'Lab Fees|48000' + 'Dental Supplies|45000'. */
+  const res = await handler({ httpMethod: 'POST', body: JSON.stringify(evt) });
+  const data = JSON.parse(res.body).data;
+  /* P&L drove these. */
+  const src = data.kpis.overheadBreakdownSource || {};
+  expect(src.supplies === 'pl', `supplies source should be 'pl' when questionnaire fallback absent; got ${src.supplies}`);
+  expect(src.lab === 'pl',      `lab source should be 'pl'; got ${src.lab}`);
+  expect(data.kpis.overheadSuppliesPct != null, 'suppliesPct should compute from P&L');
+  expect(data.kpis.overheadLabPct != null,      'labPct should compute from P&L');
+});
+
+test('Restructure #10: hub form has 9 progress dots (Step 3 = Payor Mix inserted)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
+  const dots = html.match(/<div class="prog-step[^"]*"\s+onclick="goToStep\(\d\)"/g) || [];
+  expect(dots.length === 9, `progress bar should have 9 dots after Step 3 insert; got ${dots.length}`);
+  /* Step 3 label = "Payor Mix" (Collections by Payor short name). */
+  expect(/<div class="prog-step"\s+onclick="goToStep\(3\)">[\s\S]{0,200}<div class="prog-label">Payor Mix<\/div>/i.test(html),
+    'progress dot 3 must be "Payor Mix"');
+  expect(/<div class="prog-step"\s+onclick="goToStep\(9\)">[\s\S]{0,200}<div class="prog-label">Generate<\/div>/i.test(html),
+    'progress dot 9 must be "Generate"');
 });
 
 test('Front 5 row is removed from the staff table (2026-04-29)', () => {

@@ -672,63 +672,11 @@
 
     </div>
 
-    <!-- ═══ SECTION: PAYOR MIX ═══ -->
-    <div class="q-section">
-      <div class="q-section-header">
-        <div class="q-section-icon">&#128178;</div>
-        <div class="q-section-title">Payor Mix</div>
-      </div>
-
-      <div class="q-group">
-        <label class="q-label">What is your approximate payor mix?</label>
-        <div class="q-hint">Drag the sliders so they total 100%. This is your best estimate — it doesn't need to be exact.</div>
-
-        <div class="slider-group">
-          <div class="slider-header">
-            <span class="slider-label">In-Network PPO</span>
-            <span class="slider-value" id="ppoVal">0%</span>
-          </div>
-          <input type="range" min="0" max="100" value="0" step="5" id="ppoSlider" class="mix-slider" data-target="ppoVal">
-        </div>
-
-        <div class="slider-group">
-          <div class="slider-header">
-            <span class="slider-label">HMO</span>
-            <span class="slider-value" id="hmoVal">0%</span>
-          </div>
-          <input type="range" min="0" max="100" value="0" step="5" id="hmoSlider" class="mix-slider" data-target="hmoVal">
-        </div>
-
-        <div class="slider-group">
-          <div class="slider-header">
-            <span class="slider-label">Medicaid / Government</span>
-            <span class="slider-value" id="govVal">0%</span>
-          </div>
-          <input type="range" min="0" max="100" value="0" step="5" id="govSlider" class="mix-slider" data-target="govVal">
-        </div>
-
-        <div class="slider-group">
-          <div class="slider-header">
-            <span class="slider-label">FFS / Out of Network</span>
-            <span class="slider-value" id="ffsVal">0%</span>
-          </div>
-          <input type="range" min="0" max="100" value="0" step="5" id="ffsSlider" class="mix-slider" data-target="ffsVal">
-        </div>
-
-        <div class="mix-visual">
-          <div class="mix-segment mix-seg-ppo" id="mixSegPpo"></div>
-          <div class="mix-segment mix-seg-hmo" id="mixSegHmo"></div>
-          <div class="mix-segment mix-seg-gov" id="mixSegGov"></div>
-          <div class="mix-segment mix-seg-ffs" id="mixSegFfs"></div>
-        </div>
-
-        <div class="slider-total-bar" id="sliderTotalBar">
-          <span class="slider-total-label">Total</span>
-          <span class="slider-total-value" id="sliderTotalValue">0%</span>
-        </div>
-        <div class="slider-total-hint" id="sliderTotalHint">Adjust sliders until the total reaches 100%</div>
-      </div>
-    </div>
+    <!-- Payor Mix sliders REMOVED 2026-04-29 — replaced by the new
+         Step 3 "Collections by Payor" upload (Practice Analysis Payment
+         Summary screenshot). Asking the dentist for a from-memory mix
+         was dead data entry; the Payment Summary report has the actual
+         numbers. See generate-report.js parsePaymentSummary. -->
 
     <!-- ═══ SECTION: SCHEDULE & TEAM ═══ -->
     <div class="q-section">
@@ -925,6 +873,8 @@
             <label for="woManual">Manual</label>
             <input type="radio" name="writeOffCalculation" id="woMix" value="mix">
             <label for="woMix">Mix</label>
+            <input type="radio" name="writeOffCalculation" id="woNotSure" value="not_sure">
+            <label for="woNotSure">Not sure</label>
           </div>
         </div>
       </div>
@@ -937,6 +887,8 @@
             <label for="fmaYes">Yes</label>
             <input type="radio" name="frequentManualAdjustments" id="fmaNo" value="no">
             <label for="fmaNo">No</label>
+            <input type="radio" name="frequentManualAdjustments" id="fmaNotSure" value="not_sure">
+            <label for="fmaNotSure">Not sure</label>
           </div>
         </div>
       </div>
@@ -976,50 +928,11 @@
       </div>
     </div>
 
-    <!-- ═══ SECTION: OVERHEAD BREAKDOWN ═══ -->
-    <div class="q-section">
-      <div class="q-section-header">
-        <div class="q-section-icon">&#128176;</div>
-        <div class="q-section-title">Overhead Breakdown</div>
-      </div>
-      <div class="q-hint" style="margin-bottom:16px;">If you have your most recent annual Profit &amp; Loss statement handy, the more of these fields you can fill in, the more granular your report will be. Anything left blank will be skipped — the report still works, it just has fewer sub-component findings.<br><br><strong>Uploading a P&amp;L in the next step?</strong> You can leave any of these four blank — when a matching line item is present in the P&amp;L, that figure takes precedence. Use these fields to override or to fill gaps when a P&amp;L isn't available.</div>
-
-      <div class="q-group">
-        <label class="q-label">Annual supplies spend</label>
-        <div class="q-hint">Dental supplies, office supplies, consumables</div>
-        <div class="q-number-wrap">
-          <input type="number" class="q-input" name="annualSuppliesSpend" placeholder="$" min="0" step="1">
-          <span class="q-unit">per year</span>
-        </div>
-      </div>
-
-      <div class="q-group">
-        <label class="q-label">Annual lab spend</label>
-        <div class="q-hint">Outside lab fees (crown &amp; bridge, dentures, ortho)</div>
-        <div class="q-number-wrap">
-          <input type="number" class="q-input" name="annualLabSpend" placeholder="$" min="0" step="1">
-          <span class="q-unit">per year</span>
-        </div>
-      </div>
-
-      <div class="q-group">
-        <label class="q-label">Annual occupancy cost</label>
-        <div class="q-hint">Rent, utilities, property tax, building maintenance</div>
-        <div class="q-number-wrap">
-          <input type="number" class="q-input" name="annualOccupancyCost" placeholder="$" min="0" step="1">
-          <span class="q-unit">per year</span>
-        </div>
-      </div>
-
-      <div class="q-group">
-        <label class="q-label">Annual marketing spend</label>
-        <div class="q-hint">Ads, SEO, website, referral programs — excluding internal patient events</div>
-        <div class="q-number-wrap">
-          <input type="number" class="q-input" name="annualMarketingSpend" placeholder="$" min="0" step="1">
-          <span class="q-unit">per year</span>
-        </div>
-      </div>
-    </div>
+    <!-- Overhead Breakdown 4 spend fields REMOVED 2026-04-29 — P&L
+         is canonical for supplies/lab/occupancy/marketing. The
+         pickDollar() questionnaire-fallback path in generate-report.js
+         had become dead-data-entry friction; supplies/lab/occupancy/
+         marketing now come from the P&L expense parser only. -->
 
     <!-- ═══ SECTION: GOALS & VISION ═══ -->
     <div class="q-section">
@@ -1096,44 +1009,8 @@
     }
   }
 
-  const sliders = document.querySelectorAll('.mix-slider');
-  const totalBar = document.getElementById('sliderTotalBar');
-  const totalValue = document.getElementById('sliderTotalValue');
-  const totalHint = document.getElementById('sliderTotalHint');
-
-  function updateSliders(e) {
-    /* Clamp the moved slider so the combined total can't exceed 100%. */
-    if (e && e.target) {
-      const changed = e.target;
-      let otherSum = 0;
-      sliders.forEach(s => { if (s !== changed) otherSum += parseInt(s.value) || 0; });
-      const roomLeft = Math.max(0, 100 - otherSum);
-      if ((parseInt(changed.value) || 0) > roomLeft) changed.value = roomLeft;
-    }
-
-    let total = 0;
-    sliders.forEach(s => {
-      const val = parseInt(s.value) || 0;
-      total += val;
-      document.getElementById(s.dataset.target).textContent = val + '%';
-    });
-    totalValue.textContent = total + '%';
-    totalBar.classList.remove('valid', 'over');
-    if (total === 100) {
-      totalBar.classList.add('valid');
-      totalHint.textContent = 'Perfect!';
-    } else {
-      totalHint.textContent = (100 - total) + '% remaining — reduce one slider to grow another';
-    }
-    /* Update visual bar */
-    document.getElementById('mixSegPpo').style.width = document.getElementById('ppoSlider').value + '%';
-    document.getElementById('mixSegHmo').style.width = document.getElementById('hmoSlider').value + '%';
-    document.getElementById('mixSegGov').style.width = document.getElementById('govSlider').value + '%';
-    document.getElementById('mixSegFfs').style.width = document.getElementById('ffsSlider').value + '%';
-
-    updateProgress();
-  }
-  sliders.forEach(s => s.addEventListener('input', updateSliders));
+  /* Payor mix slider wiring REMOVED 2026-04-29 — Step 3 Collections by
+     Payor upload provides the actual breakdown. */
 
   /* ── Associate Toggle ── */
   document.querySelectorAll('input[name="hasAssociate"]').forEach(r => {
@@ -1150,7 +1027,6 @@
       !!document.querySelector('[name="yearsOwned"]').value,
       !!document.querySelector('[name="ownerAge"]').value,
       !!document.querySelector('[name="pmSoftware"]').value,
-      getMixTotal() === 100,
       !!document.querySelector('[name="doctorDays"]').value,
       !!document.querySelector('[name="numHygienists"]').value,
       !!document.querySelector('input[name="yearsToWork"]:checked'),
@@ -1162,11 +1038,7 @@
     document.getElementById('progressPct').textContent = pct + '%';
   }
 
-  function getMixTotal() {
-    let t = 0;
-    sliders.forEach(s => t += parseInt(s.value));
-    return t;
-  }
+  /* getMixTotal removed 2026-04-29 — payor mix sliders gone. */
 
   /* Track all inputs */
   document.querySelectorAll('.q-tracked').forEach(el => {
@@ -1186,12 +1058,10 @@
       yearsOwned: parseInt(document.querySelector('[name="yearsOwned"]').value) || 0,
       ownerAge: parseInt(document.querySelector('[name="ownerAge"]').value) || 0,
       pmSoftware: document.querySelector('[name="pmSoftware"]').value,
-      payorMix: {
-        ppo: parseInt(document.getElementById('ppoSlider').value),
-        hmo: parseInt(document.getElementById('hmoSlider').value),
-        gov: parseInt(document.getElementById('govSlider').value),
-        ffs: parseInt(document.getElementById('ffsSlider').value),
-      },
+      /* payorMix sliders REMOVED 2026-04-29 — Step 3 (Collections by
+         Payor) Practice Analysis Payment Summary upload now provides
+         the actual per-payment-type breakdown. The Hub posts
+         paymentSummary alongside practiceProfile. */
       doctorDays: parseInt(document.querySelector('[name="doctorDays"]').value) || 0,
       numHygienists: parseInt(document.querySelector('[name="numHygienists"]').value) || 0,
       patientsPerHygienistPerDay: parseInt(document.querySelector('[name="patientsPerHygienistPerDay"]').value) || 0,
@@ -1216,18 +1086,9 @@
       hasPatientCollectionsSystem: document.querySelector('input[name="hasPatientCollectionsSystem"]:checked')?.value || '',
       /* Q6 BWV operational gate (2026-04-22): dedicated / during_hygiene / none / not_sure */
       biteConsultApproach: document.querySelector('input[name="biteConsultApproach"]:checked')?.value || '',
-      /* Overhead breakdown (2026-04-22) — four optional annual-spend figures.
-         Blank/0 = skip in SWOT. Nested so it's easy to extend with sub-role
-         staff costs later without touching the top-level practiceProfile shape. */
-      overheadBreakdown: (() => {
-        const val = (n) => { const raw = document.querySelector('[name="' + n + '"]').value; const p = parseFloat(raw); return Number.isFinite(p) && p > 0 ? p : null; };
-        return {
-          annualSuppliesSpend:  val('annualSuppliesSpend'),
-          annualLabSpend:       val('annualLabSpend'),
-          annualOccupancyCost:  val('annualOccupancyCost'),
-          annualMarketingSpend: val('annualMarketingSpend'),
-        };
-      })(),
+      /* overheadBreakdown.annual* fields REMOVED 2026-04-29 — P&L is
+         canonical for supplies/lab/occupancy/marketing. The questionnaire
+         fallback path was dead-data-entry friction. */
       concerns: [...document.querySelectorAll('input[name="concerns"]:checked')].map(c => c.value),
       biggestChallenge: document.querySelector('[name="biggestChallenge"]').value.trim(),
     };
@@ -1274,19 +1135,8 @@
        'doctorDays','numHygienists','patientsPerHygienistPerDay','associateDays','opsActive','opsTotal',
        'docDailyAvg','assocDailyAvg','hygDailyAvg','crownsPerMonth','biggestChallenge']
         .forEach(k => setByName(k, pp[k]));
-      /* Overhead breakdown (2026-04-22) — 4 optional annual-spend numbers. */
-      const ob = pp.overheadBreakdown || {};
-      setByName('annualSuppliesSpend',  ob.annualSuppliesSpend);
-      setByName('annualLabSpend',       ob.annualLabSpend);
-      setByName('annualOccupancyCost',  ob.annualOccupancyCost);
-      setByName('annualMarketingSpend', ob.annualMarketingSpend);
-      /* Sliders for payor mix — fire input so clamp/total UI updates */
-      const mix = pp.payorMix || {};
-      const setSlider = (id, v) => { const el = document.getElementById(id); if (el && v != null) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); } };
-      setSlider('ppoSlider', mix.ppo);
-      setSlider('hmoSlider', mix.hmo);
-      setSlider('govSlider', mix.gov);
-      setSlider('ffsSlider', mix.ffs);
+      /* overheadBreakdown.annual* + payor-mix slider autofill REMOVED
+         2026-04-29 — fields no longer exist in the form. */
       /* Radio: hasAssociate (yes/no) — also triggers the associate-days visibility */
       if (pp.hasAssociate === true || pp.hasAssociate === 'yes') {
         const r = document.getElementById('assocYes'); if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }

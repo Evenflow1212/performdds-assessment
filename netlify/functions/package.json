@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Netlify functions for Perform DDS assessment report generation",
   "dependencies": {
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "pdf-lib": "^1.17.1"
   }
 }

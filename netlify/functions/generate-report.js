@@ -253,6 +253,101 @@ function parseDaySheet(text) {
   return out;
 }
 
+/* ─── Dentrix Practice Analysis Payment Summary (2026-04-29) ───
+   Replaces the questionnaire's free-text payor mix sliders. Source: a
+   screenshot of the Payment Summary report's last page; downstream
+   prompt is `dentrixPaymentSummary` in parse-pdf.js. Each line is
+   classified into one of: patient_pay, insurance, government,
+   third_party_finance, recovered_debt, other. The mix percentages drive
+   the Revenue Mix card (replaces the P&L-only path) and the payor-
+   profile SWOT branches (high PPO concentration, HMO-heavy, etc.).
+   Day Sheet × 3 remains the canonical source for collection TOTALS
+   (commit d53440c) — Payment Summary is for the MIX only. */
+function parsePaymentSummary(text) {
+  const out = {
+    lines: [],
+    insuranceSubtotal: null,
+    totalAllPayments: null,
+    period: { from: null, to: null },
+    mix: {
+      insurancePct: 0, patientPayPct: 0, governmentPct: 0,
+      thirdPartyFinancePct: 0, recoveredDebtPct: 0, otherPct: 0,
+    },
+    totals: {
+      insurance: 0, patientPay: 0, government: 0,
+      thirdPartyFinance: 0, recoveredDebt: 0, other: 0, sum: 0,
+    },
+  };
+  if (!text) return out;
+  const parseMoney = (s) => {
+    let raw = String(s).replace(/[,$%]/g, '').trim();
+    if (raw.startsWith('(') && raw.endsWith(')')) raw = '-' + raw.slice(1, -1);
+    if (raw === '') return null;
+    const n = parseFloat(raw);
+    return isNaN(n) ? null : n;
+  };
+  const parseInt2 = (s) => {
+    const n = parseInt(String(s).replace(/[,$\s]/g, ''), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  /* Categorize a line by its label. Order matters — the most specific
+     pattern wins (insurance check before patient check, government
+     before generic insurance, etc.). */
+  const categorize = (label) => {
+    const l = String(label || '').toLowerCase();
+    if (/medicaid|medicare|tricare|\bchip\b/i.test(l))           return 'government';
+    if (/dental.*ins|ins.*dental|medical.*ins|ins.*medical/i.test(l)) return 'insurance';
+    if (/\bins(urance)?\b/i.test(l) && !/\bhealth\s+ins/i.test(l))   return 'insurance';
+    if (/care\s*credit|carecredit|sunbit|lending\s*club|cherry|alphaeon|proceed\s*finance/i.test(l)) return 'third_party_finance';
+    if (/collection|recover/i.test(l))                            return 'recovered_debt';
+    if (/\b(check|cash|visa|mastercard|\bmc\b|discover|amex|debit|credit\s*card)\b/i.test(l)) return 'patient_pay';
+    return 'other';
+  };
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    /* Header totals. */
+    const tot = line.match(/^TOTAL_PAYMENTS\s*\|\s*(-?[\d,.$()]+)/i);
+    if (tot) { out.totalAllPayments = parseMoney(tot[1]); continue; }
+    const sub = line.match(/^INSURANCE_SUBTOTAL\s*\|\s*(-?[\d,.$()]+)/i);
+    if (sub) { out.insuranceSubtotal = parseMoney(sub[1]); continue; }
+    /* Line items: LINE|label|qty|total|avg|pct. */
+    const m = line.match(/^LINE\s*\|\s*([^|]+)\|\s*([^|]*)\|\s*([^|]*)(?:\|\s*([^|]*)(?:\|\s*([^|]*))?)?$/i);
+    if (!m) continue;
+    const label = (m[1] || '').trim();
+    const qty   = parseInt2(m[2]);
+    const total = parseMoney(m[3]);
+    const avg   = m[4] ? parseMoney(m[4]) : null;
+    const pct   = m[5] ? parseMoney(m[5]) : null;
+    if (!label || total == null) continue;
+    const category = categorize(label);
+    out.lines.push({ label, quantity: qty, total, average: avg, percent: pct, category });
+    out.totals[
+      category === 'patient_pay' ? 'patientPay' :
+      category === 'third_party_finance' ? 'thirdPartyFinance' :
+      category === 'recovered_debt' ? 'recoveredDebt' :
+      category   /* insurance | government | other */
+    ] += Math.abs(total);
+  }
+  out.totals.sum =
+    out.totals.insurance + out.totals.patientPay + out.totals.government +
+    out.totals.thirdPartyFinance + out.totals.recoveredDebt + out.totals.other;
+  if (out.totals.sum > 0) {
+    out.mix.insurancePct        = (out.totals.insurance        / out.totals.sum) * 100;
+    out.mix.patientPayPct       = (out.totals.patientPay       / out.totals.sum) * 100;
+    out.mix.governmentPct       = (out.totals.government       / out.totals.sum) * 100;
+    out.mix.thirdPartyFinancePct = (out.totals.thirdPartyFinance / out.totals.sum) * 100;
+    out.mix.recoveredDebtPct    = (out.totals.recoveredDebt    / out.totals.sum) * 100;
+    out.mix.otherPct            = (out.totals.other            / out.totals.sum) * 100;
+  }
+  /* Synthesize insuranceSubtotal if the prompt didn't emit it (legitimate
+     when the report doesn't print the subtotal row). */
+  if (out.insuranceSubtotal == null && out.totals.insurance > 0) {
+    out.insuranceSubtotal = out.totals.insurance;
+  }
+  return out;
+}
+
 /* ─── Dentrix Patient Summary (2026-04-23) ───
    Extracts top-line patient counts Dave uses to unblock hygiene-capacity
    math. All fields optional — null when the source text didn't include
@@ -1052,23 +1147,32 @@ function generateSWOT(prodData, collData, plData, hygieneData, employeeCosts, ar
     }
   }
 
-  /* "I don't know" scorekeeping-gap SWOT (2026-04-28). The questionnaire has
-     "I don't know" checkboxes on docDailyAvg, assocDailyAvg, hygDailyAvg, and
-     crownsPerMonth — the toggle stores the literal string 'idk'. Fires when
-     2+ are checked. Co-exists with the Q2 setup-foundation scorekeeping
-     SWOT — these are separate signals (Q2 fires on no-tracking-system; this
-     fires on tracking-but-owner-doesn't-know-the-number). */
+  /* Scorekeeping-gap SWOT (2026-04-28, expanded 2026-04-29). Two signal
+     types are pooled into a single counter:
+       - 'idk' answers on docDailyAvg / assocDailyAvg / hygDailyAvg /
+         crownsPerMonth (the daily-average questionnaire fields with
+         "I don't know" toggles)
+       - 'not_sure' answers on writeOffCalculation +
+         frequentManualAdjustments (added 2026-04-29 — same diagnostic
+         meaning, owner doesn't know the operational answer)
+     Fires when ≥2 of these flags are present. Co-exists with Q2 setup-
+     foundation scorekeeping (Q2 = no tracking system at all; this =
+     tracking but owner doesn't know the number). */
   const idkFields = [
-    { key: 'docDailyAvg',    label: 'doctor daily production target' },
-    { key: 'assocDailyAvg',  label: 'associate daily production target' },
-    { key: 'hygDailyAvg',    label: 'hygiene daily production target' },
-    { key: 'crownsPerMonth', label: 'monthly crown count' },
+    { key: 'docDailyAvg',              label: 'doctor daily production target',              flag: 'idk' },
+    { key: 'assocDailyAvg',            label: 'associate daily production target',           flag: 'idk' },
+    { key: 'hygDailyAvg',              label: 'hygiene daily production target',             flag: 'idk' },
+    { key: 'crownsPerMonth',           label: 'monthly crown count',                         flag: 'idk' },
+    { key: 'writeOffCalculation',      label: 'how insurance write-offs are calculated',     flag: 'not_sure' },
+    { key: 'frequentManualAdjustments', label: 'frequency of manual adjustments / write-offs', flag: 'not_sure' },
   ];
-  const idkChecked = idkFields.filter(f => String(pp[f.key] || '').toLowerCase() === 'idk');
+  const idkChecked = idkFields.filter(f =>
+    String(pp[f.key] || '').toLowerCase() === f.flag
+  );
   var scorekeepingGapWeakness = '';
   if (idkChecked.length >= 2) {
     const list = idkChecked.map(f => f.label).join(', ');
-    scorekeepingGapWeakness = `You marked "I don't know" on ${idkChecked.length} of our operational-tracking questions (${list}). Without knowing daily production targets, hygiene production benchmarks, or monthly crown count, the data foundation for diagnosing performance gaps and measuring improvement is incomplete. Building these tracking habits is the prerequisite for every other remedy in this report — you can't fix what you don't measure.`;
+    scorekeepingGapWeakness = `You marked "I don't know" / "Not sure" on ${idkChecked.length} of our operational-tracking questions (${list}). Without knowing these numbers, the data foundation for diagnosing performance gaps and measuring improvement is incomplete. Building these tracking habits is the prerequisite for every other remedy in this report — you can't fix what you don't measure.`;
   }
 
   /* ── Hygiene Capacity SWOT (2026-04-23) — HIGH PRIORITY ─────────────────
@@ -1291,6 +1395,13 @@ function computeReportData(input) {
        Trend card and the year-over-year SWOT weakness. Each value is the
        output of parseDaySheet() or null when not provided. */
     daySheets,
+    /* Payment Summary (2026-04-29): Practice Analysis Payment Summary
+       last-page screenshot. Provides per-payment-type breakdown for the
+       Revenue Mix card and the payor-profile SWOT branches. Replaces
+       the questionnaire payorMix sliders. Null when not uploaded — the
+       legacy practiceProfile.payorMix path serves as a backward-compat
+       fallback for older test fixtures. */
+    paymentSummary,
   } = input;
 
   const codes = prodData?.codes || [];
@@ -1300,7 +1411,35 @@ function computeReportData(input) {
   const zipCode = pp.zipCode || pp.zip || '';
   const website = pp.website || '';
   const pmSoftware = pp.pmSoftware || pp.software || '';
-  const mix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
+  /* Payor mix sources, in priority order (2026-04-29):
+       1. paymentSummary.mix — Practice Analysis Payment Summary screenshot,
+          new canonical source for the Revenue Mix card. Synthesize the
+          legacy {ppo,hmo,gov,ffs} shape so the existing payor-profile SWOT
+          branches continue firing without rewriting them. Insurance →
+          PPO proxy (most dental insurance in dental practices is PPO),
+          patient-pay → FFS proxy, government → gov, HMO can't be
+          distinguished from PPO at the payment-type level (kept at 0).
+       2. practiceProfile.payorMix — legacy slider values (still posted by
+          older test fixtures and during the transition window before users
+          re-fill on the new questionnaire). */
+  const _legacyMix = pp.payorMix || { ppo: pp.payorPPO || 0, hmo: pp.payorHMO || 0, gov: pp.payorGov || 0, ffs: pp.payorFFS || 0 };
+  let mix;
+  let mixSource = null;  /* 'paymentSummary' | 'practiceProfile' | null */
+  if (paymentSummary && (paymentSummary.lines || []).length > 0 && paymentSummary.totals && paymentSummary.totals.sum > 0) {
+    const pm = paymentSummary.mix;
+    mix = {
+      ppo: Math.round(pm.insurancePct || 0),
+      hmo: 0,                                  /* not distinguishable from Payment Summary */
+      gov: Math.round(pm.governmentPct || 0),
+      ffs: Math.round(pm.patientPayPct || 0),
+    };
+    mixSource = 'paymentSummary';
+  } else if (Number(_legacyMix.ppo) || Number(_legacyMix.hmo) || Number(_legacyMix.gov) || Number(_legacyMix.ffs)) {
+    mix = _legacyMix;
+    mixSource = 'practiceProfile';
+  } else {
+    mix = _legacyMix;  /* all-zeros placeholder so downstream `mix.ppo` etc. don't NPE */
+  }
   const opsActive = pp.opsActive || pp.activeOps || null;
   const opsTotal = pp.opsTotal || pp.totalOps || null;
   const doctorDays = Number(pp.doctorDays) || 16;
@@ -1931,6 +2070,14 @@ function computeReportData(input) {
          Hub uploads it (2026-04-23). Null when that PDF wasn't included.
          Unblocks hygiene-capacity math and Q5 dollar-opportunity work. */
       patientSummary: patientSummary || null,
+      /* Payment Summary (2026-04-29): per-payment-type breakdown from
+         the Practice Analysis Payment Summary screenshot. Drives the
+         payor-mix data path (when present) and the Revenue Mix card. */
+      paymentSummary: paymentSummary || null,
+      /* Mix provenance — 'paymentSummary' when the new upload drove the
+         numbers, 'practiceProfile' when legacy slider values drove,
+         null when neither path produced data. */
+      payorMixSource: mixSource,
     },
 
     period: {
@@ -3183,6 +3330,7 @@ exports.parseCollections   = parseCollections;
 exports.parsePL            = parsePL;
 exports.parsePatientSummary = parsePatientSummary;
 exports.parseDaySheet      = parseDaySheet;
+exports.parsePaymentSummary = parsePaymentSummary;
 /* Staff cost helpers (2026-04-29) — exposed for unit testing the loading-
    factor logic without invoking the full handler. */
 exports.modeledLoadingFactor = modeledLoadingFactor;
@@ -3202,7 +3350,13 @@ exports.handler = async function(event) {
   catch (e) { return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
   const {
-    prodText, collText, plText, patientSummaryText = null,
+    prodText, collText, plText, patientSummaryText = null, paymentSummaryText = null,
+    /* Manual date-range pairs from the form (2026-04-29). User-supplied
+       dates are the AUTHORITATIVE period for each report; PDF-parsed
+       dates serve as a fallback when missing. Shape:
+         { production: {from, to}, collectionsByPayor: {from, to},
+           pl: {from, to}, patientAR: {asOf}, insuranceAR: {asOf} } */
+    dateRanges = {},
     /* Day Sheet × 3 (2026-04-24) — three pipe-delimited texts, one per period.
        The Hub posts these alongside the legacy collText for backward compat;
        when daySheets are present they are the canonical collections source. */
@@ -3224,6 +3378,22 @@ exports.handler = async function(event) {
     const prodData = parseProduction(prodText);
     const plData = plText ? parsePL(plText) : null;
     const patientSummary = patientSummaryText ? parsePatientSummary(patientSummaryText) : null;
+    const paymentSummary = paymentSummaryText ? parsePaymentSummary(paymentSummaryText) : null;
+    /* Apply user-supplied production date range if provided — overrides
+       whatever parseProduction inferred from the PDF header. monthsCovered
+       computed from the user dates becomes the authoritative period. */
+    const _prodRange = (dateRanges && dateRanges.production) || {};
+    if (_prodRange.from && _prodRange.to) {
+      const f = new Date(_prodRange.from + 'T00:00:00Z');
+      const t = new Date(_prodRange.to   + 'T00:00:00Z');
+      if (!isNaN(f) && !isNaN(t) && t >= f) {
+        prodData.dateStart = _prodRange.from;
+        prodData.dateEnd   = _prodRange.to;
+        prodData.months    = Math.max(1, Math.round((t - f) / (1000 * 60 * 60 * 24 * 30.44)));
+        prodData.years     = [];
+        for (let y = f.getUTCFullYear(); y <= t.getUTCFullYear(); y++) prodData.years.push(y);
+      }
+    }
     /* Day Sheet × 3 — each parseDaySheet returns null fields when not
        uploaded. When at least one Day Sheet is present, it overrides the
        legacy collText path for collTotal / annualCollections. */
@@ -3267,7 +3437,7 @@ exports.handler = async function(event) {
       prodData, collData, plData, employeeCosts, practiceProfile,
       arPatient, arInsurance, swotData: null, practiceName,
       totalProd, collTotal, years, prodMonths, hygieneData, patientSummary,
-      daySheets,
+      daySheets, paymentSummary,
     });
 
     const swotData = generateSWOT(

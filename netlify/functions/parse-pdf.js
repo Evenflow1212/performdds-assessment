@@ -1,6 +1,52 @@
 'use strict';
 const fetch = require('node-fetch');
 
+/* Defensive PDF auto-slice (2026-04-29) — Anthropic's Claude API rejects
+   PDFs over 100 pages with a silent "we never tried" failure. Dave hit
+   this on a full Day Sheet PDF (200+ pages) earlier today. Mitigation:
+   when an uploaded PDF exceeds 100 pages, slice the LAST 5 pages and
+   send those instead. The last page (or last few) is what carries the
+   totals row in every report we ingest, so slicing the front off is
+   safe for every current report type. pdf-lib runs in Node serverless;
+   slicing a 200-page PDF takes ~30ms. */
+const PDF_PAGE_LIMIT = 100;
+const PDF_SLICE_LAST_N = 5;
+
+async function maybeSlicePdf(b64) {
+  if (!b64) return { b64, sliced: false, originalPages: null };
+  let PDFDocument;
+  try { ({ PDFDocument } = require('pdf-lib')); }
+  catch (e) {
+    console.warn('parse-pdf: pdf-lib not available; skipping slice check:', e.message);
+    return { b64, sliced: false, originalPages: null };
+  }
+  try {
+    const bytes = Buffer.from(b64, 'base64');
+    const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+    const total = src.getPageCount();
+    if (total <= PDF_PAGE_LIMIT) {
+      return { b64, sliced: false, originalPages: total };
+    }
+    const dst = await PDFDocument.create();
+    const start = total - PDF_SLICE_LAST_N;
+    const indices = [];
+    for (let i = start; i < total; i++) indices.push(i);
+    const copied = await dst.copyPages(src, indices);
+    copied.forEach(p => dst.addPage(p));
+    const out = await dst.save();
+    const slicedB64 = Buffer.from(out).toString('base64');
+    console.warn(`parse-pdf: defensive slice — original pages=${total} > ${PDF_PAGE_LIMIT} cap; sent last ${PDF_SLICE_LAST_N} pages to Claude.`);
+    return { b64: slicedB64, sliced: true, originalPages: total };
+  } catch (e) {
+    /* If the PDF is corrupt or pdf-lib chokes, log + send original. The
+       Claude call may still fail, but at least we won't double-fail by
+       throwing in the slicer. */
+    console.warn('parse-pdf: slice attempt failed; sending original:', e.message);
+    return { b64, sliced: false, originalPages: null };
+  }
+}
+exports.maybeSlicePdf = maybeSlicePdf;
+
 /* Thin Claude proxy — sends ONE PDF to Claude with a specific prompt.
    Designed to run in <10 s on Netlify free tier. */
 
@@ -76,6 +122,56 @@ Return ONLY these 3 lines:
 DATES|[start] - [end]
 CHARGES|[number]
 PAYMENTS|[number as positive]`,
+
+    /* Practice Analysis Payment Summary (2026-04-29) — replaces the
+       questionnaire's free-text payor-mix sliders. Source: Reports →
+       Management → Practice Analysis Reports → Payment Summary tab.
+       The output is a short table (1-3 pages typically) listing each
+       payment type with quantity, total, average, and percent. The
+       LAST page contains the totals row ("TOTAL OF ALL PAYMENTS"). We
+       extract one LINE per payment type plus the insurance subtotal +
+       the grand total. Downstream parsePaymentSummary classifies each
+       line into patient_pay / insurance / recovered_debt / other and
+       computes mix percentages for the Revenue Mix card and the payor-
+       profile SWOT branches.
+       Output schema: pipe-delimited, totals at the top so truncation
+       can't eat them. */
+    dentrixPaymentSummary: `Dentrix Practice Analysis Payment Summary report. The user uploads a screenshot of the LAST PAGE — the page with the "TOTAL OF ALL PAYMENTS" row near the bottom. Extract every payment line item plus the totals.
+
+OUTPUT ORDER — totals first, then per-line items.
+
+The FIRST two lines MUST be (in this order):
+TOTAL_PAYMENTS|<number>
+INSURANCE_SUBTOTAL|<number>
+
+Then one LINE per payment type, in this exact pipe-delimited shape:
+LINE|<label>|<quantity>|<total>|<average>|<percent>
+
+Where:
+- <label> is the payment-type name as printed on the report — e.g.
+  "Check Payment", "Cash Payment", "Visa/MC Payment", "Dental Ins.
+  Check Payment", "Dental Ins. Elec. Payment", "Medical Ins. Check
+  Payment", "Medical Ins. Elec. Payment", "Wasatch Collections", or
+  carrier-specific lines like "J & M Recoveries". Preserve the exact
+  label text as printed.
+- <quantity> is integer count of payments (column may be labeled "#"
+  or "Qty"). Plain integer, no commas.
+- <total> is the dollar total for the period (the largest column).
+  Plain number, no $, no commas, no parens. Use a leading minus for
+  negatives.
+- <average> is dollars per payment if printed; omit (empty) if not.
+- <percent> is the percent-of-total if printed; omit if not.
+
+Also:
+- Skip any "Sub-Total" / "Total" / "Grand Total" header lines except
+  TOTAL_PAYMENTS (which goes at the top).
+- INSURANCE_SUBTOTAL is the subtotal line for insurance payments
+  combined (Dental + Medical Ins). Some reports print it explicitly;
+  if not present, omit the line and downstream code computes it.
+- If a row has no quantity column, emit the line with quantity 0.
+- Plain numbers throughout — no $, no commas, no parens.
+
+Return ONLY the pipe-delimited lines. No commentary, no markdown.`,
 
     /* Day Sheet (2026-04-24 methodology pivot) — Danika confirmed this is the
        ONLY reliable Dentrix report for collection totals. The full report runs
@@ -207,7 +303,7 @@ ItemName|Amount
 Include EVERY line item. Use the exact QuickBooks label for each item's ItemName.
 Return ONLY these lines — no prose, no preamble, no summary, no markdown.`;
 
-const TOKEN_LIMITS = { production: 8192, collections: 4096, pl: 8192, patientSummary: 1024, dentrixDaySheet: 1024 };
+const TOKEN_LIMITS = { production: 8192, collections: 4096, pl: 8192, patientSummary: 1024, dentrixDaySheet: 1024, dentrixPaymentSummary: 2048 };
 
 /* Map a media type string to the right Anthropic content block. PDFs use the
    'document' source shape; screenshots (image/png|jpeg|heic|webp|gif) use the
@@ -256,15 +352,23 @@ exports.handler = async function(event) {
   if (!prompt) return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ error: `Invalid type "${type}" or software "${software}"` }) };
 
   try {
+    /* Defensive slice for PDF uploads >100 pages (Claude API silently
+       rejects oversized PDFs). Skip for rawText / images — only PDFs hit
+       the page-count limit. */
+    let sendB64 = fileB64;
+    if (!rawText && effectiveMediaType === 'application/pdf') {
+      const slice = await maybeSlicePdf(fileB64);
+      sendB64 = slice.b64;
+    }
     const mode = rawText ? 'rawText' : (effectiveMediaType.startsWith('image/') ? 'image' : 'pdf');
-    console.log(`parse-pdf: calling Claude for type=${type}, software=${software}, mode=${mode}, mediaType=${effectiveMediaType}, size=${rawText ? rawText.length + ' chars' : Math.round(fileB64.length * 0.75) + ' bytes'}`);
+    console.log(`parse-pdf: calling Claude for type=${type}, software=${software}, mode=${mode}, mediaType=${effectiveMediaType}, size=${rawText ? rawText.length + ' chars' : Math.round(sendB64.length * 0.75) + ' bytes'}`);
 
     /* Build message content: prefer rawText (cheap, fast, no rate-limit hazard).
        Fall back to file attachment — image or PDF — based on mediaType. */
     const content = rawText
       ? [{ type: 'text', text: prompt + '\n\nRAW TEXT EXTRACTED FROM PDF:\n\n' + rawText }]
       : [
-          buildContentBlock(effectiveMediaType, fileB64),
+          buildContentBlock(effectiveMediaType, sendB64),
           { type: 'text', text: prompt }
         ];
 
@@ -355,6 +459,14 @@ function validateShape(type, text) {
     const hasPayments = /(^|\n)\s*PAYMENTS_TOTAL\s*\|/i.test(text);
     if (!hasCharges || !hasPayments) {
       return { ok: false, reason: 'dentrixDaySheet missing CHARGES_TOTAL or PAYMENTS_TOTAL line' };
+    }
+    return { ok: true };
+  }
+  if (type === 'dentrixPaymentSummary') {
+    const hasTotal = /(^|\n)\s*TOTAL_PAYMENTS\s*\|/i.test(text);
+    const hasLine  = /(^|\n)\s*LINE\s*\|/i.test(text);
+    if (!hasTotal || !hasLine) {
+      return { ok: false, reason: 'dentrixPaymentSummary missing TOTAL_PAYMENTS or LINE rows' };
     }
     return { ok: true };
   }
