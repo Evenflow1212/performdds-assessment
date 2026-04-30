@@ -2597,22 +2597,27 @@ function renderReportHtml(data) {
   const arP = ar.patient || {};
   const arI = ar.insurance || {};
   const arHasData = (arP.total || arI.total);
+  /* Cell padding/text-align must match the <th> exactly so columns visually
+     line flush under their headers. Previous rendering relied on td defaults
+     (no padding, left-aligned) while ths were padded+right-aligned, which
+     drifted values diagonally relative to their column headers and looked
+     like a data-mismatch bug to the reader. Six columns: label + 5 buckets. */
   const arRow = (label, a) => `
     <tr>
-      <td><strong>${label}</strong></td>
-      <td>${fmt$(a.current)}</td>
-      <td>${fmt$(a.d3160)}</td>
-      <td>${fmt$(a.d6190)}</td>
-      <td>${fmt$(a.d90plus ?? a.over90)}</td>
-      <td><strong>${fmt$(a.total)}</strong></td>
+      <td style="padding:8px 12px;text-align:left;"><strong>${label}</strong></td>
+      <td style="padding:8px 12px;text-align:right;">${fmt$(a.current)}</td>
+      <td style="padding:8px 12px;text-align:right;">${fmt$(a.d3160)}</td>
+      <td style="padding:8px 12px;text-align:right;">${fmt$(a.d6190)}</td>
+      <td style="padding:8px 12px;text-align:right;">${fmt$(a.d90plus ?? a.over90)}</td>
+      <td style="padding:8px 12px;text-align:right;"><strong>${fmt$(a.total)}</strong></td>
     </tr>`;
   const arAgingTable = arHasData ? `
     <div style="margin-top:20px">
       <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#8899aa;margin:0 0 8px;">Accounts Receivable Aging</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:14px;background:rgba(15,28,46,.4);border-radius:8px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:14px;background:rgba(15,28,46,.4);border-radius:8px;overflow:hidden;table-layout:fixed;">
         <thead>
           <tr style="background:rgba(42,63,95,.6);color:#cbd5e1;">
-            <th style="padding:8px 12px;text-align:left;font-weight:600;"></th>
+            <th style="padding:8px 12px;text-align:left;font-weight:600;width:18%;"></th>
             <th style="padding:8px 12px;text-align:right;font-weight:600;">Current</th>
             <th style="padding:8px 12px;text-align:right;font-weight:600;">30–60</th>
             <th style="padding:8px 12px;text-align:right;font-weight:600;">60–90</th>

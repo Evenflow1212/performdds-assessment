@@ -3214,6 +3214,107 @@ test('Front 5 row is removed from the staff table (2026-04-29)', () => {
   expect(/ec_name_f4/.test(html), 'ec_name_f4 still present (only Front 5 dropped)');
 });
 
+/* ──────────────────────────────────────────────────────────────────────
+   GRAPHIC BATCH 2026-04-29 — three visual regressions captured during
+   Dave's Pigneri review session. All three are visual-only fixes; the
+   methodology, KPI math, and SWOT logic are untouched.
+   ────────────────────────────────────────────────────────────────────── */
+
+test('AR Aging table: Patient row places fixture Total $128,689 under <th>Total>, columns aligned', async () => {
+  /* Fixture matches the handoff exactly (current $44,358, 31-60 $14,545,
+     61-90 $10,838, 90+ $58,948, total $128,689). Asserts the rendered
+     <td> Total cell shows the total field, not a stray bucket value, and
+     that header/data cell counts agree (drift guard). */
+  const body = await invoke(null, null, {
+    arPatient: { current: 44358, d3160: 14545, d6190: 10838, d90plus: 58948, total: 128689 },
+    arInsurance: { current: 30000, d3160: 8000, d6190: 4000, d90plus: 12000, total: 54000 },
+  });
+  const html = body.reportHtml;
+  /* Locate the AR aging table specifically (not any other table on the
+     page) by anchoring on the section heading. */
+  const tableMatch = html.match(/Accounts Receivable Aging[\s\S]*?<\/table>/);
+  expect(tableMatch, 'AR aging table block not found in reportHtml');
+  const tbl = tableMatch[0];
+  /* Header cell count = data row cell count (per row). 1 leading th + 5 buckets = 6. */
+  const headerCells = (tbl.match(/<th[\s>][^<]*?>/g) || []).length;
+  expect(headerCells === 6, `AR header should have 6 <th> cells (label + 5 buckets); got ${headerCells}`);
+  /* Patient row should have 6 tds with Total = $128,689 in the last cell. */
+  const patientRowMatch = tbl.match(/<tr>\s*<td[^>]*>\s*<strong>Patient<\/strong>[\s\S]*?<\/tr>/);
+  expect(patientRowMatch, 'Patient AR row not found');
+  const patientRow = patientRowMatch[0];
+  const patientTds = (patientRow.match(/<td[\s>][^<]*?>/g) || []).length;
+  expect(patientTds === 6, `Patient AR row should have 6 <td> cells; got ${patientTds}`);
+  /* Each value lands in its expected position. */
+  const expectedSequence = ['Patient', '$44,358', '$14,545', '$10,838', '$58,948', '$128,689'];
+  /* Strip tags, get visible text in order. */
+  const visible = patientRow.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const v of expectedSequence) {
+    expect(visible.includes(v), `Patient AR row missing "${v}" in visible text "${visible}"`);
+  }
+  /* Order check: $128,689 (total) appears AFTER $58,948 (90+), not before. */
+  expect(visible.indexOf('$58,948') < visible.indexOf('$128,689'),
+    'Total cell value $128,689 must appear AFTER 90+ value $58,948 (column order check)');
+  /* Header cells match data cells in count (drift regression guard). */
+  expect(headerCells === patientTds, `header cells (${headerCells}) must equal data cells (${patientTds})`);
+});
+
+test('Production by Category renders as doughnut chart, not horizontal bar', () => {
+  /* The chart init lives inline in the report template's <script>; assert
+     the type is doughnut and that the legacy horizontal-bar config is gone. */
+  const fs = require('fs');
+  const path = require('path');
+  const tpl = fs.readFileSync(path.resolve(__dirname, '..', 'assessment-report-template.html'), 'utf8');
+  /* Locate the chart block by canvas id. */
+  const chartBlockMatch = tpl.match(/REPORT\.productionByCategory[\s\S]*?\}\);\s*\n\}/);
+  expect(chartBlockMatch, 'Production by Category Chart.js init block not found');
+  const block = chartBlockMatch[0];
+  expect(/type:\s*['"]doughnut['"]/.test(block),
+    `Chart type must be 'doughnut' for Production by Category; block was: ${block.slice(0, 200)}`);
+  expect(!/type:\s*['"]bar['"]/.test(block),
+    `Chart type 'bar' must be removed for Production by Category`);
+  expect(!/indexAxis:\s*['"]y['"]/.test(block),
+    `indexAxis: 'y' (horizontal-bar marker) must be removed`);
+});
+
+test("Hygiene Staffing table: 7-cell consolidation with patients-per-hyg input absorbed into top-left", () => {
+  /* Visual restructure — staffing table now has [label] + 6 day cells in
+     a single 7-column row, with the patients-per-hygienist input embedded
+     in the leading week-col cell. Standalone "Avg Patients per Hygienist
+     / Day" row is gone. Field IDs (hs_pts_per_hyg, hs_rdh_*) are preserved. */
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.resolve(__dirname, '..', 'assessment_hub.html'), 'utf8');
+  /* New label appears (handoff's exact wording). */
+  expect(/A Full Day of HYG has how many patients\?/.test(html),
+    "new staffing label 'A Full Day of HYG has how many patients?' missing");
+  /* Old standalone label/row is removed. */
+  expect(!/Avg Patients per Hygienist \/ Day/.test(html),
+    'standalone "Avg Patients per Hygienist / Day" row must be removed (absorbed into staffing table)');
+  /* Field IDs preserved. */
+  expect(/id="hs_pts_per_hyg"/.test(html), 'hs_pts_per_hyg input must still exist (just relocated)');
+  for (const day of ['mon','tue','wed','thu','fri','sat']) {
+    expect(new RegExp('id="hs_rdh_' + day + '"').test(html), `hs_rdh_${day} input must still exist`);
+  }
+  /* The staffing table's data row now has 7 td cells: 1 week-label
+     (with hs_pts_per_hyg) + 6 day-group (with hs_rdh_*). Locate by
+     anchoring on the form-section-label that titles the staffing table. */
+  const staffSectionMatch = html.match(/Hygiene Staffing[\s\S]*?<\/table>/);
+  expect(staffSectionMatch, 'staffing table block not found');
+  const staffBlock = staffSectionMatch[0];
+  /* Count tds in the body row of THIS table only. */
+  const tbodyMatch = staffBlock.match(/<tbody>([\s\S]*?)<\/tbody>/);
+  expect(tbodyMatch, 'staffing table <tbody> not found');
+  const bodyTds = (tbodyMatch[1].match(/<td\b/g) || []).length;
+  expect(bodyTds === 7, `staffing table body row should have 7 <td> cells (label + 6 days); got ${bodyTds}`);
+  /* hs_pts_per_hyg lives inside the staffing table now (not in a separate div). */
+  expect(/<td[^>]*class="week-label"[^>]*>\s*<input[^>]*id="hs_pts_per_hyg"/.test(staffBlock),
+    'hs_pts_per_hyg input must be embedded in the staffing table\'s leading week-label cell');
+  /* All five hygiene tables (1 staffing + 4 schedule) share .hs-grid for
+     column-width alignment. */
+  const hsGridTables = (html.match(/<table\s+class="hs-grid"/g) || []).length;
+  expect(hsGridTables === 5, `expected 5 hs-grid tables (staffing + 4 schedule grids); got ${hsGridTables}`);
+});
+
 (async () => {
   let failed = 0;
   const start = Date.now();

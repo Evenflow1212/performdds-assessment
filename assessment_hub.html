@@ -282,7 +282,11 @@
     background: var(--navy); color: white; font-family: 'Montserrat', sans-serif; font-weight: 700; padding: 7px 4px;
     text-align: center; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.68rem;
   }
-  .hs-grid th.week-col { width: 100px; text-align: center; vertical-align: middle; }
+  /* Shared by the staffing table's leading label cell AND the four schedule
+     grids' "Required Dates" cell. Pinning a fixed width here is what makes
+     the staffing day columns line up vertically with the schedule grids'
+     day groups under table-layout:fixed. */
+  .hs-grid th.week-col { width: 140px; text-align: center; vertical-align: middle; padding: 6px 8px; line-height: 1.25; }
   .hs-grid th.day-group { border-left: 2px solid rgba(255,255,255,0.2); }
   .hs-grid th.sub { background: var(--blue); font-size: 0.65rem; font-weight: 600; text-transform: uppercase; border-left: 1px solid rgba(255,255,255,0.2); }
   .hs-grid td { padding: 5px 3px; border-bottom: 1px solid var(--border); text-align: center; }
@@ -1245,11 +1249,17 @@
         </a>
       </div>
 
-      <!-- HYGIENIST STAFFING -->
+      <!-- HYGIENIST STAFFING — single 7-column table.
+           Leading week-col cell holds the patients-per-hygienist label +
+           input (absorbed from the standalone row that used to live below
+           this table). Day columns align vertically with the four schedule
+           grids below because all five tables share class="hs-grid" with
+           table-layout:fixed and the leading week-col width pin. -->
       <div class="form-section-label">Hygiene Staffing — How Many Hygienists Work Each Day, and Average Patients per Hygienist</div>
-      <table class="hs-grid" style="max-width:620px;">
+      <table class="hs-grid">
         <thead>
           <tr>
+            <th class="week-col">A Full Day of HYG has how many patients?</th>
             <th class="day-group">Mon</th>
             <th class="day-group">Tue</th>
             <th class="day-group">Wed</th>
@@ -1260,6 +1270,7 @@
         </thead>
         <tbody>
           <tr>
+            <td class="week-label"><input type="number" id="hs_pts_per_hyg" placeholder="e.g. 8" step="1" min="1"></td>
             <td class="day-group"><input type="number" id="hs_rdh_mon" min="0" placeholder="1" step="1"></td>
             <td class="day-group"><input type="number" id="hs_rdh_tue" min="0" placeholder="1" step="1"></td>
             <td class="day-group"><input type="number" id="hs_rdh_wed" min="0" placeholder="1" step="1"></td>
@@ -1269,10 +1280,6 @@
           </tr>
         </tbody>
       </table>
-      <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
-        <div class="form-section-label" style="margin:0;">Avg Patients per Hygienist / Day</div>
-        <input type="number" id="hs_pts_per_hyg" placeholder="e.g. 8" step="1" min="1" style="width:80px; border:1.5px solid var(--border); border-radius:6px; padding:7px 10px; font-size:0.88rem; font-family:inherit; text-align:center;">
-      </div>
 
       <!-- RECENT PAST -->
       <div class="form-section-label">Recent Past — Appointments Available vs Appointments Filled</div>
